@@ -1,1 +1,1 @@
-worker: python MissionAlertBot.py
+web: python MissionAlertBot.py
