@@ -1,5 +1,5 @@
+# MissionAlertBot.py
 from PIL import Image, ImageFont, ImageDraw
-# from configparser import ConfigParser
 import os
 import discord
 import sqlite3
