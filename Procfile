@@ -1,1 +1,1 @@
-web: python \bot\MissionAlertBot.py
+web: python MissionAlertBot.py
