@@ -1,6 +1,7 @@
 # MissionAlertBot.py
 from PIL import Image, ImageFont, ImageDraw
 import os
+import sys
 import discord
 import sqlite3
 from dotenv import load_dotenv
@@ -139,7 +140,19 @@ def defcreateimage_unload(carriername, carrierreg, commodity, system, station, p
     image_editable.text((170,450), profit + "k per unit", (255, 255, 255), font=normal_font)
     my_image.save("result.png")
 
-# bot functions begin here
+
+# function to stop and quit
+def defquit():
+    sys.exit("User requested exit.")
+
+#
+#
+#
+# BOT FUNCTIONS BEGIN HERE
+#
+#
+#
+
 bot = commands.Bot(command_prefix='m.')
 
 # displays message in console when bot connects to Discord
@@ -315,6 +328,16 @@ async def findshort(ctx, lookfor):
     defcomm_find(lookfor)
     await ctx.send(f"Commodity {commodity} avgsell {avgsell} avgbuy {avgbuy} maxsell {maxsell} minbuy {minbuy} maxprofit {maxprofit}")
 
+# quit the bot
+@bot.command(name='stopquit', help='Stops the bot\'s process on the VM, ending all functions.')
+@commands.has_role('Admin')
+async def stopquit(ctx):
+    await ctx.send(f"k thx bye")
+    await defquit()
+
+    
+
+
 # error handling
 @bot.event
 async def on_command_error(ctx, error):
@@ -327,6 +350,6 @@ async def on_command_error(ctx, error):
     if isinstance(error, commands.MissingPermissions):
         await ctx.send('**You must be a Carrier Owner to use this command.**')
     else:
-        await ctx.send('Sorry, that didn\'t work. Make sure you have the Carrier Owner role.')
+        await ctx.send('Sorry, that didn\'t work. Make sure you have the correct permissions.')
 
 bot.run(TOKEN)
