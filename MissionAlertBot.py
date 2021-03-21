@@ -212,7 +212,7 @@ async def unload(ctx, lookname, commshort, system, station, profit):
     embed=discord.Embed(title="Reddit Post Title", description=f"`*** P.T.N. News - Trade mission - {longname} {cid} - {dt_string} ***`", color=0xff0000)
     await ctx.send(embed=embed)
 
-    embed=discord.Embed(title="Reddit Post Body - PASTE INTO MARKDOWN MODE", description=f"`    INCOMING WIDEBAND TRANSMISSION: P.T.N. CARRIER LOADING MISSION IN PROGRESS\n\n**BUY FROM**: Fleet Carrier **{longname} {cid}**\n\n**COMMODITY**: {commodity}\n\n&#x200B;\n\n**SELL TO**: station **{station.upper()}** in system **{system.upper()}**\n\n**PROFIT**: {profit}k/unit\n\n\n\n[Join us on Discord](https://www.reddit.com/r/PilotsTradeNetwork/comments/l0y7dk/pilots_trade_network_intergalactic_discord_server/) for mission updates and discussion.`", color=0x800000)
+    embed=discord.Embed(title="Reddit Post Body - PASTE INTO MARKDOWN MODE", description=f"`    INCOMING WIDEBAND TRANSMISSION: P.T.N. CARRIER UNLOADING MISSION IN PROGRESS\n\n**BUY FROM**: Fleet Carrier **{longname} {cid}**\n\n**COMMODITY**: {commodity}\n\n&#x200B;\n\n**SELL TO**: station **{station.upper()}** in system **{system.upper()}**\n\n**PROFIT**: {profit}k/unit\n\n\n\n[Join us on Discord](https://www.reddit.com/r/PilotsTradeNetwork/comments/l0y7dk/pilots_trade_network_intergalactic_discord_server/) for mission updates and discussion.`", color=0x800000)
     embed.set_footer(text="**REMEMBER TO USE MARKDOWN MODE WHEN PASTING TEXT TO REDDIT.**")
     await ctx.send(embed=embed)
 
@@ -224,7 +224,7 @@ async def unload(ctx, lookname, commshort, system, station, profit):
     #await ctx.send(file=discord.File('result.png'))
     #await ctx.send(f"**TRADE ALERT (DISCORD)**:\n`{longname} unloading {commodity} to **{station.upper()}** station in ** {system.upper()}**, {profit}k per unit profit`")
     #await ctx.send(f"**REDDIT TITLE**:\n `*** P.T.N. News - Trade mission - {longname} {cid} - {dt_string}`")
-    #await ctx.send(f"**REDDIT TEXT**:\n`    INCOMING WIDEBAND TRANSMISSION: P.T.N. CARRIER LOADING MISSION IN PROGRESS\n\n**BUY FROM**: Fleet Carrier **{longname} {cid}**\n\n**COMMODITY**: {commodity}\n\n&#x200B;\n\n**SELL TO**: station ** {station.upper()}** in system **{system.upper()}**\n\n**PROFIT**: {profit}k/unit\n\n\n\n[Join us on Discord](https://www.reddit.com/r/PilotsTradeNetwork/comments/l0y7dk/pilots_trade_network_intergalactic_discord_server/) for mission updates and discussion.`")
+    #await ctx.send(f"**REDDIT TEXT**:\n`    INCOMING WIDEBAND TRANSMISSION: P.T.N. CARRIER UNLOADING MISSION IN PROGRESS\n\n**BUY FROM**: Fleet Carrier **{longname} {cid}**\n\n**COMMODITY**: {commodity}\n\n&#x200B;\n\n**SELL TO**: station ** {station.upper()}** in system **{system.upper()}**\n\n**PROFIT**: {profit}k/unit\n\n\n\n[Join us on Discord](https://www.reddit.com/r/PilotsTradeNetwork/comments/l0y7dk/pilots_trade_network_intergalactic_discord_server/) for mission updates and discussion.`")
 
 # add FC to database
 @bot.command(name='carrier_add', help='Add a Fleet Carrier to the database:\n'
