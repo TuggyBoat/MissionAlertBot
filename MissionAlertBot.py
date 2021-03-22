@@ -107,6 +107,8 @@ def defget_datetime():
 # function to create image for loading
 def defcreateimage_load(carriername, carrierreg, commodity, system, station, profit):
     my_image = Image.open("bitmap.png")
+    # below line is for when we switch to individual glamour images for each carrier, they will be named from carriers' shortnames
+    #my_image = Image.open(f("{shortname}.png")
     image_editable = ImageDraw.Draw(my_image)
     image_editable.text((27,150), "PILOTS TRADE NETWORK", (255, 255, 255), font=title_font)
     image_editable.text((27,180), "CARRIER LOADING MISSION", (191, 53, 57), font=title_font)
@@ -125,6 +127,8 @@ def defcreateimage_load(carriername, carrierreg, commodity, system, station, pro
 # function to create image for unloading
 def defcreateimage_unload(carriername, carrierreg, commodity, system, station, profit):
     my_image = Image.open("bitmap.png")
+    # below line is for when we switch to individual glamour images for each carrier, they will be named from carriers' shortnames
+    #my_image = Image.open(f("{shortname}.png")
     image_editable = ImageDraw.Draw(my_image)
     image_editable.text((27,150), "PILOTS TRADE NETWORK", (255, 255, 255), font=title_font)
     image_editable.text((27,180), "CARRIER UNLOADING MISSION", (191, 53, 57), font=title_font)
@@ -337,8 +341,9 @@ async def stopquit(ctx):
 
     
 
-
+#
 # error handling
+#
 @bot.event
 async def on_command_error(ctx, error):
     if isinstance(error, commands.BadArgument):
