@@ -279,8 +279,8 @@ async def loadsend(ctx, lookname, commshort, system, station, profit):
             channel_id = channel.id
             await channel.send(file=discord.File('result.png'))
             # send trade alert to trade alerts channel
-            #channel = bot.get_channel(801798469189763073)
-            channel = bot.get_channel(823541666157166592)
+            channel = bot.get_channel(801798469189763073)
+            #channel = bot.get_channel(823541666157166592)
             #  - this is for McKee's test server
             embed=discord.Embed(title=f"{longname} TRADE ALERT", description=f'<#{channel_id}> loading {commodity} from **{station.upper()}** station in system **{system.upper()}**, {profit}k per unit profit', color=0x80ffff)
             embed.set_footer(text="Add a reaction to show you're working this mission! React with 💯 if loading is complete.")
