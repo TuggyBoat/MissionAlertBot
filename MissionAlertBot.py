@@ -332,6 +332,12 @@ async def findshort(ctx, lookfor):
     defcomm_find(lookfor)
     await ctx.send(f"Commodity {commodity} avgsell {avgsell} avgbuy {avgbuy} maxsell {maxsell} minbuy {minbuy} maxprofit {maxprofit}")
 
+# ping the bot
+@bot.command(name='ping', help='Ping the bot')
+@commands.has_role('Carrier Owner')
+async def ping(ctx):
+    await ctx.send("**PING? PONG!**")
+
 # quit the bot
 @bot.command(name='stopquit', help='Stops the bot\'s process on the VM, ending all functions.')
 @commands.has_role('Admin')
