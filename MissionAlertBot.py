@@ -278,6 +278,7 @@ async def loadsend(ctx, lookname, commshort, system, station, profit):
             channel = discord.utils.get(ctx.guild.channels, name=discordchannel)
             channel_id = channel.id
             await channel.send(file=discord.File('result.png'))
+
             # send trade alert to trade alerts channel
             channel = bot.get_channel(801798469189763073)
             #channel = bot.get_channel(823541666157166592)
@@ -315,6 +316,7 @@ async def unloadsend(ctx, lookname, commshort, system, station, profit):
             channel = discord.utils.get(ctx.guild.channels, name=discordchannel)
             channel_id = channel.id
             await channel.send(file=discord.File('result.png'))
+            
             # send trade alert to trade alerts channel
             channel = bot.get_channel(801798469189763073)
             embed=discord.Embed(title=f"{longname} TRADE ALERT", description=f'<#{channel_id}> unloading {commodity} to **{station.upper()}** station in system **{system.upper()}**, {profit}k per unit profit', color=0x80ff80)
