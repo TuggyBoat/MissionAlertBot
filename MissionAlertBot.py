@@ -4,10 +4,15 @@ import os
 import sys
 import discord
 import sqlite3
+import asyncio
 from dotenv import load_dotenv
 from discord.ext import commands
 from datetime import datetime
 from datetime import timezone
+
+#
+#                       DATABASE STUFF
+#
 
 # connect to sqlite db
 conn = sqlite3.connect('carriers.db') 
@@ -61,7 +66,7 @@ def defcarrier_findlong(looklong):
     result = c.fetchone()
     global p_ID, shortname, longname, cid, discordchannel
     p_ID, shortname, longname, cid, discordchannel = result['p_ID'],result['shortname'],result['longname'],result['cid'],result['discordchannel']
-    print(f"FC {p_ID} is {longname} {cid} called by shortname {shortname} with channel {discordchannel}")
+    print(f"FC {p_ID} is {longname} {cid} called by shortname {shortname} with channel #{discordchannel}")
 
 # function to search for a carrier by shortname
 def defcarrier_findshort(lookshort):
@@ -69,7 +74,7 @@ def defcarrier_findshort(lookshort):
     result = c.fetchone()
     global p_ID, shortname, longname, cid, discordchannel
     p_ID, shortname, longname, cid, discordchannel = result['p_ID'],result['shortname'],result['longname'],result['cid'],result['discordchannel']
-    print(f"FC {p_ID} is {longname} {cid} called by shortname {shortname} with channel {discordchannel}")
+    print(f"FC {p_ID} is {longname} {cid} called by shortname {shortname} with channel #{discordchannel}")
 
 # function to search for a carrier by p_ID
 def defcarrier_findpid(lookid):
@@ -77,7 +82,7 @@ def defcarrier_findpid(lookid):
     result = c.fetchone()
     global p_ID, shortname, longname, cid, discordchannel
     p_ID, shortname, longname, cid, discordchannel = result['p_ID'],result['shortname'],result['longname'],result['cid'],result['discordchannel']
-    print(f"FC {p_ID} is {longname} {cid} called by shortname {shortname} with channel {discordchannel}")
+    print(f"FC {p_ID} is {longname} {cid} called by shortname {shortname} with channel #{discordchannel}")
 
 # function to search for a commodity by name or partial name
 def defcomm_find(lookfor):
@@ -87,9 +92,22 @@ def defcomm_find(lookfor):
     commodity, avgsell, avgbuy, maxsell, minbuy, maxprofit = result['commodity'],result['avgsell'],result['avgbuy'],result['maxsell'],result['minbuy'],result['maxprofit']
     print(f"Commodity {commodity} avgsell {avgsell} avgbuy {avgbuy} maxsell {maxsell} minbuy {minbuy} maxprofit {maxprofit}")
 
+
+#
+#                       OTHER
+#
+
 # load token from .env - allows bot to connect to Discord
 load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
+
+# function to stop and quit
+def defquit():
+    sys.exit("User requested exit.")
+
+#
+#                       IMAGE GEN STUFF
+#
 
 # defining fonts for pillow use
 reg_font = ImageFont.truetype('font/Exo/static/Exo-Light.ttf', 16)
@@ -106,9 +124,7 @@ def defget_datetime():
 
 # function to create image for loading
 def defcreateimage_load(carriername, carrierreg, commodity, system, station, profit):
-    my_image = Image.open("bitmap.png")
-    # below line is for when we switch to individual glamour images for each carrier, they will be named from carriers' shortnames
-    #my_image = Image.open(f("{shortname}.png")
+    my_image = Image.open(f"images/{shortname}.png")
     image_editable = ImageDraw.Draw(my_image)
     image_editable.text((27,150), "PILOTS TRADE NETWORK", (255, 255, 255), font=title_font)
     image_editable.text((27,180), "CARRIER LOADING MISSION", (191, 53, 57), font=title_font)
@@ -126,9 +142,7 @@ def defcreateimage_load(carriername, carrierreg, commodity, system, station, pro
 
 # function to create image for unloading
 def defcreateimage_unload(carriername, carrierreg, commodity, system, station, profit):
-    my_image = Image.open("bitmap.png")
-    # below line is for when we switch to individual glamour images for each carrier, they will be named from carriers' shortnames
-    #my_image = Image.open(f("{shortname}.png")
+    my_image = Image.open(f"images/{shortname}.png")
     image_editable = ImageDraw.Draw(my_image)
     image_editable.text((27,150), "PILOTS TRADE NETWORK", (255, 255, 255), font=title_font)
     image_editable.text((27,180), "CARRIER UNLOADING MISSION", (191, 53, 57), font=title_font)
@@ -145,16 +159,8 @@ def defcreateimage_unload(carriername, carrierreg, commodity, system, station, p
     my_image.save("result.png")
 
 
-# function to stop and quit
-def defquit():
-    sys.exit("User requested exit.")
-
 #
-#
-#
-# BOT FUNCTIONS BEGIN HERE
-#
-#
+#                       BOT FUNCTIONS
 #
 
 bot = commands.Bot(command_prefix='m.')
@@ -163,6 +169,10 @@ bot = commands.Bot(command_prefix='m.')
 @bot.event
 async def on_ready():
     print(f'{bot.user.name} has connected to Discord!')
+
+#
+#                       LOAD/UNLOAD COMMANDS
+#
 
 # take input from a load command and send it to the image creation function above, then output details as text
 @bot.command(name='load', help='Generate details for a loading mission.\n'
@@ -184,19 +194,19 @@ async def load(ctx, lookname, commshort, system, station, profit):
     embed=discord.Embed(title="Generating and fetching mission alerts...", color=0x80ff80)
     await ctx.send(embed=embed)
 
-    embed=discord.Embed(title="Trade Alert (Discord)", description=f"`{discordchannel} loading {commodity} from **{station.upper()}** station in system **{system.upper()}**, {profit}k per unit profit`", color=0x80ffff)
+    embed=discord.Embed(title="Trade Alert (Discord)", description=f"`#{discordchannel} loading {commodity} from **{station.upper()}** station in system **{system.upper()}**, {profit}k per unit profit`", color=0x80ffff)
     await ctx.send(embed=embed)
 
     embed=discord.Embed(title="Reddit Post Title", description=f"`*** P.T.N. News - Trade mission - {longname} {cid} - {dt_string} ***`", color=0xff0000)
     await ctx.send(embed=embed)
 
-    embed=discord.Embed(title="Reddit Post Body - PASTE INTO MARKDOWN MODE", description=f"`    INCOMING WIDEBAND TRANSMISSION: P.T.N. CARRIER LOADING MISSION IN PROGRESS\n\n**BUY FROM**: station **{station.upper()}** in system **{system.upper()}**\n\n**COMMODITY**: {commodity}\n\n&#x200B;\n\n**SELL TO**: Fleet Carrier **{longname} {cid}**\n\n**PROFIT**: {profit}k/unit\n\n\n\n[Join us on Discord](https://www.reddit.com/r/PilotsTradeNetwork/comments/l0y7dk/pilots_trade_network_intergalactic_discord_server/) for mission updates and discussion, channel **{discordchannel}**.`", color=0x800000)
+    embed=discord.Embed(title="Reddit Post Body - PASTE INTO MARKDOWN MODE", description=f"`    INCOMING WIDEBAND TRANSMISSION: P.T.N. CARRIER LOADING MISSION IN PROGRESS\n\n**BUY FROM**: station **{station.upper()}** in system **{system.upper()}**\n\n**COMMODITY**: {commodity}\n\n&#x200B;\n\n**SELL TO**: Fleet Carrier **{longname} {cid}**\n\n**PROFIT**: {profit}k/unit\n\n\n\n[Join us on Discord](https://www.reddit.com/r/PilotsTradeNetwork/comments/l0y7dk/pilots_trade_network_intergalactic_discord_server/) for mission updates and discussion, channel **#{discordchannel}**.`", color=0x800000)
     embed.set_footer(text="**REMEMBER TO USE MARKDOWN MODE WHEN PASTING TEXT TO REDDIT.**")
     await ctx.send(embed=embed)
 
     await ctx.send(file=discord.File('result.png'))
 
-    embed=discord.Embed(title=f"Mission Generation Complete for {longname}", description="Paste Reddit content into **MARKDOWN MODE** in the editor. You can swap back to Fancy Pants afterwards and make any changes/additions or embed the image.\n\nBest practice for Reddit is an image post with a top level comment that contains the text version of the advert. This ensures the image displays with highest possible compatibility across platforms and apps.", color=0x80ff80)
+    embed=discord.Embed(title=f"Mission Generation Complete for {longname}", description="Paste Reddit content into **MARKDOWN MODE** in the editor. You can swap back to Fancy Pants afterwards and make any changes/additions or embed the image.\n\nBest practice for Reddit is an image post with a top level comment that contains the text version of the advert. This ensures the image displays with highest possible compatibility across platforms and apps. When mission complete, flag the post as *Spoiler* to prevent image showing and add a comment to inform.", color=0x80ff80)
     await ctx.send(embed=embed)
     
     #await ctx.send(f"**TRADE ALERT (DISCORD)**:\n`{longname} loading {commodity} from **{station.upper()}** station in ** {system.upper()}**, {profit}k per unit profit`")
@@ -223,19 +233,19 @@ async def unload(ctx, lookname, commshort, system, station, profit):
     embed=discord.Embed(title="Generating and fetching mission alerts...", color=0x80ff80)
     await ctx.send(embed=embed)
   
-    embed=discord.Embed(title="Trade Alert (Discord)", description=f"`{discordchannel} unloading {commodity} to **{station.upper()}** station in system **{system.upper()}**, {profit}k per unit profit`", color=0x80ffff)
+    embed=discord.Embed(title="Trade Alert (Discord)", description=f"`#{discordchannel} unloading {commodity} to **{station.upper()}** station in system **{system.upper()}**, {profit}k per unit profit`", color=0x80ffff)
     await ctx.send(embed=embed)
 
     embed=discord.Embed(title="Reddit Post Title", description=f"`*** P.T.N. News - Trade mission - {longname} {cid} - {dt_string} ***`", color=0xff0000)
     await ctx.send(embed=embed)
 
-    embed=discord.Embed(title="Reddit Post Body - PASTE INTO MARKDOWN MODE", description=f"`    INCOMING WIDEBAND TRANSMISSION: P.T.N. CARRIER UNLOADING MISSION IN PROGRESS\n\n**BUY FROM**: Fleet Carrier **{longname} {cid}**\n\n**COMMODITY**: {commodity}\n\n&#x200B;\n\n**SELL TO**: station **{station.upper()}** in system **{system.upper()}**\n\n**PROFIT**: {profit}k/unit\n\n\n\n[Join us on Discord](https://www.reddit.com/r/PilotsTradeNetwork/comments/l0y7dk/pilots_trade_network_intergalactic_discord_server/) for mission updates and discussion, channel **{discordchannel}**.`", color=0x800000)
+    embed=discord.Embed(title="Reddit Post Body - PASTE INTO MARKDOWN MODE", description=f"`    INCOMING WIDEBAND TRANSMISSION: P.T.N. CARRIER UNLOADING MISSION IN PROGRESS\n\n**BUY FROM**: Fleet Carrier **{longname} {cid}**\n\n**COMMODITY**: {commodity}\n\n&#x200B;\n\n**SELL TO**: station **{station.upper()}** in system **{system.upper()}**\n\n**PROFIT**: {profit}k/unit\n\n\n\n[Join us on Discord](https://www.reddit.com/r/PilotsTradeNetwork/comments/l0y7dk/pilots_trade_network_intergalactic_discord_server/) for mission updates and discussion, channel **#{discordchannel}**.`", color=0x800000)
     embed.set_footer(text="**REMEMBER TO USE MARKDOWN MODE WHEN PASTING TEXT TO REDDIT.**")
     await ctx.send(embed=embed)
 
     await ctx.send(file=discord.File('result.png'))
 
-    embed=discord.Embed(title=f"Mission Generation Complete for {longname}", description="Paste Reddit content into **MARKDOWN MODE** in the editor. You can swap back to Fancy Pants afterwards and make any changes/additions or embed the image.\n\nBest practice for Reddit is an image post with a top level comment that contains the text version of the advert. This ensures the image displays with highest possible compatibility across platforms and apps.", color=0x80ff80)
+    embed=discord.Embed(title=f"Mission Generation Complete for {longname}", description="Paste Reddit content into **MARKDOWN MODE** in the editor. You can swap back to Fancy Pants afterwards and make any changes/additions or embed the image.\n\nBest practice for Reddit is an image post with a top level comment that contains the text version of the advert. This ensures the image displays with highest possible compatibility across platforms and apps. When mission complete, flag the post as *Spoiler* to prevent image showing and add a comment to inform.", color=0x80ff80)
     await ctx.send(embed=embed)
 
     #await ctx.send(file=discord.File('result.png'))
@@ -243,18 +253,98 @@ async def unload(ctx, lookname, commshort, system, station, profit):
     #await ctx.send(f"**REDDIT TITLE**:\n `*** P.T.N. News - Trade mission - {longname} {cid} - {dt_string}`")
     #await ctx.send(f"**REDDIT TEXT**:\n`    INCOMING WIDEBAND TRANSMISSION: P.T.N. CARRIER UNLOADING MISSION IN PROGRESS\n\n**BUY FROM**: Fleet Carrier **{longname} {cid}**\n\n**COMMODITY**: {commodity}\n\n&#x200B;\n\n**SELL TO**: station ** {station.upper()}** in system **{system.upper()}**\n\n**PROFIT**: {profit}k/unit\n\n\n\n[Join us on Discord](https://www.reddit.com/r/PilotsTradeNetwork/comments/l0y7dk/pilots_trade_network_intergalactic_discord_server/) for mission updates and discussion.`")
 
+#
+#                       DIRECT TO CHANNEL COMMANDS - UNDER CONSTRUCTION
+#
+
+# load direct to channel
+@bot.command(name='loadsend', help='Generate loading mission and send directly to Discord.')
+@commands.has_role('Carrier Owner')
+async def loadsend(ctx, lookname, commshort, system, station, profit):
+    await load(ctx, lookname, commshort, system, station, profit)
+
+    # check they're happy with output
+    await ctx.send('**> Proceed with broadcast to Discord channels? y / n**')
+    def check(msg):
+        return msg.author == ctx.author and msg.channel == ctx.channel and \
+        msg.content.lower() in ["y", "n"]
+
+    try:
+        msg = await bot.wait_for("message", check=check, timeout=30)
+        if msg.content.lower() == "y":
+            await ctx.send("**OK, proceeding...**")
+        
+            # send image to carrier channel
+            channel = discord.utils.get(ctx.guild.channels, name=discordchannel)
+            channel_id = channel.id
+            await channel.send(file=discord.File('result.png'))
+            # send trade alert to trade alerts channel
+            #channel = bot.get_channel(801798469189763073)
+            channel = bot.get_channel(823541666157166592)
+            #  - this is for McKee's test server
+            embed=discord.Embed(title=f"{longname} TRADE ALERT", description=f'<#{channel_id}> loading {commodity} from **{station.upper()}** station in system **{system.upper()}**, {profit}k per unit profit', color=0x80ffff)
+            embed.set_footer(text="Add a reaction to show you're working this mission! React with 💯 if loading is complete.")
+            await channel.send(embed=embed)
+            embed=discord.Embed(title=f"Trade alerts sent for {longname}", description=f"Check <#801798469189763073> for trade alert and <#{channel_id}> for image.", color=0x80ff80)
+            await ctx.send(embed=embed)
+
+        else:
+            await ctx.send("**Broadcast cancelled.**")
+    except asyncio.TimeoutError:
+        await ctx.send("**Request timed out, broadcast cancelled.**")
+
+
+# unload direct to channel
+@bot.command(name='unloadsend', help='Generate unloading mission and send directly to Discord.')
+@commands.has_role('Carrier Owner')
+async def unloadsend(ctx, lookname, commshort, system, station, profit):
+    await unload(ctx, lookname, commshort, system, station, profit)
+
+    # check they're happy with output
+    await ctx.send('**> Proceed with broadcast to Discord channels? y / n**')
+    def check(msg):
+        return msg.author == ctx.author and msg.channel == ctx.channel and \
+        msg.content.lower() in ["y", "n"]
+
+    try:
+        msg = await bot.wait_for("message", check=check, timeout=30)
+        if msg.content.lower() == "y":
+            await ctx.send("**OK, proceeding...**")
+
+            # send image to carrier channel
+            channel = discord.utils.get(ctx.guild.channels, name=discordchannel)
+            channel_id = channel.id
+            await channel.send(file=discord.File('result.png'))
+            # send trade alert to trade alerts channel
+            channel = bot.get_channel(801798469189763073)
+            embed=discord.Embed(title=f"{longname} TRADE ALERT", description=f'<#{channel_id}> unloading {commodity} to **{station.upper()}** station in system **{system.upper()}**, {profit}k per unit profit', color=0x80ff80)
+            embed.set_footer(text="Add a reaction to show you're working this mission! React with 💯 if unloading is complete.")
+            await channel.send(embed=embed)
+            embed=discord.Embed(title=f"Trade alerts sent for {longname}", description=f"Check <#801798469189763073> for trade alert and <#{channel_id}> for image.", color=0x80ff80)
+            await ctx.send(embed=embed)
+
+        else:
+            await ctx.send("**Broadcast cancelled.**")
+    except asyncio.TimeoutError:
+        await ctx.send("**Request timed out, broadcast cancelled.**")
+
+#
+#                       UTILITY COMMANDS
+#
+
 # add FC to database
 @bot.command(name='carrier_add', help='Add a Fleet Carrier to the database:\n'
                                       '\n'
                                       '<shortname> should be a short one-word string as you\'ll be typing it a lot\n'
                                       '<longname> is the carrier\'s full name including P.T.N. etc - surround this with quotes.\n'
                                       '<cid> is the carrier\'s unique identifier in the format ABC-XYZ\n'
-                                      '<discordchannel> is the carrier\'s discord channel in the format #ptn-carriername\n')
+                                      '<discordchannel> is the carrier\'s discord channel in the format ptn-carriername\n'
+                                      'do NOT include the # at the start of the channel name!')
 @commands.has_role('Carrier Owner')
 async def carrier_add(ctx, shortname, longname, cid, discordchannel):
     defcarrier_add(shortname, longname, cid, discordchannel)
     defcarrier_findshort(shortname)
-    await ctx.send(f"Added **{longname.upper()}** **{cid.upper()}** with shortname **{shortname.lower()}** and channel **{discordchannel.lower()}** at ID **{p_ID}**")
+    await ctx.send(f"Added **{longname.upper()}** **{cid.upper()}** with shortname **{shortname.lower()}** and channel **#{discordchannel.lower()}** at ID **{p_ID}**")
 
 # remove FC from database
 @bot.command(name='carrier_del', help='Delete a Fleet Carrier from the database using its ID.\n'
@@ -274,12 +364,12 @@ async def carrier_del(ctx, p_ID):
 async def findshort(ctx, lookshort):
     try:
         defcarrier_findshort(lookshort)
-        #await ctx.send(f"FC {p_ID} is **{longname} {cid}** called by shortname **{shortname}** with channel **{discordchannel}**")
+        #await ctx.send(f"FC {p_ID} is **{longname} {cid}** called by shortname **{shortname}** with channel **#{discordchannel}**")
         embed=discord.Embed(title="Fleet Carrier Shortname Search Result", description=f"Displaying first match for {lookshort}", color=0x00d9ff)
         embed.add_field(name="Carrier Name", value=f"{longname}", inline=True)
         embed.add_field(name="Carrier ID", value=f"{cid}", inline=True)
         embed.add_field(name="Shortname", value=f"{shortname}", inline=True)
-        embed.add_field(name="Discord Channel", value=f"{discordchannel}", inline=True)
+        embed.add_field(name="Discord Channel", value=f"#{discordchannel}", inline=True)
         embed.add_field(name="Database Entry", value=f"{p_ID}", inline=True)
         await ctx.send(embed=embed)
     except TypeError:
@@ -294,12 +384,12 @@ async def findshort(ctx, lookshort):
 async def find(ctx, looklong):
     try:
         defcarrier_findlong(looklong)
-        #await ctx.send(f"FC {p_ID} is **{longname} {cid}** called by shortname **{shortname}** with channel **{discordchannel}**")
+        #await ctx.send(f"FC {p_ID} is **{longname} {cid}** called by shortname **{shortname}** with channel **#{discordchannel}**")
         embed=discord.Embed(title="Fleet Carrier Search Result", description=f"Displaying first match for {looklong}", color=0x00d9ff)
         embed.add_field(name="Carrier Name", value=f"{longname}", inline=True)
         embed.add_field(name="Carrier ID", value=f"{cid}", inline=True)
         embed.add_field(name="Shortname", value=f"{shortname}", inline=True)
-        embed.add_field(name="Discord Channel", value=f"{discordchannel}", inline=True)
+        embed.add_field(name="Discord Channel", value=f"#{discordchannel}", inline=True)
         embed.add_field(name="Database Entry", value=f"{p_ID}", inline=True)
         await ctx.send(embed=embed)
     except TypeError:
@@ -316,7 +406,7 @@ async def findid(ctx, lookid):
         embed.add_field(name="Carrier Name", value=f"{longname}", inline=True)
         embed.add_field(name="Carrier ID", value=f"{cid}", inline=True)
         embed.add_field(name="Shortname", value=f"{shortname}", inline=True)
-        embed.add_field(name="Discord Channel", value=f"{discordchannel}", inline=True)
+        embed.add_field(name="Discord Channel", value=f"#{discordchannel}", inline=True)
         embed.add_field(name="Database Entry", value=f"{p_ID}", inline=True)
         await ctx.send(embed=embed)
     except TypeError:
@@ -361,6 +451,6 @@ async def on_command_error(ctx, error):
     if isinstance(error, commands.MissingPermissions):
         await ctx.send('**You must be a Carrier Owner to use this command.**')
     else:
-        await ctx.send('Sorry, that didn\'t work. Make sure you have the correct permissions.')
+        await ctx.send('Sorry, that didn\'t work. Check your syntax and permissions.')
 
 bot.run(TOKEN)
