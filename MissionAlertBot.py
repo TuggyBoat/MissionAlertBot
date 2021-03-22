@@ -123,7 +123,7 @@ def defget_datetime():
     dt_string = dt_now.strftime("%d %B" + " 3307" + " %H:%M")
 
 # function to create image for loading
-def defcreateimage_load(carriername, carrierreg, commodity, system, station, profit):
+def defcreateimage_load(carriername, carrierreg, commodity, system, station, profit, pads, demand):
     my_image = Image.open(f"images/{shortname}.png")
     image_editable = ImageDraw.Draw(my_image)
     image_editable.text((27,150), "PILOTS TRADE NETWORK", (255, 255, 255), font=title_font)
@@ -135,13 +135,13 @@ def defcreateimage_load(carriername, carrierreg, commodity, system, station, pro
     image_editable.text((27,370), "SYSTEM:", (255, 255, 255), font=field_font)
     image_editable.text((170,370), system.upper(), (255, 255, 255), font=normal_font)
     image_editable.text((27,410), "STATION:", (255, 255, 255), font=field_font)
-    image_editable.text((170,410), station.upper(), (255, 255, 255), font=normal_font)
+    image_editable.text((170,410), f"{station.upper()} ({pads.upper()} pads)", (255, 255, 255), font=normal_font)
     image_editable.text((27,450), "PROFIT:", (255, 255, 255), font=field_font)
     image_editable.text((170,450), profit + "k per unit", (255, 255, 255), font=normal_font)
     my_image.save("result.png")
 
 # function to create image for unloading
-def defcreateimage_unload(carriername, carrierreg, commodity, system, station, profit):
+def defcreateimage_unload(carriername, carrierreg, commodity, system, station, profit, pads, demand):
     my_image = Image.open(f"images/{shortname}.png")
     image_editable = ImageDraw.Draw(my_image)
     image_editable.text((27,150), "PILOTS TRADE NETWORK", (255, 255, 255), font=title_font)
@@ -153,7 +153,7 @@ def defcreateimage_unload(carriername, carrierreg, commodity, system, station, p
     image_editable.text((27,370), "SYSTEM:", (255, 255, 255), font=field_font)
     image_editable.text((170,370), system.upper(), (255, 255, 255), font=normal_font)
     image_editable.text((27,410), "STATION:", (255, 255, 255), font=field_font)
-    image_editable.text((170,410), station.upper(), (255, 255, 255), font=normal_font)
+    image_editable.text((170,410), f"{station.upper()} ({pads.upper()} pads)", (255, 255, 255), font=normal_font)
     image_editable.text((27,450), "PROFIT:", (255, 255, 255), font=field_font)
     image_editable.text((170,450), profit + "k per unit", (255, 255, 255), font=normal_font)
     my_image.save("result.png")
@@ -182,25 +182,27 @@ async def on_ready():
                                '<system> should be in quotes\n'
                                '<station> should also be in quotes\n'
                                '<profit> is a number of thousands without the k\n'
+                               '<pads> is the largest pad size available (M for outposts, L for everything else)'
+                               '<demand> is how much your carrier is buying'
                                '\n'
                                'Case is automatically corrected for all inputs.')
 @commands.has_role('Carrier Owner')
-async def load(ctx, lookname, commshort, system, station, profit):
+async def load(ctx, lookname, commshort, system, station, profit, pads, demand):
     defcomm_find(commshort)
     defcarrier_findlong(lookname)
-    defcreateimage_load(longname, cid, commodity, system, station, profit)
+    defcreateimage_load(longname, cid, commodity, system, station, profit, pads, demand)
     defget_datetime()
 
     embed=discord.Embed(title="Generating and fetching mission alerts...", color=0x80ff80)
     await ctx.send(embed=embed)
 
-    embed=discord.Embed(title="Trade Alert (Discord)", description=f"`#{discordchannel} loading {commodity} from **{station.upper()}** station in system **{system.upper()}**, {profit}k per unit profit`", color=0x80ffff)
+    embed=discord.Embed(title="Trade Alert (Discord)", description=f"`#{discordchannel} loading {commodity} from **{station.upper()}** station in system **{system.upper()}** : {profit}k per unit profit : {demand} demand : {pads.upper()}-pads.`", color=0x80ffff)
     await ctx.send(embed=embed)
 
     embed=discord.Embed(title="Reddit Post Title", description=f"`*** P.T.N. News - Trade mission - {longname} {cid} - {dt_string} ***`", color=0xff0000)
     await ctx.send(embed=embed)
 
-    embed=discord.Embed(title="Reddit Post Body - PASTE INTO MARKDOWN MODE", description=f"`    INCOMING WIDEBAND TRANSMISSION: P.T.N. CARRIER LOADING MISSION IN PROGRESS\n\n**BUY FROM**: station **{station.upper()}** in system **{system.upper()}**\n\n**COMMODITY**: {commodity}\n\n&#x200B;\n\n**SELL TO**: Fleet Carrier **{longname} {cid}**\n\n**PROFIT**: {profit}k/unit\n\n\n\n[Join us on Discord](https://www.reddit.com/r/PilotsTradeNetwork/comments/l0y7dk/pilots_trade_network_intergalactic_discord_server/) for mission updates and discussion, channel **#{discordchannel}**.`", color=0x800000)
+    embed=discord.Embed(title="Reddit Post Body - PASTE INTO MARKDOWN MODE", description=f"`    INCOMING WIDEBAND TRANSMISSION: P.T.N. CARRIER LOADING MISSION IN PROGRESS\n\n**BUY FROM**: station **{station.upper()}** in system **{system.upper()}** ({pads}-pads)\n\n**COMMODITY**: {commodity}\n\n&#x200B;\n\n**SELL TO**: Fleet Carrier **{longname} {cid}**\n\n**PROFIT**: {profit}k/unit : {demand} demand\n\n\n\n[Join us on Discord](https://www.reddit.com/r/PilotsTradeNetwork/comments/l0y7dk/pilots_trade_network_intergalactic_discord_server/) for mission updates and discussion, channel **#{discordchannel}**.`", color=0x800000)
     embed.set_footer(text="**REMEMBER TO USE MARKDOWN MODE WHEN PASTING TEXT TO REDDIT.**")
     await ctx.send(embed=embed)
 
@@ -221,25 +223,27 @@ async def load(ctx, lookname, commshort, system, station, profit):
                                  '<system> should be in quotes\n'
                                  '<station> should also be in quotes\n'
                                  '<profit> is a number of thousands without the k\n'
+                                 '<pads> is the largest pad size available (M for outposts, L for everything else)'
+                                 '<demand> is how much your carrier is buying'
                                  '\n'
                                  'Case is automatically corrected for all inputs.')
 @commands.has_role('Carrier Owner')
-async def unload(ctx, lookname, commshort, system, station, profit):
+async def unload(ctx, lookname, commshort, system, station, profit, pads, demand):
     defcomm_find(commshort)
     defcarrier_findlong(lookname)
-    defcreateimage_unload(longname, cid, commodity, system, station, profit)
+    defcreateimage_unload(longname, cid, commodity, system, station, profit, pads, demand)
     defget_datetime()
 
     embed=discord.Embed(title="Generating and fetching mission alerts...", color=0x80ff80)
     await ctx.send(embed=embed)
   
-    embed=discord.Embed(title="Trade Alert (Discord)", description=f"`#{discordchannel} unloading {commodity} to **{station.upper()}** station in system **{system.upper()}**, {profit}k per unit profit`", color=0x80ffff)
+    embed=discord.Embed(title="Trade Alert (Discord)", description=f"`#{discordchannel} unloading {commodity} to **{station.upper()}** station in system **{system.upper()}** : {profit}k per unit profit : {demand} supply : {pads.upper()}-pads.`", color=0x80ffff)
     await ctx.send(embed=embed)
 
     embed=discord.Embed(title="Reddit Post Title", description=f"`*** P.T.N. News - Trade mission - {longname} {cid} - {dt_string} ***`", color=0xff0000)
     await ctx.send(embed=embed)
 
-    embed=discord.Embed(title="Reddit Post Body - PASTE INTO MARKDOWN MODE", description=f"`    INCOMING WIDEBAND TRANSMISSION: P.T.N. CARRIER UNLOADING MISSION IN PROGRESS\n\n**BUY FROM**: Fleet Carrier **{longname} {cid}**\n\n**COMMODITY**: {commodity}\n\n&#x200B;\n\n**SELL TO**: station **{station.upper()}** in system **{system.upper()}**\n\n**PROFIT**: {profit}k/unit\n\n\n\n[Join us on Discord](https://www.reddit.com/r/PilotsTradeNetwork/comments/l0y7dk/pilots_trade_network_intergalactic_discord_server/) for mission updates and discussion, channel **#{discordchannel}**.`", color=0x800000)
+    embed=discord.Embed(title="Reddit Post Body - PASTE INTO MARKDOWN MODE", description=f"`    INCOMING WIDEBAND TRANSMISSION: P.T.N. CARRIER UNLOADING MISSION IN PROGRESS\n\n**BUY FROM**: Fleet Carrier **{longname} {cid}**\n\n**COMMODITY**: {commodity}\n\n&#x200B;\n\n**SELL TO**: station **{station.upper()}** in system **{system.upper()}** ({pads}-pads)\n\n**PROFIT**: {profit}k/unit  : {demand} supply\n\n\n\n[Join us on Discord](https://www.reddit.com/r/PilotsTradeNetwork/comments/l0y7dk/pilots_trade_network_intergalactic_discord_server/) for mission updates and discussion, channel **#{discordchannel}**.`", color=0x800000)
     embed.set_footer(text="**REMEMBER TO USE MARKDOWN MODE WHEN PASTING TEXT TO REDDIT.**")
     await ctx.send(embed=embed)
 
@@ -260,8 +264,8 @@ async def unload(ctx, lookname, commshort, system, station, profit):
 # load direct to channel
 @bot.command(name='loadsend', help='Generate loading mission and send directly to Discord.')
 @commands.has_role('Carrier Owner')
-async def loadsend(ctx, lookname, commshort, system, station, profit):
-    await load(ctx, lookname, commshort, system, station, profit)
+async def loadsend(ctx, lookname, commshort, system, station, profit, pads, demand):
+    await load(ctx, lookname, commshort, system, station, profit, pads, demand)
 
     # check they're happy with output
     await ctx.send('**> Proceed with broadcast to Discord channels? y / n**')
@@ -283,8 +287,9 @@ async def loadsend(ctx, lookname, commshort, system, station, profit):
             channel = bot.get_channel(801798469189763073)
             #channel = bot.get_channel(823541666157166592)
             #  - this is for McKee's test server
-            embed=discord.Embed(title=f"{longname} TRADE ALERT", description=f'<#{channel_id}> loading {commodity} from **{station.upper()}** station in system **{system.upper()}**, {profit}k per unit profit', color=0x80ffff)
-            embed.set_footer(text="Add a reaction to show you're working this mission! React with 💯 if loading is complete.")
+            #embed=discord.Embed(title=f"{longname} TRADE ALERT", description=f'<#{channel_id}> loading {commodity} from **{station.upper()}** station in system **{system.upper()}**, {profit}k per unit profit', color=0x80ffff)
+            embed=discord.Embed(description=f'<#{channel_id}> loading {commodity} from **{station.upper()}** station in system **{system.upper()}**, {profit}k per unit profit', color=0x80ffff)
+            #embed.set_footer(text="Add a reaction to show you're working this mission! React with 💯 if loading is complete.")
             await channel.send(embed=embed)
             embed=discord.Embed(title=f"Trade alerts sent for {longname}", description=f"Check <#801798469189763073> for trade alert and <#{channel_id}> for image.", color=0x80ff80)
             await ctx.send(embed=embed)
@@ -298,8 +303,8 @@ async def loadsend(ctx, lookname, commshort, system, station, profit):
 # unload direct to channel
 @bot.command(name='unloadsend', help='Generate unloading mission and send directly to Discord.')
 @commands.has_role('Carrier Owner')
-async def unloadsend(ctx, lookname, commshort, system, station, profit):
-    await unload(ctx, lookname, commshort, system, station, profit)
+async def unloadsend(ctx, lookname, commshort, system, station, profit, pads, demand):
+    await unload(ctx, lookname, commshort, system, station, profit, pads, demand)
 
     # check they're happy with output
     await ctx.send('**> Proceed with broadcast to Discord channels? y / n**')
@@ -316,11 +321,11 @@ async def unloadsend(ctx, lookname, commshort, system, station, profit):
             channel = discord.utils.get(ctx.guild.channels, name=discordchannel)
             channel_id = channel.id
             await channel.send(file=discord.File('result.png'))
-            
+
             # send trade alert to trade alerts channel
             channel = bot.get_channel(801798469189763073)
-            embed=discord.Embed(title=f"{longname} TRADE ALERT", description=f'<#{channel_id}> unloading {commodity} to **{station.upper()}** station in system **{system.upper()}**, {profit}k per unit profit', color=0x80ff80)
-            embed.set_footer(text="Add a reaction to show you're working this mission! React with 💯 if unloading is complete.")
+            embed=discord.Embed(description=f'<#{channel_id}> unloading {commodity} to **{station.upper()}** station in system **{system.upper()}**, {profit}k per unit profit', color=0x80ff80)
+            #embed.set_footer(text="Add a reaction to show you're working this mission! React with 💯 if unloading is complete.")
             await channel.send(embed=embed)
             embed=discord.Embed(title=f"Trade alerts sent for {longname}", description=f"Check <#801798469189763073> for trade alert and <#{channel_id}> for image.", color=0x80ff80)
             await ctx.send(embed=embed)
