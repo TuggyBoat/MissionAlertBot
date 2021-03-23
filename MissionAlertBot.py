@@ -137,7 +137,7 @@ def defcreateimage_load(carriername, carrierreg, commodity, system, station, pro
     image_editable.text((27,400), "STATION:", (255, 255, 255), font=field_font)
     image_editable.text((150,400), f"{station.upper()} ({pads.upper()})", (255, 255, 255), font=normal_font)
     image_editable.text((27,440), "PROFIT:", (255, 255, 255), font=field_font)
-    image_editable.text((150,440), profit + "k per unit", (255, 255, 255), font=normal_font)
+    image_editable.text((150,440), f"{demand} demand at {profit}k per unit", (255, 255, 255), font=normal_font)
     my_image.save("result.png")
 
 # function to create image for unloading
@@ -155,7 +155,7 @@ def defcreateimage_unload(carriername, carrierreg, commodity, system, station, p
     image_editable.text((27,400), "STATION:", (255, 255, 255), font=field_font)
     image_editable.text((150,400), f"{station.upper()} ({pads.upper()})", (255, 255, 255), font=normal_font)
     image_editable.text((27,440), "PROFIT:", (255, 255, 255), font=field_font)
-    image_editable.text((150,440), profit + "k per unit", (255, 255, 255), font=normal_font)
+    image_editable.text((150,440), f"{demand} supply at {profit}k per unit", (255, 255, 255), font=normal_font)
     my_image.save("result.png")
 
 
@@ -258,7 +258,7 @@ async def unload(ctx, lookname, commshort, system, station, profit, pads, demand
     #await ctx.send(f"**REDDIT TEXT**:\n`    INCOMING WIDEBAND TRANSMISSION: P.T.N. CARRIER UNLOADING MISSION IN PROGRESS\n\n**BUY FROM**: Fleet Carrier **{longname} {cid}**\n\n**COMMODITY**: {commodity}\n\n&#x200B;\n\n**SELL TO**: station ** {station.upper()}** in system **{system.upper()}**\n\n**PROFIT**: {profit}k/unit\n\n\n\n[Join us on Discord](https://www.reddit.com/r/PilotsTradeNetwork/comments/l0y7dk/pilots_trade_network_intergalactic_discord_server/) for mission updates and discussion.`")
 
 #
-#                       DIRECT TO CHANNEL COMMANDS - UNDER CONSTRUCTION
+#                       DIRECT TO CHANNEL COMMANDS
 #
 
 # load direct to channel
