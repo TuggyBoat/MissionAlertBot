@@ -288,7 +288,7 @@ async def loadsend(ctx, lookname, commshort, system, station, profit, pads, dema
             #channel = bot.get_channel(823541666157166592)
             #  - this is for McKee's test server
             #embed=discord.Embed(title=f"{longname} TRADE ALERT", description=f'<#{channel_id}> loading {commodity} from **{station.upper()}** station in system **{system.upper()}**, {profit}k per unit profit', color=0x80ffff)
-            embed=discord.Embed(description=f'<#{channel_id}> loading {commodity} from **{station.upper()}** station in system **{system.upper()}**, {profit}k per unit profit', color=0x80ffff)
+            embed=discord.Embed(description=f'<#{channel_id}> loading {commodity} from **{station.upper()}** station in system **{system.upper()}**, {profit}k per unit profit : {demand} demand : {pads.upper()}-pads.', color=0x80ffff)
             #embed.set_footer(text="Add a reaction to show you're working this mission! React with 💯 if loading is complete.")
             await channel.send(embed=embed)
             embed=discord.Embed(title=f"Trade alerts sent for {longname}", description=f"Check <#801798469189763073> for trade alert and <#{channel_id}> for image.", color=0x80ff80)
@@ -324,7 +324,7 @@ async def unloadsend(ctx, lookname, commshort, system, station, profit, pads, de
 
             # send trade alert to trade alerts channel
             channel = bot.get_channel(801798469189763073)
-            embed=discord.Embed(description=f'<#{channel_id}> unloading {commodity} to **{station.upper()}** station in system **{system.upper()}**, {profit}k per unit profit', color=0x80ff80)
+            embed=discord.Embed(description=f'<#{channel_id}> unloading {commodity} to **{station.upper()}** station in system **{system.upper()}**, {profit}k per unit profit : {demand} supply : {pads.upper()}-pads.', color=0x80ff80)
             #embed.set_footer(text="Add a reaction to show you're working this mission! React with 💯 if unloading is complete.")
             await channel.send(embed=embed)
             embed=discord.Embed(title=f"Trade alerts sent for {longname}", description=f"Check <#801798469189763073> for trade alert and <#{channel_id}> for image.", color=0x80ff80)
@@ -454,7 +454,7 @@ async def on_command_error(ctx, error):
     if isinstance(error, commands.CommandNotFound):
         await ctx.send("**Invalid command.**")
     if isinstance(error, commands.MissingRequiredArgument):
-        await ctx.send('**Please pass in all requirements.**')
+        await ctx.send('**Please include all required parameters.** Use m.help <command> for details.')
     if isinstance(error, commands.MissingPermissions):
         await ctx.send('**You must be a Carrier Owner to use this command.**')
     else:
