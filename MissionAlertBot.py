@@ -38,13 +38,14 @@ if not table_exists('carriers'):
             shortname TEXT NOT NULL UNIQUE, 
             longname TEXT NOT NULL, 
             cid TEXT NOT NULL, 
-            discordchannel TEXT NOT NULL 
+            discordchannel TEXT NOT NULL,
+            channelid INT 
         ) 
     ''')
 
 # function to add carrier, being sure to correct case
-def defcarrier_add(shortname, longname, cid, discordchannel): 
-    c.execute(''' INSERT INTO carriers VALUES(NULL, ?, ?, ?, ?) ''', (shortname.lower(), longname.upper(), cid.upper(), discordchannel.lower())) 
+def defcarrier_add(shortname, longname, cid, discordchannel, channelid): 
+    c.execute(''' INSERT INTO carriers VALUES(NULL, ?, ?, ?, ?, ?) ''', (shortname.lower(), longname.upper(), cid.upper(), discordchannel.lower(), channelid)) 
     conn.commit()
 
 # function to remove a carrier
@@ -67,27 +68,27 @@ def defcarriers_list():
 
 # function to search for a carrier by longname
 def defcarrier_findlong(looklong):
-    c.execute(f"SELECT p_ID, shortname, longname, cid, discordchannel FROM carriers WHERE longname LIKE (?)", ('%'+looklong+'%',))
+    c.execute(f"SELECT p_ID, shortname, longname, cid, discordchannel, channelid FROM carriers WHERE longname LIKE (?)", ('%'+looklong+'%',))
     result = c.fetchone()
-    global p_ID, shortname, longname, cid, discordchannel
-    p_ID, shortname, longname, cid, discordchannel = result['p_ID'],result['shortname'],result['longname'],result['cid'],result['discordchannel']
-    print(f"FC {p_ID} is {longname} {cid} called by shortname {shortname} with channel #{discordchannel}")
+    global p_ID, shortname, longname, cid, discordchannel, channelid
+    p_ID, shortname, longname, cid, discordchannel, channelid = result['p_ID'],result['shortname'],result['longname'],result['cid'],result['discordchannel'],result['channelid']
+    print(f"FC {p_ID} is {longname} {cid} called by shortname {shortname} with channel <#{channelid}>")
 
 # function to search for a carrier by shortname
 def defcarrier_findshort(lookshort):
     c.execute(f"SELECT p_ID, shortname, longname, cid, discordchannel FROM carriers WHERE shortname LIKE (?)", ('%'+lookshort+'%',))
     result = c.fetchone()
-    global p_ID, shortname, longname, cid, discordchannel
-    p_ID, shortname, longname, cid, discordchannel = result['p_ID'],result['shortname'],result['longname'],result['cid'],result['discordchannel']
-    print(f"FC {p_ID} is {longname} {cid} called by shortname {shortname} with channel #{discordchannel}")
+    global p_ID, shortname, longname, cid, discordchannel, channelid
+    p_ID, shortname, longname, cid, discordchannel, channelid = result['p_ID'],result['shortname'],result['longname'],result['cid'],result['discordchannel'],result['channelid']
+    print(f"FC {p_ID} is {longname} {cid} called by shortname {shortname} with channel <#{channelid}>")
 
 # function to search for a carrier by p_ID
 def defcarrier_findpid(lookid):
     c.execute(f"SELECT p_ID, shortname, longname, cid, discordchannel FROM carriers WHERE p_ID = {lookid}")
     result = c.fetchone()
-    global p_ID, shortname, longname, cid, discordchannel
-    p_ID, shortname, longname, cid, discordchannel = result['p_ID'],result['shortname'],result['longname'],result['cid'],result['discordchannel']
-    print(f"FC {p_ID} is {longname} {cid} called by shortname {shortname} with channel #{discordchannel}")
+    global p_ID, shortname, longname, cid, discordchannel, channelid
+    p_ID, shortname, longname, cid, discordchannel, channelid = result['p_ID'],result['shortname'],result['longname'],result['cid'],result['discordchannel'],result['channelid']
+    print(f"FC {p_ID} is {longname} {cid} called by shortname {shortname} with channel <#{channelid}>")
 
 # function to search for a commodity by name or partial name
 def defcomm_find(lookfor):
@@ -284,8 +285,9 @@ async def loadsend(ctx, lookname, commshort, system, station, profit, pads, dema
             await ctx.send("**OK, proceeding...**")
         
             # send image to carrier channel
-            channel = discord.utils.get(ctx.guild.channels, name=discordchannel)
-            channel_id = channel.id
+            #channel = discord.utils.get(ctx.guild.channels, name=discordchannel)
+            #channel_id = channel.id
+            channel = bot.get_channel(channelid)
             await channel.send(file=discord.File('result.png'))
 
             # send trade alert to trade alerts channel
@@ -293,10 +295,10 @@ async def loadsend(ctx, lookname, commshort, system, station, profit, pads, dema
             #channel = bot.get_channel(823541666157166592)
             #  - this is for McKee's test server
             #embed=discord.Embed(title=f"{longname} TRADE ALERT", description=f'<#{channel_id}> loading {commodity} from **{station.upper()}** station in system **{system.upper()}**, {profit}k per unit profit', color=0x80ffff)
-            embed=discord.Embed(description=f'<#{channel_id}> loading {commodity} from **{station.upper()}** station in system **{system.upper()}**, {profit}k per unit profit : {demand} demand : {pads.upper()}-pads.', color=0x80ffff)
+            embed=discord.Embed(description=f'<#{channelid}> loading {commodity} from **{station.upper()}** station in system **{system.upper()}**, {profit}k per unit profit : {demand} demand : {pads.upper()}-pads.', color=0x80ffff)
             #embed.set_footer(text="Add a reaction to show you're working this mission! React with 💯 if loading is complete.")
             await channel.send(embed=embed)
-            embed=discord.Embed(title=f"Trade alerts sent for {longname}", description=f"Check <#801798469189763073> for trade alert and <#{channel_id}> for image.", color=0x80ff80)
+            embed=discord.Embed(title=f"Trade alerts sent for {longname}", description=f"Check <#801798469189763073> for trade alert and <#{channelid}> for image.", color=0x80ff80)
             await ctx.send(embed=embed)
 
         else:
@@ -323,16 +325,17 @@ async def unloadsend(ctx, lookname, commshort, system, station, profit, pads, de
             await ctx.send("**OK, proceeding...**")
 
             # send image to carrier channel
-            channel = discord.utils.get(ctx.guild.channels, name=discordchannel)
-            channel_id = channel.id
+            #channel = discord.utils.get(ctx.guild.channels, name=discordchannel)
+            #channel_id = channel.id
+            channel = bot.get_channel(channelid)
             await channel.send(file=discord.File('result.png'))
 
             # send trade alert to trade alerts channel
             channel = bot.get_channel(801798469189763073)
-            embed=discord.Embed(description=f'<#{channel_id}> unloading {commodity} to **{station.upper()}** station in system **{system.upper()}**, {profit}k per unit profit : {demand} supply : {pads.upper()}-pads.', color=0x80ff80)
+            embed=discord.Embed(description=f'<#{channelid}> unloading {commodity} to **{station.upper()}** station in system **{system.upper()}**, {profit}k per unit profit : {demand} supply : {pads.upper()}-pads.', color=0x80ff80)
             #embed.set_footer(text="Add a reaction to show you're working this mission! React with 💯 if unloading is complete.")
             await channel.send(embed=embed)
-            embed=discord.Embed(title=f"Trade alerts sent for {longname}", description=f"Check <#801798469189763073> for trade alert and <#{channel_id}> for image.", color=0x80ff80)
+            embed=discord.Embed(title=f"Trade alerts sent for {longname}", description=f"Check <#801798469189763073> for trade alert and <#{channelid}> for image.", color=0x80ff80)
             await ctx.send(embed=embed)
 
         else:
@@ -344,6 +347,17 @@ async def unloadsend(ctx, lookname, commshort, system, station, profit, pads, de
 #                       UTILITY COMMANDS
 #
 
+# list FCs
+@bot.command(name='carrier_list', help='List all Fleet Carriers in the database.')
+async def carrier_list(ctx):
+    c.execute(f"SELECT p_ID, shortname, longname, cid, discordchannel, channelid FROM carriers")
+    records = c.fetchall()
+    embed=discord.Embed(title=f"{len(records)} Registered Fleet Carriers")
+    for row in records:
+        embed.add_field(name=f"{row[0]}: {row[2]} ({row[3]})", value=f"<#{row[5]}>", inline=False)
+    await ctx.send(embed=embed)
+
+
 # add FC to database
 @bot.command(name='carrier_add', help='Add a Fleet Carrier to the database:\n'
                                       '\n'
@@ -354,9 +368,11 @@ async def unloadsend(ctx, lookname, commshort, system, station, profit, pads, de
                                       'do NOT include the # at the start of the channel name!')
 @commands.has_role('Carrier Owner')
 async def carrier_add(ctx, shortname, longname, cid, discordchannel):
-    defcarrier_add(shortname, longname, cid, discordchannel)
+    channel = discord.utils.get(ctx.guild.channels, name=discordchannel)
+    channelid = channel.id
+    defcarrier_add(shortname, longname, cid, discordchannel, channelid)
     defcarrier_findshort(shortname)
-    await ctx.send(f"Added **{longname.upper()}** **{cid.upper()}** with shortname **{shortname.lower()}** and channel **#{discordchannel.lower()}** at ID **{p_ID}**")
+    await ctx.send(f"Added **{longname.upper()}** **{cid.upper()}** with shortname **{shortname.lower()}** and channel **<#{channel_id}>** at ID **{p_ID}**")
 
 # remove FC from database
 @bot.command(name='carrier_del', help='Delete a Fleet Carrier from the database using its ID.\n'
@@ -401,7 +417,7 @@ async def find(ctx, looklong):
         embed.add_field(name="Carrier Name", value=f"{longname}", inline=True)
         embed.add_field(name="Carrier ID", value=f"{cid}", inline=True)
         embed.add_field(name="Shortname", value=f"{shortname}", inline=True)
-        embed.add_field(name="Discord Channel", value=f"#{discordchannel}", inline=True)
+        embed.add_field(name="Discord Channel", value=f"<#{channelid}>", inline=True)
         embed.add_field(name="Database Entry", value=f"{p_ID}", inline=True)
         await ctx.send(embed=embed)
     except TypeError:
