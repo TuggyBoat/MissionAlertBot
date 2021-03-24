@@ -1,4 +1,9 @@
 # MissionAlertBot.py
+# Discord bot to help PTN Carrier Owners post trade missions to Discord and Reddit
+# By Charles Tosh 17 March 2021
+# Discord Developer Portal: https://discord.com/developers/applications/822146046934384640/information
+# Git repo: https://github.com/cimspin/MissionAlertBot
+
 from PIL import Image, ImageFont, ImageDraw
 import os
 import sys
