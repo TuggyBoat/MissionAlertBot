@@ -19,7 +19,7 @@ from datetime import timezone
 #                       DATABASE STUFF
 #
 
-# connect to sqlite db
+# connect to sqlite carrier database
 conn = sqlite3.connect('carriers.db') 
 conn.row_factory = sqlite3.Row
 c = conn.cursor()
