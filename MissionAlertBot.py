@@ -122,9 +122,9 @@ field_font = ImageFont.truetype('font/Exo/static/Exo-Light.ttf', 18)
 # get date and time
 def defget_datetime():
     dt_now = datetime.now(tz=timezone.utc)
+    global dt_string, dt_file_string
     dt_string = dt_now.strftime("%d %B" + " 3307" + " %H:%M")
-    dt_file_string = dt.now.strftime("%Y%m%d %H%M%S")
-    return dt_file_string, dt_string
+    dt_file_string = dt_now.strftime("%Y%m%d %H%M%S")
 
 # function to create image for loading
 def defcreateimage_load(carriername, carrierreg, commodity, system, station, profit, pads, demand):
@@ -196,7 +196,7 @@ async def load(ctx, lookname, commshort, system, station, profit, pads, demand):
     defcarrier_findlong(lookname)
     defcreateimage_load(longname, cid, commodity, system, station, profit, pads, demand)
     defget_datetime()
-
+    
     embed=discord.Embed(title="Generating and fetching mission alerts...", color=0x80ff80)
     await ctx.send(embed=embed)
 
