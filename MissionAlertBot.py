@@ -47,24 +47,21 @@ if not table_exists('carriers'):
 def defcarrier_add(shortname, longname, cid, discordchannel, channelid): 
     c.execute(''' INSERT INTO carriers VALUES(NULL, ?, ?, ?, ?, ?) ''', (shortname.lower(), longname.upper(), cid.upper(), discordchannel.lower(), channelid)) 
     conn.commit()
+    # copy the blank bitmap to the new carrier's name to serve until unique image uploaded
+    os.system(f'cp bitmap.png images/{shortname}.png')
 
 # function to remove a carrier
 def defcarrier_del(p_ID):
     c.execute(f"DELETE FROM carriers WHERE p_ID = {p_ID}")
     conn.commit()
+    defget_datetime()
+    # archive the removed carrier's image by appending date and time of deletion to it
+    os.system(f'mv {shortname}.png {shortname}.{dt_file_string}.png')
 
 # function to remove all carriers, not currently used by any bot command
 def defdelete_all_carriers(): 
     c.execute(f"DELETE FROM carriers") 
     conn.commit()
-
-# old function to list carriers - this doesn't work as-is with row_factory enabled
-def defcarriers_list(): 
-    c.execute('''SELECT * FROM carriers''') 
-    data = [] 
-    for row in c.fetchall(): 
-        data.append(row) 
-    return data
 
 # function to search for a carrier by longname
 def defcarrier_findlong(looklong):
@@ -125,8 +122,9 @@ field_font = ImageFont.truetype('font/Exo/static/Exo-Light.ttf', 18)
 # get date and time
 def defget_datetime():
     dt_now = datetime.now(tz=timezone.utc)
-    global dt_string
     dt_string = dt_now.strftime("%d %B" + " 3307" + " %H:%M")
+    dt_file_string = dt.now.strftime("%Y%m%d %H%M%S")
+    return dt_file_string, dt_string
 
 # function to create image for loading
 def defcreateimage_load(carriername, carrierreg, commodity, system, station, profit, pads, demand):
