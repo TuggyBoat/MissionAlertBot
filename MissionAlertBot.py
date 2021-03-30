@@ -48,7 +48,7 @@ def defcarrier_add(shortname, longname, cid, discordchannel, channelid):
     c.execute(''' INSERT INTO carriers VALUES(NULL, ?, ?, ?, ?, ?) ''', (shortname.lower(), longname.upper(), cid.upper(), discordchannel.lower(), channelid)) 
     conn.commit()
     # copy the blank bitmap to the new carrier's name to serve until unique image uploaded
-    os.system(f'cp bitmap.png images/{shortname}.png')
+    os.system(f'cp bitmap.png images/{shortname.lower()}.png')
 
 # function to remove a carrier
 def defcarrier_del(p_ID):
@@ -369,7 +369,7 @@ async def carrier_add(ctx, shortname, longname, cid, discordchannel):
     channel = discord.utils.get(ctx.guild.channels, name=discordchannel)
     channelid = channel.id
     defcarrier_add(shortname, longname, cid, discordchannel, channelid)
-    defcarrier_findshort(shortname)
+    defcarrier_findlong(longname)
     await ctx.send(f"Added **{longname.upper()}** **{cid.upper()}** with shortname **{shortname.lower()}** and channel **<#{channelid}>** at ID **{p_ID}**")
 
 # remove FC from database
