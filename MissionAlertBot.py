@@ -370,7 +370,7 @@ async def carrier_add(ctx, shortname, longname, cid, discordchannel):
     channelid = channel.id
     defcarrier_add(shortname, longname, cid, discordchannel, channelid)
     defcarrier_findshort(shortname)
-    await ctx.send(f"Added **{longname.upper()}** **{cid.upper()}** with shortname **{shortname.lower()}** and channel **<#{channel_id}>** at ID **{p_ID}**")
+    await ctx.send(f"Added **{longname.upper()}** **{cid.upper()}** with shortname **{shortname.lower()}** and channel **<#{channelid}>** at ID **{p_ID}**")
 
 # remove FC from database
 @bot.command(name='carrier_del', help='Delete a Fleet Carrier from the database using its ID.\n'
