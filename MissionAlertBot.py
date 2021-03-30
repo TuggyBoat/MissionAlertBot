@@ -37,7 +37,7 @@ if not table_exists('carriers'):
             p_ID INTEGER PRIMARY KEY AUTOINCREMENT,
             shortname TEXT NOT NULL UNIQUE, 
             longname TEXT NOT NULL, 
-            cid TEXT NOT NULL, 
+            cid TEXT NOT NULL,
             discordchannel TEXT NOT NULL,
             channelid INT 
         ) 
