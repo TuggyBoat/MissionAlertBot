@@ -237,9 +237,9 @@ def defcreateimage_unload(carriername, carrierreg, commodity, system, station, p
 def txt_create_discord(mission_type, commodity, station, system, profit, pads, demand, eta_text):
     global discord_text
     if mission_type == 'load':
-        discord_text=(f"#{discordchannel} loading {commodity} from **{station.upper()}** station in system **{system.upper()}** : {profit}k per unit profit : {demand} demand : {pads.upper()}-pads.{eta_text}")
+        discord_text=(f"<#{channelid}> loading {commodity} from **{station.upper()}** station in system **{system.upper()}** : {profit}k per unit profit : {demand} demand : {pads.upper()}-pads.{eta_text}")
     else:
-        discord_text=(f"#{discordchannel} unloading {commodity} to **{station.upper()}** station in system **{system.upper()}** : {profit}k per unit profit : {demand} supply : {pads.upper()}-pads.{eta_text}")
+        discord_text=(f"<#{channelid}> unloading {commodity} to **{station.upper()}** station in system **{system.upper()}** : {profit}k per unit profit : {demand} supply : {pads.upper()}-pads.{eta_text}")
     
     return discord_text
 
@@ -361,7 +361,7 @@ async def gen_mission(ctx, lookname, commshort, system, station, profit, pads, d
         return msg.author == ctx.author and msg.channel == ctx.channel
 
     if rp:
-        embed=discord.Embed(title="Input roleplay text", description="Roleplay text is sent in quote style like this:\n\n> This is a quote!\n\nYou can use all regular Markdown formatting plus \\n for line breaks. If the \"send to Discord\" option is chosen, your quote will be broadcast to your carrier's channel following its mission image. If the \"send to Reddit\" option is chosen, the quote is inserted above the mission details in the top-level comment.", color=embed_color_rp)
+        embed=discord.Embed(title="Input roleplay text", description="Roleplay text is sent in quote style like this:\n\n> This is a quote!\n\nYou can use all regular Markdown formatting. If the \"send to Discord\" option is chosen, your quote will be broadcast to your carrier's channel following its mission image. If the \"send to Reddit\" option is chosen, the quote is inserted above the mission details in the top-level comment.", color=embed_color_rp)
         message_rp = await ctx.send(embed=embed)
 
         try:
@@ -378,7 +378,10 @@ async def gen_mission(ctx, lookname, commshort, system, station, profit, pads, d
     # generate the mission elements
     defcomm_find(commshort)
     defcarrier_findlong(lookname)
-    defcreateimage_load(longname, cid, commodity, system, station, profit, pads, demand)
+    if mission_type == 'load':
+        defcreateimage_load(longname, cid, commodity, system, station, profit, pads, demand)
+    else:
+        defcreateimage_unload(longname, cid, commodity, system, station, profit, pads, demand)
     defget_datetime()
     txt_create_discord(mission_type, commodity, station, system, profit, pads, demand, eta_text)
     txt_create_reddit_title()
@@ -462,7 +465,7 @@ async def gen_mission(ctx, lookname, commshort, system, station, profit, pads, d
                     embed=discord.Embed(title="P.T.N TRADE MISSION STARTING", color=embed_colour_unloading)
             embed.set_image(url="attachment://image.png")
             embed.set_footer(text="m.complete will mark this mission complete\nm.ission will display info to channel\nm.issions will list trade missions for all carriers.")
-            await ctx.send(file=file, embed=embed)
+            await channel.send(file=file, embed=embed)
             
             
             embed=discord.Embed(title=f"Discord trade alerts sent for {longname}", description=f"Check <#{trade_alerts_id}> for trade alert and <#{channelid}> for image.", color=embed_color_discord)
@@ -507,15 +510,15 @@ async def gen_mission(ctx, lookname, commshort, system, station, profit, pads, d
 # load direct to channel
 @bot.command(name='loadsend', help='Deprecated, now identical to m.load.')
 @commands.has_role('Carrier Owner')
-async def loadsend(ctx, lookname, commshort, system, station, profit, pads, demand):
-    await load(ctx, lookname, commshort, system, station, profit, pads, demand)
+async def loadsend(ctx, lookname, commshort, system, station, profit, pads, demand, eta=None):
+    await load(ctx, lookname, commshort, system, station, profit, pads, demand, eta=None)
 
 
 # unload direct to channel
 @bot.command(name='unloadsend', help='Deprecated, now identical to m.unload.')
 @commands.has_role('Carrier Owner')
-async def unloadsend(ctx, lookname, commshort, system, station, profit, pads, demand):
-    await unload(ctx, lookname, commshort, system, station, profit, pads, demand)
+async def unloadsend(ctx, lookname, commshort, system, station, profit, pads, demand, eta=None):
+    await unload(ctx, lookname, commshort, system, station, profit, pads, demand, eta=None)
 
 #
 #                       MISSION DB
@@ -561,7 +564,7 @@ async def ission(ctx):
         result = cm.fetchone()
         if not result:
             # if there's no result, return an error
-            embed=discord.Embed(title="Error", description=f"{carrier} doesn't seem to be on a trade mission right now.", color=embed_color_ok)
+            embed=discord.Embed(description=f"**{carrier}** doesn't seem to be on a trade mission right now.", color=embed_color_ok)
             await ctx.send(embed=embed)
         else:
             # user is in correct channel and carrier is on a mission, so show the current trade mission for selected carrier
@@ -635,18 +638,18 @@ async def done(ctx, lookname, rp=None):
         # send Discord carrier channel updates
             channelid = result['channelid']
             channel = bot.get_channel(channelid)
-            embed=discord.Embed(title=f"{carrier} MISSION COMPLETE :o7:", description=f"{desc_msg}", color=embed_color_ok)
-            await ctx.send(embed=embed)
+            embed=discord.Embed(title=f"{carrier} MISSION COMPLETE", description=f"{desc_msg}", color=embed_color_ok)
+            await channel.send(embed=embed)
         
         # add comment to Reddit post
         if not result['reddit_post_id'] == 'NULL':
             reddit_post_id = result['reddit_post_id']
             subreddit = await reddit.subreddit(to_subreddit)
             submission = await reddit.submission(reddit_post_id)
-            await submission.reply(f"**{carrier} MISSION COMPLETE o7**\n\n>{desc_msg}")
+            await submission.reply(f"    INCOMING WIDEBAND TRANSMISSION: P.T.N. CARRIER MISSION UPDATE\n\n**{carrier}** mission complete. o7 CMDRs!\n\n{desc_msg}")
 
         # mark original post as spoiler, change its flair
-            await submission.flair.select("4242a2e2-8e8e-11eb-b443-0e664851dbff")
+            await submission.flair.select(flair_mission_stop)
             await submission.mod.spoiler()
         
         # delete mission entry from db
@@ -699,7 +702,7 @@ async def complete(ctx):
                     await ctx.send(embed=embed)
                     return
                 elif msg.content.lower() == "y":
-                    embed=discord.Embed(title=f"{carrier} MISSION COMPLETE :o7:", description=f"<@{msg_usr_id}> reports that mission is complete!", color=embed_color_ok)
+                    embed=discord.Embed(title=f"{carrier} MISSION COMPLETE", description=f"<@{msg_usr_id}> reports that mission is complete!", color=embed_color_ok)
                     await ctx.send(embed=embed)
                     # now we need to go do all the mission cleanup stuff
 
@@ -718,10 +721,10 @@ async def complete(ctx):
                         reddit_post_id = result['reddit_post_id']
                         subreddit = await reddit.subreddit(to_subreddit)
                         submission = await reddit.submission(reddit_post_id)
-                        await submission.reply(f"**{carrier} MISSION COMPLETE o7**\n\n*Reported on PTN Discord by {ctx.author.display_name}*")
+                        await submission.reply(f"    INCOMING WIDEBAND TRANSMISSION: P.T.N. CARRIER MISSION UPDATE\n\n**{carrier}** mission complete. o7 CMDRs!\n\n\n\n*Reported on PTN Discord by {ctx.author.display_name}*")
 
                     # mark original post as spoiler, change its flair
-                        await submission.flair.select("4242a2e2-8e8e-11eb-b443-0e664851dbff")
+                        await submission.flair.select(flair_mission_stop)
                         await submission.mod.spoiler()
 
                     # delete mission entry from db
@@ -769,9 +772,7 @@ async def carrier_add(ctx, shortname, longname, cid, discordchannel):
     channel = discord.utils.get(ctx.guild.channels, name=discordchannel)
     channelid = channel.id
     defcarrier_add(shortname, longname, cid, discordchannel, channelid)
-    await ctx.send("Carrier added, now looking it up")
     defcarrier_findlong(longname)
-    await ctx.send("Carrier looked up")
     await ctx.send(f"Added **{longname.upper()}** **{cid.upper()}** with shortname **{shortname.lower()}** and channel **<#{channelid}>** at ID **{p_ID}**")
 
 # remove FC from database
