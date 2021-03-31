@@ -391,7 +391,7 @@ async def gen_mission(ctx, lookname, commshort, system, station, profit, pads, d
     embed=discord.Embed(title=f"Mission pending for {longname}{eta_text}", color=embed_color_ok)
     embed.add_field(name="Mission type", value=f"{mission_type.title()}ing", inline=True)
     embed.add_field(name="Commodity", value=f"{demand} of {commodity.title()} at {profit}k/unit", inline=True)
-    embed.add_field(name="Location", value=f"{station.upper()} station in system {system.upper()} with {pads.upper()}-pads", inline=True)
+    embed.add_field(name="Location", value=f"{station.upper()} station ({pads.upper()}-pads) in system {system.upper()}", inline=True)
     if rp:
         await message_rp.delete()
         await message_rp_text.delete()
@@ -464,7 +464,7 @@ async def gen_mission(ctx, lookname, commshort, system, station, profit, pads, d
                 else:
                     embed=discord.Embed(title="P.T.N TRADE MISSION STARTING", color=embed_colour_unloading)
             embed.set_image(url="attachment://image.png")
-            embed.set_footer(text="m.complete will mark this mission complete\nm.ission will display info to channel\nm.issions will list trade missions for all carriers.")
+            embed.set_footer(text="m.complete will mark this mission complete\nm.ission will display info to channel\nm.issions will list trade missions for all carriers")
             await channel.send(file=file, embed=embed)
             
             
@@ -537,7 +537,7 @@ async def mission_add(ctx, longname, cid, channelid, commodity, mission_type, sy
     embed.set_image(url="attachment://image.png")
     embed.add_field(name="Type", value=f"{mission_type.title()}ing", inline=True)
     embed.add_field(name="Commodity", value=f"{demand} of {commodity.title()} at {profit}k/unit", inline=True)
-    embed.add_field(name="Location", value=f"{station.upper()} station in system {system.upper()} with {pads.upper()}-pads", inline=True)
+    embed.add_field(name="Location", value=f"{station.upper()} station ({pads.upper()}-pads) in system {system.upper()}", inline=True)
     embed.set_footer(text="Remember to use m.done when mission is complete.")
     if rp:
         embed.add_field(name="Roleplay text",value=rp_text, inline=False)
