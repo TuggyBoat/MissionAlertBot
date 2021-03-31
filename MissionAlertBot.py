@@ -430,7 +430,7 @@ async def gen_mission(ctx, lookname, commshort, system, station, profit, pads, d
             embed.set_footer(text="**REMEMBER TO USE MARKDOWN MODE WHEN PASTING TEXT TO REDDIT.**")
             await ctx.send(embed=embed)
             await ctx.send(file=discord.File('result.png'))
-            embed=discord.Embed(title=f"Mission Generation Complete for {longname}", description="Paste Reddit content into **MARKDOWN MODE** in the editor. You can swap back to Fancy Pants afterwards and make any changes/additions or embed the image.\n\nBest practice for Reddit is an image post with a top level comment that contains the text version of the advert. This ensures the image displays with highest possible compatibility across platforms and apps. When mission complete, flag the post as *Spoiler* to prevent image showing and add a comment to inform.", color=embed_color_ok)
+            embed=discord.Embed(title=f"Alert Generation Complete for {longname}", description="Paste Reddit content into **MARKDOWN MODE** in the editor. You can swap back to Fancy Pants afterwards and make any changes/additions or embed the image.\n\nBest practice for Reddit is an image post with a top level comment that contains the text version of the advert. This ensures the image displays with highest possible compatibility across platforms and apps. When mission complete, flag the post as *Spoiler* to prevent image showing and add a comment to inform.", color=embed_color_ok)
             await ctx.send(embed=embed)
 
         if "d" in msg.content.lower():
