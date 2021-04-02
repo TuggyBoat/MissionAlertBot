@@ -249,12 +249,12 @@ def txt_create_reddit_title():
     
     return reddit_title
 
-def txt_create_reddit_body(mission_type, commodity, station, system, profit, pads, demand, eta_text):
+def txt_create_reddit_body(mission_type, commodity, station, system, profit, pads, demand, rp_text, eta_text):
     global reddit_body
     if mission_type == 'load': 
-        reddit_body=(f"    INCOMING WIDEBAND TRANSMISSION: P.T.N. CARRIER UNLOADING MISSION IN PROGRESS\n\n**BUY FROM**: station **{station.upper()}** in system **{system.upper()}** ({pads.upper()}-pads)\n\n**COMMODITY**: {commodity}\n\n&#x200B;\n\n**SELL TO**: Fleet Carrier **{longname} {cid}{eta_text}**\n\n**PROFIT**: {profit}k/unit : {demand} demand\n\n\n\n[Join us on Discord](https://www.reddit.com/r/PilotsTradeNetwork/comments/l0y7dk/pilots_trade_network_intergalactic_discord_server/) for mission updates and discussion, channel **#{discordchannel}**.")
+        reddit_body=(f"    INCOMING WIDEBAND TRANSMISSION: P.T.N. CARRIER UNLOADING MISSION IN PROGRESS\n\n{rp_text}\n\n**BUY FROM**: station **{station.upper()}** in system **{system.upper()}** ({pads.upper()}-pads)\n\n**COMMODITY**: {commodity}\n\n&#x200B;\n\n**SELL TO**: Fleet Carrier **{longname} {cid}{eta_text}**\n\n**PROFIT**: {profit}k/unit : {demand} demand\n\n\n\n[Join us on Discord](https://www.reddit.com/r/PilotsTradeNetwork/comments/l0y7dk/pilots_trade_network_intergalactic_discord_server/) for mission updates and discussion, channel **#{discordchannel}**.")
     else:
-        reddit_body=(f"    INCOMING WIDEBAND TRANSMISSION: P.T.N. CARRIER UNLOADING MISSION IN PROGRESS\n\n**BUY FROM**: Fleet Carrier **{longname} {cid}{eta_text}**\n\n**COMMODITY**: {commodity}\n\n&#x200B;\n\n**SELL TO**: station **{station.upper()}** in system **{system.upper()}** ({pads.upper()}-pads)\n\n**PROFIT**: {profit}k/unit : {demand} supply\n\n\n\n[Join us on Discord](https://www.reddit.com/r/PilotsTradeNetwork/comments/l0y7dk/pilots_trade_network_intergalactic_discord_server/) for mission updates and discussion, channel **#{discordchannel}**.")
+        reddit_body=(f"    INCOMING WIDEBAND TRANSMISSION: P.T.N. CARRIER UNLOADING MISSION IN PROGRESS\n\n{rp_text}\n\n**BUY FROM**: Fleet Carrier **{longname} {cid}{eta_text}**\n\n**COMMODITY**: {commodity}\n\n&#x200B;\n\n**SELL TO**: station **{station.upper()}** in system **{system.upper()}** ({pads.upper()}-pads)\n\n**PROFIT**: {profit}k/unit : {demand} supply\n\n\n\n[Join us on Discord](https://www.reddit.com/r/PilotsTradeNetwork/comments/l0y7dk/pilots_trade_network_intergalactic_discord_server/) for mission updates and discussion, channel **#{discordchannel}**.")
     return reddit_body
 
 def txt_create_reddit_info():
@@ -385,7 +385,7 @@ async def gen_mission(ctx, lookname, commshort, system, station, profit, pads, d
     defget_datetime()
     txt_create_discord(mission_type, commodity, station, system, profit, pads, demand, eta_text)
     txt_create_reddit_title()
-    txt_create_reddit_body(mission_type, commodity, station, system, profit, pads, demand, eta_text)
+    txt_create_reddit_body(mission_type, commodity, station, system, profit, pads, demand, rp_text, eta_text)
     
     # check they're happy with output and offer to send
     embed=discord.Embed(title=f"Mission pending for {longname}{eta_text}", color=embed_color_ok)
@@ -481,10 +481,11 @@ async def gen_mission(ctx, lookname, commshort, system, station, profit, pads, d
             submission = await subreddit.submit_image(reddit_title, image_path="result.png", flair_id=flair_id)
             reddit_post_url = submission.permalink
             reddit_post_id = submission.id
-            if rp:
-                comment = await submission.reply(f"> {rp_text}\n\n&#x200B;\n\n{reddit_body}")
-            else:
-                comment = await submission.reply(reddit_body)
+            #if rp:
+            #    comment = await submission.reply(f"> {rp_text}\n\n&#x200B;\n\n{reddit_body}")
+            #else:
+            # above was for before I added rp_text into text gen but I need to test that and make sure it works
+            comment = await submission.reply(reddit_body)
             reddit_comment_url = comment.permalink
             reddit_comment_id = comment.id
             embed=discord.Embed(title=f"Reddit trade alert sent for {longname}", description=f"https://www.reddit.com{reddit_post_url}", color=embed_color_reddit)
