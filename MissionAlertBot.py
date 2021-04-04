@@ -492,7 +492,8 @@ async def gen_mission(ctx, lookname, commshort, system, station, profit, pads, d
             await ctx.send(embed=embed)
             await message_send.delete()
             embed=discord.Embed(title=f"{longname} REQUIRES YOUR UPDOOTS", description=f"https://www.reddit.com{reddit_post_url}", color=embed_color_reddit)
-            await channel_upvotes.send(embed=embed)
+            channel = bot.get_channel(channel_upvotes)
+            await channel.send(embed=embed)
         
     except asyncio.TimeoutError:
         await ctx.send("**Mission did not broadcast (no valid response from user).**")
