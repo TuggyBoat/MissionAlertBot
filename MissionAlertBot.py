@@ -809,7 +809,7 @@ async def carrier_image(ctx, lookname=None):
         defcarrier_findlong(lookname)
         defget_datetime()
         file = discord.File(f"images/{shortname}.png", filename="image.png")
-        embed=discord.Embed(title=f"Change background image for {longname}", description="Please upload your image now. Images should be 500x500, in .png format, and based on the standard PTN image template. Or input **x** to cancel.", color=embed_color_qu)
+        embed=discord.Embed(title=f"View or change background image for {longname}", description="You can upload a replacement image now. Images should be 500x500, in .png format, and based on the standard PTN image template. Or input **x** to cancel upload and just view.", color=embed_color_qu)
         embed.set_image(url="attachment://image.png")
         message_upload_now = await ctx.send(file=file, embed=embed)
         def check(message):
@@ -827,9 +827,9 @@ async def carrier_image(ctx, lookname=None):
                 await message.delete()
                 await message_upload_now.delete()
             elif message.content.lower() == "x":
-                await ctx.send("**Cancelled**")
+                await ctx.send("**Upload cancelled**")
                 await message.delete()
-                await message_upload_now.delete()
+                #await message_upload_now.delete()
                 return
         except asyncio.TimeoutError:
             await ctx.send("**Cancelled - timed out**")
