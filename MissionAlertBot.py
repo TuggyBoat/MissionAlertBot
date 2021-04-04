@@ -795,38 +795,46 @@ async def carrier_del(ctx, p_ID):
     await ctx.send(f"Attempted to remove carrier number {p_ID}")
 
 # change FC background image
-@bot.command(name='carrier_image', help='Change the background image for the specified carrier.')
+@bot.command(name='carrier_image', help='Change the background image for the specified carrier:\n\n'
+                                        'Type without argument to receive a blank PNG suitable for overlaying on top of your carrier\'s image.\n'
+                                        'Type with carrier as argument to check the carrier\'s image or begin upload of a new image.')
 @commands.has_role('Carrier Owner')
-async def carrier_image(ctx, lookname):
-    defcarrier_findlong(lookname)
-    defget_datetime()
-    file = discord.File(f"images/{shortname}.png", filename="image.png")
-    embed=discord.Embed(title=f"Change background image for {longname}", description="Please upload your image now. Images should be 500x500, in .png format, and based on the standard PTN image template. Or input **x** to cancel.", color=embed_color_qu)
-    embed.set_image(url="attachment://image.png")
-    message_upload_now = await ctx.send(file=file, embed=embed)
-    def check(message):
-        return message.author == ctx.author and message.channel == ctx.channel
-    try:
-        message = await bot.wait_for("message", check=check, timeout=30)
-        if message.attachments:
-            shutil.move(f'images/{shortname}.png', f'images/old/{shortname}.{dt_file_string}.png')
-            for attachment in message.attachments:
-                await attachment.save(f"images/{shortname}.png")
-            file = discord.File(f"images/{shortname}.png", filename="image.png")
-            embed=discord.Embed(title=f"{longname}", description="Background image updated.", color=embed_color_ok)
+async def carrier_image(ctx, lookname=None):
+    if not lookname:
+        file = discord.File(f"blank.png", filename="image.png")
+            embed=discord.Embed(title=f"Blank foreground image", description="Overlay atop your carrier's image then use m.carrier_image <carrier> to upload.", color=embed_color_ok)
             embed.set_image(url="attachment://image.png")
             await ctx.send(file=file, embed=embed)
-            await message.delete()
-            await message_upload_now.delete()
-        elif message.content.lower() == "x":
-            await ctx.send("**Cancelled**")
-            await message.delete()
+    else:
+        defcarrier_findlong(lookname)
+        defget_datetime()
+        file = discord.File(f"images/{shortname}.png", filename="image.png")
+        embed=discord.Embed(title=f"Change background image for {longname}", description="Please upload your image now. Images should be 500x500, in .png format, and based on the standard PTN image template. Or input **x** to cancel.", color=embed_color_qu)
+        embed.set_image(url="attachment://image.png")
+        message_upload_now = await ctx.send(file=file, embed=embed)
+        def check(message):
+            return message.author == ctx.author and message.channel == ctx.channel
+        try:
+            message = await bot.wait_for("message", check=check, timeout=30)
+            if message.attachments:
+                shutil.move(f'images/{shortname}.png', f'images/old/{shortname}.{dt_file_string}.png')
+                for attachment in message.attachments:
+                    await attachment.save(f"images/{shortname}.png")
+                file = discord.File(f"images/{shortname}.png", filename="image.png")
+                embed=discord.Embed(title=f"{longname}", description="Background image updated.", color=embed_color_ok)
+                embed.set_image(url="attachment://image.png")
+                await ctx.send(file=file, embed=embed)
+                await message.delete()
+                await message_upload_now.delete()
+            elif message.content.lower() == "x":
+                await ctx.send("**Cancelled**")
+                await message.delete()
+                await message_upload_now.delete()
+                return
+        except asyncio.TimeoutError:
+            await ctx.send("**Cancelled - timed out**")
             await message_upload_now.delete()
             return
-    except asyncio.TimeoutError:
-        await ctx.send("**Cancelled - timed out**")
-        await message_upload_now.delete()
-        return
         
     
 
