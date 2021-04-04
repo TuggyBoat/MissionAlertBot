@@ -802,9 +802,9 @@ async def carrier_del(ctx, p_ID):
 async def carrier_image(ctx, lookname=None):
     if not lookname:
         file = discord.File(f"blank.png", filename="image.png")
-            embed=discord.Embed(title=f"Blank foreground image", description="Overlay atop your carrier's image then use m.carrier_image <carrier> to upload.", color=embed_color_ok)
-            embed.set_image(url="attachment://image.png")
-            await ctx.send(file=file, embed=embed)
+        embed=discord.Embed(title=f"Blank foreground image", description="Overlay atop your carrier's image then use m.carrier_image <carrier> to upload.", color=embed_color_ok)
+        embed.set_image(url="attachment://image.png")
+        await ctx.send(file=file, embed=embed)
     else:
         defcarrier_findlong(lookname)
         defget_datetime()
