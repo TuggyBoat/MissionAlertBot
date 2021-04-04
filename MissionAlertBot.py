@@ -41,6 +41,7 @@ trade_alerts_id = 801798469189763073
 #to_subreddit = "PTNBotTesting"
 # subreddit for live
 to_subreddit = "PilotsTradeNetwork"
+channel_upvotes = 828279034387103744
 embed_colour_loading = 0x80ffff # blue
 embed_colour_unloading = 0x80ff80 # green
 embed_color_reddit = 0xff0000 # red
@@ -490,6 +491,8 @@ async def gen_mission(ctx, lookname, commshort, system, station, profit, pads, d
             embed=discord.Embed(title=f"Reddit trade alert sent for {longname}", description=f"https://www.reddit.com{reddit_post_url}", color=embed_color_reddit)
             await ctx.send(embed=embed)
             await message_send.delete()
+            embed=discord.Embed(title=f"{longname} REQUIRES YOUR UPDOOTS", description=f"https://www.reddit.com{reddit_post_url}", color=embed_color_reddit)
+            await channel_upvotes.send(embed=embed)
         
     except asyncio.TimeoutError:
         await ctx.send("**Mission did not broadcast (no valid response from user).**")
@@ -633,7 +636,7 @@ async def done(ctx, lookname, rp=None):
                 msg = await channel.fetch_message(discord_alert_id)
                 await msg.delete()
             except:
-                print("Looks like this mission alert was already deleted by someone else")
+                await ctx.send("Looks like this mission alert was already deleted. Not to worry.")
 
         # send Discord carrier channel updates
             channelid = result['channelid']
@@ -643,14 +646,18 @@ async def done(ctx, lookname, rp=None):
         
         # add comment to Reddit post
         if not result['reddit_post_id'] == 'NULL':
-            reddit_post_id = result['reddit_post_id']
-            subreddit = await reddit.subreddit(to_subreddit)
-            submission = await reddit.submission(reddit_post_id)
-            await submission.reply(f"    INCOMING WIDEBAND TRANSMISSION: P.T.N. CARRIER MISSION UPDATE\n\n**{carrier}** mission complete. o7 CMDRs!\n\n{desc_msg}")
+            try: # try in case Reddit is down
+                reddit_post_id = result['reddit_post_id']
+                subreddit = await reddit.subreddit(to_subreddit)
+                submission = await reddit.submission(reddit_post_id)
+                await submission.reply(f"    INCOMING WIDEBAND TRANSMISSION: P.T.N. CARRIER MISSION UPDATE\n\n**{carrier}** mission complete. o7 CMDRs!\n\n{desc_msg}")
+
 
         # mark original post as spoiler, change its flair
-            await submission.flair.select(flair_mission_stop)
-            await submission.mod.spoiler()
+                await submission.flair.select(flair_mission_stop)
+                await submission.mod.spoiler()
+            except:
+                await ctx.send("Failed updating Reddit :(")
         
         # delete mission entry from db
         cm.execute(f'''DELETE FROM missions WHERE carrier LIKE (?)''', ('%'+lookname+'%',))
@@ -714,18 +721,21 @@ async def complete(ctx):
                             msg = await channel.fetch_message(discord_alert_id)
                             await msg.delete()
                         except:
-                            print("Looks like this mission alert was already deleted by someone else")
+                            print(f"Looks like this mission alert for {carrier} was already deleted by someone else")
 
                     # add comment to Reddit post
                     if not result['reddit_post_id'] == 'NULL':
-                        reddit_post_id = result['reddit_post_id']
-                        subreddit = await reddit.subreddit(to_subreddit)
-                        submission = await reddit.submission(reddit_post_id)
-                        await submission.reply(f"    INCOMING WIDEBAND TRANSMISSION: P.T.N. CARRIER MISSION UPDATE\n\n**{carrier}** mission complete. o7 CMDRs!\n\n\n\n*Reported on PTN Discord by {ctx.author.display_name}*")
+                        try:
+                            reddit_post_id = result['reddit_post_id']
+                            subreddit = await reddit.subreddit(to_subreddit)
+                            submission = await reddit.submission(reddit_post_id)
+                            await submission.reply(f"    INCOMING WIDEBAND TRANSMISSION: P.T.N. CARRIER MISSION UPDATE\n\n**{carrier}** mission complete. o7 CMDRs!\n\n\n\n*Reported on PTN Discord by {ctx.author.display_name}*")
 
-                    # mark original post as spoiler, change its flair
-                        await submission.flair.select(flair_mission_stop)
-                        await submission.mod.spoiler()
+                        # mark original post as spoiler, change its flair
+                            await submission.flair.select(flair_mission_stop)
+                            await submission.mod.spoiler()
+                        except:
+                            print(f"Reddit post failed to update for {carrier}")
 
                     # delete mission entry from db
                     cm.execute(f'''DELETE FROM missions WHERE carrier LIKE (?)''', ('%'+carrier+'%',))
