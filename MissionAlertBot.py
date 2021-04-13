@@ -358,9 +358,12 @@ async def gen_mission(ctx, lookname, commshort, system, station, profit, pads, d
         await ctx.send(embed=embed)
         return
     
-    def check(msg):
+    def checkconfirm(msg):
         return msg.author == ctx.author and msg.channel == ctx.channel and \
         msg.content.lower() in ["d", "r", "t", "x", "dr", "dt", "drt", "rd", "rt", "rdt", "tr", "td", "tdr"]
+
+    def checkrp(msg):
+        return msg.author == ctx.author and msg.channel == ctx.channel
 
     if rp:
         embed=discord.Embed(title="Input roleplay text", description="Roleplay text is sent in quote style like this:\n\n> This is a quote!\n\nYou can use all regular Markdown formatting. If the \"send to Discord\" option is chosen, your quote will be broadcast to your carrier's channel following its mission image. If the \"send to Reddit\" option is chosen, the quote is inserted above the mission details in the top-level comment.", color=embed_color_rp)
@@ -368,7 +371,7 @@ async def gen_mission(ctx, lookname, commshort, system, station, profit, pads, d
 
         try:
 
-            message_rp_text = await bot.wait_for("message", check=check, timeout=120)
+            message_rp_text = await bot.wait_for("message", check=checkrp, timeout=120)
             rp_text = message_rp_text.content
 
         except asyncio.TimeoutError:
@@ -406,7 +409,7 @@ async def gen_mission(ctx, lookname, commshort, system, station, profit, pads, d
     message_confirm = await ctx.send(embed=embed)
 
     try:
-        msg = await bot.wait_for("message", check=check, timeout=30)
+        msg = await bot.wait_for("message", check=checkconfirm, timeout=30)
 
         if "x" in msg.content.lower():
             # immediately stop if there's an x anywhere in the message, even if there are other proper inputs
