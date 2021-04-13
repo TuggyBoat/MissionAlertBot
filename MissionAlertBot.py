@@ -359,7 +359,8 @@ async def gen_mission(ctx, lookname, commshort, system, station, profit, pads, d
         return
     
     def check(msg):
-        return msg.author == ctx.author and msg.channel == ctx.channel
+        return msg.author == ctx.author and msg.channel == ctx.channel and \
+        msg.content.lower() in ["d", "r", "t", "x"]
 
     if rp:
         embed=discord.Embed(title="Input roleplay text", description="Roleplay text is sent in quote style like this:\n\n> This is a quote!\n\nYou can use all regular Markdown formatting. If the \"send to Discord\" option is chosen, your quote will be broadcast to your carrier's channel following its mission image. If the \"send to Reddit\" option is chosen, the quote is inserted above the mission details in the top-level comment.", color=embed_color_rp)
@@ -494,10 +495,7 @@ async def gen_mission(ctx, lookname, commshort, system, station, profit, pads, d
             embed=discord.Embed(title=f"{longname} REQUIRES YOUR UPDOOTS", description=f"https://www.reddit.com{reddit_post_url}", color=embed_color_reddit)
             channel = bot.get_channel(channel_upvotes)
             await channel.send(embed=embed)
-        else:
-            await ctx.send("**Mission not generated or broadcast (no valid response from user).**")
-            return
-        
+       
     except asyncio.TimeoutError:
         await ctx.send("**Mission not generated or broadcast (no valid response from user).**")
         return
