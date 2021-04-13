@@ -409,7 +409,7 @@ async def gen_mission(ctx, lookname, commshort, system, station, profit, pads, d
 
         if "x" in msg.content.lower():
             # immediately stop if there's an x anywhere in the message, even if there are other proper inputs
-            message_cancelled = await ctx.send("**Broadcast cancelled.**")
+            message_cancelled = await ctx.send("**Mission creation cancelled.**")
             await msg.delete()
             await message_confirm.delete()
             return
