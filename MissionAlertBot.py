@@ -495,11 +495,11 @@ async def gen_mission(ctx, lookname, commshort, system, station, profit, pads, d
             channel = bot.get_channel(channel_upvotes)
             await channel.send(embed=embed)
         else:
-            await ctx.send("**Mission did not broadcast (no valid response from user).**")
+            await ctx.send("**Mission not generated or broadcast (no valid response from user).**")
             return
         
     except asyncio.TimeoutError:
-        await ctx.send("**Mission did not broadcast (no valid response from user).**")
+        await ctx.send("**Mission not generated or broadcast (no valid response from user).**")
         return
 
     # now clear up by deleting the prompt message and user response
