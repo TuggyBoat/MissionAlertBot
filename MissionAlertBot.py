@@ -253,7 +253,7 @@ def txt_create_reddit_title():
 def txt_create_reddit_body(mission_type, commodity, station, system, profit, pads, demand, eta_text):
     global reddit_body
     if mission_type == 'load': 
-        reddit_body=(f"    INCOMING WIDEBAND TRANSMISSION: P.T.N. CARRIER UNLOADING MISSION IN PROGRESS\n\n**BUY FROM**: station **{station.upper()}** in system **{system.upper()}** ({pads.upper()}-pads)\n\n**COMMODITY**: {commodity}\n\n&#x200B;\n\n**SELL TO**: Fleet Carrier **{longname} {cid}{eta_text}**\n\n**PROFIT**: {profit}k/unit : {demand} demand\n\n\n\n[Join us on Discord](https://www.reddit.com/r/PilotsTradeNetwork/comments/l0y7dk/pilots_trade_network_intergalactic_discord_server/) for mission updates and discussion, channel **#{discordchannel}**.")
+        reddit_body=(f"    INCOMING WIDEBAND TRANSMISSION: P.T.N. CARRIER LOADING MISSION IN PROGRESS\n\n**BUY FROM**: station **{station.upper()}** in system **{system.upper()}** ({pads.upper()}-pads)\n\n**COMMODITY**: {commodity}\n\n&#x200B;\n\n**SELL TO**: Fleet Carrier **{longname} {cid}{eta_text}**\n\n**PROFIT**: {profit}k/unit : {demand} demand\n\n\n\n[Join us on Discord](https://www.reddit.com/r/PilotsTradeNetwork/comments/l0y7dk/pilots_trade_network_intergalactic_discord_server/) for mission updates and discussion, channel **#{discordchannel}**.")
     else:
         reddit_body=(f"    INCOMING WIDEBAND TRANSMISSION: P.T.N. CARRIER UNLOADING MISSION IN PROGRESS\n\n**BUY FROM**: Fleet Carrier **{longname} {cid}{eta_text}**\n\n**COMMODITY**: {commodity}\n\n&#x200B;\n\n**SELL TO**: station **{station.upper()}** in system **{system.upper()}** ({pads.upper()}-pads)\n\n**PROFIT**: {profit}k/unit : {demand} supply\n\n\n\n[Join us on Discord](https://www.reddit.com/r/PilotsTradeNetwork/comments/l0y7dk/pilots_trade_network_intergalactic_discord_server/) for mission updates and discussion, channel **#{discordchannel}**.")
     return reddit_body
@@ -400,7 +400,7 @@ async def gen_mission(ctx, lookname, commshort, system, station, profit, pads, d
     message_pending = await ctx.send(embed=embed)
     await message_gen.delete()
     
-    embed=discord.Embed(title="Where would you like to send the alert?", description="(**d**)iscord, (**r**)eddit, (**t**)ext for copy/pasting or e(**x**)it and cancel", color=embed_color_qu)
+    embed=discord.Embed(title="Where would you like to send the alert?", description="(**d**)iscord, (**r**)eddit, (**t**)ext for copy/pasting or (**x**) to cancel", color=embed_color_qu)
     embed.set_footer(text="Enter all that apply, e.g. **drt** will print text and send alerts to Discord and Reddit.")
     message_confirm = await ctx.send(embed=embed)
 
@@ -494,6 +494,9 @@ async def gen_mission(ctx, lookname, commshort, system, station, profit, pads, d
             embed=discord.Embed(title=f"{longname} REQUIRES YOUR UPDOOTS", description=f"https://www.reddit.com{reddit_post_url}", color=embed_color_reddit)
             channel = bot.get_channel(channel_upvotes)
             await channel.send(embed=embed)
+        else:
+            await ctx.send("**Mission did not broadcast (no valid response from user).**")
+            return
         
     except asyncio.TimeoutError:
         await ctx.send("**Mission did not broadcast (no valid response from user).**")
@@ -515,6 +518,7 @@ async def gen_mission(ctx, lookname, commshort, system, station, profit, pads, d
 @bot.command(name='loadsend', help='Deprecated, now identical to m.load.')
 @commands.has_role('Carrier Owner')
 async def loadsend(ctx, lookname, commshort, system, station, profit, pads, demand, eta=None):
+    await ctx.send("This command is deprecated. It will continue to work for now but please use **m.load** in future.")
     await load(ctx, lookname, commshort, system, station, profit, pads, demand, eta=None)
 
 
@@ -522,6 +526,7 @@ async def loadsend(ctx, lookname, commshort, system, station, profit, pads, dema
 @bot.command(name='unloadsend', help='Deprecated, now identical to m.unload.')
 @commands.has_role('Carrier Owner')
 async def unloadsend(ctx, lookname, commshort, system, station, profit, pads, demand, eta=None):
+    await ctx.send("This command is deprecated. It will continue to work for now but please use **m.unload** in future.")
     await unload(ctx, lookname, commshort, system, station, profit, pads, demand, eta=None)
 
 #
