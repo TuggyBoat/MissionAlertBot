@@ -92,12 +92,6 @@ if not table_exists('carriers'):
     ''')
 
 # create missions db if necessary
-def table_exists(table_name): 
-    cm.execute('''SELECT count(name) FROM sqlite_master WHERE TYPE = 'table' AND name = '{}' '''.format(table_name)) 
-    if cm.fetchone()[0] == 1: 
-        return True 
-    return False
-
 if not table_exists('missions'): 
     conm.execute('''
         CREATE TABLE missions(
