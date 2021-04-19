@@ -394,7 +394,7 @@ async def gen_mission(ctx, lookname, commshort, system, station, profit, pads, d
     if rp:
         await message_rp.delete()
         await message_rp_text.delete()
-        embed.add_field(name="Roleplay text",value=rp_text, inline=False)
+        embed.add_field(name="Roleplay text", value=rp_text, inline=False)
     message_pending = await ctx.send(embed=embed)
     await message_gen.delete()
     
