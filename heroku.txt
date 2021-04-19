@@ -1,2 +1,0 @@
-run from console:
-heroku ps:scale worker=1
