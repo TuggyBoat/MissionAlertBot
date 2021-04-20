@@ -73,13 +73,13 @@ cm = conm.cursor()
 #
 
 # create carrier record if necessary (only needed on first run)
-def table_exists(table_name): 
+def table_exists_carriers(table_name): 
     c.execute('''SELECT count(name) FROM sqlite_master WHERE TYPE = 'table' AND name = '{}' '''.format(table_name)) 
     if c.fetchone()[0] == 1: 
         return True 
     return False
 
-if not table_exists('carriers'): 
+if not table_exists_carriers('carriers'): 
     c.execute('''
         CREATE TABLE carriers( 
             p_ID INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -91,9 +91,15 @@ if not table_exists('carriers'):
         ) 
     ''')
 
+def table_exists_missions(table_name): 
+    cm.execute('''SELECT count(name) FROM sqlite_master WHERE TYPE = 'table' AND name = '{}' '''.format(table_name)) 
+    if cm.fetchone()[0] == 1: 
+        return True 
+    return False
+
 # create missions db if necessary
-if not table_exists('missions'): 
-    conm.execute('''
+if not table_exists_missions('missions'): 
+    cm.execute('''
         CREATE TABLE missions(
             "carrier"	TEXT NOT NULL UNIQUE,
             "cid"	TEXT,
@@ -111,8 +117,8 @@ if not table_exists('missions'):
             "reddit_comment_id"	TEXT,
             "reddit_comment_url"	TEXT,
             "discord_alert_id"	INT
-            )
-        ''')
+        )
+    ''')
 
 # function to add carrier, being sure to correct case
 def defcarrier_add(shortname, longname, cid, discordchannel, channelid): 
