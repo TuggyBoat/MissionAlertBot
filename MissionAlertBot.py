@@ -160,7 +160,7 @@ def defcarrier_findshort(lookshort):
 
 # function to search for a carrier by p_ID
 def defcarrier_findpid(lookid):
-    c.execute(f"SELECT p_ID, shortname, longname, cid, discordchannel FROM carriers WHERE p_ID = {lookid}")
+    c.execute(f"SELECT p_ID, shortname, longname, cid, discordchannel, channelid FROM carriers WHERE p_ID = {lookid}")
     result = c.fetchone()
     global p_ID, shortname, longname, cid, discordchannel, channelid
     p_ID, shortname, longname, cid, discordchannel, channelid = result['p_ID'],result['shortname'],result['longname'],result['cid'],result['discordchannel'],result['channelid']
