@@ -18,6 +18,8 @@ from discord.ext import commands
 from datetime import datetime
 from datetime import timezone
 
+from .constants import PROD_FLAIR_MISSION_START, PROD_FLAIR_MISSION_STOP, TEST_TRADE_ALERTS_ID, PROD_TRADE_ALERTS_ID, \
+    TEST_SUB_REDDIT, PROD_SUB_REDDIT, TEST_FLAIR_MISSION_START, TEST_FLAIR_MISSION_STOP
 #
 #                       INIT STUFF
 #
@@ -25,22 +27,20 @@ from datetime import timezone
 # load Discord token from .env - allows bot to connect to Discord
 load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
+_production = os.environ.get('PTN-MISSION-ALERT-SERVICE', 'PROD')
 
-# setting some variables
-# reddit flair IDs - testing sub
-#flair_mission_start="3cbb1ab6-8e8e-11eb-93a1-0e0f446bc1b7"
-#flair_mission_stop="4242a2e2-8e8e-11eb-b443-0e664851dbff"
-# reddit flair IDs - main sub
-flair_mission_start="d01e6808-9235-11eb-9cc0-0eb650439ee7"
-flair_mission_stop="eea2d818-9235-11eb-b86f-0e50eec082f5"
+# TODO: Add an enumeration here, we only accept a few values for the flag
+
+# setting some variables, you can toggle between production and test by setting an env variable flag now.
+
+flair_mission_start = PROD_FLAIR_MISSION_START if _production else TEST_FLAIR_MISSION_START
+flair_mission_stop = PROD_FLAIR_MISSION_STOP if _production else TEST_FLAIR_MISSION_STOP
+
 # trade alerts channel ID for PTN main server
-trade_alerts_id = 801798469189763073
-# trade alerts channel ID for PTN test server
-#trade_alerts_id = 824383348628783144
-# subreddit for testing
-#to_subreddit = "PTNBotTesting"
-# subreddit for live
-to_subreddit = "PilotsTradeNetwork"
+trade_alerts_id = PROD_TRADE_ALERTS_ID if _production else TEST_TRADE_ALERTS_ID
+to_subreddit = PROD_SUB_REDDIT if _production else TEST_SUB_REDDIT
+
+
 channel_upvotes = 828279034387103744
 embed_colour_loading = 0x80ffff # blue
 embed_colour_unloading = 0x80ff80 # green
