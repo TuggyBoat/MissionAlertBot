@@ -120,6 +120,18 @@ if not table_exists_missions('missions'):
         )
     ''')
 
+# function to backup carrier database
+def backup_carrier_db()
+    defget_datetime()
+    shutil.copy ('carriers.db', f'backup/carriers.{dt_file_string}.db')
+    print(f'Backed up carriers.db at {dt_file_string}')
+
+# function to backup mission database
+def backup_mission_db()
+    defget_datetime()
+    shutil.copy ('missions.db', f'backup/missions.{dt_file_string}.db')
+    print(f'Backed up missions.db at {dt_file_string}')
+
 # function to add carrier, being sure to correct case
 def defcarrier_add(shortname, longname, cid, discordchannel, channelid): 
     c.execute(''' INSERT INTO carriers VALUES(NULL, ?, ?, ?, ?, ?) ''', (shortname.lower(), longname.upper(), cid.upper(), discordchannel.lower(), channelid)) 
@@ -347,7 +359,7 @@ async def gen_mission(ctx, lookname, commshort, system, station, profit, pads, d
 
     rp_text = reddit_post_id = reddit_post_url = reddit_comment_id = reddit_comment_url = discord_alert_id = "NULL"
     eta_text = f" (ETA {eta} minutes)" if eta else ""
-        
+
     embed=discord.Embed(title="Generating and fetching mission alerts...", color=embed_color_qu)
     message_gen = await ctx.send(embed=embed)
 
@@ -537,6 +549,9 @@ async def unloadsend(ctx, lookname, commshort, system, station, profit, pads, de
 
 # add mission to DB, called from mission generator
 async def mission_add(ctx, longname, cid, channelid, commodity, mission_type, system, station, profit, pads, demand, rp_text, reddit_post_id, reddit_post_url, reddit_comment_id, reddit_comment_url, discord_alert_id, rp, message_pending, eta_text):
+
+    await backup_mission_db() # backup the missions database before going any further
+
     cm.execute(''' INSERT INTO missions VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ''', (longname, cid, channelid, commodity.title(), mission_type.lower(), system.title(), station.title(), profit, pads.upper(), demand, rp_text, reddit_post_id, reddit_post_url, reddit_comment_id, reddit_comment_url, discord_alert_id))
     conm.commit()
     if mission_type == 'load':
@@ -624,6 +639,9 @@ async def issions(ctx):
                                'Anything put in quotes after the carrier name will be treated as a quote to be sent along with the completion notice. This can be used for RP if desired.')
 @commands.has_role('Carrier Owner')
 async def done(ctx, lookname, rp=None):
+
+    await backup_mission_db() # backup the missions database before going any further
+
     cm.execute(f'''SELECT * FROM missions WHERE carrier LIKE (?)''', ('%'+lookname+'%',))
     result = cm.fetchone()
     if not result:
@@ -679,6 +697,9 @@ async def done(ctx, lookname, rp=None):
 # a command for users to mark a carrier mission complete from within the carrier channel
 @bot.command(name='complete', help='Use in a carrier\'s channel to mark the current trade mission complete.')
 async def complete(ctx):
+
+    await backup_mission_db() # backup the missions database before going any further
+
     # take a note of user and channel ID
     msg_ctx_id = ctx.channel.id
     msg_usr_id = ctx.author.id
@@ -786,10 +807,13 @@ async def carrier_list(ctx):
                                       'do NOT include the # at the start of the channel name!')
 @commands.has_role('Carrier Owner')
 async def carrier_add(ctx, shortname, longname, cid, discordchannel):
+
+    await backup_carrier_db() # backup the carriers database before going any further
+
     channel = discord.utils.get(ctx.guild.channels, name=discordchannel)
     channelid = channel.id
-    defcarrier_add(shortname, longname, cid, discordchannel, channelid)
-    defcarrier_findlong(longname)
+    await defcarrier_add(shortname, longname, cid, discordchannel, channelid)
+    await defcarrier_findlong(longname)
     await ctx.send(f"Added **{longname.upper()}** **{cid.upper()}** with shortname **{shortname.lower()}** and channel **<#{channelid}>** at ID **{p_ID}**")
 
 # remove FC from database
@@ -797,7 +821,10 @@ async def carrier_add(ctx, shortname, longname, cid, discordchannel):
                                       'Use the findid command to check before deleting.')
 @commands.has_role('Carrier Owner')
 async def carrier_del(ctx, p_ID):
-    defcarrier_del(p_ID)
+
+    await backup_carrier_db() # backup the carriers database before going any further
+
+    await defcarrier_del(p_ID)
     await ctx.send(f"Attempted to remove carrier number {p_ID}")
 
 # change FC background image
