@@ -23,24 +23,31 @@ from datetime import timezone
 #
 
 # load Discord token from .env - allows bot to connect to Discord
-load_dotenv()
-TOKEN = os.getenv('DISCORD_TOKEN')
+load_dotenv() # the token is loaded below depending on whether testing environment is enabled
 
-# setting some variables
-# reddit flair IDs - testing sub
-#flair_mission_start="3cbb1ab6-8e8e-11eb-93a1-0e0f446bc1b7"
-#flair_mission_stop="4242a2e2-8e8e-11eb-b443-0e664851dbff"
-# reddit flair IDs - main sub
-flair_mission_start="d01e6808-9235-11eb-9cc0-0eb650439ee7"
-flair_mission_stop="eea2d818-9235-11eb-b86f-0e50eec082f5"
-# trade alerts channel ID for PTN main server
-trade_alerts_id = 801798469189763073
-# trade alerts channel ID for PTN test server
-#trade_alerts_id = 824383348628783144
-# subreddit for testing
-#to_subreddit = "PTNBotTesting"
-# subreddit for live
-to_subreddit = "PilotsTradeNetwork"
+testing=1
+
+if testing:
+    print("Testing mode enabled")
+    TOKEN = os.getenv('DISCORD_TOKEN_TESTING')
+    # reddit flair IDs - testing sub
+    flair_mission_start="3cbb1ab6-8e8e-11eb-93a1-0e0f446bc1b7"
+    flair_mission_stop="4242a2e2-8e8e-11eb-b443-0e664851dbff"
+    # subreddit for testing
+    to_subreddit = "PTNBotTesting"
+    # trade alerts channel ID for PTN test server
+    trade_alerts_id = 824383348628783144
+    
+else:
+    TOKEN = os.getenv('DISCORD_TOKEN')
+    # reddit flair IDs - live sub
+    flair_mission_start="d01e6808-9235-11eb-9cc0-0eb650439ee7"
+    flair_mission_stop="eea2d818-9235-11eb-b86f-0e50eec082f5"
+    # subreddit for live
+    to_subreddit = "PilotsTradeNetwork"
+    # trade alerts channel ID for PTN main server
+    trade_alerts_id = 801798469189763073
+
 channel_upvotes = 828279034387103744
 embed_colour_loading = 0x80ffff # blue
 embed_colour_unloading = 0x80ff80 # green
@@ -63,8 +70,6 @@ c = conn.cursor()
 conm = sqlite3.connect('missions.db')
 conm.row_factory = sqlite3.Row
 cm = conm.cursor()
-
-
 
 
 
@@ -121,16 +126,18 @@ if not table_exists_missions('missions'):
     ''')
 
 # function to backup carrier database
-def backup_carrier_db()
+def backup_carrier_db():
     defget_datetime()
     shutil.copy ('carriers.db', f'backup/carriers.{dt_file_string}.db')
     print(f'Backed up carriers.db at {dt_file_string}')
+    return
 
 # function to backup mission database
-def backup_mission_db()
+def backup_mission_db():
     defget_datetime()
     shutil.copy ('missions.db', f'backup/missions.{dt_file_string}.db')
     print(f'Backed up missions.db at {dt_file_string}')
+    return
 
 # function to add carrier, being sure to correct case
 def defcarrier_add(shortname, longname, cid, discordchannel, channelid): 
@@ -550,7 +557,7 @@ async def unloadsend(ctx, lookname, commshort, system, station, profit, pads, de
 # add mission to DB, called from mission generator
 async def mission_add(ctx, longname, cid, channelid, commodity, mission_type, system, station, profit, pads, demand, rp_text, reddit_post_id, reddit_post_url, reddit_comment_id, reddit_comment_url, discord_alert_id, rp, message_pending, eta_text):
 
-    await backup_mission_db() # backup the missions database before going any further
+    backup_mission_db() # backup the missions database before going any further
 
     cm.execute(''' INSERT INTO missions VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ''', (longname, cid, channelid, commodity.title(), mission_type.lower(), system.title(), station.title(), profit, pads.upper(), demand, rp_text, reddit_post_id, reddit_post_url, reddit_comment_id, reddit_comment_url, discord_alert_id))
     conm.commit()
@@ -640,7 +647,7 @@ async def issions(ctx):
 @commands.has_role('Carrier Owner')
 async def done(ctx, lookname, rp=None):
 
-    await backup_mission_db() # backup the missions database before going any further
+    backup_mission_db() # backup the missions database before going any further
 
     cm.execute(f'''SELECT * FROM missions WHERE carrier LIKE (?)''', ('%'+lookname+'%',))
     result = cm.fetchone()
@@ -698,7 +705,7 @@ async def done(ctx, lookname, rp=None):
 @bot.command(name='complete', help='Use in a carrier\'s channel to mark the current trade mission complete.')
 async def complete(ctx):
 
-    await backup_mission_db() # backup the missions database before going any further
+    backup_mission_db() # backup the missions database before going any further
 
     # take a note of user and channel ID
     msg_ctx_id = ctx.channel.id
@@ -808,7 +815,7 @@ async def carrier_list(ctx):
 @commands.has_role('Carrier Owner')
 async def carrier_add(ctx, shortname, longname, cid, discordchannel):
 
-    await backup_carrier_db() # backup the carriers database before going any further
+    backup_carrier_db() # backup the carriers database before going any further
 
     channel = discord.utils.get(ctx.guild.channels, name=discordchannel)
     channelid = channel.id
@@ -822,7 +829,7 @@ async def carrier_add(ctx, shortname, longname, cid, discordchannel):
 @commands.has_role('Carrier Owner')
 async def carrier_del(ctx, p_ID):
 
-    await backup_carrier_db() # backup the carriers database before going any further
+    backup_carrier_db() # backup the carriers database before going any further
 
     await defcarrier_del(p_ID)
     await ctx.send(f"Attempted to remove carrier number {p_ID}")
