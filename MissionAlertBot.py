@@ -14,7 +14,6 @@ import sqlite3
 import asyncpraw
 import asyncio
 import shutil
-from dotenv import load_dotenv
 from discord.ext import commands
 from datetime import datetime
 from datetime import timezone
@@ -25,13 +24,9 @@ import constants
 #                       INIT STUFF
 #
 
-# load Discord token from .env - allows bot to connect to Discord
-load_dotenv()  # the token is loaded below depending on whether testing environment is enabled
-TOKEN = os.getenv('DISCORD_TOKEN')
-
 # Ast will parse a value into a python type, but if you try to give a boolean its going to get into problems. Just use
 # a string and be consistent.
-_production = ast.literal_eval(os.environ.get('PTN-MISSION-ALERT-SERVICE', 'True'))
+_production = ast.literal_eval(os.environ.get('PTN-MISSION-ALERT-SERVICE', 'False'))
 
 
 # setting some variables, you can toggle between production and test by setting an env variable flag now,
@@ -44,6 +39,9 @@ flair_mission_stop = conf['MISSION_STOP']
 # trade alerts channel ID
 trade_alerts_id = conf['TRADE_ALERTS_ID']
 to_subreddit = conf['SUB_REDDIT']
+
+# Get the discord token
+token = conf['DISCORD_TOKEN']
 
 # create reddit instance
 reddit = asyncpraw.Reddit('bot1')
@@ -268,6 +266,8 @@ def defcreateimage_unload(carriername, carrierreg, commodity, system, station, p
 #
 
 def txt_create_discord(mission_type, commodity, station, system, profit, pads, demand, eta_text):
+    # TODO: Add unit test around this, but we need to mock out the whole discord thing first or refactor this such
+    #  that we do not auto trigger all the underneath blocks
     global discord_text
     discord_text = f"<#{channelid}> {'load' if mission_type == 'load' else 'unload'}ing {commodity} " \
                    f"{'from' if mission_type == 'load' else 'to'} **{station.upper()}** station in system " \
@@ -279,7 +279,7 @@ def txt_create_discord(mission_type, commodity, station, system, profit, pads, d
 
 def txt_create_reddit_title():
     global reddit_title
-    reddit_title = (f"P.T.N. News - Trade mission - {longname} {cid} - {dt_string} UTC")
+    reddit_title = f"P.T.N. News - Trade mission - {longname} {cid} - {dt_string} UTC"
 
     return reddit_title
 
@@ -291,14 +291,15 @@ def txt_create_reddit_body(mission_type, commodity, station, system, profit, pad
             f"    INCOMING WIDEBAND TRANSMISSION: P.T.N. CARRIER LOADING MISSION IN PROGRESS\n\n**BUY FROM**: station "
             f"**{station.upper()}** in system **{system.upper()}** ({pads.upper()}-pads)\n\n**COMMODITY**: "
             f"{commodity}\n\n&#x200B;\n\n**SELL TO**: Fleet Carrier **{longname} {cid}{eta_text}**\n\n**PROFIT**: "
-            f"{profit}k/unit : {demand} demand\n\n\n\n[Join us on Discord]("
-            f"https://www.reddit.com/r/PilotsTradeNetwork/comments/l0y7dk/pilots_trade_network_intergalactic_discord_server/) for mission updates and discussion, channel **#{discordchannel}**.")
+            f"{profit}k/unit : {demand} demand\n\n\n\n[Join us on Discord]({constants.REDDIT_DISCORD_LINK_URL}) for "
+            f"mission updates and discussion, channel **#{discordchannel}**.")
     else:
         reddit_body = (
             f"    INCOMING WIDEBAND TRANSMISSION: P.T.N. CARRIER UNLOADING MISSION IN PROGRESS\n\n**BUY FROM**: Fleet "
             f"Carrier **{longname} {cid}{eta_text}**\n\n**COMMODITY**: {commodity}\n\n&#x200B;\n\n**SELL TO**: station "
             f"**{station.upper()}** in system **{system.upper()}** ({pads.upper()}-pads)\n\n**PROFIT**: {profit}k/unit "
-            f": {demand} supply\n\n\n\n[Join us on Discord](https://www.reddit.com/r/PilotsTradeNetwork/comments/l0y7dk/pilots_trade_network_intergalactic_discord_server/) for mission updates and discussion, channel **#{discordchannel}**.")
+            f": {demand} supply\n\n\n\n[Join us on Discord]({constants.REDDIT_DISCORD_LINK_URL}) for mission updates"
+            f" and discussion, channel **#{discordchannel}**.")
     return reddit_body
 
 
@@ -495,11 +496,13 @@ async def gen_mission(ctx, lookname, commshort, system, station, profit, pads, d
                                       color=constants.EMBED_COLOUR_DISCORD)
                 await ctx.send(embed=embed)
 
-            embed = discord.Embed(title="Reddit Post Title", description=f"`{reddit_title}`", color=constants.EMBED_COLOUR_REDDIT)
+            embed = discord.Embed(title="Reddit Post Title", description=f"`{reddit_title}`",
+                                  color=constants.EMBED_COLOUR_REDDIT)
             await ctx.send(embed=embed)
             if rp:
                 embed = discord.Embed(title="Reddit Post Body - PASTE INTO MARKDOWN MODE",
-                                      description=f"```> {rp_text}\n\n{reddit_body}```", color=constants.EMBED_COLOUR_REDDIT)
+                                      description=f"```> {rp_text}\n\n{reddit_body}```",
+                                      color=constants.EMBED_COLOUR_REDDIT)
             else:
                 embed = discord.Embed(title="Reddit Post Body - PASTE INTO MARKDOWN MODE",
                                       description=f"```{reddit_body}```", color=constants.EMBED_COLOUR_REDDIT)
@@ -636,11 +639,13 @@ async def mission_add(ctx, longname, cid, channelid, commodity, mission_type, sy
     conm.commit()
     if mission_type == 'load':
         embed = discord.Embed(title=f"Mission now in progress for {longname}{eta_text}",
-                              description="Use **m.done** to mark complete and **m.issions** to list all active missions.",
+                              description="Use **m.done** to mark complete and **m.issions** to list all active "
+                                          "missions.",
                               color=constants.EMBED_COLOUR_LOADING)
     else:
         embed = discord.Embed(title=f"Mission now in progress for {longname}{eta_text}",
-                              description="Use **m.done** to mark complete and **m.issions** to list all active missions.",
+                              description="Use **m.done** to mark complete and **m.issions** to list all active "
+                                          "missions.",
                               color=constants.EMBED_COLOUR_UNLOADING)
     file = discord.File("result.png", filename="image.png")
     embed.set_image(url="attachment://image.png")
@@ -688,13 +693,15 @@ async def ission(ctx):
                                                                                                   'rp_text']
             if missiontype == 'load':
                 if rp_text == 'NULL':
-                    embed = discord.Embed(title=f"{carrier} ({cid}) on LOADING mission", color=constants.EMBED_COLOUR_LOADING)
+                    embed = discord.Embed(title=f"{carrier} ({cid}) on LOADING mission",
+                                          color=constants.EMBED_COLOUR_LOADING)
                 else:
                     embed = discord.Embed(title=f"{carrier} ({cid}) on LOADING mission", description=f"> {rp_text}",
                                           color=constants.EMBED_COLOUR_LOADING)
             else:
                 if rp_text == 'NULL':
-                    embed = discord.Embed(title=f"{carrier} ({cid}) on UNLOADING mission", color=constants.EMBED_COLOUR_UNLOADING)
+                    embed = discord.Embed(title=f"{carrier} ({cid}) on UNLOADING mission",
+                                          color=constants.EMBED_COLOUR_UNLOADING)
                 else:
                     embed = discord.Embed(title=f"{carrier} ({cid}) on UNLOADING mission", description=f"> {rp_text}",
                                           color=constants.EMBED_COLOUR_UNLOADING)
@@ -768,7 +775,8 @@ async def done(ctx, lookname, rp=None):
             # send Discord carrier channel updates
             channelid = result['channelid']
             channel = bot.get_channel(channelid)
-            embed = discord.Embed(title=f"{carrier} MISSION COMPLETE", description=f"{desc_msg}", color=constants.EMBED_COLOUR_OK)
+            embed = discord.Embed(title=f"{carrier} MISSION COMPLETE", description=f"{desc_msg}",
+                                  color=constants.EMBED_COLOUR_OK)
             await channel.send(embed=embed)
 
         # add comment to Reddit post
@@ -1097,4 +1105,4 @@ async def on_command_error(ctx, error):
         await ctx.send('Sorry, that didn\'t work. Check your syntax and permissions.')
 
 
-bot.run(TOKEN)
+bot.run(token)
