@@ -282,14 +282,10 @@ def defcreateimage_unload(carriername, carrierreg, commodity, system, station, p
 
 def txt_create_discord(mission_type, commodity, station, system, profit, pads, demand, eta_text):
     global discord_text
-    if mission_type == 'load':
-        discord_text = (
-            f"<#{channelid}> loading {commodity} from **{station.upper()}** station in system **{system.upper()}** : "
-            f"{profit}k per unit profit : {demand} demand : {pads.upper()}-pads.{eta_text}")
-    else:
-        discord_text = (
-            f"<#{channelid}> unloading {commodity} to **{station.upper()}** station in system **{system.upper()}** : "
-            f"{profit}k per unit profit : {demand} supply : {pads.upper()}-pads.{eta_text}")
+    discord_text = f"<#{channelid}> {'load' if mission_type == 'load' else 'unload'} {commodity} " \
+                   f"{'from' if mission_type == 'load' else 'to'} **{station.upper()}** station in system " \
+                   f"**{system.upper()}** : {profit}k per unit profit : {demand} demand : {pads.upper()}-pads" \
+                   f".{eta_text}"
 
     return discord_text
 
