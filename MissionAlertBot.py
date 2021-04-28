@@ -4,6 +4,7 @@
 # Additional contributions by Alexander Leidinger
 # Discord Developer Portal: https://discord.com/developers/applications/822146046934384640/information
 # Git repo: https://github.com/cimspin/MissionAlertBot
+import ast
 
 from PIL import Image, ImageFont, ImageDraw
 import os
@@ -18,8 +19,8 @@ from discord.ext import commands
 from datetime import datetime
 from datetime import timezone
 
-from .constants import PROD_FLAIR_MISSION_START, PROD_FLAIR_MISSION_STOP, TEST_TRADE_ALERTS_ID, PROD_TRADE_ALERTS_ID, \
-    TEST_SUB_REDDIT, PROD_SUB_REDDIT, TEST_FLAIR_MISSION_START, TEST_FLAIR_MISSION_STOP
+import constants
+
 #
 #                       INIT STUFF
 #
@@ -27,29 +28,22 @@ from .constants import PROD_FLAIR_MISSION_START, PROD_FLAIR_MISSION_STOP, TEST_T
 # load Discord token from .env - allows bot to connect to Discord
 load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
-_production = os.environ.get('PTN-MISSION-ALERT-SERVICE', 'PROD')
 
-# TODO: Add an enumeration here, we only accept a few values for the flag
-
-# setting some variables, you can toggle between production and test by setting an env variable flag now.
-
-flair_mission_start = PROD_FLAIR_MISSION_START if _production else TEST_FLAIR_MISSION_START
-flair_mission_stop = PROD_FLAIR_MISSION_STOP if _production else TEST_FLAIR_MISSION_STOP
-
-# trade alerts channel ID for PTN main server
-trade_alerts_id = PROD_TRADE_ALERTS_ID if _production else TEST_TRADE_ALERTS_ID
-to_subreddit = PROD_SUB_REDDIT if _production else TEST_SUB_REDDIT
+# Ast will parse a value into a python type, but if you try to give a boolean its going to get into problems. Just use
+# a string and be consistent.
+_production = ast.literal_eval(os.environ.get('PTN-MISSION-ALERT-SERVICE', 'True'))
 
 
-channel_upvotes = 828279034387103744
-embed_colour_loading = 0x80ffff # blue
-embed_colour_unloading = 0x80ff80 # green
-embed_color_reddit = 0xff0000 # red
-embed_color_discord = 0x8080ff # purple
-embed_color_rp = 0xff00ff # pink
-embed_color_error = 0x800000 # dark red
-embed_color_qu = 0x80ffff # same as loading
-embed_color_ok = 0x80ff80 # same as unloading
+# setting some variables, you can toggle between production and test by setting an env variable flag now,
+# PTN-MISSION-ALERT-SERVICE
+conf = constants.get_constant(_production)
+
+flair_mission_start = conf['MISSION_START']
+flair_mission_stop = conf['MISSION_STOP']
+
+# trade alerts channel ID
+trade_alerts_id = conf['TRADE_ALERTS_ID']
+to_subreddit = conf['SUB_REDDIT']
 
 # create reddit instance
 reddit = asyncpraw.Reddit('bot1')
@@ -63,10 +57,6 @@ c = conn.cursor()
 conm = sqlite3.connect('missions.db')
 conm.row_factory = sqlite3.Row
 cm = conm.cursor()
-
-
-
-
 
 #
 #                       DATABASE STUFF
@@ -259,7 +249,7 @@ def txt_create_reddit_body(mission_type, commodity, station, system, profit, pad
     return reddit_body
 
 def txt_create_reddit_info():
-	return discord.Embed(title=f"Mission Generation Complete for {longname}", description="Paste Reddit content into **MARKDOWN MODE** in the editor. You can swap back to Fancy Pants afterwards and make any changes/additions or embed the image.\n\nBest practice for Reddit is an image post with a top level comment that contains the text version of the advert. This ensures the image displays with highest possible compatibility across platforms and apps. When mission complete, flag the post as *Spoiler* to prevent image showing and add a comment to inform.", color=embed_color_ok)
+	return discord.Embed(title=f"Mission Generation Complete for {longname}", description="Paste Reddit content into **MARKDOWN MODE** in the editor. You can swap back to Fancy Pants afterwards and make any changes/additions or embed the image.\n\nBest practice for Reddit is an image post with a top level comment that contains the text version of the advert. This ensures the image displays with highest possible compatibility across platforms and apps. When mission complete, flag the post as *Spoiler* to prevent image showing and add a comment to inform.", color=constants.EMBED_COLOUR_OK)
 
 
 
@@ -348,13 +338,13 @@ async def gen_mission(ctx, lookname, commshort, system, station, profit, pads, d
     rp_text = reddit_post_id = reddit_post_url = reddit_comment_id = reddit_comment_url = discord_alert_id = "NULL"
     eta_text = f" (ETA {eta} minutes)" if eta else ""
         
-    embed=discord.Embed(title="Generating and fetching mission alerts...", color=embed_color_qu)
+    embed=discord.Embed(title="Generating and fetching mission alerts...", color=constants.EMBED_COLOUR_QU)
     message_gen = await ctx.send(embed=embed)
 
     cm.execute(f'''SELECT carrier FROM missions WHERE carrier LIKE (?)''', ('%'+lookname+'%',))
     result = cm.fetchone()
     if result:
-        embed=discord.Embed(title="Error", description=f"{result['carrier']} is already on a mission, please use **m.done** to mark it complete before starting a new mission.", color=embed_color_error)
+        embed=discord.Embed(title="Error", description=f"{result['carrier']} is already on a mission, please use **m.done** to mark it complete before starting a new mission.", color=constants.EMBED_COLOUR_ERROR)
         await ctx.send(embed=embed)
         return
     
@@ -366,7 +356,7 @@ async def gen_mission(ctx, lookname, commshort, system, station, profit, pads, d
         return msg.author == ctx.author and msg.channel == ctx.channel
 
     if rp:
-        embed=discord.Embed(title="Input roleplay text", description="Roleplay text is sent in quote style like this:\n\n> This is a quote!\n\nYou can use all regular Markdown formatting. If the \"send to Discord\" option is chosen, your quote will be broadcast to your carrier's channel following its mission image. If the \"send to Reddit\" option is chosen, the quote is inserted above the mission details in the top-level comment.", color=embed_color_rp)
+        embed=discord.Embed(title="Input roleplay text", description="Roleplay text is sent in quote style like this:\n\n> This is a quote!\n\nYou can use all regular Markdown formatting. If the \"send to Discord\" option is chosen, your quote will be broadcast to your carrier's channel following its mission image. If the \"send to Reddit\" option is chosen, the quote is inserted above the mission details in the top-level comment.", color=constants.EMBED_COLOUR_RP)
         message_rp = await ctx.send(embed=embed)
 
         try:
@@ -393,7 +383,7 @@ async def gen_mission(ctx, lookname, commshort, system, station, profit, pads, d
     txt_create_reddit_body(mission_type, commodity, station, system, profit, pads, demand, eta_text)
     
     # check they're happy with output and offer to send
-    embed=discord.Embed(title=f"Mission pending for {longname}{eta_text}", color=embed_color_ok)
+    embed=discord.Embed(title=f"Mission pending for {longname}{eta_text}", color=constants.EMBED_COLOUR_OK)
     embed.add_field(name="Mission type", value=f"{mission_type.title()}ing", inline=True)
     embed.add_field(name="Commodity", value=f"{demand} of {commodity.title()} at {profit}k/unit", inline=True)
     embed.add_field(name="Location", value=f"{station.upper()} station ({pads.upper()}-pads) in system {system.upper()}", inline=True)
@@ -404,7 +394,7 @@ async def gen_mission(ctx, lookname, commshort, system, station, profit, pads, d
     message_pending = await ctx.send(embed=embed)
     await message_gen.delete()
     
-    embed=discord.Embed(title="Where would you like to send the alert?", description="(**d**)iscord, (**r**)eddit, (**t**)ext for copy/pasting or (**x**) to cancel", color=embed_color_qu)
+    embed=discord.Embed(title="Where would you like to send the alert?", description="(**d**)iscord, (**r**)eddit, (**t**)ext for copy/pasting or (**x**) to cancel", color=constants.EMBED_COLOUR_QU)
     embed.set_footer(text="Enter all that apply, e.g. **drt** will print text and send alerts to Discord and Reddit.")
     message_confirm = await ctx.send(embed=embed)
 
@@ -420,22 +410,22 @@ async def gen_mission(ctx, lookname, commshort, system, station, profit, pads, d
 
         if "t" in msg.content.lower():
 
-            embed=discord.Embed(title="Trade Alert (Discord)", description=f"`{discord_text}`", color=embed_color_discord)
+            embed=discord.Embed(title="Trade Alert (Discord)", description=f"`{discord_text}`", color=constants.EMBED_COLOUR_DISCORD)
             await ctx.send(embed=embed)
             if rp:
-                embed=discord.Embed(title="Roleplay Text (Discord)", description=f"`> {rp_text}`", color=embed_color_discord)
+                embed=discord.Embed(title="Roleplay Text (Discord)", description=f"`> {rp_text}`", color=constants.EMBED_COLOUR_DISCORD)
                 await ctx.send(embed=embed)
 
-            embed=discord.Embed(title="Reddit Post Title", description=f"`{reddit_title}`", color=embed_color_reddit)
+            embed=discord.Embed(title="Reddit Post Title", description=f"`{reddit_title}`", color=constants.EMBED_COLOUR_REDDIT)
             await ctx.send(embed=embed)
             if rp:
-                embed=discord.Embed(title="Reddit Post Body - PASTE INTO MARKDOWN MODE", description=f"```> {rp_text}\n\n{reddit_body}```", color=embed_color_reddit)
+                embed=discord.Embed(title="Reddit Post Body - PASTE INTO MARKDOWN MODE", description=f"```> {rp_text}\n\n{reddit_body}```", color=constants.EMBED_COLOUR_REDDIT)
             else:
-                embed=discord.Embed(title="Reddit Post Body - PASTE INTO MARKDOWN MODE", description=f"```{reddit_body}```", color=embed_color_reddit)
+                embed=discord.Embed(title="Reddit Post Body - PASTE INTO MARKDOWN MODE", description=f"```{reddit_body}```", color=constants.EMBED_COLOUR_REDDIT)
             embed.set_footer(text="**REMEMBER TO USE MARKDOWN MODE WHEN PASTING TEXT TO REDDIT.**")
             await ctx.send(embed=embed)
             await ctx.send(file=discord.File('result.png'))
-            embed=discord.Embed(title=f"Alert Generation Complete for {longname}", description="Paste Reddit content into **MARKDOWN MODE** in the editor. You can swap back to Fancy Pants afterwards and make any changes/additions or embed the image.\n\nBest practice for Reddit is an image post with a top level comment that contains the text version of the advert. This ensures the image displays with highest possible compatibility across platforms and apps. When mission complete, flag the post as *Spoiler* to prevent image showing and add a comment to inform.", color=embed_color_ok)
+            embed=discord.Embed(title=f"Alert Generation Complete for {longname}", description="Paste Reddit content into **MARKDOWN MODE** in the editor. You can swap back to Fancy Pants afterwards and make any changes/additions or embed the image.\n\nBest practice for Reddit is an image post with a top level comment that contains the text version of the advert. This ensures the image displays with highest possible compatibility across platforms and apps. When mission complete, flag the post as *Spoiler* to prevent image showing and add a comment to inform.", color=constants.EMBED_COLOUR_OK)
             await ctx.send(embed=embed)
 
         if "d" in msg.content.lower():
@@ -446,9 +436,9 @@ async def gen_mission(ctx, lookname, commshort, system, station, profit, pads, d
 
 
             if mission_type == 'load':
-                embed=discord.Embed(description=discord_text, color=embed_colour_loading)
+                embed=discord.Embed(description=discord_text, color=constants.EMBED_COLOUR_LOADING)
             else:
-                embed=discord.Embed(description=discord_text, color=embed_colour_unloading)
+                embed=discord.Embed(description=discord_text, color=constants.EMBED_COLOUR_UNLOADING)
             # old footer hashed out but can be used if desired
             #embed.set_footer(text="Add a reaction to show you're working this mission! React with 💯 if loading is complete.")
             trade_alert_msg = await channel.send(embed=embed)
@@ -459,21 +449,21 @@ async def gen_mission(ctx, lookname, commshort, system, station, profit, pads, d
             file = discord.File("result.png", filename="image.png")
             if mission_type == 'load':
                 if rp:
-                    embed=discord.Embed(title="P.T.N TRADE MISSION STARTING", description=f"> {rp_text}", color=embed_colour_loading)
+                    embed=discord.Embed(title="P.T.N TRADE MISSION STARTING", description=f"> {rp_text}", color=constants.EMBED_COLOUR_LOADING)
                 else:
-                    embed=discord.Embed(title="P.T.N TRADE MISSION STARTING", color=embed_colour_loading)
+                    embed=discord.Embed(title="P.T.N TRADE MISSION STARTING", color=constants.EMBED_COLOUR_LOADING)
 
             else:
                 if rp:
-                    embed=discord.Embed(title="P.T.N TRADE MISSION STARTING", description=f"> {rp_text}", color=embed_colour_unloading)
+                    embed=discord.Embed(title="P.T.N TRADE MISSION STARTING", description=f"> {rp_text}", color=constants.EMBED_COLOUR_UNLOADING)
                 else:
-                    embed=discord.Embed(title="P.T.N TRADE MISSION STARTING", color=embed_colour_unloading)
+                    embed=discord.Embed(title="P.T.N TRADE MISSION STARTING", color=constants.EMBED_COLOUR_UNLOADING)
             embed.set_image(url="attachment://image.png")
             embed.set_footer(text="m.complete will mark this mission complete\nm.ission will display info to channel\nm.issions will list trade missions for all carriers")
             await channel.send(file=file, embed=embed)
             
             
-            embed=discord.Embed(title=f"Discord trade alerts sent for {longname}", description=f"Check <#{trade_alerts_id}> for trade alert and <#{channelid}> for image.", color=embed_color_discord)
+            embed=discord.Embed(title=f"Discord trade alerts sent for {longname}", description=f"Check <#{trade_alerts_id}> for trade alert and <#{channelid}> for image.", color=constants.EMBED_COLOUR_DISCORD)
             await ctx.send(embed=embed)
             await message_send.delete()
 
@@ -492,11 +482,11 @@ async def gen_mission(ctx, lookname, commshort, system, station, profit, pads, d
                 comment = await submission.reply(reddit_body)
             reddit_comment_url = comment.permalink
             reddit_comment_id = comment.id
-            embed=discord.Embed(title=f"Reddit trade alert sent for {longname}", description=f"https://www.reddit.com{reddit_post_url}", color=embed_color_reddit)
+            embed=discord.Embed(title=f"Reddit trade alert sent for {longname}", description=f"https://www.reddit.com{reddit_post_url}", color=constants.EMBED_COLOUR_REDDIT)
             await ctx.send(embed=embed)
             await message_send.delete()
-            embed=discord.Embed(title=f"{longname} REQUIRES YOUR UPDOOTS", description=f"https://www.reddit.com{reddit_post_url}", color=embed_color_reddit)
-            channel = bot.get_channel(channel_upvotes)
+            embed=discord.Embed(title=f"{longname} REQUIRES YOUR UPDOOTS", description=f"https://www.reddit.com{reddit_post_url}", color=constants.EMBED_COLOUR_REDDIT)
+            channel = bot.get_channel(constants.CHANNEL_UPVOTES)
             await channel.send(embed=embed)
        
     except asyncio.TimeoutError:
@@ -540,9 +530,9 @@ async def mission_add(ctx, longname, cid, channelid, commodity, mission_type, sy
     cm.execute(''' INSERT INTO missions VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ''', (longname, cid, channelid, commodity.title(), mission_type.lower(), system.title(), station.title(), profit, pads.upper(), demand, rp_text, reddit_post_id, reddit_post_url, reddit_comment_id, reddit_comment_url, discord_alert_id))
     conm.commit()
     if mission_type == 'load':
-        embed=discord.Embed(title=f"Mission now in progress for {longname}{eta_text}", description="Use **m.done** to mark complete and **m.issions** to list all active missions.", color=embed_colour_loading)
+        embed=discord.Embed(title=f"Mission now in progress for {longname}{eta_text}", description="Use **m.done** to mark complete and **m.issions** to list all active missions.", color=constants.EMBED_COLOUR_LOADING)
     else:
-        embed=discord.Embed(title=f"Mission now in progress for {longname}{eta_text}", description="Use **m.done** to mark complete and **m.issions** to list all active missions.", color=embed_colour_unloading)
+        embed=discord.Embed(title=f"Mission now in progress for {longname}{eta_text}", description="Use **m.done** to mark complete and **m.issions** to list all active missions.", color=constants.EMBED_COLOUR_UNLOADING)
     file = discord.File("result.png", filename="image.png")
     embed.set_image(url="attachment://image.png")
     embed.add_field(name="Type", value=f"{mission_type.title()}ing", inline=True)
@@ -564,7 +554,7 @@ async def ission(ctx):
     result = c.fetchone()
     if not result:
         # if there's no channel match, return an error
-        embed=discord.Embed(description="Try again in the carrier's channel.", color=embed_color_qu)
+        embed=discord.Embed(description="Try again in the carrier's channel.", color=constants.EMBED_COLOUR_QU)
         await ctx.send(embed=embed)
         return
     else:
@@ -574,21 +564,21 @@ async def ission(ctx):
         result = cm.fetchone()
         if not result:
             # if there's no result, return an error
-            embed=discord.Embed(description=f"**{carrier}** doesn't seem to be on a trade mission right now.", color=embed_color_ok)
+            embed=discord.Embed(description=f"**{carrier}** doesn't seem to be on a trade mission right now.", color=constants.EMBED_COLOUR_OK)
             await ctx.send(embed=embed)
         else:
             # user is in correct channel and carrier is on a mission, so show the current trade mission for selected carrier
             carrier, commodity, missiontype, system, station, profit, pads, demand, rp_text = result['carrier'], result['commodity'], result['missiontype'], result['system'], result['station'], result['profit'], result['pad'], result['demand'], result['rp_text']
             if missiontype == 'load':
                 if rp_text == 'NULL':
-                    embed=discord.Embed(title=f"{carrier} ({cid}) on LOADING mission", color=embed_colour_loading)
+                    embed=discord.Embed(title=f"{carrier} ({cid}) on LOADING mission", color=constants.EMBED_COLOUR_LOADING)
                 else:
-                    embed=discord.Embed(title=f"{carrier} ({cid}) on LOADING mission", description=f"> {rp_text}", color=embed_colour_loading)
+                    embed=discord.Embed(title=f"{carrier} ({cid}) on LOADING mission", description=f"> {rp_text}", color=constants.EMBED_COLOUR_LOADING)
             else:
                 if rp_text == 'NULL':
-                    embed=discord.Embed(title=f"{carrier} ({cid}) on UNLOADING mission", color=embed_colour_unloading)
+                    embed=discord.Embed(title=f"{carrier} ({cid}) on UNLOADING mission", color=constants.EMBED_COLOUR_UNLOADING)
                 else:
-                    embed=discord.Embed(title=f"{carrier} ({cid}) on UNLOADING mission", description=f"> {rp_text}", color=embed_colour_unloading)
+                    embed=discord.Embed(title=f"{carrier} ({cid}) on UNLOADING mission", description=f"> {rp_text}", color=constants.EMBED_COLOUR_UNLOADING)
             embed.add_field(name=f"{system.upper()}", value="*System*", inline=True)
             embed.add_field(name=f"{station.upper()} ({pads}-pads)", value="*Station*", inline=True)
             embed.add_field(name=f"{commodity.upper()}", value="*Commodity*", inline=True)
@@ -603,7 +593,7 @@ async def ission(ctx):
 async def issions(ctx):
     cm.execute('''SELECT * FROM missions WHERE missiontype="load";''')
     records = cm.fetchall()
-    embed=discord.Embed(title=f"{len(records)} P.T.N Fleet Carrier LOADING missions in progress:", color=embed_colour_loading)
+    embed=discord.Embed(title=f"{len(records)} P.T.N Fleet Carrier LOADING missions in progress:", color=constants.EMBED_COLOUR_LOADING)
     for row in records:
         embed.add_field(name=f"{row[0]}", value=f"<#{row[2]}>", inline=True)
         embed.add_field(name=f"{row[3]}", value=f"{row[9]} at {row[7]}k/unit", inline=True)
@@ -611,7 +601,7 @@ async def issions(ctx):
     await ctx.send(embed=embed)
     cm.execute('''SELECT * FROM missions WHERE missiontype="unload";''')
     records = cm.fetchall()
-    embed=discord.Embed(title=f"{len(records)} P.T.N Fleet Carrier UNLOADING missions in progress:", color=embed_colour_unloading)
+    embed=discord.Embed(title=f"{len(records)} P.T.N Fleet Carrier UNLOADING missions in progress:", color=constants.EMBED_COLOUR_UNLOADING)
     for row in records:
         embed.add_field(name=f"{row[0]}", value=f"<#{row[2]}>", inline=True)
         embed.add_field(name=f"{row[3]}", value=f"{row[9]} at {row[7]}k/unit", inline=True)
@@ -627,7 +617,7 @@ async def done(ctx, lookname, rp=None):
     cm.execute(f'''SELECT * FROM missions WHERE carrier LIKE (?)''', ('%'+lookname+'%',))
     result = cm.fetchone()
     if not result:
-        embed=discord.Embed(description=f"**ERROR**: no trade missions found for carriers matching \"**{lookname}\"**.", color=embed_color_error)
+        embed=discord.Embed(description=f"**ERROR**: no trade missions found for carriers matching \"**{lookname}\"**.", color=constants.EMBED_COLOUR_ERROR)
         await ctx.send(embed=embed)   
 
     else:
@@ -648,7 +638,7 @@ async def done(ctx, lookname, rp=None):
         # send Discord carrier channel updates
             channelid = result['channelid']
             channel = bot.get_channel(channelid)
-            embed=discord.Embed(title=f"{carrier} MISSION COMPLETE", description=f"{desc_msg}", color=embed_color_ok)
+            embed=discord.Embed(title=f"{carrier} MISSION COMPLETE", description=f"{desc_msg}", color=constants.EMBED_COLOUR_OK)
             await channel.send(embed=embed)
         
         # add comment to Reddit post
@@ -670,7 +660,7 @@ async def done(ctx, lookname, rp=None):
         cm.execute(f'''DELETE FROM missions WHERE carrier LIKE (?)''', ('%'+lookname+'%',))
         conm.commit()
         
-        embed=discord.Embed(title=f"Mission complete for {carrier}", description=f"{desc_msg}Updated any sent alerts and removed from mission list.", color=embed_color_ok)
+        embed=discord.Embed(title=f"Mission complete for {carrier}", description=f"{desc_msg}Updated any sent alerts and removed from mission list.", color=constants.EMBED_COLOUR_OK)
         await ctx.send(embed=embed)
         return
 
@@ -687,7 +677,7 @@ async def complete(ctx):
     result = c.fetchone()
     if not result:
         # if there's no channel match, return an error
-        embed=discord.Embed(description="**You need to be in a carrier's channel to mark its mission as complete.**", color=embed_color_error)
+        embed=discord.Embed(description="**You need to be in a carrier's channel to mark its mission as complete.**", color=constants.EMBED_COLOUR_ERROR)
         await ctx.send(embed=embed)
         return
     else:
@@ -697,12 +687,12 @@ async def complete(ctx):
         result = cm.fetchone()
         if not result:
             # if there's no result, return an error
-            embed=discord.Embed(description=f"**{carrier} doesn't seem to be on a trade mission right now.**", color=embed_color_error)
+            embed=discord.Embed(description=f"**{carrier} doesn't seem to be on a trade mission right now.**", color=constants.EMBED_COLOUR_ERROR)
             await ctx.send(embed=embed)
         else:
             # user is in correct channel and carrier is on a mission, so check whether user is sure they want to proceed
             carrier_mission, station, missiontype = result['carrier'], result['station'], result['missiontype']
-            embed=discord.Embed(description=f"Please confirm that **{carrier}** has been fully {missiontype}ed : **y** / **n**", color=embed_color_qu)
+            embed=discord.Embed(description=f"Please confirm that **{carrier}** has been fully {missiontype}ed : **y** / **n**", color=constants.EMBED_COLOUR_QU)
             #embed.set_footer(text="For other issues (e.g. station price changes) please @ the Carrier Owner directly.")
             msg_confirm = await ctx.send(embed=embed)
             def check(msg):
@@ -712,11 +702,11 @@ async def complete(ctx):
             try:
                 msg = await bot.wait_for("message", check=check, timeout=30)
                 if msg.content.lower() == "n":
-                    embed=discord.Embed(description="OK, mission will remain listed as in-progress.", color=embed_color_ok)
+                    embed=discord.Embed(description="OK, mission will remain listed as in-progress.", color=constants.EMBED_COLOUR_OK)
                     await ctx.send(embed=embed)
                     return
                 elif msg.content.lower() == "y":
-                    embed=discord.Embed(title=f"{carrier} MISSION COMPLETE", description=f"<@{msg_usr_id}> reports that mission is complete!", color=embed_color_ok)
+                    embed=discord.Embed(title=f"{carrier} MISSION COMPLETE", description=f"<@{msg_usr_id}> reports that mission is complete!", color=constants.EMBED_COLOUR_OK)
                     await ctx.send(embed=embed)
                     # now we need to go do all the mission cleanup stuff
 
@@ -808,14 +798,14 @@ async def carrier_del(ctx, p_ID):
 async def carrier_image(ctx, lookname=None):
     if not lookname:
         file = discord.File(f"blank.png", filename="image.png")
-        embed=discord.Embed(title=f"Blank foreground image", description="Overlay atop your carrier's image then use m.carrier_image <carrier> to upload.", color=embed_color_ok)
+        embed=discord.Embed(title=f"Blank foreground image", description="Overlay atop your carrier's image then use m.carrier_image <carrier> to upload.", color=constants.EMBED_COLOUR_OK)
         embed.set_image(url="attachment://image.png")
         await ctx.send(file=file, embed=embed)
     else:
         defcarrier_findlong(lookname)
         defget_datetime()
         file = discord.File(f"images/{shortname}.png", filename="image.png")
-        embed=discord.Embed(title=f"View or change background image for {longname}", description="You can upload a replacement image now. Images should be 500x500, in .png format, and based on the standard PTN image template. Or input **x** to cancel upload and just view.", color=embed_color_qu)
+        embed=discord.Embed(title=f"View or change background image for {longname}", description="You can upload a replacement image now. Images should be 500x500, in .png format, and based on the standard PTN image template. Or input **x** to cancel upload and just view.", color=constants.EMBED_COLOUR_QU)
         embed.set_image(url="attachment://image.png")
         message_upload_now = await ctx.send(file=file, embed=embed)
         def check(message):
@@ -827,7 +817,7 @@ async def carrier_image(ctx, lookname=None):
                 for attachment in message.attachments:
                     await attachment.save(f"images/{shortname}.png")
                 file = discord.File(f"images/{shortname}.png", filename="image.png")
-                embed=discord.Embed(title=f"{longname}", description="Background image updated.", color=embed_color_ok)
+                embed=discord.Embed(title=f"{longname}", description="Background image updated.", color=constants.EMBED_COLOUR_OK)
                 embed.set_image(url="attachment://image.png")
                 await ctx.send(file=file, embed=embed)
                 await message.delete()
@@ -858,7 +848,7 @@ async def findshort(ctx, lookshort):
     try:
         defcarrier_findshort(lookshort)
         #await ctx.send(f"FC {p_ID} is **{longname} {cid}** called by shortname **{shortname}** with channel **#{discordchannel}**")
-        embed=discord.Embed(title="Fleet Carrier Shortname Search Result", description=f"Displaying first match for {lookshort}", color=embed_color_ok)
+        embed=discord.Embed(title="Fleet Carrier Shortname Search Result", description=f"Displaying first match for {lookshort}", color=constants.EMBED_COLOUR_OK)
         embed.add_field(name="Carrier Name", value=f"{longname}", inline=True)
         embed.add_field(name="Carrier ID", value=f"{cid}", inline=True)
         embed.add_field(name="Shortname", value=f"{shortname}", inline=True)
@@ -878,7 +868,7 @@ async def find(ctx, looklong):
     try:
         defcarrier_findlong(looklong)
         #await ctx.send(f"FC {p_ID} is **{longname} {cid}** called by shortname **{shortname}** with channel **#{discordchannel}**")
-        embed=discord.Embed(title="Fleet Carrier Search Result", description=f"Displaying first match for {looklong}", color=embed_color_ok)
+        embed=discord.Embed(title="Fleet Carrier Search Result", description=f"Displaying first match for {looklong}", color=constants.EMBED_COLOUR_OK)
         embed.add_field(name="Carrier Name", value=f"{longname}", inline=True)
         embed.add_field(name="Carrier ID", value=f"{cid}", inline=True)
         embed.add_field(name="Shortname", value=f"{shortname}", inline=True)
@@ -895,7 +885,7 @@ async def findid(ctx, lookid):
     try:
         defcarrier_findpid(lookid)
         #await ctx.send(f"FC {p_ID} is **{longname} {cid}** called by shortname **{shortname}** with channel **{discordchannel}**")
-        embed=discord.Embed(title="Fleet Carrier DB# Search Result", description=f"Displaying carrier with DB# {p_ID}", color=embed_color_ok)
+        embed=discord.Embed(title="Fleet Carrier DB# Search Result", description=f"Displaying carrier with DB# {p_ID}", color=constants.EMBED_COLOUR_OK)
         embed.add_field(name="Carrier Name", value=f"{longname}", inline=True)
         embed.add_field(name="Carrier ID", value=f"{cid}", inline=True)
         embed.add_field(name="Shortname", value=f"{shortname}", inline=True)
