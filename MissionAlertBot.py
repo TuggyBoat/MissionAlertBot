@@ -792,13 +792,48 @@ async def carrier_add(ctx, shortname, longname, cid, discordchannel):
     defcarrier_findlong(longname)
     await ctx.send(f"Added **{longname.upper()}** **{cid.upper()}** with shortname **{shortname.lower()}** and channel **<#{channelid}>** at ID **{p_ID}**")
 
+
 # remove FC from database
-@bot.command(name='carrier_del', help='Delete a Fleet Carrier from the database using its ID.\n'
-                                      'Use the findid command to check before deleting.')
+@bot.command(name='carrier_del', help='Delete a Fleet Carrier from the database using its database entry ID#.')
 @commands.has_role('Carrier Owner')
-async def carrier_del(ctx, p_ID):
-    defcarrier_del(p_ID)
-    await ctx.send(f"Attempted to remove carrier number {p_ID}")
+async def carrier_del(ctx, lookid):
+
+    try:
+        defcarrier_findpid(lookid)
+        embed=discord.Embed(title="Delete Fleet Carrier", description=f"Result for {p_ID}", color=embed_color_ok)
+        embed.add_field(name="Carrier Name", value=f"{longname}", inline=True)
+        embed.add_field(name="Carrier ID", value=f"{cid}", inline=True)
+        embed.add_field(name="Shortname", value=f"{shortname}", inline=True)
+        embed.add_field(name="Discord Channel", value=f"#{discordchannel}", inline=True)
+        embed.add_field(name="Database Entry", value=f"{p_ID}", inline=True)
+        await ctx.send(embed=embed)
+        embed=discord.Embed(title="Proceed with deletion?", description="y/n", color=embed_color_ok)
+        await ctx.send(embed=embed)
+
+        def check(msg):
+            return msg.author == ctx.author and msg.channel == ctx.channel and \
+            msg.content.lower() in ["y", "n"]
+
+        try:
+            msg = await bot.wait_for("message", check=check, timeout=30)
+            if msg.content.lower() == "n":
+                embed=discord.Embed(description="Deletion cancelled.", color=embed_color_ok)
+                await ctx.send(embed=embed)
+                return
+            elif msg.content.lower() == "y":
+                try:
+                    defcarrier_del(lookid)
+                    embed=discord.Embed(description=f"Fleet carrier #{p_ID} deleted.", color=embed_color_ok)
+                    await ctx.send(embed=embed)
+                except:
+                    await ctx.send("Oops, something went wrong.")
+
+        except asyncio.TimeoutError:
+            await ctx.send("**Cancelled - timed out**")
+            
+    except TypeError:
+        await ctx.send(f'Couldn\'t find a carrier with ID #{lookid}.')
+
 
 # change FC background image
 @bot.command(name='carrier_image', help='Change the background image for the specified carrier:\n\n'
