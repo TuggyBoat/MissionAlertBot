@@ -431,8 +431,11 @@ async def gen_mission(ctx, lookname, commshort, system, station, profit, pads, d
         return
 
     def checkconfirm(msg):
-        return msg.author == ctx.author and msg.channel == ctx.channel and \
-               msg.content.lower() in ["d", "r", "t", "x", "dr", "dt", "drt", "rd", "rt", "rdt", "tr", "td", "tdr"]
+        # use all to verify that all the characters in the message content are present in the allowed list (dtrx).
+        # Anything outwith this grouping will cause all to fail. Use set to throw away any duplicate objects.
+        # not sure if the msg.content can ever be None, but lets gate it anyway
+        return msg.content and msg.author == ctx.author and msg.channel == ctx.channel and \
+               all(character in 'drtx' for character in set(msg.content.lower()))
 
     def checkrp(msg):
         return msg.author == ctx.author and msg.channel == ctx.channel
