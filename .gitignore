@@ -3,3 +3,4 @@ missions.db
 missions.db.backup
 
 .idea
+.env
