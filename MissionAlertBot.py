@@ -800,7 +800,7 @@ async def carrier_del(ctx, lookid):
 
     try:
         defcarrier_findpid(lookid)
-        embed=discord.Embed(title="Delete Fleet Carrier", description=f"Result for {p_ID}", color=embed_color_ok)
+        embed=discord.Embed(title="Delete Fleet Carrier", description=f"Result for {lookid}", color=embed_color_ok)
         embed.add_field(name="Carrier Name", value=f"{longname}", inline=True)
         embed.add_field(name="Carrier ID", value=f"{cid}", inline=True)
         embed.add_field(name="Shortname", value=f"{shortname}", inline=True)
