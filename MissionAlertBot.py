@@ -834,7 +834,8 @@ async def carrier_del(ctx, db_id):
                 try:
                     defcarrier_del(db_id)
 
-                    # if errormsg: await ctx.send(errormsg)  - WHY DOES THIS NOT WORK OH MY GOD WHY DOES IT JUST STOP HERE
+                    errormsg = defcarrier_del(db_id)
+                    if errormsg: await ctx.send(errormsg)
 
                     embed=discord.Embed(description=f"Fleet carrier #{carrier_values ['p_ID']} deleted.", color=embed_color_ok)
                     await ctx.send(embed=embed)
