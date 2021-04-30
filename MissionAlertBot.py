@@ -144,8 +144,14 @@ def defcarrier_del(p_ID):
     conn.commit()
     defget_datetime()
     # archive the removed carrier's image by appending date and time of deletion to it
-    shutil.move(f'images/{shortname}.png', f'images/old/{shortname}.{dt_file_string}.png')
-    # os.system(f'mv {shortname}.png {shortname}.{dt_file_string}.png')
+    try:
+        shutil.move(f'images/{shortname}.png', f'images/old/{shortname}.{dt_file_string}.png')
+    except:
+        errormsg = 'Unable to backup image file, perhaps it never existed?'
+        print(errormsg)
+        return errormsg
+
+    return
 
 
 # function to remove all carriers, not currently used by any bot command
@@ -179,14 +185,16 @@ def defcarrier_findshort(lookshort):
 
 
 # function to search for a carrier by p_ID
-def defcarrier_findpid(lookid):
-    c.execute(f"SELECT p_ID, shortname, longname, cid, discordchannel, channelid FROM carriers WHERE p_ID = {lookid}")
+def defcarrier_findpid(db_id):
+    c.execute(f"SELECT p_ID, shortname, longname, cid, discordchannel, channelid FROM carriers WHERE p_ID = {db_id}")
     result = c.fetchone()
     global p_ID, shortname, longname, cid, discordchannel, channelid
     p_ID, shortname, longname, cid, discordchannel, channelid = result['p_ID'], result['shortname'], result['longname'], \
                                                                 result['cid'], result['discordchannel'], result[
                                                                     'channelid']
     print(f"FC {p_ID} is {longname} {cid} called by shortname {shortname} with channel <#{channelid}>")
+    result = {'p_ID': p_ID, 'shortname': shortname, 'longname': longname, 'cid': cid, 'discordchannel': discordchannel, 'channelid': channelid}
+    return result
 
 
 # function to search for a commodity by name or partial name
@@ -935,15 +943,51 @@ async def carrier_add(ctx, shortname, longname, cid, discordchannel):
         f"**<#{channelid}>** at ID **{p_ID}**")
 
 
-# remove FC from database
-@bot.command(name='carrier_del', help='Delete a Fleet Carrier from the database using its ID.\n'
-                                      'Use the findid command to check before deleting.')
-@commands.has_role('Carrier Owner')
-async def carrier_del(ctx, p_ID):
-    backup_carrier_db()  # backup the carriers database before going any further
 
-    await defcarrier_del(p_ID)
-    await ctx.send(f"Attempted to remove carrier number {p_ID}")
+# remove FC from database
+@bot.command(name='carrier_del', help='Delete a Fleet Carrier from the database using its database entry ID#.')
+@commands.has_role('Carrier Owner')
+async def carrier_del(ctx, db_id):
+
+    try:
+        carrier_values = defcarrier_findpid(db_id)
+        embed=discord.Embed(title="Delete Fleet Carrier", description=f"Result for {db_id}", color=embed_color_ok)
+        embed.add_field(name="Carrier Name", value=f"{carrier_values ['longname']}", inline=True)
+        embed.add_field(name="Carrier ID", value=f"{carrier_values ['cid']}", inline=True)
+        embed.add_field(name="Shortname", value=f"{carrier_values ['shortname']}", inline=True)
+        embed.add_field(name="Discord Channel", value=f"#{carrier_values ['discordchannel']}", inline=True)
+        embed.add_field(name="Database Entry", value=f"{carrier_values ['p_ID']}", inline=True)
+        await ctx.send(embed=embed)
+        embed=discord.Embed(title="Proceed with deletion?", description="y/n", color=embed_color_ok)
+        await ctx.send(embed=embed)
+
+        def check(msg):
+            return msg.author == ctx.author and msg.channel == ctx.channel and \
+            msg.content.lower() in ["y", "n"]
+
+        try:
+            msg = await bot.wait_for("message", check=check, timeout=30)
+            if msg.content.lower() == "n":
+                embed=discord.Embed(description="Deletion cancelled.", color=embed_color_ok)
+                await ctx.send(embed=embed)
+                return
+            elif msg.content.lower() == "y":
+                try:
+                    defcarrier_del(db_id)
+
+                    errormsg = defcarrier_del(db_id)
+                    if errormsg: await ctx.send(errormsg)
+
+                    embed=discord.Embed(description=f"Fleet carrier #{carrier_values ['p_ID']} deleted.", color=embed_color_ok)
+                    await ctx.send(embed=embed)
+                except Exception as e:
+                    return f'Something went wrong, go ask Sihmm and tell him computer said:  {e}'
+
+        except asyncio.TimeoutError:
+            await ctx.send("**Cancelled - timed out**")
+            
+    except TypeError:
+        await ctx.send(f'Couldn\'t find a carrier with ID #{db_id}.')
 
 
 # change FC background image
@@ -1048,7 +1092,7 @@ async def find(ctx, looklong):
 # find FC based on ID
 @bot.command(name='findid', help='Find a carrier based on its database ID\n'
                                  'Syntax: findid <integer>')
-async def findid(ctx, lookid):
+async def findid(ctx, db_id):
     try:
         defcarrier_findpid(lookid)
         # await ctx.send(f"FC {p_ID} is **{longname} {cid}** called by shortname **{shortname}** with channel **{discordchannel}**")
@@ -1061,7 +1105,7 @@ async def findid(ctx, lookid):
         embed.add_field(name="Database Entry", value=f"{p_ID}", inline=True)
         await ctx.send(embed=embed)
     except TypeError:
-        await ctx.send(f'No result for {lookid}.')
+        await ctx.send(f'No result for {db_id}.')
 
 
 # find commodity
