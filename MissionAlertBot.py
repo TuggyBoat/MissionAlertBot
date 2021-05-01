@@ -947,12 +947,14 @@ async def carrier_list(ctx):
 async def carrier_add(ctx, short_name, long_name, carrier_id, discord_channel):
     backup_database('carriers')  # backup the carriers database before going any further
 
-    print(f'Looking for discord channel: {discord_channel}')
+    print(f'Looking for discord channel to add the carrier: {discord_channel}')
     print(f'Channels: {ctx.guild.channels}')
     channel = discord.utils.get(ctx.guild.channels, name=discord_channel)
+    if not channel:
+        raise EnvironmentError('Channel does not exist, go make it first and try again')
 
-    #TODO: task #26 make the channel if it does not exist
-    print(f'Channel: {channel}')
+    # TODO: task #26 make the channel if it does not exist
+
     add_carrier_to_database(short_name, long_name, carrier_id, discord_channel, channel.id)
     carrier_data = find_carrier_from_long_name(long_name)
     await ctx.send(
