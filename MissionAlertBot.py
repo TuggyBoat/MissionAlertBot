@@ -51,7 +51,7 @@ to_subreddit = conf['SUB_REDDIT']
 # Get the discord token from the local .env file. Deliberately not hosted in the repo or Discord takes the bot down
 # because the keys are exposed. DO NOT HOST IN THE REPO. Seriously do not do it ...
 load_dotenv()
-TOKEN = os.getenv('DISCORD_TOKEN')
+TOKEN = os.getenv('DISCORD_TOKEN') if _production else os.getenv('DISCORD_TOKEN_TESTING')
 
 # create reddit instance
 reddit = asyncpraw.Reddit('bot1')
