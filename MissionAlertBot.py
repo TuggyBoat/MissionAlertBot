@@ -17,6 +17,7 @@ import shutil
 from discord.ext import commands
 from datetime import datetime
 from datetime import timezone
+from dotenv import load_dotenv
 
 import constants
 import threading
@@ -47,8 +48,10 @@ flair_mission_stop = conf['MISSION_STOP']
 trade_alerts_id = conf['TRADE_ALERTS_ID']
 to_subreddit = conf['SUB_REDDIT']
 
-# Get the discord token
-token = conf['DISCORD_TOKEN']
+# Get the discord token from the local .env file. Deliberately not hosted in the repo or Discord takes the bot down
+# because the keys are exposed. DO NOT HOST IN THE REPO. Seriously do not do it ...
+load_dotenv()
+TOKEN = os.getenv('DISCORD_TOKEN')
 
 # create reddit instance
 reddit = asyncpraw.Reddit('bot1')
