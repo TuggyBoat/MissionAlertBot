@@ -4,7 +4,6 @@ PROD_FLAIR_MISSION_STOP = "eea2d818-9235-11eb-b86f-0e50eec082f5"
 
 PROD_TRADE_ALERTS_ID = 801798469189763073  # trade alerts channel ID for PTN main server
 PROD_SUB_REDDIT = "PilotsTradeNetwork"  # subreddit for live
-DISCORD_TOKEN = 'ODIyMTQ2MDQ2OTM0Mzg0NjQw.YFOBLA.sj1ilXL2ya1JGAHlLEU3ma75cyw'
 
 # Testing variables
 
