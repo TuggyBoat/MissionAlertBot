@@ -59,12 +59,12 @@ reddit = asyncpraw.Reddit('bot1')
 # connect to sqlite carrier database
 conn = sqlite3.connect('carriers.db')
 conn.row_factory = sqlite3.Row
-c = conn.cursor()
+carrier_db = conn.cursor()
 
 # connect to sqlite missions database
 conm = sqlite3.connect('missions.db')
 conm.row_factory = sqlite3.Row
-cm = conm.cursor()
+mission_db = conm.cursor()
 
 #
 #                       DATABASE STUFF
@@ -72,7 +72,7 @@ cm = conm.cursor()
 
 
 # create carrier record if necessary (only needed on first run)
-def check_database_table_exists(table_name):
+def check_database_table_exists(table_name, database):
     """
     Checks whether a carrier exists in the database already.
 
@@ -80,13 +80,16 @@ def check_database_table_exists(table_name):
     :returns: A boolean state, True if it exists, else False
     :rtype: bool
     """
-    c.execute('''SELECT count(name) FROM sqlite_master WHERE TYPE = 'table' AND name = '{}' '''.format(table_name))
-    return bool(c.fetchone()[0])
+    database.execute('''SELECT count(name) FROM sqlite_master WHERE TYPE = 'table' AND name = '{}' '''.format(
+        table_name))
+    return bool(database.fetchone()[0])
 
 
-if not check_database_table_exists('carriers'):
+print('Starting up - checking carriers database if it exists or not')
+if not check_database_table_exists('carriers', carrier_db):
+    print('Carriers database missing - creating it now')
     # Check if carriers database exists, create if not
-    c.execute('''
+    carrier_db.execute('''
         CREATE TABLE carriers( 
             p_ID INTEGER PRIMARY KEY AUTOINCREMENT,
             shortname TEXT NOT NULL UNIQUE, 
@@ -96,11 +99,14 @@ if not check_database_table_exists('carriers'):
             channelid INT 
         ) 
     ''')
+else:
+    print('Carrier database exists, do nothing')
 
-
+print('Starting up - checking missions database if it exists or not')
 # create missions db if necessary
-if not check_database_table_exists('missions'):
-    cm.execute('''
+if not check_database_table_exists('missions', mission_db):
+    print('Mission database missing - creating it now')
+    mission_db.execute('''
         CREATE TABLE missions(
             "carrier"	TEXT NOT NULL UNIQUE,
             "cid"	TEXT,
@@ -120,6 +126,8 @@ if not check_database_table_exists('missions'):
             "discord_alert_id"	INT
         )
     ''')
+else:
+    print('Mission database exists, do nothing')
 
 
 # function to backup carrier database
@@ -149,8 +157,8 @@ def add_carrier_to_database(short_name, long_name, carrier_id, discord_channel, 
     """
     carrier_db_lock.acquire()
     try:
-        c.execute(''' INSERT INTO carriers VALUES(NULL, ?, ?, ?, ?, ?) ''',
-                  (short_name.lower(), long_name.upper(), carrier_id.upper(), discord_channel.lower(), channel_id))
+        carrier_db.execute(''' INSERT INTO carriers VALUES(NULL, ?, ?, ?, ?, ?) ''',
+                           (short_name.lower(), long_name.upper(), carrier_id.upper(), discord_channel.lower(), channel_id))
         conn.commit()
     finally:
         carrier_db_lock.release()
@@ -163,7 +171,7 @@ def delete_carrier_from_db(p_id):
     carrier = find_carrier_from_pid(p_id)
     try:
         carrier_db_lock.acquire()
-        c.execute(f"DELETE FROM carriers WHERE p_ID = {p_id}")
+        carrier_db.execute(f"DELETE FROM carriers WHERE p_ID = {p_id}")
         conn.commit()
     finally:
         carrier_db_lock.release()
@@ -186,17 +194,17 @@ def _delete_all_from_database(database):
 
     :returns: None
     """
-    c.execute(f"DELETE FROM {database}")
+    carrier_db.execute(f"DELETE FROM {database}")
     conn.commit()
 
 
 # function to search for a carrier by longname
 def find_carrier_from_long_name(find_long_name):
 
-    c.execute(
+    carrier_db.execute(
         f"SELECT p_ID, shortname, longname, cid, discordchannel, channelid FROM carriers WHERE longname LIKE (?)",
         (f'%{find_long_name}%',))
-    carrier_data = CarrierData(c.fetchone())
+    carrier_data = CarrierData(carrier_db.fetchone())
     print(f"FC {carrier_data.pid} is {carrier_data.carrier_long_name} {carrier_data.carrier_identifier} called by "
           f"shortname {carrier_data.carrier_short_name} with channel <#{carrier_data.channel_id}> called from "
           f"find_carrier_from_long_name.")
@@ -207,9 +215,9 @@ def find_carrier_from_long_name(find_long_name):
 # function to search for a carrier by shortname
 def find_carrier_from_short_name(find_short_name):
 
-    c.execute(f"SELECT p_ID, shortname, longname, cid, discordchannel FROM carriers WHERE shortname LIKE (?)",
-              (f'%{find_short_name}%',))
-    carrier_data = CarrierData(c.fetchone())
+    carrier_db.execute(f"SELECT p_ID, shortname, longname, cid, discordchannel FROM carriers WHERE shortname LIKE (?)",
+                       (f'%{find_short_name}%',))
+    carrier_data = CarrierData(carrier_db.fetchone())
     print(f"FC {carrier_data.pid} is {carrier_data.carrier_long_name} {carrier_data.carrier_identifier} called by "
           f"shortname {carrier_data.carrier_short_name} with channel <#{carrier_data.channel_id}> called from "
           f"find_carrier_from_short_name.")
@@ -219,8 +227,8 @@ def find_carrier_from_short_name(find_short_name):
 
 # function to search for a carrier by p_ID
 def find_carrier_from_pid(db_id):
-    c.execute(f"SELECT p_ID, shortname, longname, cid, discordchannel, channelid FROM carriers WHERE p_ID = {db_id}")
-    carrier_data = CarrierData(c.fetchone())
+    carrier_db.execute(f"SELECT p_ID, shortname, longname, cid, discordchannel, channelid FROM carriers WHERE p_ID = {db_id}")
+    carrier_data = CarrierData(carrier_db.fetchone())
     print(f"FC {carrier_data.pid} is {carrier_data.carrier_long_name} {carrier_data.carrier_identifier} called by "
           f"shortname {carrier_data.carrier_short_name} with channel <#{carrier_data.channel_id}> called "
           f"from find_carrier_from_pid.")
@@ -231,10 +239,10 @@ def find_carrier_from_pid(db_id):
 def find_commodity(lookfor):
     # TODO: Where do we get set up this database? it is searching for things, but what is the source of the data, do
     #  we update it periodically?
-    c.execute(
+    carrier_db.execute(
         f"SELECT commodity, avgsell, avgbuy, maxsell, minbuy, maxprofit FROM commodities WHERE commodity LIKE (?)",
         (f'%{lookfor}%',))
-    commodity = Commodity(c.fetchone())
+    commodity = Commodity(carrier_db.fetchone())
     print(f"Commodity {commodity.name} avgsell {commodity.average_sell} avgbuy {commodity.average_buy} "
           f"maxsell {commodity.max_sell} minbuy {commodity.min_buy} maxprofit {commodity.max_profit}")
     return commodity
@@ -427,8 +435,8 @@ async def gen_mission(ctx, carrier_name, commodity_short_name, system, station, 
     embed = discord.Embed(title="Generating and fetching mission alerts...", color=constants.EMBED_COLOUR_QU)
     message_gen = await ctx.send(embed=embed)
 
-    cm.execute(f'''SELECT carrier FROM missions WHERE carrier LIKE (?)''', ('%' + carrier_name + '%',))
-    carrier_data = CarrierData(cm.fetchone())
+    mission_db.execute(f'''SELECT carrier FROM missions WHERE carrier LIKE (?)''', ('%' + carrier_name + '%',))
+    carrier_data = CarrierData(mission_db.fetchone())
     if carrier_data:
         embed = discord.Embed(title="Error",
                               description=f"{carrier_data.carrier_long_name} is already on a mission, please "
@@ -625,7 +633,7 @@ async def mission_add(ctx, carrier_data, commodity_data, mission_type, system, s
                       rp, message_pending, eta_text):
     backup_database('missions')  # backup the missions database before going any further
 
-    cm.execute(''' INSERT INTO missions VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ''', (
+    mission_db.execute(''' INSERT INTO missions VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ''', (
         carrier_data.carrier_long_name, carrier_data.carrier_identifier, carrier_data.channel_id,
         commodity_data.name.title(), mission_type.lower(), system.title(), station.title(), profit, pads.upper(),
         demand, rp_text, reddit_post_id, reddit_post_url, reddit_comment_id, reddit_comment_url, discord_alert_id
@@ -656,8 +664,8 @@ async def ission(ctx):
     # take a note channel ID
     msg_ctx_id = ctx.channel.id
     # look for a match for the channel ID in the carrier DB
-    c.execute(f"SELECT longname, cid FROM carriers WHERE channelid = {msg_ctx_id}")
-    carrier_data = CarrierData(c.fetchone())
+    carrier_db.execute(f"SELECT longname, cid FROM carriers WHERE channelid = {msg_ctx_id}")
+    carrier_data = CarrierData(carrier_db.fetchone())
     if not carrier_data.channel_id:
         # if there's no channel match, return an error
         embed = discord.Embed(description="Try again in the carrier's channel.", color=constants.EMBED_COLOUR_QU)
@@ -666,8 +674,8 @@ async def ission(ctx):
     else:
 
         # now look to see if the carrier is on an active mission
-        cm.execute('''SELECT * FROM missions WHERE carrier LIKE (?)''', ('%' + carrier_data.carrier_long_name + '%',))
-        mission_data = MissionData(cm.fetchone())
+        mission_db.execute('''SELECT * FROM missions WHERE carrier LIKE (?)''', ('%' + carrier_data.carrier_long_name + '%',))
+        mission_data = MissionData(mission_db.fetchone())
         if not mission_data:
             # if there's no result, return an error
             embed = discord.Embed(description=f"**{mission_data.carrier_name}** doesn't seem to be on a trade"
@@ -703,17 +711,17 @@ async def ission(ctx):
 # list all active carrier trade missions from DB
 @bot.command(name='issions', help='List all active trade missions.')
 async def issions(ctx):
-    cm.execute('''SELECT * FROM missions WHERE missiontype="load";''')
+    mission_db.execute('''SELECT * FROM missions WHERE missiontype="load";''')
 
     # TODO: Convert this to a list of mission objects? [MissionData(mission_data) for mission_data in
-    records = [MissionData(mission_data) for mission_data in cm.fetchall()]
+    records = [MissionData(mission_data) for mission_data in mission_db.fetchall()]
     embed = discord.Embed(title=f"{len(records)} P.T.N Fleet Carrier LOADING missions in progress:",
                           color=constants.EMBED_COLOUR_LOADING)
     embed = _format_missions_embedd(records, embed)
     await ctx.send(embed=embed)
 
-    cm.execute('''SELECT * FROM missions WHERE missiontype="unload";''')
-    records = cm.fetchall()
+    mission_db.execute('''SELECT * FROM missions WHERE missiontype="unload";''')
+    records = mission_db.fetchall()
     embed = discord.Embed(title=f"{len(records)} P.T.N Fleet Carrier UNLOADING missions in progress:",
                           color=constants.EMBED_COLOUR_UNLOADING)
     embed = _format_missions_embedd(records, embed)
@@ -742,8 +750,8 @@ def _format_missions_embedd(mission_data_list, embed):
 @commands.has_role('Carrier Owner')
 async def done(ctx, carrier_name, rp=None):
 
-    cm.execute(f'''SELECT * FROM missions WHERE carrier LIKE (?)''', ('%' + carrier_name + '%',))
-    mission_data = MissionData(cm.fetchone())
+    mission_db.execute(f'''SELECT * FROM missions WHERE carrier LIKE (?)''', ('%' + carrier_name + '%',))
+    mission_data = MissionData(mission_db.fetchone())
     if not mission_data:
         embed = discord.Embed(
             description=f"**ERROR**: no trade missions found for carriers matching \"**{carrier_name}\"**.",
@@ -790,7 +798,7 @@ async def done(ctx, carrier_name, rp=None):
                 await ctx.send("Failed updating Reddit :(")
 
         # delete mission entry from db
-        cm.execute(f'''DELETE FROM missions WHERE carrier LIKE (?)''', ('%' + carrier_name + '%',))
+        mission_db.execute(f'''DELETE FROM missions WHERE carrier LIKE (?)''', ('%' + carrier_name + '%',))
         conm.commit()
 
         embed = discord.Embed(title=f"Mission complete for {mission_data.carrier_name}",
@@ -808,8 +816,8 @@ async def complete(ctx):
     msg_ctx_id = ctx.channel.id
     msg_usr_id = ctx.author.id
     # look for a match for the channel ID in the carrier DB
-    c.execute(f"SELECT longname FROM carriers WHERE channelid = {msg_ctx_id}")
-    carrier_data = CarrierData(c.fetchone())
+    carrier_db.execute(f"SELECT longname FROM carriers WHERE channelid = {msg_ctx_id}")
+    carrier_data = CarrierData(carrier_db.fetchone())
     if not carrier_data:
         # if there's no channel match, return an error
         embed = discord.Embed(description="**You need to be in a carrier's channel to mark its mission as complete.**",
@@ -820,8 +828,8 @@ async def complete(ctx):
         backup_database('missions')  # backup the missions database before going any further
 
         # now look to see if the carrier is on an active mission
-        cm.execute('''SELECT * FROM missions WHERE carrier LIKE (?)''', ('%' + carrier_data.carrier_long_name + '%',))
-        mission_data = MissionData(cm.fetchone())
+        mission_db.execute('''SELECT * FROM missions WHERE carrier LIKE (?)''', ('%' + carrier_data.carrier_long_name + '%',))
+        mission_data = MissionData(mission_db.fetchone())
         if not mission_data:
             # if there's no result, return an error
             embed = discord.Embed(description=f"**{carrier_data.carrier_long_name} doesn't seem to be on a trade "
@@ -883,8 +891,8 @@ async def complete(ctx):
                             print(f"Reddit post failed to update for {mission_data.carrier_name}")
 
                     # delete mission entry from db
-                    cm.execute(f'''DELETE FROM missions WHERE carrier LIKE (?)''',
-                               ('%' + mission_data.carrier_name + '%',))
+                    mission_db.execute(f'''DELETE FROM missions WHERE carrier LIKE (?)''',
+                                       ('%' + mission_data.carrier_name + '%',))
                     conm.commit()
 
             except asyncio.TimeoutError:
@@ -900,8 +908,8 @@ async def complete(ctx):
 @bot.command(name='carrier_list', help='List all Fleet Carriers in the database.')
 async def carrier_list(ctx):
 
-    c.execute(f"SELECT * FROM carriers")
-    carriers = [CarrierData(carrier) for carrier in c.fetchall()]
+    carrier_db.execute(f"SELECT * FROM carriers")
+    carriers = [CarrierData(carrier) for carrier in carrier_db.fetchall()]
     embed = discord.Embed(title=f"{len(carriers)} Registered Fleet Carriers")
     count = 0
     for carrier in carriers:
