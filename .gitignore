@@ -3,3 +3,6 @@ missions.db
 missions.db.backup
 backup/
 .idea
+
+.env
+praw.ini
