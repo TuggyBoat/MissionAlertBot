@@ -3,9 +3,12 @@ class MissionData:
     def __init__(self, info_dict=None):
         """
         Class represents a mission object as returned from the database.
+
+        :param sqlite.Row info_dict: A single row from the sqlite query.
         """
-        if not info_dict:
-            info_dict = dict()
+
+        # Convert the sqlite3.Row object to a dictionary
+        info_dict = dict(info_dict)
 
         # TODO: Some of these will be NULL because that is what we get back from the SQL database, we should convert
         #  those to python types

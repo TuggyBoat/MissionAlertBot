@@ -71,6 +71,13 @@ mission_db = conm.cursor()
 #
 
 
+print('MissionAlertBot starting')
+print(f'Configuring to run against: {"Production" if _production else "Testing"} env.')
+print('Dumping some values just for debug:')
+print(f'Configuration = {conf}')
+print(f'Bot Token: {TOKEN}')
+
+
 # create carrier record if necessary (only needed on first run)
 def check_database_table_exists(table_name, database):
     """
@@ -139,6 +146,10 @@ def backup_database(database_name):
     :rtype: None
     """
     dt_file_string = get_formatted_date_string()[1]
+    if not os.path.exists(os.path.join(os.getcwd(), 'backup')):
+        # make sure the backup folder exists first
+        os.mkdir(os.path.join(os.getcwd(), 'backup'))
+
     shutil.copy('carriers.db', f'backup/{database_name}.{dt_file_string}.db')
     print(f'Backed up {database_name}.db at {dt_file_string}')
 
@@ -689,7 +700,7 @@ async def ission(ctx):
                 constants.EMBED_COLOUR_UNLOADING
 
             mission_description = ''
-            if mission_data.rp_text and mission_data.rp_text is not 'NULL':
+            if mission_data.rp_text and mission_data.rp_text != 'NULL':
                 mission_description = f"> {mission_data.rp_text}"
 
             embed = discord.Embed(title=f"{mission_data.carrier_name} ({mission_data.carrier_identifier}) on "
@@ -936,9 +947,13 @@ async def carrier_list(ctx):
 async def carrier_add(ctx, short_name, long_name, carrier_id, discord_channel):
     backup_database('carriers')  # backup the carriers database before going any further
 
+    print(f'Looking for discord channel: {discord_channel}')
+    print(f'Channels: {ctx.guild.channels}')
     channel = discord.utils.get(ctx.guild.channels, name=discord_channel)
-    channel_id = channel.id
-    add_carrier_to_database(short_name, long_name, carrier_id, discord_channel, channel_id)
+
+    #TODO: task #26 make the channel if it does not exist
+    print(f'Channel: {channel}')
+    add_carrier_to_database(short_name, long_name, carrier_id, discord_channel, channel.id)
     carrier_data = find_carrier_from_long_name(long_name)
     await ctx.send(
         f"Added **{carrier_data.carrier_long_name.upper()}** **{carrier_data.carrier_identifier.upper()}** "
@@ -1071,7 +1086,7 @@ def _add_common_embed_fields(embed, carrier_data):
     embed.add_field(name="Carrier Name", value=f"{carrier_data.carrier_long_name}", inline=True)
     embed.add_field(name="Carrier ID", value=f"{carrier_data.carrier_identifier}", inline=True)
     embed.add_field(name="Shortname", value=f"{carrier_data.carrier_short_name}", inline=True)
-    embed.add_field(name="Discord Channel", value=f"#{carrier_data.channel_id}", inline=True)
+    embed.add_field(name="Discord Channel", value=f"#{carrier_data.discord_channel}", inline=True)
     embed.add_field(name="Database Entry", value=f"{carrier_data.pid}", inline=True)
     return embed
 
@@ -1120,7 +1135,7 @@ async def findid(ctx, db_id):
                                    'e.g. searching for "plat" will return Reinforced Mounting Plate as it\'s higher '
                                    'up the list.\n'
                                    'To find Platinum, you\'d have to type at least "plati".')
-async def findshort(ctx, lookfor):
+async def search_for_commodity(ctx, lookfor):
     commodity = find_commodity(lookfor)
     await ctx.send(commodity)
 
@@ -1157,4 +1172,4 @@ async def on_command_error(ctx, error):
         await ctx.send(f"Sorry, that didn't work. Check your syntax and permissions, error: {error}")
 
 
-bot.run(token)
+bot.run(TOKEN)

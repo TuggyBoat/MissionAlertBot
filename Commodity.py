@@ -1,11 +1,17 @@
+import sqlite3
+
+
 class Commodity:
 
     def __init__(self, info_dict=None):
         """
         Class represents a commodity object as returned from the database.
+
+        :param sqlite.Row info_dict: A single row from the sqlite query.
         """
-        if not info_dict:
-            info_dict = dict()
+
+        # Convert the sqlite3.Row object to a dictionary
+        info_dict = dict(info_dict)
 
         self.name = info_dict.get('commodity', None)
         self.average_sell = info_dict.get('avgsell', None)
@@ -33,5 +39,5 @@ class Commodity:
 
         :rtype: str
         """
-        return 'Commodity: Name:{0.name} AverageSell:{0.average_sell} AverageBuy:{0.average_buy} ' \
-               'MaxSell:{0.max_sell} MinBuy:{0.min_buy} MaxProfit:{0.max_profit}'.format(self)
+        return 'Commodity: Name: "{0.name}" AverageSell: {0.average_sell} AverageBuy: {0.average_buy} ' \
+               'MaxSell: {0.max_sell} MinBuy: {0.min_buy} MaxProfit: {0.max_profit}'.format(self)
