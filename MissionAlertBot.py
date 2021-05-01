@@ -123,7 +123,7 @@ if not check_database_table_exists('missions'):
 def backup_database(database_name):
     """
     Creates a backup of the requested database into .backup/db_name.datetimestamp.db
-    
+
     :param str database_name: The database name to back up
     :rtype: None
     """
@@ -164,10 +164,16 @@ def delete_carrier_from_db(p_id):
         conn.commit()
     finally:
         carrier_db_lock.release()
-    dt_file_string = get_formatted_date_string()[1]
     # archive the removed carrier's image by appending date and time of deletion to it
-    shutil.move(f'images/{carrier.carrier_short_name}.png',
-                f'images/old/{carrier.carrier_short_name}.{dt_file_string}.png')
+    try:
+        shutil.move(f'images/{carrier.carrier_short_name}.png',
+                    f'images/old/{carrier.carrier_short_name}.{get_formatted_date_string()[1]}.png')
+    except:
+        errormsg = 'Unable to backup image file, perhaps it never existed?'
+        print(errormsg)
+        return errormsg
+
+    return
 
 
 # function to remove all carriers, not currently used by any bot command
@@ -209,9 +215,8 @@ def find_carrier_from_short_name(find_short_name):
 
 
 # function to search for a carrier by p_ID
-def find_carrier_from_pid(find_pid):
-
-    c.execute(f"SELECT p_ID, shortname, longname, cid, discordchannel, channelid FROM carriers WHERE p_ID = {find_pid}")
+def find_carrier_from_pid(db_id):
+    c.execute(f"SELECT p_ID, shortname, longname, cid, discordchannel, channelid FROM carriers WHERE p_ID = {db_id}")
     carrier_data = CarrierData(c.fetchone())
     print(f"FC {carrier_data.pid} is {carrier_data.carrier_long_name} {carrier_data.carrier_identifier} called by "
           f"shortname {carrier_data.carrier_short_name} with channel <#{carrier_data.channel_id}> called "
@@ -931,14 +936,48 @@ async def carrier_add(ctx, short_name, long_name, carrier_id, discord_channel):
 
 
 # remove FC from database
-@bot.command(name='carrier_del', help='Delete a Fleet Carrier from the database using its ID.\n'
-                                      'Use the findid command to check before deleting.')
+@bot.command(name='carrier_del', help='Delete a Fleet Carrier from the database using its database entry ID#.')
 @commands.has_role('Carrier Owner')
-async def carrier_del(ctx, pid):
-    backup_database('carriers')  # backup the carriers database before going any further
+async def carrier_del(ctx, db_id):
+    try:
+        carrier_data = find_carrier_from_pid(db_id)
+        if carrier_data:
+            embed = discord.Embed(title="Delete Fleet Carrier", description=f"Result for {db_id}",
+                                  color=constants.EMBED_COLOUR_OK)
+            embed = _add_common_embed_fields(embed, carrier_data)
+            await ctx.send(embed=embed)
 
-    await delete_carrier_from_db(pid)
-    await ctx.send(f"Attempted to remove carrier number {pid}")
+            embed = discord.Embed(title="Proceed with deletion?", description="y/n", color=constants.EMBED_COLOUR_OK)
+            await ctx.send(embed=embed)
+
+            def check(message):
+                return message.author == ctx.author and message.channel == ctx.channel and \
+                       message.content.lower() in ["y", "n"]
+
+            try:
+                msg = await bot.wait_for("message", check=check, timeout=30)
+                if msg.content.lower() == "n":
+                    embed=discord.Embed(description="Deletion cancelled.", color=constants.EMBED_COLOUR_OK)
+                    await ctx.send(embed=embed)
+                    return
+                elif msg.content.lower() == "y":
+                    try:
+                        error_msg = delete_carrier_from_db(db_id)
+                        if error_msg:
+                            await ctx.send(error_msg)
+
+                        embed = discord.Embed(description=f"Fleet carrier #{carrier_data.pid} deleted.",
+                                              color=constants.EMBED_COLOUR_OK)
+                        await ctx.send(embed=embed)
+                    except Exception as e:
+                        return f'Something went wrong, go ask Sihmm and tell him computer said: {e}'
+
+            except asyncio.TimeoutError:
+                await ctx.send("**Cancelled - timed out**")
+
+    except TypeError as e:
+        print(f'Error while finding carrier to delete: {e}.')
+    await ctx.send(f"Couldn't find a carrier with ID #{db_id}.")
 
 
 # change FC background image
@@ -1047,19 +1086,20 @@ async def find(ctx, looklong):
 
 
 # find FC based on ID
-@bot.command(name='findid', help='Find a carrier based on its database ID\nSyntax: findid <integer>')
-async def findid(ctx, lookid):
+@bot.command(name='findid', help='Find a carrier based on its database ID\n'
+                                 'Syntax: findid <integer>')
+async def findid(ctx, db_id):
     try:
-        carrier_data = find_carrier_from_pid(lookid)
+        carrier_data = find_carrier_from_pid(db_id)
         if carrier_data:
             embed = discord.Embed(title="Fleet Carrier DB# Search Result",
                                   description=f"Displaying carrier with DB# {carrier_data.pid}",
                                   color=constants.EMBED_COLOUR_OK)
             embed = _add_common_embed_fields(embed, carrier_data)
-            return await ctx.send(embed=embed)
+            await ctx.send(embed=embed)
     except TypeError as e:
         print('Error in carrier findid search: {}'.format(e))
-    await ctx.send(f'No result for {lookid}.')
+    await ctx.send(f'No result for {db_id}.')
 
 
 # find commodity
