@@ -18,7 +18,7 @@ from discord.ext import commands
 from datetime import datetime
 from datetime import timezone
 from dotenv import load_dotenv
-
+from dateutil.relativedelta import relativedelta
 import constants
 import threading
 #
@@ -73,9 +73,6 @@ mission_db = conm.cursor()
 
 print('MissionAlertBot starting')
 print(f'Configuring to run against: {"Production" if _production else "Testing"} env.')
-print('Dumping some values just for debug:')
-print(f'Configuration = {conf}')
-print(f'Bot Token: {TOKEN}')
 
 
 # create carrier record if necessary (only needed on first run)
@@ -84,6 +81,7 @@ def check_database_table_exists(table_name, database):
     Checks whether a carrier exists in the database already.
 
     :param str table_name:  The database string name to create.
+    :param sqlite.Connection.cursor database: The database to connect againt.
     :returns: A boolean state, True if it exists, else False
     :rtype: bool
     """
@@ -213,7 +211,7 @@ def _delete_all_from_database(database):
 def find_carrier_from_long_name(find_long_name):
 
     carrier_db.execute(
-        f"SELECT p_ID, shortname, longname, cid, discordchannel, channelid FROM carriers WHERE longname LIKE (?)",
+        f"SELECT * FROM carriers WHERE longname LIKE (?)",
         (f'%{find_long_name}%',))
     carrier_data = CarrierData(carrier_db.fetchone())
     print(f"FC {carrier_data.pid} is {carrier_data.carrier_long_name} {carrier_data.carrier_identifier} called by "
@@ -226,7 +224,7 @@ def find_carrier_from_long_name(find_long_name):
 # function to search for a carrier by shortname
 def find_carrier_from_short_name(find_short_name):
 
-    carrier_db.execute(f"SELECT p_ID, shortname, longname, cid, discordchannel FROM carriers WHERE shortname LIKE (?)",
+    carrier_db.execute(f"SELECT * FROM carriers WHERE shortname LIKE (?)",
                        (f'%{find_short_name}%',))
     carrier_data = CarrierData(carrier_db.fetchone())
     print(f"FC {carrier_data.pid} is {carrier_data.carrier_long_name} {carrier_data.carrier_identifier} called by "
@@ -238,7 +236,7 @@ def find_carrier_from_short_name(find_short_name):
 
 # function to search for a carrier by p_ID
 def find_carrier_from_pid(db_id):
-    carrier_db.execute(f"SELECT p_ID, shortname, longname, cid, discordchannel, channelid FROM carriers WHERE p_ID = {db_id}")
+    carrier_db.execute(f"SELECT * FROM carriers WHERE p_ID = {db_id}")
     carrier_data = CarrierData(carrier_db.fetchone())
     print(f"FC {carrier_data.pid} is {carrier_data.carrier_long_name} {carrier_data.carrier_identifier} called by "
           f"shortname {carrier_data.carrier_short_name} with channel <#{carrier_data.channel_id}> called "
@@ -251,7 +249,7 @@ def find_commodity(lookfor):
     # TODO: Where do we get set up this database? it is searching for things, but what is the source of the data, do
     #  we update it periodically?
     carrier_db.execute(
-        f"SELECT commodity, avgsell, avgbuy, maxsell, minbuy, maxprofit FROM commodities WHERE commodity LIKE (?)",
+        f"SELECT * FROM commodities WHERE commodity LIKE (?)",
         (f'%{lookfor}%',))
     commodity = Commodity(carrier_db.fetchone())
     print(f"Commodity {commodity.name} avgsell {commodity.average_sell} avgbuy {commodity.average_buy} "
@@ -279,9 +277,8 @@ def get_formatted_date_string():
     :rtype: tuple
     """
     dt_now = datetime.now(tz=timezone.utc)
-    # dt_string is the Elite Dangerous time this is running in.
-    # TODO: This is hardcoded for 3307, is it a straight up X years in future, then we should increment it accordingly
-    elite_time_string = dt_now.strftime("%d %B" + " 3307" + " %H%M")
+    # elite_time_string is the Elite Dangerous time this is running in, today plus 1268 years
+    elite_time_string = (dt_now + relativedelta(years=1268)).strftime("%Y%m%d %H%M%S")
     current_time_string = dt_now.strftime("%Y%m%d %H%M%S")
     return elite_time_string, current_time_string
 
@@ -300,7 +297,7 @@ def create_carrier_mission_image(carrier_data, commodity, system, station, profi
     image_editable.text((27, 360), "SYSTEM:", (255, 255, 255), font=field_font)
     image_editable.text((150, 360), system.upper(), (255, 255, 255), font=normal_font)
     image_editable.text((27, 400), "STATION:", (255, 255, 255), font=field_font)
-    image_editable.text((150, 400), f"{station.upper()} ({pads.upper()})", (255, 255, 255), font=normal_font)
+    image_editable.text((150, 400), f"{station.upper()} ({pads.upper()} pads)", (255, 255, 255), font=normal_font)
     image_editable.text((27, 440), "PROFIT:", (255, 255, 255), font=field_font)
     image_editable.text((150, 440), f"{profit}k per unit, {demand} units", (255, 255, 255), font=normal_font)
     my_image.save("result.png")
@@ -440,17 +437,25 @@ async def unloadrp(ctx, carrier_name, commodity_short_name, system, station, pro
 # mission generator called by loading/unloading commands
 async def gen_mission(ctx, carrier_name, commodity_short_name, system, station, profit, pads, demand, rp, mission_type,
                       eta):
-    rp_text = reddit_post_id = reddit_post_url = reddit_comment_id = reddit_comment_url = discord_alert_id = "NULL"
+
+    # Empty string for the database just in case we use it before assignment
+    rp_text = 'NULL'
+    reddit_post_id = 'Null'
+    reddit_post_url = 'NULL'
+    reddit_comment_id = 'NULL'
+    reddit_comment_url = 'NULL'
+    discord_alert_id = 'NULL'
+
     eta_text = f" (ETA {eta} minutes)" if eta else ""
 
     embed = discord.Embed(title="Generating and fetching mission alerts...", color=constants.EMBED_COLOUR_QU)
     message_gen = await ctx.send(embed=embed)
 
-    mission_db.execute(f'''SELECT carrier FROM missions WHERE carrier LIKE (?)''', ('%' + carrier_name + '%',))
-    carrier_data = CarrierData(mission_db.fetchone())
-    if carrier_data:
+    mission_db.execute(f'''SELECT * FROM missions WHERE carrier LIKE (?)''', ('%' + carrier_name + '%',))
+    mission_data = MissionData(mission_db.fetchone())
+    if mission_data:
         embed = discord.Embed(title="Error",
-                              description=f"{carrier_data.carrier_long_name} is already on a mission, please "
+                              description=f"{mission_data.carrier_name} is already on a mission, please "
                                           f"use **m.done** to mark it complete before starting a new mission.",
                               color=constants.EMBED_COLOUR_ERROR)
         await ctx.send(embed=embed)
@@ -675,21 +680,27 @@ async def ission(ctx):
     # take a note channel ID
     msg_ctx_id = ctx.channel.id
     # look for a match for the channel ID in the carrier DB
-    carrier_db.execute(f"SELECT longname, cid FROM carriers WHERE channelid = {msg_ctx_id}")
+    carrier_db.execute(f"SELECT * FROM carriers WHERE "
+                       f"channelid = {msg_ctx_id}")
     carrier_data = CarrierData(carrier_db.fetchone())
+    print(f'Mission command carrier_data: {carrier_data}')
     if not carrier_data.channel_id:
         # if there's no channel match, return an error
         embed = discord.Embed(description="Try again in the carrier's channel.", color=constants.EMBED_COLOUR_QU)
         await ctx.send(embed=embed)
         return
     else:
-
+        print(f'Searching if carrier ({carrier_data.carrier_long_name}) has active mission.')
         # now look to see if the carrier is on an active mission
-        mission_db.execute('''SELECT * FROM missions WHERE carrier LIKE (?)''', ('%' + carrier_data.carrier_long_name + '%',))
+        mission_db.execute('''SELECT * FROM missions WHERE carrier LIKE (?)''',
+                           ('%' + carrier_data.carrier_long_name + '%',))
+        print('DB command ran, go fetch the result')
         mission_data = MissionData(mission_db.fetchone())
+        print(f'Found mission data: {mission_data}')
+
         if not mission_data:
             # if there's no result, return an error
-            embed = discord.Embed(description=f"**{mission_data.carrier_name}** doesn't seem to be on a trade"
+            embed = discord.Embed(description=f"**{carrier_data.carrier_long_name}** doesn't seem to be on a trade"
                                               f" mission right now.",
                                   color=constants.EMBED_COLOUR_OK)
             await ctx.send(embed=embed)
@@ -723,16 +734,16 @@ async def ission(ctx):
 @bot.command(name='issions', help='List all active trade missions.')
 async def issions(ctx):
     mission_db.execute('''SELECT * FROM missions WHERE missiontype="load";''')
-
-    # TODO: Convert this to a list of mission objects? [MissionData(mission_data) for mission_data in
+    print(f'Generating full loading mission list requested by: {ctx.author}')
     records = [MissionData(mission_data) for mission_data in mission_db.fetchall()]
     embed = discord.Embed(title=f"{len(records)} P.T.N Fleet Carrier LOADING missions in progress:",
                           color=constants.EMBED_COLOUR_LOADING)
     embed = _format_missions_embedd(records, embed)
     await ctx.send(embed=embed)
 
+    print(f'Generating full unloading mission list requested by: {ctx.author}')
     mission_db.execute('''SELECT * FROM missions WHERE missiontype="unload";''')
-    records = mission_db.fetchall()
+    records = [MissionData(mission_data) for mission_data in mission_db.fetchall()]
     embed = discord.Embed(title=f"{len(records)} P.T.N Fleet Carrier UNLOADING missions in progress:",
                           color=constants.EMBED_COLOUR_UNLOADING)
     embed = _format_missions_embedd(records, embed)
@@ -744,7 +755,6 @@ def _format_missions_embedd(mission_data_list, embed):
     Loop over a set of records and add certain fields to the message.
     """
     for mission_data in mission_data_list:
-        # TODO: What are the rest of the fields
         embed.add_field(name=f"{mission_data.carrier_name}", value=f"<#{mission_data.channel_id}>", inline=True)
         embed.add_field(name=f"{mission_data.commodity}",
                         value=f"{mission_data.demand} at {mission_data.profit}k/unit", inline=True)
@@ -760,7 +770,7 @@ def _format_missions_embedd(mission_data_list, embed):
                                'quote to be sent along with the completion notice. This can be used for RP if desired.')
 @commands.has_role('Carrier Owner')
 async def done(ctx, carrier_name, rp=None):
-
+    print(f'Request received from {ctx.author} to mark the mission of {carrier_name} as completed')
     mission_db.execute(f'''SELECT * FROM missions WHERE carrier LIKE (?)''', ('%' + carrier_name + '%',))
     mission_data = MissionData(mission_db.fetchone())
     if not mission_data:
@@ -927,7 +937,7 @@ async def carrier_list(ctx):
         count += 1
         embed.add_field(name=f"{count}: {carrier.carrier_long_name} ({carrier.carrier_identifier})",
                         value=f"<#{carrier.channel_id}>", inline=False)
-        # TODO: An ambedd can have 25 fields only, this needs extended out for more carriers. Add a contingent here to
+        # TODO: An embed can have 25 fields only, this needs extended out for more carriers. Add a contingent here to
         #  send the response when the count mod 25 is 0, reset the embedd after sending and make sure the last set also
         #  send
     await ctx.send(embed=embed)

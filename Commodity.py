@@ -10,8 +10,11 @@ class Commodity:
         :param sqlite.Row info_dict: A single row from the sqlite query.
         """
 
-        # Convert the sqlite3.Row object to a dictionary
-        info_dict = dict(info_dict)
+        if info_dict:
+            # Convert the sqlite3.Row object to a dictionary
+            info_dict = dict(info_dict)
+        else:
+            info_dict = dict()
 
         self.name = info_dict.get('commodity', None)
         self.average_sell = info_dict.get('avgsell', None)

@@ -7,13 +7,13 @@ class MissionData:
         :param sqlite.Row info_dict: A single row from the sqlite query.
         """
 
-        # Convert the sqlite3.Row object to a dictionary
-        info_dict = dict(info_dict)
+        if info_dict:
+            # Convert the sqlite3.Row object to a dictionary
+            info_dict = dict(info_dict)
+        else:
+            info_dict = dict()
 
-        # TODO: Some of these will be NULL because that is what we get back from the SQL database, we should convert
-        #  those to python types
-
-        # TODO: What do we get back from db.fetchone(), is it a dictionary object?
+        # TODO: transform NULL into None at some stage
 
         self.carrier_name = info_dict.get('carrier', None)
         self.carrier_identifier = info_dict.get('cid', None)
@@ -51,9 +51,19 @@ class MissionData:
 
         :rtype: str
         """
+
         return 'MissionData: CarrierName:{0.carrier_name} CarrierIdentifier:{0.carrier_identifier} ' \
                'DiscordChannelID:{0.channel_id} Commodity:{0.commodity} ' \
-               'MissingType:{0.mission_type} System:{0.system} Station:(0.station} Profit:{0.profit}' \
-               'Pad:{0.pad} Demand:{0.demand} RpText:{0.rp_text} RedditPostId:{0.reddit_post_id}' \
+               'MissingType:{0.mission_type} System:{0.system} Station:{0.station} Profit:{0.profit}' \
+               'Pad:{0.pad_size} Demand:{0.demand} RpText:{0.rp_text} RedditPostId:{0.reddit_post_id}' \
                'RedditPostUrl:{0.reddit_post_url} RedditCommentId:{0.reddit_comment_id}' \
                'RedditCommentUrl:{0.reddit_comment_url} DiscordAlertId:{0.discord_alert_id}'.format(self)
+
+    def __bool__(self):
+        """
+        Override boolean to check if any values are set, if yes then return True, else False, where false is an empty
+        class.
+
+        :rtype: bool
+        """
+        return any([value for key, value in vars(self).items() if value])

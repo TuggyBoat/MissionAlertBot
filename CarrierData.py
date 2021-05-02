@@ -6,9 +6,11 @@ class CarrierData:
 
         :param sqlite.Row info_dict: A single row from the sqlite query.
         """
-
-        # Convert the sqlite3.Row object to a dictionary
-        info_dict = dict(info_dict)
+        if info_dict:
+            # Convert the sqlite3.Row object to a dictionary
+            info_dict = dict(info_dict)
+        else:
+            info_dict = dict()
 
         self.carrier_long_name = info_dict.get('longname', None)
         self.carrier_short_name = info_dict.get('shortname', None)
