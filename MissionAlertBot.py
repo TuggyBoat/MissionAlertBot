@@ -55,6 +55,9 @@ TOKEN = os.getenv('DISCORD_TOKEN') if _production else os.getenv('DISCORD_TOKEN_
 
 # create reddit instance
 reddit = asyncpraw.Reddit('bot1')
+print(reddit)
+print(f'Logged into reddit as: {reddit.user.me()}')
+sys.exit(9)
 
 # connect to sqlite carrier database
 conn = sqlite3.connect('carriers.db')
@@ -1136,6 +1139,7 @@ async def findid(ctx, db_id):
                                   color=constants.EMBED_COLOUR_OK)
             embed = _add_common_embed_fields(embed, carrier_data)
             await ctx.send(embed=embed)
+            return  # We exit here
     except TypeError as e:
         print('Error in carrier findid search: {}'.format(e))
     await ctx.send(f'No result for {db_id}.')
