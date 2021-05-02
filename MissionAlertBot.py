@@ -55,6 +55,9 @@ TOKEN = os.getenv('DISCORD_TOKEN') if _production else os.getenv('DISCORD_TOKEN_
 
 # create reddit instance
 reddit = asyncpraw.Reddit('bot1')
+print(reddit)
+print(f'Logged into reddit as: {reddit.user.me()}')
+sys.exit(9)
 
 # connect to sqlite carrier database
 conn = sqlite3.connect('carriers.db')
