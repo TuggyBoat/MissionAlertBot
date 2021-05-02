@@ -438,13 +438,15 @@ async def unloadrp(ctx, carrier_name, commodity_short_name, system, station, pro
 async def gen_mission(ctx, carrier_name, commodity_short_name, system, station, profit, pads, demand, rp, mission_type,
                       eta):
 
-    # Empty string for the database just in case we use it before assignment
-    rp_text = 'NULL'
-    reddit_post_id = 'Null'
-    reddit_post_url = 'NULL'
-    reddit_comment_id = 'NULL'
-    reddit_comment_url = 'NULL'
-    discord_alert_id = 'NULL'
+    # TODO: This method is way too long, break it up into logical steps.
+
+    # None-strings, should hopefully not break the database. If it does revert these to 'NULL'
+    rp_text = None
+    reddit_post_id = None
+    reddit_post_url = None
+    reddit_comment_id = None
+    reddit_comment_url = None
+    discord_alert_id = None
 
     eta_text = f" (ETA {eta} minutes)" if eta else ""
 
@@ -627,7 +629,6 @@ async def gen_mission(ctx, carrier_name, commodity_short_name, system, station, 
                                   color=constants.EMBED_COLOUR_REDDIT)
             channel = bot.get_channel(constants.CHANNEL_UPVOTES)
             await channel.send(embed=embed)
-
     except asyncio.TimeoutError:
         await ctx.send("**Mission not generated or broadcast (no valid response from user).**")
         return
