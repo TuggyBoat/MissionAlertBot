@@ -1150,11 +1150,15 @@ async def findid(ctx, db_id):
                                    'up the list.\n'
                                    'To find Platinum, you\'d have to type at least "plati".')
 async def search_for_commodity(ctx, lookfor):
+    print(f'search_for_commodity called by {ctx.author} to search for {lookfor}')
     try:
         commodity = find_commodity(lookfor)
-        await ctx.send(commodity)
+        if commodity:
+            return await ctx.send(commodity)
     except:
-        await ctx.send("No such commodity.")
+        # Catch any exception
+        pass
+    await ctx.send(f"No such commodity found for: {lookfor}.")
 
 
 # ping the bot
