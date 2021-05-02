@@ -1099,7 +1099,7 @@ def _add_common_embed_fields(embed, carrier_data):
     embed.add_field(name="Carrier Name", value=f"{carrier_data.carrier_long_name}", inline=True)
     embed.add_field(name="Carrier ID", value=f"{carrier_data.carrier_identifier}", inline=True)
     embed.add_field(name="Shortname", value=f"{carrier_data.carrier_short_name}", inline=True)
-    embed.add_field(name="Discord Channel", value=f"#{carrier_data.discord_channel}", inline=True)
+    embed.add_field(name="Discord Channel", value=f"<#{carrier_data.channel_id}>", inline=True)
     embed.add_field(name="Database Entry", value=f"{carrier_data.pid}", inline=True)
     return embed
 
@@ -1136,6 +1136,7 @@ async def findid(ctx, db_id):
                                   color=constants.EMBED_COLOUR_OK)
             embed = _add_common_embed_fields(embed, carrier_data)
             await ctx.send(embed=embed)
+            return  # We exit here
     except TypeError as e:
         print('Error in carrier findid search: {}'.format(e))
     await ctx.send(f'No result for {db_id}.')
@@ -1149,8 +1150,11 @@ async def findid(ctx, db_id):
                                    'up the list.\n'
                                    'To find Platinum, you\'d have to type at least "plati".')
 async def search_for_commodity(ctx, lookfor):
-    commodity = find_commodity(lookfor)
-    await ctx.send(commodity)
+    try:
+        commodity = find_commodity(lookfor)
+        await ctx.send(commodity)
+    except:
+        await ctx.send("No such commodity.")
 
 
 # ping the bot
