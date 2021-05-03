@@ -13,7 +13,6 @@ TEST_FLAIR_MISSION_STOP = "4242a2e2-8e8e-11eb-b443-0e664851dbff"
 
 TEST_TRADE_ALERTS_ID = 824383348628783144  # trade alerts channel ID for PTN test server
 TEST_SUB_REDDIT = "PTNBotTesting"  # subreddit for testing
-TEST_DISCORD_TOKEN = 'ODI0MjQzNDIxMTQ1MzMzNzcw.YFsigQ.91N6szUK39WiL8j_E4zXsBVPtjQ'
 
 CHANNEL_UPVOTES = 828279034387103744    # The ID for the updoots channel
 EMBED_COLOUR_LOADING = 0x80ffff         # blue
@@ -42,7 +41,6 @@ def get_constant(production: bool):
             'MISSION_STOP': PROD_FLAIR_MISSION_STOP,
             'SUB_REDDIT': PROD_SUB_REDDIT,
             'TRADE_ALERTS_ID': PROD_TRADE_ALERTS_ID,
-            'DISCORD_TOKEN': DISCORD_TOKEN
         }
     else:
         result = {
@@ -50,7 +48,6 @@ def get_constant(production: bool):
                 'MISSION_STOP': TEST_FLAIR_MISSION_STOP,
                 'SUB_REDDIT': TEST_SUB_REDDIT,
                 'TRADE_ALERTS_ID': TEST_TRADE_ALERTS_ID,
-                'DISCORD_TOKEN': TEST_DISCORD_TOKEN
             }
 
     return result

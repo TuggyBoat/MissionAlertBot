@@ -2,6 +2,7 @@ result.png
 missions.db
 missions.db.backup
 backup/
+__pycache__/
 .idea
 
 .env
