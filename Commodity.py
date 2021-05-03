@@ -44,3 +44,12 @@ class Commodity:
         """
         return 'Commodity: Name: "{0.name}" AverageSell: {0.average_sell} AverageBuy: {0.average_buy} ' \
                'MaxSell: {0.max_sell} MinBuy: {0.min_buy} MaxProfit: {0.max_profit}'.format(self)
+
+    def __bool__(self):
+        """
+        Override boolean to check if any values are set, if yes then return True, else False, where false is an empty
+        class.
+
+        :rtype: bool
+        """
+        return any([value for key, value in vars(self).items() if value])

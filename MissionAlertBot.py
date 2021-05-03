@@ -1003,16 +1003,16 @@ async def carrier_del(ctx, db_id):
                     try:
                         error_msg = delete_carrier_from_db(db_id)
                         if error_msg:
-                            await ctx.send(error_msg)
+                            return await ctx.send(error_msg)
 
                         embed = discord.Embed(description=f"Fleet carrier #{carrier_data.pid} deleted.",
                                               color=constants.EMBED_COLOUR_OK)
-                        await ctx.send(embed=embed)
+                        return await ctx.send(embed=embed)
                     except Exception as e:
-                        return f'Something went wrong, go ask Sihmm and tell him computer said: {e}'
+                        return ctx.send(f'Something went wrong, go tell the bot team "computer said: {e}"')
 
             except asyncio.TimeoutError:
-                await ctx.send("**Cancelled - timed out**")
+                return await ctx.send("**Cancelled - timed out**")
 
     except TypeError as e:
         print(f'Error while finding carrier to delete: {e}.')
