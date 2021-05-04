@@ -1129,6 +1129,11 @@ async def find(ctx, looklong):
                                  'Syntax: findid <integer>')
 async def findid(ctx, db_id):
     try:
+        if not isinstance(db_id, int):
+            # Someone passed in a non integer, because this gets passed in with the wrapped quotation marks, it is
+            # probably impossible to convert. Just go return an error and call the user an fool of a took
+            return await ctx.send(
+                f'Computer says "The input must be a valid integer, you gave us a {type(db_id)} with value: {db_id}"')
         carrier_data = find_carrier_from_pid(db_id)
         if carrier_data:
             embed = discord.Embed(title="Fleet Carrier DB# Search Result",
@@ -1137,6 +1142,7 @@ async def findid(ctx, db_id):
             embed = _add_common_embed_fields(embed, carrier_data)
             await ctx.send(embed=embed)
             return  # We exit here
+
     except TypeError as e:
         print('Error in carrier findid search: {}'.format(e))
     await ctx.send(f'No result for {db_id}.')
