@@ -4,6 +4,7 @@ PROD_FLAIR_MISSION_STOP = "eea2d818-9235-11eb-b86f-0e50eec082f5"
 
 PROD_TRADE_ALERTS_ID = 801798469189763073  # trade alerts channel ID for PTN main server
 PROD_SUB_REDDIT = "PilotsTradeNetwork"  # subreddit for live
+PROD_CHANNEL_UPVOTES = 828279034387103744    # The ID for the updoots channel
 
 # Testing variables
 
@@ -13,8 +14,8 @@ TEST_FLAIR_MISSION_STOP = "4242a2e2-8e8e-11eb-b443-0e664851dbff"
 
 TEST_TRADE_ALERTS_ID = 824383348628783144  # trade alerts channel ID for PTN test server
 TEST_SUB_REDDIT = "PTNBotTesting"  # subreddit for testing
+TEST_CHANNEL_UPVOTES = 839918504676294666    # The ID for the updoots channel on test
 
-CHANNEL_UPVOTES = 828279034387103744    # The ID for the updoots channel
 EMBED_COLOUR_LOADING = 0x80ffff         # blue
 EMBED_COLOUR_UNLOADING = 0x80ff80       # green
 EMBED_COLOUR_REDDIT = 0xff0000          # red
@@ -41,6 +42,7 @@ def get_constant(production: bool):
             'MISSION_STOP': PROD_FLAIR_MISSION_STOP,
             'SUB_REDDIT': PROD_SUB_REDDIT,
             'TRADE_ALERTS_ID': PROD_TRADE_ALERTS_ID,
+            'CHANNEL_UPVOTES': PROD_CHANNEL_UPVOTES
         }
     else:
         result = {
@@ -48,6 +50,7 @@ def get_constant(production: bool):
                 'MISSION_STOP': TEST_FLAIR_MISSION_STOP,
                 'SUB_REDDIT': TEST_SUB_REDDIT,
                 'TRADE_ALERTS_ID': TEST_TRADE_ALERTS_ID,
+                'CHANNEL_UPVOTES': TEST_CHANNEL_UPVOTES
             }
 
     return result
