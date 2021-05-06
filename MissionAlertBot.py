@@ -966,7 +966,7 @@ async def carrier_list(ctx):
     # Now go send it and wait on a reaction
     message = await ctx.send(embed=embed)
 
-    await message.add_reaction("◀️")
+    # From page 0 we can only go forwards
     await message.add_reaction("▶️")
 
     # 60 seconds time out gets raised by Asyncio
@@ -985,7 +985,13 @@ async def carrier_list(ctx):
                                         value=f"<#{carrier.channel_id}>", inline=False)
 
                 await message.edit(embed=new_embed)
+
+                # Ok now we can go back, check if we can also go forwards still
+                if current_page == max_pages:
+                    await message.clear_reaction("▶️")
+
                 await message.remove_reaction(reaction, user)
+                await message.add_reaction("◀️")
 
             elif str(reaction.emoji) == "◀️" and current_page > 1:
                 print(f'{ctx.author} requested to go back a page.')
@@ -1004,16 +1010,24 @@ async def carrier_list(ctx):
                                         value=f"<#{carrier.channel_id}>", inline=False)
 
                 await message.edit(embed=new_embed)
+                # Ok now we can go forwards, check if we can also go backwards still
+                if current_page == 1:
+                    await message.clear_reaction("◀️")
+
                 await message.remove_reaction(reaction, user)
+                await message.add_reaction("▶️")
             else:
-
-                # TODO: Better error message please when a user requests a page we cannot display please
-
-                print(f'{ctx.author} requested an action we cannot perform.')
+                # It should be impossible to hit this part, but lets gate it just in case.
+                print(f'HAL9000 error: {ctx.author} ended in a random state while trying to handle: {reaction.emoji} '
+                      f'and on page: {current_page}.')
+                # HAl-9000 error response.
+                error_embed = discord.Embed(title=f"I'm sorry {ctx.author}, I'm afraid I can't do that.")
+                await message.edit(embed=error_embed)
                 await message.remove_reaction(reaction, user)
 
         except asyncio.TimeoutError:
             print(f'Timeout hit during carrier request by: {ctx.author}')
+            await ctx.send(f'Closed the active carrier list request from: {ctx.author} due to no input in 60 seconds.')
             await message.delete()
             break
 
