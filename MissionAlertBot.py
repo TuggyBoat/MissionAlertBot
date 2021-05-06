@@ -5,6 +5,7 @@
 # Discord Developer Portal: https://discord.com/developers/applications/822146046934384640/information
 # Git repo: https://github.com/PilotsTradeNetwork/MissionAlertBot
 import ast
+import time
 
 from PIL import Image, ImageFont, ImageDraw
 import os
@@ -927,21 +928,94 @@ async def complete(ctx):
 #
 
 # list FCs
-@bot.command(name='carrier_list', help='List all Fleet Carriers in the database.')
+@bot.command(name='carrier_list', help='List all Fleet Carriers in the database. This times out after 60 seconds')
 async def carrier_list(ctx):
+
+    print(f'Carrier List requested by user: {ctx.author}')
 
     carrier_db.execute(f"SELECT * FROM carriers")
     carriers = [CarrierData(carrier) for carrier in carrier_db.fetchall()]
-    embed = discord.Embed(title=f"{len(carriers)} Registered Fleet Carriers")
-    count = 0
-    for carrier in carriers:
+
+    def chunk(chunk_list, max_size=25):
+        """
+        Take an input list, and an expected max_size.
+
+        :returns: A chunked list that is yielded back to the caller
+        :rtype: iterator
+        """
+        for i in range(0, len(chunk_list), max_size):
+            yield chunk_list[i:i + max_size]
+
+    def validate_response(react, user):
+        return user == ctx.author and str(react.emoji) in ["◀️", "▶️"]
+        # This makes sure nobody except the command sender can interact with the "menu"
+
+    # TODO: should pages just be a list of embed_fields we want to add?
+    pages = [page for page in chunk(carriers)]
+
+    max_pages = len(pages)
+    current_page = 1
+
+    embed = discord.Embed(title=f"{len(carriers)} Registered Fleet Carriers Page:#{current_page} of {max_pages}")
+    count = 0   # Track the overall count for all carriers
+    # Go populate page 0 by default
+    for carrier in pages[0]:
         count += 1
         embed.add_field(name=f"{count}: {carrier.carrier_long_name} ({carrier.carrier_identifier})",
                         value=f"<#{carrier.channel_id}>", inline=False)
-        # TODO: An embed can have 25 fields only, this needs extended out for more carriers. Add a contingent here to
-        #  send the response when the count mod 25 is 0, reset the embedd after sending and make sure the last set also
-        #  send
-    await ctx.send(embed=embed)
+    # Now go send it and wait on a reaction
+    message = await ctx.send(embed=embed)
+
+    await message.add_reaction("◀️")
+    await message.add_reaction("▶️")
+
+    # 60 seconds time out gets raised by Asyncio
+    while True:
+        try:
+            reaction, user = await bot.wait_for('reaction_add', timeout=60, check=validate_response)
+            if str(reaction.emoji) == "▶️" and current_page != max_pages:
+
+                print(f'{ctx.author} requested to go forward a page.')
+                current_page += 1   # Forward a page
+                new_embed = discord.Embed(title=f"{len(carriers)} Registered Fleet Carriers Page:{current_page}")
+                for carrier in pages[current_page-1]:
+                    # Page -1 as humans think page 1, 2, but python thinks 0, 1, 2
+                    count += 1
+                    new_embed.add_field(name=f"{count}: {carrier.carrier_long_name} ({carrier.carrier_identifier})",
+                                        value=f"<#{carrier.channel_id}>", inline=False)
+
+                await message.edit(embed=new_embed)
+                await message.remove_reaction(reaction, user)
+
+            elif str(reaction.emoji) == "◀️" and current_page > 1:
+                print(f'{ctx.author} requested to go back a page.')
+                current_page -= 1   # Go back a page
+
+                new_embed = discord.Embed(title=f"{len(carriers)} Registered Fleet Carriers Page:{current_page}")
+                # Start by counting back however many carriers are in the current page, minus the new page, that way
+                # when we start a 3rd page we don't end up in problems
+                count -= len(pages[current_page - 1])
+                count -= len(pages[current_page])
+
+                for carrier in pages[current_page - 1]:
+                    # Page -1 as humans think page 1, 2, but python thinks 0, 1, 2
+                    count += 1
+                    new_embed.add_field(name=f"{count}: {carrier.carrier_long_name} ({carrier.carrier_identifier})",
+                                        value=f"<#{carrier.channel_id}>", inline=False)
+
+                await message.edit(embed=new_embed)
+                await message.remove_reaction(reaction, user)
+            else:
+
+                # TODO: Better error message please when a user requests a page we cannot display please
+
+                print(f'{ctx.author} requested an action we cannot perform.')
+                await message.remove_reaction(reaction, user)
+
+        except asyncio.TimeoutError:
+            print(f'Timeout hit during carrier request by: {ctx.author}')
+            await message.delete()
+            break
 
 
 # add FC to database
