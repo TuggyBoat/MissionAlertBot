@@ -31,7 +31,7 @@ from CarrierData import CarrierData
 from Commodity import Commodity
 from MissionData import MissionData
 
-_production = ast.literal_eval(os.environ.get('PTN-MISSION-ALERT-SERVICE', 'False'))
+_production = ast.literal_eval(os.environ.get('PTN_MISSION_ALERT_SERVICE', 'False'))
 
 # We need some locks to we wait on the DB queries
 carrier_db_lock = threading.Lock()
