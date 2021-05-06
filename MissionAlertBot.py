@@ -327,7 +327,7 @@ def txt_create_reddit_body(carrier_data, mission_type, commodity, station, syste
     if mission_type == 'load':
         reddit_body = (
             f"    INCOMING WIDEBAND TRANSMISSION: P.T.N. CARRIER LOADING MISSION IN PROGRESS\n\n**BUY FROM**: station "
-            f"**{station.upper()}** in system **{system.upper()}** ({pads.upper()}-pads)\n\n**COMMODITY**: "
+            f"**{station.upper()}** ({pads.upper()}-pads) in system **{system.upper()}**\n\n**COMMODITY**: "
             f"{commodity}\n\n&#x200B;\n\n**SELL TO**: Fleet Carrier **{carrier_data.carrier_long_name} "
             f"{carrier_data.carrier_identifier}{eta_text}**\n\n**PROFIT**: {profit}k/unit : {demand} "
             f"demand\n\n\n\n[Join us on Discord]({constants.REDDIT_DISCORD_LINK_URL}) for "
@@ -337,7 +337,7 @@ def txt_create_reddit_body(carrier_data, mission_type, commodity, station, syste
             f"    INCOMING WIDEBAND TRANSMISSION: P.T.N. CARRIER UNLOADING MISSION IN PROGRESS\n\n**BUY FROM**: Fleet "
             f"Carrier **{carrier_data.carrier_long_name} {carrier_data.carrier_identifier}{eta_text}**"
             f"\n\n**COMMODITY**: {commodity}\n\n&#x200B;\n\n**SELL TO**: station "
-            f"**{station.upper()}** in system **{system.upper()}** ({pads.upper()}-pads)\n\n**PROFIT**: {profit}k/unit "
+            f"**{station.upper()}** ({pads.upper()}-pads) in system **{system.upper()}**\n\n**PROFIT**: {profit}k/unit "
             f": {demand} supply\n\n\n\n[Join us on Discord]({constants.REDDIT_DISCORD_LINK_URL}) for mission updates"
             f" and discussion, channel **#{carrier_data.discord_channel}**.")
     return reddit_body
@@ -715,16 +715,15 @@ async def ission(ctx):
             if mission_data.rp_text and mission_data.rp_text != 'NULL':
                 mission_description = f"> {mission_data.rp_text}"
 
-            embed = discord.Embed(title=f"{mission_data.carrier_name} ({mission_data.carrier_identifier}) on "
-                                        f"{mission_data.mission_type.upper()}ING mission",
+            embed = discord.Embed(title=f"{mission_data.mission_type.upper()}ING {mission_data.carrier_name} ({mission_data.carrier_identifier})",
                                   description=mission_description, color=embed_colour)
 
-            embed.add_field(name=f"{mission_data.system.upper()}", value="*System*", inline=True)
-            embed.add_field(name=f"{mission_data.station.upper()} ({mission_data.pad_size}-pads)", value="*Station*",
+            embed.add_field(name="System", value=f"{mission_data.system.upper()}", inline=True)
+            embed.add_field(name="Station", value=f"{mission_data.station.upper()} ({mission_data.pad_size}-pads)",
                             inline=True)
-            embed.add_field(name=f"{mission_data.commodity.upper()}", value="*Commodity*", inline=True)
-            embed.add_field(name=f"{mission_data.demand} units at {mission_data.profit}k profit per unit",
-                            value="*Quantity and profit*", inline=True)
+            embed.add_field(name="Commodity", value=f"{mission_data.commodity.upper()}", inline=False)
+            embed.add_field(name="Quantity and profit",
+                            value=f"{mission_data.demand} units at {mission_data.profit}k profit per unit", inline=True)
             embed.set_footer(text="You can use m.complete if the mission is complete.")
 
             await ctx.send(embed=embed)
