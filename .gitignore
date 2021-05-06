@@ -1,8 +1,9 @@
 result.png
 missions.db
 missions.db.backup
-praw.ini
+backup/
+__pycache__/
 .idea
+
 .env
-praw.ini
 praw.ini
