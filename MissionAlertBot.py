@@ -935,7 +935,7 @@ async def carrier_list(ctx):
     carrier_db.execute(f"SELECT * FROM carriers")
     carriers = [CarrierData(carrier) for carrier in carrier_db.fetchall()]
 
-    def chunk(chunk_list, max_size=25):
+    def chunk(chunk_list, max_size=10):
         """
         Take an input list, and an expected max_size.
 
