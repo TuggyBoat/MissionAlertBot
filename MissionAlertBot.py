@@ -278,8 +278,8 @@ def get_formatted_date_string():
     :rtype: tuple
     """
     dt_now = datetime.now(tz=timezone.utc)
-    # elite_time_string is the Elite Dangerous time this is running in, today plus 1268 years
-    elite_time_string = (dt_now + relativedelta(years=1268)).strftime("%Y%m%d %H%M%S")
+    # elite_time_string is the Elite Dangerous time this is running in, today plus 1286 years
+    elite_time_string = (dt_now + relativedelta(years=1286)).strftime("%d %B %Y")
     current_time_string = dt_now.strftime("%Y%m%d %H%M%S")
     return elite_time_string, current_time_string
 
