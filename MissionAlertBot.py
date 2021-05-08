@@ -5,6 +5,7 @@
 # Discord Developer Portal: https://discord.com/developers/applications/822146046934384640/information
 # Git repo: https://github.com/PilotsTradeNetwork/MissionAlertBot
 import ast
+import copy
 import time
 
 from PIL import Image, ImageFont, ImageDraw
@@ -1256,6 +1257,127 @@ async def search_for_commodity(ctx, lookfor):
         # Catch any exception
         pass
     await ctx.send(f"No such commodity found for: {lookfor}.")
+
+
+@bot.command(name='edit_carrier', help='Edit a specific carrier in the database by providing specific inputs')
+@commands.has_role('Carrier Owner')
+async def edit_carrier(ctx, carrier_name):
+    print(f'edit_carrier called by {ctx.author} to update the carrier: {carrier_name}')
+    # Go fetch the carrier details
+    carrier_data = find_carrier_from_short_name(carrier_name)
+    print(carrier_data)
+    if carrier_data:
+        embed = discord.Embed(title=f"Edit DB request received.",
+                              description=f"Editing starting for {carrier_data.carrier_long_name}",
+                              color=constants.EMBED_COLOUR_OK)
+        embed = _configure_all_carrier_detail_embed(embed, carrier_data)
+
+        # Store this, we might want to update it later
+        initial_message = await ctx.send(embed=embed)
+        edit_carrier_data = await _check_and_edit_db_fields(ctx, carrier_data, initial_message)
+        if not edit_carrier_data:
+            # TODO: We can remove this, just here for debugging to make sure we exit
+            return await ctx.send('BYE!')  # just break out here
+        # Now we know what fields to edit, go do something with them
+    else:
+        return await ctx.send(f'No result found for the carrier: "{carrier_name}".')
+
+
+async def _check_and_edit_db_fields(ctx, carrier_data, initial_message):
+    """
+    Loop through a dummy CarrierData object and see if the user wants to update any of the fields.
+    """
+    # Track this as we can abort if nothing needs changed
+    init_data = copy.copy(carrier_data)
+
+    embed = discord.Embed(title=f"Edit DB request in progress ...",
+                          description=f"Editing in progress for {init_data.carrier_long_name}",
+                          color=constants.EMBED_COLOUR_OK)
+
+    def check_confirm(message):
+        return message.content and message.author == ctx.author and message.channel == ctx.channel and \
+               all(character in 'ynx' for character in set(message.content.lower()))
+
+    def check_user(message):
+        return message.content and message.author == ctx.author and message.channel == ctx.channel
+
+    for field in vars(carrier_data):
+        print(f'Looking to see if the user wants to edit the field {field} for carrier: '
+              f'{init_data.carrier_long_name}')
+
+        # Go ask the user for each one if they want to update, and if yes then to what.
+        embed.add_field(name=f'Do you want to update the carriers: "{field}" value?', value='y/n/x', inline=True)
+        embed.set_footer(text='yes, no or cancel the operation')
+        message_confirm = await ctx.send(embed=embed)
+
+        try:
+            msg = await bot.wait_for("message", check=check_confirm, timeout=30)
+            if "x" in msg.content.lower():
+                print(f'User {ctx.author} requested to cancel the edit operation.')
+                # immediately stop if there's an x anywhere in the message, even if there are other proper inputs
+                await ctx.send("**Edit operation cancelled by the user.**")
+                await msg.delete()
+                await message_confirm.delete()
+                await initial_message.delete()  # Remove the initial message also
+                return   # Exit the check logic
+
+            elif 'n' in msg.content.lower():
+                # Log a message and skip over
+                print(f'User {ctx.author} does not want to edit the field: {field}')
+                # We do not care, just move on
+            elif 'y' in msg.content.lower():
+                # Log a message and skip over
+                print(f'User {ctx.author} wants to edit the field: {field}')
+                embed.remove_field(0)   # Remove the current field, add a new one and resend
+
+                embed.add_field(name=f'What is the new value for: {field}?', value='Type your response now.')
+                embed.set_footer()   # Clear the foot as well
+                message_confirm = await ctx.send(embed=embed)
+
+                # Delete the edit embed
+                # Now what do we do? Send the user the request for the new field value, trim the response.
+                # make sure user is the allowed user for this message also.
+                msg = await bot.wait_for("message", check=check_user, timeout=30)
+                print(f'Setting the value for {init_data.carrier_long_name} filed {field} to "{msg.content}"')
+
+                # Use setattr to change the value of the variable field object to the user input
+                setattr(carrier_data, field, msg.content.strip())
+            else:
+                # TODO: Raise a problem
+                pass
+        except asyncio.TimeoutError:
+            await ctx.send("**Edit operation timed out (no valid response from user).**")
+            await message_confirm.delete()
+            await initial_message.delete()  # Remove the initial message also
+            return
+
+        # Remove the previous field so we have things in a nice view
+        embed.remove_field(0)
+
+    print(f'Current tracking of carrier data: {carrier_data}')
+    # If the current thing is the same as the old thing, why did we bother?
+    if init_data == carrier_data:
+        print(f'User {ctx.author} went through the whole process and does not want to edit anything.')
+        await ctx.send("**After all those button clicks you did not want to edit anything, fun.**")
+        await initial_message.delete()  # Remove the initial message also
+        return None
+
+    print(f'Carrier data now looks like:')
+    print(f'\t Initial: {init_data}')
+    print(f'\t Initial: {carrier_data}')
+
+    return carrier_data
+
+
+def _configure_all_carrier_detail_embed(embed, carrier_data):
+    embed.add_field(name='Long Name', value=f'{carrier_data.carrier_long_name}', inline=True)
+    embed.add_field(name='Short Name', value=f'{carrier_data.carrier_short_name}', inline=True)
+    embed.add_field(name='Carrier Identifier', value=f'{carrier_data.carrier_identifier}', inline=True)
+    embed.add_field(name='Discord Channel', value=f'{carrier_data.discord_channel}', inline=True)
+    embed.add_field(name='Channel ID', value=f'{carrier_data.channel_id}', inline=True)
+    embed.add_field(name='DB ID', value=f'{carrier_data.pid}', inline=True)
+    embed.set_footer(text="Note: DB ID is not an editable field.")
+    return embed
 
 
 # ping the bot
