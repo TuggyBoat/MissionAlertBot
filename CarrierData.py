@@ -14,9 +14,9 @@ class CarrierData:
 
         self.carrier_long_name = info_dict.get('longname', None)
         self.carrier_short_name = info_dict.get('shortname', None)
+        self.carrier_identifier = info_dict.get('cid', None)
         self.discord_channel = info_dict.get('discordchannel', None)
         self.channel_id = info_dict.get('channelid', None)
-        self.carrier_identifier = info_dict.get('cid', None)
         self.pid = info_dict.get('p_ID', None)
 
     def to_dictionary(self):
