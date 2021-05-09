@@ -1361,7 +1361,7 @@ def _update_carrier_details_in_database(ctx, carrier_data, original_name):
     print(f'Channels: {ctx.guild.channels}')
     channel = discord.utils.get(ctx.guild.channels, name=carrier_data.discord_channel)
     if not channel:
-        raise EnvironmentError('The discord channel does not exist; are you trying to updat it? Go make it first and'
+        raise EnvironmentError('The discord channel does not exist; are you trying to update it? Go make it first and'
                                ' try again')
     # TODO: Write to the database
     carrier_db_lock.acquire()
