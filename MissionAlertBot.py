@@ -1262,9 +1262,18 @@ async def search_for_commodity(ctx, lookfor):
 @bot.command(name='carrier_edit', help='Edit a specific carrier in the database by providing specific inputs')
 @commands.has_role('Carrier Owner')
 async def edit_carrier(ctx, carrier_name):
+    """
+    Edits a carriers information in the database. Provide a carrier name that can be partially matched and follow the
+    steps.
+
+    :param discord.ext.commands.Context ctx: The discord context
+    :param str carrier_name: The carrier name to find
+    :returns: None
+    """
     print(f'edit_carrier called by {ctx.author} to update the carrier: {carrier_name}')
     # Go fetch the carrier details by searching for the name
-    carrier_data = find_carrier_from_long_name(carrier_name)
+
+    carrier_data = copy.copy(find_carrier_from_long_name(carrier_name))
     print(carrier_data)
     if carrier_data:
         embed = discord.Embed(title=f"Edit DB request received.",
@@ -1275,20 +1284,50 @@ async def edit_carrier(ctx, carrier_name):
 
         # Store this, we might want to update it later
         initial_message = await ctx.send(embed=embed)
-        edit_carrier_data = await _check_and_edit_db_fields(ctx, carrier_data)
+        edit_carrier_data = await _determine_db_fields_to_edit(ctx, carrier_data)
         if not edit_carrier_data:
+            # The determination told the user there was an error. Wipe the original message and move on
             initial_message.delete()
-            # TODO: We can remove this, just here for debugging to make sure we exit
-            return await ctx.send('BYE!')  # just break out here
+            return
 
         # Now we know what fields to edit, go do something with them, first display them to the user
-        embed = discord.Embed(title=f"Writing carrier details",
-                              description=f"Writing the following settings for {carrier_data.carrier_long_name}",
+        embed = discord.Embed(title=f"Please validate the inputs are correct",
+                              description=f"Validate the new settings for {carrier_data.carrier_long_name}",
                               color=constants.EMBED_COLOUR_OK)
         embed = _configure_all_carrier_detail_embed(embed, edit_carrier_data)
         await ctx.send(embed=embed)
 
-        _update_carrier_details(ctx, edit_carrier_data, carrier_data.carrier_long_name)
+        # Get the user to agree before we write
+        embed = discord.Embed(title="Confirm you want to write these values to the database please",
+                              description="Yes or No.", color=constants.EMBED_COLOUR_QU)
+        embed.set_footer(text='y/n - yes, no.')
+        message_confirm = await ctx.send(embed=embed)
+
+        def check_confirm(message):
+            return message.content and message.author == ctx.author and message.channel == ctx.channel and \
+                   all(character in 'yn' for character in set(message.content.lower())) and len(message.content) == 1
+
+        try:
+
+            msg = await bot.wait_for("message", check=check_confirm, timeout=30)
+            if "n" in msg.content.lower():
+                print(f'User {ctx.author} requested to cancel the edit operation.')
+                # immediately stop if there's an x anywhere in the message, even if there are other proper inputs
+                await ctx.send("**Edit operation cancelled by the user.**")
+                await msg.delete()
+                await message_confirm.delete()
+                return None  # Exit the check logic
+
+            elif 'y' in msg.content.lower():
+                await ctx.send("**Writing the values now ...**")
+
+        except asyncio.TimeoutError:
+            await ctx.send("**Write operation from {ctx.author} timed out.**")
+            await message_confirm.delete()
+            return None  # Exit the check logic
+
+        # Go update the details to the database
+        _update_carrier_details_in_database(ctx, edit_carrier_data, carrier_data.carrier_long_name)
 
         # Go grab the details again, make sure it is correct and display to the user
         updated_carrier_data = find_carrier_from_long_name(edit_carrier_data.carrier_long_name)
@@ -1306,7 +1345,15 @@ async def edit_carrier(ctx, carrier_name):
         return await ctx.send(f'No result found for the carrier: "{carrier_name}".')
 
 
-def _update_carrier_details(ctx, carrier_data, original_name):
+def _update_carrier_details_in_database(ctx, carrier_data, original_name):
+    """
+    Updates the carrier details into the database. It first ensures that the discord channel actually exists, if it
+    does not then you are getting an error back.
+
+    :param discord.ext.commands.Context ctx: The discord context
+    :param CarrierData carrier_data: The carrier data to write
+    :param str original_name: The original carrier name, needed so we can find it in the database
+    """
     backup_database('carriers')  # backup the carriers database before going any further
 
     print(f'Ensuring the discord channel {carrier_data.channel_id} exists for the carrier: '
@@ -1328,8 +1375,8 @@ def _update_carrier_details(ctx, carrier_data, original_name):
             carrier_data.channel_id,
             f'%{original_name}%'
         )
-
-        # TODO: This is not working as we expect
+        # Handy number to print out what the database connection is actually doing
+        carriers_conn.set_trace_callback(print)
         carrier_db.execute(
             ''' UPDATE carriers 
             SET shortname=?, longname=?, cid=?, discordchannel=?, channelid=?
@@ -1341,18 +1388,21 @@ def _update_carrier_details(ctx, carrier_data, original_name):
         carrier_db_lock.release()
 
 
-async def _check_and_edit_db_fields(ctx, carrier_data):
+async def _determine_db_fields_to_edit(ctx, carrier_data):
     """
     Loop through a dummy CarrierData object and see if the user wants to update any of the fields.
 
-    :param ctx:
+    :param discord.ext.commands.Context ctx: The discord context object
     :param CarrierData carrier_data: The carriers data you want to edit.
+    :returns: A carrier data object to edit into the database
+    :rtype: CarrierData
     """
-    # Track this as we can abort if nothing needs changed
-    init_data = copy.copy(carrier_data)
+    # We operate and return from this a copy of the object, not the object itself. Else things outside this also get
+    # affected. Because python uses pass by reference, and this is a mutable object, things can go wrong.
+    new_carrier_data = copy.copy(carrier_data)
 
     embed = discord.Embed(title=f"Edit DB request in progress ...",
-                          description=f"Editing in progress for {init_data.carrier_long_name}",
+                          description=f"Editing in progress for {carrier_data.carrier_long_name}",
                           color=constants.EMBED_COLOUR_OK)
 
     async def check_confirm(message):
@@ -1369,7 +1419,7 @@ async def _check_and_edit_db_fields(ctx, carrier_data):
             continue
 
         print(f'Looking to see if the user wants to edit the field {field} for carrier: '
-              f'{init_data.carrier_long_name}')
+              f'{carrier_data.carrier_long_name}')
 
         # Go ask the user for each one if they want to update, and if yes then to what.
         embed.add_field(name=f'Do you want to update the carriers: "{field}" value?',
@@ -1401,10 +1451,11 @@ async def _check_and_edit_db_fields(ctx, carrier_data):
                 message_confirm = await ctx.send(embed=embed)
 
                 msg = await bot.wait_for("message", check=check_user, timeout=30)
-                print(f'Setting the value for {init_data.carrier_long_name} filed {field} to "{msg.content.strip()}"')
+                print(f'Setting the value for {new_carrier_data.carrier_long_name} filed {field} to '
+                      f'"{msg.content.strip()}"')
 
                 # Use setattr to change the value of the variable field object to the user input
-                setattr(carrier_data, field, msg.content.strip())
+                setattr(new_carrier_data, field, msg.content.strip())
             else:
                 # Should never be hitting this as we gate the message
                 await ctx.send(f"**I cannot do anything with that entry '{msg.content}', please stick to y, n or x.**")
@@ -1419,19 +1470,26 @@ async def _check_and_edit_db_fields(ctx, carrier_data):
 
     print(f'Current tracking of carrier data: {carrier_data}')
     # If the current thing is the same as the old thing, why did we bother?
-    if init_data == carrier_data:
+    if new_carrier_data == carrier_data:
         print(f'User {ctx.author} went through the whole process and does not want to edit anything.')
         await ctx.send("**After all those button clicks you did not want to edit anything, fun.**")
         return None
 
     print(f'Carrier data now looks like:')
-    print(f'\t Initial: {init_data}')
     print(f'\t Initial: {carrier_data}')
+    print(f'\t Initial: {new_carrier_data}')
 
-    return carrier_data
+    return new_carrier_data
 
 
 def _configure_all_carrier_detail_embed(embed, carrier_data):
+    """
+    Adds all the common fields to a message embed and returns the embed.
+
+    :param discord.Embed embed: The original embed to edit.
+    :param CarrierData carrier_data: The carrier data to use for populating the embed
+    :returns: The embeded message
+    """
     embed.add_field(name='Carrier Name', value=f'{carrier_data.carrier_long_name}', inline=True)
     embed.add_field(name='Carrier Identifier', value=f'{carrier_data.carrier_identifier}', inline=True)
     embed.add_field(name='Short Name', value=f'{carrier_data.carrier_short_name}', inline=True)
