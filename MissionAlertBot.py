@@ -1270,7 +1270,15 @@ async def edit_carrier(ctx, carrier_name):
     :param str carrier_name: The carrier name to find
     :returns: None
     """
-    print(f'edit_carrier called by {ctx.author} to update the carrier: {carrier_name}')
+    print(f'edit_carrier called by {ctx.author} to update the carrier: {carrier_name} from channel: {ctx.channel}')
+
+    # make sure we are in the right channel
+    bot_command_channel = bot.get_channel(conf['BOT_COMMAND_CHANNEL'])
+    current_channel = ctx.channel
+    if current_channel != bot_command_channel:
+        # problem, wrong channel, no progress
+        return await ctx.send(f'Sorry, you can only run this command out of: {bot_command_channel}.')
+
     # Go fetch the carrier details by searching for the name
 
     carrier_data = copy.copy(find_carrier_from_long_name(carrier_name))
