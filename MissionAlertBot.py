@@ -440,6 +440,14 @@ async def unloadrp(ctx, carrier_name, commodity_short_name, system, station, pro
 async def gen_mission(ctx, carrier_name, commodity_short_name, system, station, profit, pads, demand, rp, mission_type,
                       eta):
 
+    # Check we are in the designated mission channel, if not go no farther.
+    mission_gen_channel = bot.get_channel(conf['MISSION_CHANNEL'])
+    current_channel = ctx.channel.id
+
+    if current_channel != mission_gen_channel:
+        # problem, wrong channel, no progress
+        raise EnvironmentError(f'You can only run this command out of: {mission_gen_channel}')
+
     # TODO: This method is way too long, break it up into logical steps.
 
     # None-strings, should hopefully not break the database. If it does revert these to 'NULL'
