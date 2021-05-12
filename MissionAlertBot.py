@@ -1260,7 +1260,7 @@ async def search_for_commodity(ctx, lookfor):
 
 
 @bot.command(name='carrier_edit', help='Edit a specific carrier in the database by providing specific inputs')
-@commands.has_role('Carrier Owner')
+@commands.has_role('Admin')
 async def edit_carrier(ctx, carrier_name):
     """
     Edits a carriers information in the database. Provide a carrier name that can be partially matched and follow the
