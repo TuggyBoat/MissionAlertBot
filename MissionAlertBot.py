@@ -735,20 +735,43 @@ async def ission(ctx):
 # list all active carrier trade missions from DB
 @bot.command(name='issions', help='List all active trade missions.')
 async def issions(ctx):
-    mission_db.execute('''SELECT * FROM missions WHERE missiontype="load";''')
-    print(f'Generating full loading mission list requested by: {ctx.author}')
-    records = [MissionData(mission_data) for mission_data in mission_db.fetchall()]
-    embed = discord.Embed(title=f"{len(records)} P.T.N Fleet Carrier LOADING missions in progress:",
-                          color=constants.EMBED_COLOUR_LOADING)
-    embed = _format_missions_embedd(records, embed)
-    await ctx.send(embed=embed)
+
+    print(f'User {ctx.author} asked for all active missions.')
+
+    co_role = discord.utils.get(ctx.guild.roles, name='Carrier Owner')
+    print(f'Check is user has role: "{co_role}"')
+    print(f'User has roles: {ctx.author.roles}')
 
     print(f'Generating full unloading mission list requested by: {ctx.author}')
     mission_db.execute('''SELECT * FROM missions WHERE missiontype="unload";''')
-    records = [MissionData(mission_data) for mission_data in mission_db.fetchall()]
-    embed = discord.Embed(title=f"{len(records)} P.T.N Fleet Carrier UNLOADING missions in progress:",
+    unload_records = [MissionData(mission_data) for mission_data in mission_db.fetchall()]
+
+    mission_db.execute('''SELECT * FROM missions WHERE missiontype="load";''')
+    print(f'Generating full loading mission list requested by: {ctx.author}')
+    load_records = [MissionData(mission_data) for mission_data in mission_db.fetchall()]
+
+    # If used by a non-carrier owner, link the total mission count and point to trade alerts.
+    if co_role not in ctx.author.roles:
+        print(f'User {ctx.author} does not have the required CO role, sending them to trade alerts.')
+        # Sorry user, you need to go to trade alerts.
+        trade_channel = bot.get_channel(trade_alerts_id)
+        embed = discord.Embed(
+            title=f"{len(load_records) + len(unload_records)} P.T.N Fleet Carrier missions in progress:",
+            description=f'Please go to {trade_channel} to see more details: <#{trade_channel.id}>',
+            color=constants.EMBED_COLOUR_LOADING
+        )
+        embed = _format_missions_embedd(load_records, embed)
+        return await ctx.send(embed=embed)
+
+    print(f'User {ctx.author} has the required CO role, dumping all the missions here.')
+    embed = discord.Embed(title=f"{len(load_records)} P.T.N Fleet Carrier LOADING missions in progress:",
+                          color=constants.EMBED_COLOUR_LOADING)
+    embed = _format_missions_embedd(load_records, embed)
+    await ctx.send(embed=embed)
+
+    embed = discord.Embed(title=f"{len(unload_records)} P.T.N Fleet Carrier UNLOADING missions in progress:",
                           color=constants.EMBED_COLOUR_UNLOADING)
-    embed = _format_missions_embedd(records, embed)
+    embed = _format_missions_embedd(unload_records, embed)
     await ctx.send(embed=embed)
 
 
