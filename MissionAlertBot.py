@@ -439,14 +439,16 @@ async def unloadrp(ctx, carrier_name, commodity_short_name, system, station, pro
 # mission generator called by loading/unloading commands
 async def gen_mission(ctx, carrier_name, commodity_short_name, system, station, profit, pads, demand, rp, mission_type,
                       eta):
-
     # Check we are in the designated mission channel, if not go no farther.
     mission_gen_channel = bot.get_channel(conf['MISSION_CHANNEL'])
-    current_channel = ctx.channel.id
+    current_channel = ctx.channel
+
+    print(f'Mission generation type: {mission_type} with RP: {rp}, requested by {ctx.author}. Request triggered from '
+          f'channel {current_channel}.')
 
     if current_channel != mission_gen_channel:
         # problem, wrong channel, no progress
-        raise EnvironmentError(f'You can only run this command out of: {mission_gen_channel}')
+        return await ctx.send(f'Sorry, you can only run this command out of: {mission_gen_channel}.')
 
     # TODO: This method is way too long, break it up into logical steps.
 
@@ -780,7 +782,19 @@ def _format_missions_embedd(mission_data_list, embed):
                                'quote to be sent along with the completion notice. This can be used for RP if desired.')
 @commands.has_role('Carrier Owner')
 async def done(ctx, carrier_name, rp=None):
-    print(f'Request received from {ctx.author} to mark the mission of {carrier_name} as completed')
+    print(f'Request received from {ctx.author} to mark the mission of {carrier_name} as done')
+
+    # Check we are in the designated mission channel, if not go no farther.
+    mission_gen_channel = bot.get_channel(conf['MISSION_CHANNEL'])
+    current_channel = ctx.channel
+
+    print(f'Request received from {ctx.author} to mark the mission of {carrier_name} as done from channel: '
+          f'{current_channel}')
+
+    if current_channel != mission_gen_channel:
+        # problem, wrong channel, no progress
+        return await ctx.send(f'Sorry, you can only run this command out of: {mission_gen_channel}.')
+
     mission_db.execute(f'''SELECT * FROM missions WHERE carrier LIKE (?)''', ('%' + carrier_name + '%',))
     mission_data = MissionData(mission_db.fetchone())
     if not mission_data:
