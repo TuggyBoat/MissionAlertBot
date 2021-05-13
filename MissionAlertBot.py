@@ -166,7 +166,6 @@ if not check_database_table_exists('missions', mission_db):
 else:
     print('Mission database exists, do nothing')
 
-raise EnvironmentError
 
 def dump_database_test(database_name):
     """
