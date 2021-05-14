@@ -1046,11 +1046,23 @@ async def carrier_list(ctx):
                                       'do NOT include the # at the start of the channel name!')
 @commands.has_role('Carrier Owner')
 async def carrier_add(ctx, short_name, long_name, carrier_id):
+
+    # Only add to the carrier DB if it does not exist, if it does exist then the user should not be adding it.
+    carrier_data = find_carrier_from_long_name(long_name)
+    if carrier_data:
+        # Carrier exists already, go skip it.
+        print(f'Request recieved from {ctx.author} to add a carrier that already exists in the database ({long_name}).')
+
+        embed = discord.Embed(title="Fleet carrier already exists, use m.carrier_edit to change its details.",
+                              description=f"Carrier data matched for {long_name}", color=constants.EMBED_COLOUR_OK)
+        embed = _add_common_embed_fields(embed, carrier_data)
+        return await ctx.send(embed=embed)
+
     backup_database('carriers')  # backup the carriers database before going any further
 
     # first create the new carrier's channel
-
-    # check whether channel already exists by sanitising the carrier's name input to match discord channel format, otherwise create one
+    # check whether channel already exists by sanitising the carrier's name input to match discord channel format,
+    # otherwise create one
 
     stripped_name = long_name.replace(' ', '-').replace('.', '')
     channel = discord.utils.get(ctx.guild.channels, name=stripped_name.lower())
@@ -1058,7 +1070,6 @@ async def carrier_add(ctx, short_name, long_name, carrier_id):
     if channel:
         await ctx.send("Channel creation skipped: a channel already exists with this carrier's name")
         print(f"Found existing {channel}")
-
     else:
         category = discord.utils.get(ctx.guild.categories, name="Drydock")
         channel = await ctx.guild.create_text_channel(stripped_name.lower(), category=category)
