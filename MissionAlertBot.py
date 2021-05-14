@@ -813,7 +813,7 @@ async def issions(ctx):
         trade_channel = bot.get_channel(trade_alerts_id)
         number_of_missions = len(load_records) + len(unload_records)
 
-        description_text = f'Please follow the link to for full details of all current missions: <#{trade_channel.id}>'
+        description_text = f'For full details of all current trade missions follow the link to <#{trade_channel.id}>'
         if not number_of_missions:
             description_text = f'Currently no active missions listed in: <#{trade_channel.id}>'
 
@@ -822,7 +822,7 @@ async def issions(ctx):
             description=description_text,
             color=constants.EMBED_COLOUR_LOADING
         )
-        embed = _format_missions_embedd(load_records, embed)
+
         return await ctx.send(embed=embed)
 
     print(f'User {ctx.author} has the required CO role, dumping all the missions here.')
