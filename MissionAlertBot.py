@@ -324,6 +324,8 @@ async def find_commodity(lookfor, ctx):
         # if only 1 match, just assign it directly
         commodity = commodities[0]
     elif len(commodities) > 3:
+        # If we ever get into a scenario where more than 3 commodities can be found with the same search directly, then
+        # we need to revisit this limit
         print(f'More than 3 commodities found for: "{lookfor}", {ctx.author} needs to search better.')
         await ctx.send(f'Please narrow down your commodity search, we found {len(commodities)} matches for your '
                        f'input choice: "{lookfor}"')
