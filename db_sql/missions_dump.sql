@@ -15,4 +15,4 @@ BEGIN TRANSACTION;CREATE TABLE missions(
             "reddit_comment_id"	TEXT,
             "reddit_comment_url"	TEXT,
             "discord_alert_id"	INT
-        );COMMIT;
+        );INSERT INTO "missions" VALUES('PTN STARSCAPE OLYMPUS','K8Y-T2G',801566562976399431,'Agronomic Treatment','unload','Test','Test',0,'M','0',NULL,NULL,NULL,NULL,NULL,NULL);COMMIT;

@@ -811,9 +811,15 @@ async def issions(ctx):
         print(f'User {ctx.author} does not have the required CO role, sending them to trade alerts.')
         # Sorry user, you need to go to trade alerts.
         trade_channel = bot.get_channel(trade_alerts_id)
+        number_of_missions = len(load_records) + len(unload_records)
+
+        description_text = f'Please follow the link to for full details of all current missions: <#{trade_channel.id}>'
+        if not number_of_missions:
+            description_text = f'Currently no active missions listed in: <#{trade_channel.id}>'
+
         embed = discord.Embed(
-            title=f"{len(load_records) + len(unload_records)} P.T.N Fleet Carrier missions in progress:",
-            description=f'Please go to {trade_channel} to see more details: <#{trade_channel.id}>',
+            title=f"{number_of_missions} P.T.N Fleet Carrier missions in progress:",
+            description=description_text,
             color=constants.EMBED_COLOUR_LOADING
         )
         embed = _format_missions_embedd(load_records, embed)
