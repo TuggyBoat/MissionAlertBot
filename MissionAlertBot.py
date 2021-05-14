@@ -120,7 +120,9 @@ if not check_database_table_exists('carriers', carrier_db):
                 longname TEXT NOT NULL, 
                 cid TEXT NOT NULL, 
                 discordchannel TEXT NOT NULL,
-                channelid INT 
+                channelid INT,
+                crewrole TEXT,
+                roleid INT
             ) 
         ''')
 else:
@@ -214,7 +216,7 @@ def backup_database(database_name):
 
 
 # function to add carrier, being sure to correct case
-def add_carrier_to_database(short_name, long_name, carrier_id, discord_channel, channel_id):
+def add_carrier_to_database(short_name, long_name, carrier_id, channel, channel_id, crew_role, roleid):
     """
     Inserts a carrier's details into the database.
 
@@ -227,8 +229,8 @@ def add_carrier_to_database(short_name, long_name, carrier_id, discord_channel, 
     """
     carrier_db_lock.acquire()
     try:
-        carrier_db.execute(''' INSERT INTO carriers VALUES(NULL, ?, ?, ?, ?, ?) ''',
-                           (short_name.lower(), long_name.upper(), carrier_id.upper(), discord_channel.lower(), channel_id))
+        carrier_db.execute(''' INSERT INTO carriers VALUES(NULL, ?, ?, ?, ?, ?, ?, ?) ''',
+                           (short_name.lower(), long_name.upper(), carrier_id.upper(), channel, channel_id, crew_role, roleid))
         carriers_conn.commit()
     finally:
         carrier_db_lock.release()
@@ -1235,23 +1237,61 @@ async def carrier_list(ctx):
                                       'ptn-carriername\n'
                                       'do NOT include the # at the start of the channel name!')
 @commands.has_role('Carrier Owner')
-async def carrier_add(ctx, short_name, long_name, carrier_id, discord_channel):
+async def carrier_add(ctx, short_name, long_name, carrier_id):
+
+    # Only add to the carrier DB if it does not exist, if it does exist then the user should not be adding it.
+    carrier_data = find_carrier_from_long_name(long_name)
+    if carrier_data:
+        # Carrier exists already, go skip it.
+        print(f'Request recieved from {ctx.author} to add a carrier that already exists in the database ({long_name}).')
+
+        embed = discord.Embed(title="Fleet carrier already exists, use m.carrier_edit to change its details.",
+                              description=f"Carrier data matched for {long_name}", color=constants.EMBED_COLOUR_OK)
+        embed = _add_common_embed_fields(embed, carrier_data)
+        return await ctx.send(embed=embed)
+
     backup_database('carriers')  # backup the carriers database before going any further
 
-    print(f'Looking for discord channel to add the carrier: {discord_channel}')
+    # first create the new carrier's channel
+    # check whether channel already exists by sanitising the carrier's name input to match discord channel format,
+    # otherwise create one
+
+    stripped_name = long_name.replace(' ', '-').replace('.', '')
+    channel = discord.utils.get(ctx.guild.channels, name=stripped_name.lower())
+
+    if channel:
+        await ctx.send("Channel creation skipped: a channel already exists with this carrier's name")
+        print(f"Found existing {channel}")
+    else:
+        category = discord.utils.get(ctx.guild.categories, name="Drydock")
+        channel = await ctx.guild.create_text_channel(stripped_name.lower(), category=category)
+        print(f"Created {channel}")
+
     print(f'Channels: {ctx.guild.channels}')
-    channel = discord.utils.get(ctx.guild.channels, name=discord_channel)
+
     if not channel:
-        raise EnvironmentError('Channel does not exist, go make it first and try again')
+        raise EnvironmentError(f'Could not create carrier channel {stripped_name.lower()}')
 
-    # TODO: task #26 make the channel if it does not exist
+    # create crew role
 
-    add_carrier_to_database(short_name, long_name, carrier_id, discord_channel, channel.id)
+    # check whether one already exists, otherwise create one
+
+    role = discord.utils.get(ctx.guild.roles, name=f"CREW: {long_name}")
+
+    if role:
+        await ctx.send('Crew role creation skipped: a role by that name already exists')
+        print(f'Found existing {role}')
+
+    else:
+        role = await ctx.guild.create_role(name=f"CREW: {long_name}")
+        print(f'Created {role}')
+
+    add_carrier_to_database(short_name, long_name, carrier_id, str(channel), channel.id, str(role), role.id)
     carrier_data = find_carrier_from_long_name(long_name)
     await ctx.send(
         f"Added **{carrier_data.carrier_long_name.upper()}** **{carrier_data.carrier_identifier.upper()}** "
-        f"with shortname **{carrier_data.carrier_short_name.lower()}** and channel "
-        f"**<#{carrier_data.channel_id}>** at ID **{carrier_data.pid}**")
+        f"with shortname **{carrier_data.carrier_short_name.lower()}**, channel "
+        f"**<#{carrier_data.channel_id}>** and Crew Role **{carrier_data.crewrole}** at ID **{carrier_data.pid}**")
 
 
 # remove FC from database
@@ -1272,6 +1312,8 @@ async def carrier_del(ctx, db_id):
             def check(message):
                 return message.author == ctx.author and message.channel == ctx.channel and \
                        message.content.lower() in ["y", "n"]
+
+            # TODO: Prompt user whether to also delete the carrier's channel and crew role
 
             try:
                 msg = await bot.wait_for("message", check=check, timeout=30)
