@@ -16,7 +16,6 @@ import sqlite3
 import asyncpraw
 import asyncio
 import shutil
-import re
 from discord.ext import commands
 from datetime import datetime
 from datetime import timezone
@@ -1035,16 +1034,6 @@ async def carrier_list(ctx):
             break
 
 
-@bot.command(name='test')
-async def test(ctx, long_name):
-    strip1_name = long_name.replace(' ', '-')
-    await ctx.send(strip1_name)
-    strip2_name = strip1_name.replace('.', '')
-    await ctx.send(strip2_name)
-    channel = discord.utils.get(ctx.guild.channels, name=strip2_name.lower())
-    if channel:
-        await ctx.send(channel)
-
 # add FC to database
 @bot.command(name='carrier_add', help='Add a Fleet Carrier to the database:\n'
                                       '\n'
@@ -1063,23 +1052,22 @@ async def carrier_add(ctx, short_name, long_name, carrier_id):
 
     # check whether channel already exists by sanitising the carrier's name input to match discord channel format, otherwise create one
 
-    strip1_name = long_name.replace(' ', '-')
-    strip2_name = strip1_name.replace('.', '')
-    channel = discord.utils.get(ctx.guild.channels, name=strip2_name.lower())
+    stripped_name = long_name.replace(' ', '-').replace('.', '')
+    channel = discord.utils.get(ctx.guild.channels, name=stripped_name.lower())
 
     if channel:
-        await ctx.send('Channel creation skipped: a channel already exists with this carrier\'s name')
+        await ctx.send("Channel creation skipped: a channel already exists with this carrier's name")
         print(f"Found existing {channel}")
 
     else:
         category = discord.utils.get(ctx.guild.categories, name="Drydock")
-        channel = await ctx.guild.create_text_channel(long_name, category=category)
+        channel = await ctx.guild.create_text_channel(stripped_name.lower(), category=category)
         print(f"Created {channel}")
 
     print(f'Channels: {ctx.guild.channels}')
     
     if not channel:
-        raise EnvironmentError('Could not create carrier channel')
+        raise EnvironmentError(f'Could not create carrier channel {stripped_name.lower()}')
 
     # create crew role
 
