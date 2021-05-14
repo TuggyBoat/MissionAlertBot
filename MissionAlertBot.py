@@ -49,8 +49,9 @@ bot_guild_id = int(conf['BOT_GUILD'])
 flair_mission_start = conf['MISSION_START']
 flair_mission_stop = conf['MISSION_STOP']
 
-# trade alerts channel ID
+# channel IDs
 trade_alerts_id = conf['TRADE_ALERTS_ID']
+bot_spam_id = conf['BOT_SPAM_CHANNEL']
 to_subreddit = conf['SUB_REDDIT']
 
 # Get the discord token from the local .env file. Deliberately not hosted in the repo or Discord takes the bot down
@@ -1093,12 +1094,16 @@ async def complete(ctx):
 #
 
 # join a carrier's crew
-@slash.slash(name="crew", guild_ids=[bot_guild_id])
+@slash.slash(name="crew", guild_ids=[bot_guild_id],
+            description="Use in a carrier's channel to join or leave that carrier's crew.")
 async def _crew(ctx: SlashContext):
     print(f"{ctx.author} used /crew in {ctx.channel}")
-    
-    # take a note channel ID
+
+    # note channel ID
     msg_ctx_id = ctx.channel.id
+
+    # define bot spam channel so we can notify
+    channel = bot.get_channel(bot_spam_id)
 
     # look for a match for the channel ID in the carrier DB
     carrier_db.execute(f"SELECT * FROM carriers WHERE "
@@ -1111,15 +1116,26 @@ async def _crew(ctx: SlashContext):
         await ctx.send(embed=embed, hidden=True)
         return
     else:
-        # get the carrier's crew role and give it to the user
-        carrier_db.execute('''SELECT * FROM carriers WHERE carrier LIKE (?)''',
-                           ('%' + carrier_data.carrier_long_name + '%',))
-        print('DB command ran, go fetch the result')
-        carrier_data = CarrierData(carrier_db.fetchone())
-        print(f'Found mission data: {carrier_data}')
+        # we're in a carrier's channel, now we define its crew role from db
+        print(f"/crew used in channel for {carrier_data.carrier_long_name}")
+        crew_role = discord.utils.get(ctx.guild.roles, id=carrier_data.roleid)
 
+        # check if user has this role
+        print(f'Check whether user has role: "{crew_role}"')
+        print(f'User has roles: {ctx.author.roles}')
+        if crew_role not in ctx.author.roles:
+            # they don't so give it to them
+            await ctx.author.add_roles(crew_role)
+            embed = discord.Embed(title=f"You've joined the crew for {carrier_data.carrier_long_name}!", description="You'll receive notifications about this carrier's activity. You can leave the crew at any time by using **/crew** again in this channel.", color=constants.EMBED_COLOUR_QU)
+            await ctx.send(embed=embed, hidden=True)
+            await channel.send(f"{ctx.author} joined the crew in <#{ctx.channel.id}>")
+        else:
+            # they do so take it from them
+            await ctx.author.remove_roles(crew_role)
+            embed = discord.Embed(title=f"You've left the crew for {carrier_data.carrier_long_name}.", description="You'll no longer receive notifications about this carrier's activity. You can rejoin the crew at any time by using **/crew** again in this channel.", color=constants.EMBED_COLOUR_OK)
+            await ctx.send(embed=embed, hidden=True)
+            await channel.send(f"{ctx.author} left the crew in <#{ctx.channel.id}>")
 
-    await ctx.send("OK", hidden=True)
 
 # list FCs
 @bot.command(name='carrier_list', help='List all Fleet Carriers in the database. This times out after 60 seconds')
