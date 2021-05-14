@@ -95,17 +95,31 @@ def check_database_table_exists(table_name, database):
 print('Starting up - checking carriers database if it exists or not')
 if not check_database_table_exists('carriers', carrier_db):
     print('Carriers database missing - creating it now')
-    # Check if carriers database exists, create if not
-    carrier_db.execute('''
-        CREATE TABLE carriers( 
-            p_ID INTEGER PRIMARY KEY AUTOINCREMENT,
-            shortname TEXT NOT NULL UNIQUE, 
-            longname TEXT NOT NULL, 
-            cid TEXT NOT NULL, 
-            discordchannel TEXT NOT NULL,
-            channelid INT 
-        ) 
-    ''')
+
+    if os.path.exists(os.path.join(os.getcwd(), 'db_sql', 'carriers_dump.sql')):
+        # recreate from backup file
+        print('Recreating database from backup ...')
+        with open(os.path.join(os.getcwd(), 'db_sql', 'carriers_dump.sql')) as f:
+            sql_script = f.read()
+            carrier_db.executescript(sql_script)
+
+        # print('Loaded the following data: ')
+        # carrier_db.execute('''SELECT * from carriers ''')
+        # for e in carrier_db.fetchall():
+        #     print(f'\t {CarrierData(e)}')
+    else:
+        # Create a new version
+        print('No backup found - Creating empty database')
+        carrier_db.execute('''
+            CREATE TABLE carriers( 
+                p_ID INTEGER PRIMARY KEY AUTOINCREMENT,
+                shortname TEXT NOT NULL UNIQUE, 
+                longname TEXT NOT NULL, 
+                cid TEXT NOT NULL, 
+                discordchannel TEXT NOT NULL,
+                channelid INT 
+            ) 
+        ''')
 else:
     print('Carrier database exists, do nothing')
 
@@ -113,28 +127,69 @@ print('Starting up - checking missions database if it exists or not')
 # create missions db if necessary
 if not check_database_table_exists('missions', mission_db):
     print('Mission database missing - creating it now')
-    mission_db.execute('''
-        CREATE TABLE missions(
-            "carrier"	TEXT NOT NULL UNIQUE,
-            "cid"	TEXT,
-            "channelid"	INTEGER,
-            "commodity"	TEXT,
-            "missiontype"	TEXT,
-            "system"	TEXT NOT NULL,
-            "station"	TEXT,
-            "profit"	INTEGER,
-            "pad"	TEXT,
-            "demand"    TEXT,
-            "rp_text"	TEXT,
-            "reddit_post_id"	TEXT,
-            "reddit_post_url"	TEXT,
-            "reddit_comment_id"	TEXT,
-            "reddit_comment_url"	TEXT,
-            "discord_alert_id"	INT
-        )
-    ''')
+
+    if os.path.exists(os.path.join(os.getcwd(), 'db_sql', 'missions_dump.sql')):
+        # recreate from backup file
+        print('Recreating mission db database from backup ...')
+        with open(os.path.join(os.getcwd(), 'db_sql', 'missions_dump.sql')) as f:
+            sql_script = f.read()
+            mission_db.executescript(sql_script)
+
+        # print('Loaded the following data: ')
+        # mission_db.execute('''SELECT * from missions ''')
+        # for e in mission_db.fetchall():
+        #     print(f'\t {MissionData(e)}')
+
+    else:
+        # Create a new version
+        print('No backup found - Creating empty database')
+        mission_db.execute('''
+            CREATE TABLE missions(
+                "carrier"	TEXT NOT NULL UNIQUE,
+                "cid"	TEXT,
+                "channelid"	INTEGER,
+                "commodity"	TEXT,
+                "missiontype"	TEXT,
+                "system"	TEXT NOT NULL,
+                "station"	TEXT,
+                "profit"	INTEGER,
+                "pad"	TEXT,
+                "demand"    TEXT,
+                "rp_text"	TEXT,
+                "reddit_post_id"	TEXT,
+                "reddit_post_url"	TEXT,
+                "reddit_comment_id"	TEXT,
+                "reddit_comment_url"	TEXT,
+                "discord_alert_id"	INT
+            )
+        ''')
 else:
     print('Mission database exists, do nothing')
+
+
+def dump_database_test(database_name):
+    """
+    Dumps the database object to a .sql text file while backing up the database. Used just to get something we can
+    recreate the database from.  This will only store the last state and should periodically be committed to the repo
+    from the bot.
+
+    :param str database_name: The DB name to connect against.
+    :returns: None
+    :raises ValueError: if the db name is unknown
+    """
+    # We only have 2 databases today, carriers and missions, though this could really just be 2 tables in a single
+    # database at some stage.
+
+    if database_name == 'missions':
+        connection = missions_conn
+    elif database_name == 'carriers':
+        connection = carriers_conn
+    else:
+        raise ValueError(f'Unknown DB dump handling for: {database_name}')
+
+    with open(f'db_sql/{database_name}_dump.sql', 'w') as f:
+        for line in connection.iterdump():
+            f.write(line)
 
 
 # function to backup carrier database
@@ -150,8 +205,9 @@ def backup_database(database_name):
         # make sure the backup folder exists first
         os.mkdir(os.path.join(os.getcwd(), 'backup'))
 
-    shutil.copy('carriers.db', f'backup/{database_name}.{dt_file_string}.db')
+    shutil.copy(f'{database_name}.db', f'backup/{database_name}.{dt_file_string}.db')
     print(f'Backed up {database_name}.db at {dt_file_string}')
+    dump_database_test(database_name)
 
 
 # function to add carrier, being sure to correct case
@@ -782,7 +838,6 @@ def _format_missions_embedd(mission_data_list, embed):
                                'quote to be sent along with the completion notice. This can be used for RP if desired.')
 @commands.has_role('Carrier Owner')
 async def done(ctx, carrier_name, rp=None):
-    print(f'Request received from {ctx.author} to mark the mission of {carrier_name} as done')
 
     # Check we are in the designated mission channel, if not go no farther.
     mission_gen_channel = bot.get_channel(conf['MISSION_CHANNEL'])
@@ -793,7 +848,7 @@ async def done(ctx, carrier_name, rp=None):
 
     if current_channel != mission_gen_channel:
         # problem, wrong channel, no progress
-        return await ctx.send(f'Sorry, you can only run this command out of: {mission_gen_channel}.')
+        return await ctx.send(f'Sorry, you can only run this command out of: <#{mission_gen_channel.id}>.')
 
     mission_db.execute(f'''SELECT * FROM missions WHERE carrier LIKE (?)''', ('%' + carrier_name + '%',))
     mission_data = MissionData(mission_db.fetchone())
@@ -1282,7 +1337,7 @@ async def search_for_commodity(ctx, lookfor):
 
 
 @bot.command(name='carrier_edit', help='Edit a specific carrier in the database by providing specific inputs')
-@commands.has_role('Carrier Owner')
+@commands.has_role('Admin')
 async def edit_carrier(ctx, carrier_name):
     """
     Edits a carriers information in the database. Provide a carrier name that can be partially matched and follow the
@@ -1292,7 +1347,15 @@ async def edit_carrier(ctx, carrier_name):
     :param str carrier_name: The carrier name to find
     :returns: None
     """
-    print(f'edit_carrier called by {ctx.author} to update the carrier: {carrier_name}')
+    print(f'edit_carrier called by {ctx.author} to update the carrier: {carrier_name} from channel: {ctx.channel}')
+
+    # make sure we are in the right channel
+    bot_command_channel = bot.get_channel(conf['BOT_COMMAND_CHANNEL'])
+    current_channel = ctx.channel
+    if current_channel != bot_command_channel:
+        # problem, wrong channel, no progress
+        return await ctx.send(f'Sorry, you can only run this command out of: {bot_command_channel}.')
+
     # Go fetch the carrier details by searching for the name
 
     carrier_data = copy.copy(find_carrier_from_long_name(carrier_name))
