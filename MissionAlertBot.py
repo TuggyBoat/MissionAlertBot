@@ -119,7 +119,8 @@ if not check_database_table_exists('carriers', carrier_db):
                 discordchannel TEXT NOT NULL,
                 channelid INT,
                 crewrole TEXT,
-                roleid INT
+                roleid INT,
+                ownerid INT
             ) 
         ''')
 else:
@@ -213,7 +214,7 @@ def backup_database(database_name):
 
 
 # function to add carrier, being sure to correct case
-def add_carrier_to_database(short_name, long_name, carrier_id, channel, channel_id, crew_role, roleid):
+def add_carrier_to_database(short_name, long_name, carrier_id, channel, channel_id, crew_role, roleid, owner_id):
     """
     Inserts a carrier's details into the database.
 
@@ -226,8 +227,8 @@ def add_carrier_to_database(short_name, long_name, carrier_id, channel, channel_
     """
     carrier_db_lock.acquire()
     try:
-        carrier_db.execute(''' INSERT INTO carriers VALUES(NULL, ?, ?, ?, ?, ?, ?, ?) ''',
-                           (short_name.lower(), long_name.upper(), carrier_id.upper(), channel, channel_id, crew_role, roleid))
+        carrier_db.execute(''' INSERT INTO carriers VALUES(NULL, ?, ?, ?, ?, ?, ?, ?, ?) ''',
+                           (short_name.lower(), long_name.upper(), carrier_id.upper(), channel, channel_id, crew_role, roleid, owner_id))
         carriers_conn.commit()
     finally:
         carrier_db_lock.release()
@@ -1197,15 +1198,13 @@ async def carrier_list(ctx):
 # add FC to database
 @bot.command(name='carrier_add', help='Add a Fleet Carrier to the database:\n'
                                       '\n'
-                                      '<shortname> should be a short one-word string as you\'ll be typing it a lot\n'
+                                      '<shortname> should be a short one-word string with no special characters\n'
                                       '<longname> is the carrier\'s full name including P.T.N. etc - surround this '
                                       'with quotes.\n'
-                                      '<cid> is the carrier\'s unique identifier in the format ABC-XYZ\n'
-                                      '<discordchannel> is the carrier\'s discord channel in the format '
-                                      'ptn-carriername\n'
-                                      'do NOT include the # at the start of the channel name!')
-@commands.has_role('Carrier Owner')
-async def carrier_add(ctx, short_name, long_name, carrier_id):
+                                      '<carrier_id> is the carrier\'s unique identifier in the format ABC-XYZ\n'
+                                      '<owner_id> is the owner\'s Discord ID')
+@commands.has_role('Admin')
+async def carrier_add(ctx, short_name, long_name, carrier_id, owner_id):
 
     # Only add to the carrier DB if it does not exist, if it does exist then the user should not be adding it.
     carrier_data = find_carrier_from_long_name(long_name)
@@ -1254,12 +1253,13 @@ async def carrier_add(ctx, short_name, long_name, carrier_id):
         role = await ctx.guild.create_role(name=f"CREW: {long_name}")
         print(f'Created {role}')
 
-    add_carrier_to_database(short_name, long_name, carrier_id, str(channel), channel.id, str(role), role.id)
+    add_carrier_to_database(short_name, long_name, carrier_id, str(channel), channel.id, str(role), role.id, owner_id)
     carrier_data = find_carrier_from_long_name(long_name)
     await ctx.send(
         f"Added **{carrier_data.carrier_long_name.upper()}** **{carrier_data.carrier_identifier.upper()}** "
         f"with shortname **{carrier_data.carrier_short_name.lower()}**, channel "
-        f"**<#{carrier_data.channel_id}>** and Crew Role **{carrier_data.crewrole}** at ID **{carrier_data.pid}**")
+        f"**<#{carrier_data.channel_id}>** and Crew Role **{carrier_data.crewrole}**"
+        f"owned by <@{owner_id}> at ID **{carrier_data.pid}**")
 
 
 # remove FC from database
