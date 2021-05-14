@@ -17,6 +17,7 @@ import asyncpraw
 import asyncio
 import shutil
 from discord.ext import commands
+from discord_slash import SlashCommand, SlashContext
 from datetime import datetime
 from datetime import timezone
 from dotenv import load_dotenv
@@ -42,6 +43,8 @@ mission_db_lock = threading.Lock()
 # setting some variables, you can toggle between production and test by setting an env variable flag now,
 # PTN-MISSION-ALERT-SERVICE
 conf = constants.get_constant(_production)
+
+bot_guild_id = int(conf['BOT_GUILD'])
 
 flair_mission_start = conf['MISSION_START']
 flair_mission_stop = conf['MISSION_STOP']
@@ -466,8 +469,8 @@ def user_exit():
 #                       BOT STUFF STARTS HERE
 #
 
-bot = commands.Bot(command_prefix='m.')
-
+bot = commands.Bot(command_prefix='m.', intents=discord.Intents.all())
+slash = SlashCommand(bot, sync_commands=True)
 
 @bot.event
 async def on_ready():
@@ -1086,6 +1089,35 @@ async def complete(ctx):
 #
 #                       UTILITY COMMANDS
 #
+
+# join a carrier's crew
+@slash.slash(name="crew", guild_ids=[bot_guild_id])
+async def _crew(ctx: SlashContext):
+    print(f"{ctx.author} used /crew in {ctx.channel}")
+    
+    # take a note channel ID
+    msg_ctx_id = ctx.channel.id
+
+    # look for a match for the channel ID in the carrier DB
+    carrier_db.execute(f"SELECT * FROM carriers WHERE "
+                       f"channelid = {msg_ctx_id}")
+    carrier_data = CarrierData(carrier_db.fetchone())
+    print(f'Crew command carrier_data: {carrier_data}')
+    if not carrier_data.channel_id:
+        # if there's no channel match, return an error
+        embed = discord.Embed(description="Try again in a carrier's channel.", color=constants.EMBED_COLOUR_ERROR)
+        await ctx.send(embed=embed, hidden=True)
+        return
+    else:
+        # get the carrier's crew role and give it to the user
+        carrier_db.execute('''SELECT * FROM carriers WHERE carrier LIKE (?)''',
+                           ('%' + carrier_data.carrier_long_name + '%',))
+        print('DB command ran, go fetch the result')
+        carrier_data = CarrierData(carrier_db.fetchone())
+        print(f'Found mission data: {carrier_data}')
+
+
+    await ctx.send("OK", hidden=True)
 
 # list FCs
 @bot.command(name='carrier_list', help='List all Fleet Carriers in the database. This times out after 60 seconds')
