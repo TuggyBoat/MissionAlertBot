@@ -303,15 +303,65 @@ def find_carrier_from_pid(db_id):
 
 
 # function to search for a commodity by name or partial name
-def find_commodity(lookfor):
+async def find_commodity(lookfor, ctx):
     # TODO: Where do we get set up this database? it is searching for things, but what is the source of the data, do
     #  we update it periodically?
+
+    print(f'Searching for commodity against match "{lookfor}" requested by {ctx.author}')
+
     carrier_db.execute(
         f"SELECT * FROM commodities WHERE commodity LIKE (?)",
         (f'%{lookfor}%',))
-    commodity = Commodity(carrier_db.fetchone())
-    print(f"Commodity {commodity.name} avgsell {commodity.average_sell} avgbuy {commodity.average_buy} "
-          f"maxsell {commodity.max_sell} minbuy {commodity.min_buy} maxprofit {commodity.max_profit}")
+
+    commodities = [Commodity(commodity) for commodity in carrier_db.fetchall()]
+    commodity = None
+    if not commodities:
+        print('No commodities found for request')
+        # Did not find anything, short-circuit out of the next block
+        return None
+    elif len(commodities) == 1:
+        print('Single commodity found, returning that directly')
+        # if only 1 match, just assign it directly
+        commodity = commodities[0]
+    elif len(commodities) > 3:
+        print(f'More than 3 commodities found for: "{lookfor}", {ctx.author} needs to search better.')
+        await ctx.send(f'Please narrow down your commodity search, we found {len(commodities)} matches for your '
+                       f'input choice: "{lookfor}"')
+        return None  # Just return None here and let the calling method figure out what is needed to happen
+    else:
+        print(f'Between 1 and 3 commodities found for: "{lookfor}", asking {ctx.author} which they want.')
+        # The database runs a partial match, in the case we have more than 1 ask the user which they want.
+        # here we have less than 3, but more than 1 match
+        embed = discord.Embed(title=f"Multiple commodities found for input: {lookfor}", color=constants.EMBED_COLOUR_OK)
+
+        count = 0
+        response = None  # just in case we try to do something before it is assigned, give it a value of None
+        for commodity in commodities:
+            count += 1
+            embed.add_field(name=f'{count}', value=f"{commodity.name}", inline=True)
+
+        embed.set_footer(text='Please select the commodity with 1, 2 or 3')
+
+        def check(message):
+            return message.author == ctx.author and message.channel == ctx.channel and \
+                   len(message.content) == 1 and message.content.lower() in ["1", "2", "3"]
+
+        message_confirm = await ctx.send(embed=embed)
+        try:
+            # Wait on the user input, this might be better by using a reaction?
+            response = await bot.wait_for("message", check=check, timeout=15)
+            print(f'{ctx.author} responded with: "{response.content}", type: {type(response.content)}.')
+            index = int(response.content) - 1  # Users count from 1, computers count from 0
+            commodity = commodities[index]
+        except asyncio.TimeoutError:
+            print('User failed to respond in time')
+            pass
+        await message_confirm.delete()
+        if response:
+            await response.delete()
+    if commodity:
+        print(f"Commodity {commodity.name} avgsell {commodity.average_sell} avgbuy {commodity.average_buy} "
+              f"maxsell {commodity.max_sell} minbuy {commodity.min_buy} maxprofit {commodity.max_profit}")
     return commodity
 
 #
@@ -552,7 +602,9 @@ async def gen_mission(ctx, carrier_name, commodity_short_name, system, station, 
             return
 
     # generate the mission elements
-    commodity_data = find_commodity(commodity_short_name)
+    commodity_data = await find_commodity(commodity_short_name, ctx)
+    if not commodity_data:
+        raise ValueError('Missing commodity data')
     carrier_data = find_carrier_from_long_name(carrier_name)
 
     create_carrier_mission_image(carrier_data, commodity_data, system, station, profit, pads, demand, mission_type)
@@ -1306,13 +1358,13 @@ async def findid(ctx, db_id):
 async def search_for_commodity(ctx, lookfor):
     print(f'search_for_commodity called by {ctx.author} to search for {lookfor}')
     try:
-        commodity = find_commodity(lookfor)
+        commodity = await find_commodity(lookfor, ctx)
         if commodity:
             return await ctx.send(commodity)
     except:
         # Catch any exception
         pass
-    await ctx.send(f"No such commodity found for: {lookfor}.")
+    await ctx.send(f'No such commodity found for: "{lookfor}".')
 
 
 @bot.command(name='carrier_edit', help='Edit a specific carrier in the database by providing specific inputs')
