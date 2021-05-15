@@ -1120,6 +1120,13 @@ async def _crew(ctx: SlashContext):
         print(f"/crew used in channel for {carrier_data.carrier_long_name}")
         crew_role = discord.utils.get(ctx.guild.roles, id=carrier_data.roleid)
 
+        # check if role exists
+        if not crew_role: 
+            await ctx.send("Sorry, I couldn't find a crew for this carrier. Please alert an Admin.", hidden=True)
+            await channel.send(f"**ERROR**: {ctx.author} tried to use **/crew** in <#{ctx.channel.id}> but received an error (role does not exist).")
+            print(f"No crew role found matching {ctx.channel}")
+            return
+
         # check if user has this role
         print(f'Check whether user has role: "{crew_role}"')
         print(f'User has roles: {ctx.author.roles}')
