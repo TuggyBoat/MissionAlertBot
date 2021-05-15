@@ -717,13 +717,16 @@ async def gen_mission(ctx, carrier_name, commodity_short_name, system, station, 
 
             embed_colour = constants.EMBED_COLOUR_LOADING if mission_type == 'load' \
                 else constants.EMBED_COLOUR_UNLOADING
-            embed = discord.Embed(title=f"P.T.N TRADE MISSION STARTING IN {eta} MINUTES" if eta else "P.T.N TRADE MISSION STARTING",
-                                  description=f"> {rp_text}" if rp else '', color=embed_colour)
+            embed = discord.Embed(title="P.T.N TRADE MISSION STARTING",
+                                  description=f"> {rp_text}" if rp else "", color=embed_colour)
 
+            embed.add_field(name="Destination", value=f"Station: {station.upper()}\nSystem: {system.upper()}", inline=True)
+            if eta: embed.add_field(name="ETA", value=f"{eta} minutes", inline=True)
+        
             embed.set_image(url="attachment://image.png")
             embed.set_footer(
                 text="m.complete will mark this mission complete\nm.ission will display info to channel\nm.issions "
-                     "will list trade missions for all carriers\nUse **/crew** to join or leave this carrier's crew")
+                     "will list trade missions for all carriers\nUse /crew to join or leave this carrier's crew")
             await channel.send(file=file, embed=embed)
 
             embed = discord.Embed(title=f"Discord trade alerts sent for {carrier_data.carrier_long_name}",
