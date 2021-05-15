@@ -17,6 +17,7 @@ import asyncpraw
 import asyncio
 import shutil
 from discord.ext import commands
+from discord_slash import SlashCommand, SlashContext
 from datetime import datetime
 from datetime import timezone
 from dotenv import load_dotenv
@@ -43,11 +44,14 @@ mission_db_lock = threading.Lock()
 # PTN-MISSION-ALERT-SERVICE
 conf = constants.get_constant(_production)
 
+bot_guild_id = int(conf['BOT_GUILD'])
+
 flair_mission_start = conf['MISSION_START']
 flair_mission_stop = conf['MISSION_STOP']
 
-# trade alerts channel ID
+# channel IDs
 trade_alerts_id = conf['TRADE_ALERTS_ID']
+bot_spam_id = conf['BOT_SPAM_CHANNEL']
 to_subreddit = conf['SUB_REDDIT']
 
 # Get the discord token from the local .env file. Deliberately not hosted in the repo or Discord takes the bot down
@@ -468,8 +472,8 @@ def user_exit():
 #                       BOT STUFF STARTS HERE
 #
 
-bot = commands.Bot(command_prefix='m.')
-
+bot = commands.Bot(command_prefix='m.', intents=discord.Intents.all())
+slash = SlashCommand(bot, sync_commands=True)
 
 @bot.event
 async def on_ready():
@@ -1088,6 +1092,57 @@ async def complete(ctx):
 #
 #                       UTILITY COMMANDS
 #
+
+# join a carrier's crew
+@slash.slash(name="crew", guild_ids=[bot_guild_id],
+            description="Use in a carrier's channel to join or leave that carrier's crew.")
+async def _crew(ctx: SlashContext):
+    print(f"{ctx.author} used /crew in {ctx.channel}")
+
+    # note channel ID
+    msg_ctx_id = ctx.channel.id
+
+    # define bot spam channel so we can notify
+    channel = bot.get_channel(bot_spam_id)
+
+    # look for a match for the channel ID in the carrier DB
+    carrier_db.execute(f"SELECT * FROM carriers WHERE "
+                       f"channelid = {msg_ctx_id}")
+    carrier_data = CarrierData(carrier_db.fetchone())
+    print(f'Crew command carrier_data: {carrier_data}')
+    if not carrier_data.channel_id:
+        # if there's no channel match, return an error
+        embed = discord.Embed(description="Try again in a carrier's channel.", color=constants.EMBED_COLOUR_ERROR)
+        await ctx.send(embed=embed, hidden=True)
+        return
+    else:
+        # we're in a carrier's channel, now we define its crew role from db
+        print(f"/crew used in channel for {carrier_data.carrier_long_name}")
+        crew_role = discord.utils.get(ctx.guild.roles, id=carrier_data.roleid)
+
+        # check if role exists
+        if not crew_role: 
+            await ctx.send("Sorry, I couldn't find a crew for this carrier. Please alert an Admin.", hidden=True)
+            await channel.send(f"**ERROR**: {ctx.author} tried to use **/crew** in <#{ctx.channel.id}> but received an error (role does not exist).")
+            print(f"No crew role found matching {ctx.channel}")
+            return
+
+        # check if user has this role
+        print(f'Check whether user has role: "{crew_role}"')
+        print(f'User has roles: {ctx.author.roles}')
+        if crew_role not in ctx.author.roles:
+            # they don't so give it to them
+            await ctx.author.add_roles(crew_role)
+            embed = discord.Embed(title=f"You've joined the crew for {carrier_data.carrier_long_name}!", description="You'll receive notifications about this carrier's activity. You can leave the crew at any time by using **/crew** again in this channel.", color=constants.EMBED_COLOUR_QU)
+            await ctx.send(embed=embed, hidden=True)
+            await channel.send(f"{ctx.author} joined the crew in <#{ctx.channel.id}>")
+        else:
+            # they do so take it from them
+            await ctx.author.remove_roles(crew_role)
+            embed = discord.Embed(title=f"You've left the crew for {carrier_data.carrier_long_name}.", description="You'll no longer receive notifications about this carrier's activity. You can rejoin the crew at any time by using **/crew** again in this channel.", color=constants.EMBED_COLOUR_OK)
+            await ctx.send(embed=embed, hidden=True)
+            await channel.send(f"{ctx.author} left the crew in <#{ctx.channel.id}>")
+
 
 # list FCs
 @bot.command(name='carrier_list', help='List all Fleet Carriers in the database. This times out after 60 seconds')
