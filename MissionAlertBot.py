@@ -1274,6 +1274,8 @@ async def carrier_add(ctx, short_name, long_name, carrier_id, owner_id):
 
     backup_database('carriers')  # backup the carriers database before going any further
 
+    # TODO: If command fails at any stage, reset roles and channels to previous state before exiting
+
     # first create the new carrier's channel
     # check whether channel already exists by sanitising the carrier's name input to match discord channel format,
     # otherwise create one
@@ -1293,6 +1295,30 @@ async def carrier_add(ctx, short_name, long_name, carrier_id, owner_id):
 
     if not channel:
         raise EnvironmentError(f'Could not create carrier channel {stripped_name.lower()}')
+        return
+
+    # add carrier owner to channel permissions
+
+    owner = await bot.fetch_user(owner_id)
+    print(f"Owner identified as {owner.display_name}")
+    try:
+        await channel.set_permissions(owner, read_messages=True,
+                                            manage_channels=True,
+                                            manage_roles=True,
+                                            manage_webhooks=True,
+                                            create_instant_invite=True,
+                                            send_messages=True,
+                                            embed_links=True,
+                                            attach_files=True,
+                                            add_reactions=True,
+                                            external_emojis=True,
+                                            manage_messages=True,
+                                            read_message_history=True,
+                                            use_slash_commands=True)
+        print(f"Set permissions for {owner} in {channel}")
+    except:
+        raise EnvironmentError(f'Could not set channel permissions for {owner.display_name} in {channel}')
+        return
 
     # create crew role
 
@@ -1308,12 +1334,14 @@ async def carrier_add(ctx, short_name, long_name, carrier_id, owner_id):
         role = await ctx.guild.create_role(name=f"CREW: {long_name}")
         print(f'Created {role}')
 
+    # finally, send all the info to the db
+
     add_carrier_to_database(short_name, long_name, carrier_id, str(channel), channel.id, str(role), role.id, owner_id)
     carrier_data = find_carrier_from_long_name(long_name)
     await ctx.send(
         f"Added **{carrier_data.carrier_long_name.upper()}** **{carrier_data.carrier_identifier.upper()}** "
         f"with shortname **{carrier_data.carrier_short_name.lower()}**, channel "
-        f"**<#{carrier_data.channel_id}>** and Crew Role **{carrier_data.crewrole}**"
+        f"**<#{carrier_data.channel_id}>** and Crew Role **{carrier_data.crewrole}** "
         f"owned by <@{owner_id}> at ID **{carrier_data.pid}**")
 
 
