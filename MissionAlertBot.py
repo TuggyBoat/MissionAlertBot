@@ -429,7 +429,8 @@ def txt_create_discord(carrier_data, mission_type, commodity, station, system, p
     discord_text = f"<#{carrier_data.channel_id}> {'load' if mission_type == 'load' else 'unload'}ing " \
                    f"{commodity.name} " \
                    f"{'from' if mission_type == 'load' else 'to'} **{station.upper()}** station in system " \
-                   f"**{system.upper()}** : {profit}k per unit profit : {demand} demand : {pads.upper()}-pads" \
+                   f"**{system.upper()}** : {profit}k per unit profit : "\
+                   f"{demand} {'demand' if mission_type == 'load' else 'supply'} : {pads.upper()}-pads" \
                    f".{eta_text}"
     return discord_text
 
