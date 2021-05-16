@@ -1295,12 +1295,17 @@ async def carrier_add(ctx, short_name, long_name, carrier_id, owner_id):
 
     if not channel:
         raise EnvironmentError(f'Could not create carrier channel {stripped_name.lower()}')
-        return
 
-    # add carrier owner to channel permissions
+    # find carrier owner as a user object
 
-    owner = await bot.fetch_user(owner_id)
-    print(f"Owner identified as {owner.display_name}")
+    try:
+        owner = await bot.fetch_user(owner_id)
+        print(f"Owner identified as {owner.display_name}")
+    except:
+        raise EnvironmentError(f'Could not find Discord user matching ID {owner_id}')
+
+    # add owner to channel permissions
+
     try:
         await channel.set_permissions(owner, read_messages=True,
                                             manage_channels=True,
@@ -1318,7 +1323,6 @@ async def carrier_add(ctx, short_name, long_name, carrier_id, owner_id):
         print(f"Set permissions for {owner} in {channel}")
     except:
         raise EnvironmentError(f'Could not set channel permissions for {owner.display_name} in {channel}')
-        return
 
     # create crew role
 
