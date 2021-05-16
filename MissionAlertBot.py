@@ -16,6 +16,7 @@ import sqlite3
 import asyncpraw
 import asyncio
 import shutil
+from discord.errors import HTTPException, InvalidArgument, Forbidden, NotFound
 from discord.ext import commands
 from discord_slash import SlashCommand, SlashContext
 from datetime import datetime
@@ -1321,6 +1322,14 @@ async def carrier_add(ctx, short_name, long_name, carrier_id, owner_id):
                                             read_message_history=True,
                                             use_slash_commands=True)
         print(f"Set permissions for {owner} in {channel}")
+    except Forbidden:
+        raise EnvironmentError(f"Could not set channel permissions for {owner.display_name} in {channel}, reason: Bot does not have permissions to edit channel specific permissions.")
+    except HTTPException:
+        raise EnvironmentError(f"Could not set channel permissions for {owner.display_name} in {channel}, reason: Editing channel specific permissions failed.")
+    except NotFound:
+        raise EnvironmentError(f"Could not set channel permissions for {owner.display_name} in {channel}, reason: The role or member being edited is not part of the guild.")
+    except InvalidArgument:
+        raise EnvironmentError(f"Could not set channel permissions for {owner.display_name} in {channel}, reason: The overwrite parameter invalid or the target type was not Role or Member.")
     except:
         raise EnvironmentError(f'Could not set channel permissions for {owner.display_name} in {channel}')
 
