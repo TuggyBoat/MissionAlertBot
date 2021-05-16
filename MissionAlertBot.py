@@ -1381,7 +1381,7 @@ async def carrier_add(ctx, short_name, long_name, carrier_id, owner_id):
     await ctx.send(
         f"Added **{carrier_data.carrier_long_name.upper()}** **{carrier_data.carrier_identifier.upper()}** "
         f"with shortname **{carrier_data.carrier_short_name.lower()}**, channel "
-        f"**<#{carrier_data.channel_id}>** and Crew Role <@{carrier_data.roleid}>"
+        f"**<#{carrier_data.channel_id}>** and Crew Role <@&{carrier_data.roleid}> "
         f"owned by <@{owner_id}> at ID **{carrier_data.pid}**")
 
 
