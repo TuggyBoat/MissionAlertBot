@@ -122,7 +122,6 @@ if not check_database_table_exists('carriers', carrier_db):
                 cid TEXT NOT NULL, 
                 discordchannel TEXT NOT NULL,
                 channelid INT,
-                crewrole TEXT,
                 roleid INT,
                 ownerid INT
             ) 
@@ -218,7 +217,7 @@ def backup_database(database_name):
 
 
 # function to add carrier, being sure to correct case
-def add_carrier_to_database(short_name, long_name, carrier_id, channel, channel_id, crew_role, roleid, owner_id):
+def add_carrier_to_database(short_name, long_name, carrier_id, channel, channel_id, roleid, owner_id):
     """
     Inserts a carrier's details into the database.
 
@@ -231,8 +230,8 @@ def add_carrier_to_database(short_name, long_name, carrier_id, channel, channel_
     """
     carrier_db_lock.acquire()
     try:
-        carrier_db.execute(''' INSERT INTO carriers VALUES(NULL, ?, ?, ?, ?, ?, ?, ?, ?) ''',
-                           (short_name.lower(), long_name.upper(), carrier_id.upper(), channel, channel_id, crew_role, roleid, owner_id))
+        carrier_db.execute(''' INSERT INTO carriers VALUES(NULL, ?, ?, ?, ?, ?, ?, ?) ''',
+                           (short_name.lower(), long_name.upper(), carrier_id.upper(), channel, channel_id, roleid, owner_id))
         carriers_conn.commit()
     finally:
         carrier_db_lock.release()
@@ -1097,6 +1096,23 @@ async def complete(ctx):
 #                       UTILITY COMMANDS
 #
 
+# backup databases
+@bot.command(name='backup', help='Backs up the carrier and mission databases.')
+@commands.has_role('Admin')
+async def backup(ctx):
+
+    # make sure we are in the right channel
+    bot_command_channel = bot.get_channel(conf['BOT_COMMAND_CHANNEL'])
+    current_channel = ctx.channel
+    if current_channel != bot_command_channel:
+        # problem, wrong channel, no progress
+        return await ctx.send(f'Sorry, you can only run this command out of: {bot_command_channel}.')
+
+    print(f"{ctx.author} requested a manual DB backup")
+    backup_database('missions') 
+    backup_database('carriers') 
+    await ctx.send("Database backup complete.")
+
 # join a carrier's crew
 @slash.slash(name="crew", guild_ids=[bot_guild_id],
             description="Use in a carrier's channel to join or leave that carrier's crew.")
@@ -1264,6 +1280,13 @@ async def carrier_list(ctx):
 @commands.has_role('Admin')
 async def carrier_add(ctx, short_name, long_name, carrier_id, owner_id):
 
+    # make sure we are in the right channel
+    bot_command_channel = bot.get_channel(conf['BOT_COMMAND_CHANNEL'])
+    current_channel = ctx.channel
+    if current_channel != bot_command_channel:
+        # problem, wrong channel, no progress
+        return await ctx.send(f'Sorry, you can only run this command out of: {bot_command_channel}.')
+
     # Only add to the carrier DB if it does not exist, if it does exist then the user should not be adding it.
     carrier_data = find_carrier_from_long_name(long_name)
     if carrier_data:
@@ -1311,19 +1334,27 @@ async def carrier_add(ctx, short_name, long_name, carrier_id, owner_id):
         role = await ctx.guild.create_role(name=f"CREW: {long_name}")
         print(f'Created {role}')
 
-    add_carrier_to_database(short_name, long_name, carrier_id, str(channel), channel.id, str(role), role.id, owner_id)
+    add_carrier_to_database(short_name, long_name, carrier_id, str(channel), channel.id, role.id, owner_id)
     carrier_data = find_carrier_from_long_name(long_name)
     await ctx.send(
         f"Added **{carrier_data.carrier_long_name.upper()}** **{carrier_data.carrier_identifier.upper()}** "
         f"with shortname **{carrier_data.carrier_short_name.lower()}**, channel "
-        f"**<#{carrier_data.channel_id}>** and Crew Role **{carrier_data.crewrole}**"
+        f"**<#{carrier_data.channel_id}>** and Crew Role <@{carrier_data.roleid}>"
         f"owned by <@{owner_id}> at ID **{carrier_data.pid}**")
 
 
 # remove FC from database
 @bot.command(name='carrier_del', help='Delete a Fleet Carrier from the database using its database entry ID#.')
-@commands.has_role('Carrier Owner')
+@commands.has_role('Admin')
 async def carrier_del(ctx, db_id):
+
+    # make sure we are in the right channel
+    bot_command_channel = bot.get_channel(conf['BOT_COMMAND_CHANNEL'])
+    current_channel = ctx.channel
+    if current_channel != bot_command_channel:
+        # problem, wrong channel, no progress
+        return await ctx.send(f'Sorry, you can only run this command out of: {bot_command_channel}.')
+
     try:
         carrier_data = find_carrier_from_pid(db_id)
         if carrier_data:
