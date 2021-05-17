@@ -460,6 +460,8 @@ def txt_create_reddit_body(carrier_data, mission_type, commodity, station, syste
             f" and discussion, channel **#{carrier_data.discord_channel}**.")
     return reddit_body
 
+def txt_create_mission_summary():
+
 #
 #                       OTHER
 #
@@ -817,8 +819,7 @@ async def gen_mission(ctx, carrier_name, commodity_short_name, system, station, 
 #
 # add mission to DB, called from mission generator
 async def mission_add(ctx, carrier_data, commodity_data, mission_type, system, station, profit, pads, demand,
-                      rp_text, reddit_post_id, reddit_post_url, reddit_comment_id, reddit_comment_url, discord_alert_id,
-                      rp, message_pending, eta_text):
+                      rp_text, reddit_post_id, reddit_post_url, reddit_comment_id, reddit_comment_url, discord_alert_id):
     backup_database('missions')  # backup the missions database before going any further
 
     mission_db.execute(''' INSERT INTO missions VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ''', (
@@ -827,6 +828,8 @@ async def mission_add(ctx, carrier_data, commodity_data, mission_type, system, s
         demand, rp_text, reddit_post_id, reddit_post_url, reddit_comment_id, reddit_comment_url, discord_alert_id
     ))
     missions_conn.commit()
+
+async def mission_generation_complete(ctx, rp, message_pending, eta_text):
 
     # fetch data we just committed back
 
@@ -845,15 +848,11 @@ async def mission_add(ctx, carrier_data, commodity_data, mission_type, system, s
     if mission_data.rp_text and mission_data.rp_text != 'NULL':
         mission_description = f"> {mission_data.rp_text}"
 
-    embed = discord.Embed(title=f"NOW {mission_data.mission_type.upper()}ING {mission_data.carrier_name} ({mission_data.carrier_identifier})",
+    embed = discord.Embed(title=f"{mission_data.mission_type.upper()}ING {mission_data.carrier_name} ({mission_data.carrier_identifier}) {eta_text}",
                             description=mission_description, color=embed_colour)
 
-    embed.add_field(name="System", value=f"{mission_data.system.upper()}", inline=True)
-    embed.add_field(name="Station", value=f"{mission_data.station.upper()} ({mission_data.pad_size}-pads)",
-                    inline=True)
-    embed.add_field(name="Commodity", value=f"{mission_data.commodity.upper()}", inline=True)
-    embed.add_field(name="Quantity and profit",
-                    value=f"{mission_data.demand} units at {mission_data.profit}k profit per unit", inline=True)
+    embed = _mission_summary_embed(mission_data, embed)
+
     embed.set_footer(text="You can use m.done <carrier> to mark the mission complete.")
 
     await ctx.send(embed=embed)
@@ -903,17 +902,21 @@ async def ission(ctx):
             embed = discord.Embed(title=f"{mission_data.mission_type.upper()}ING {mission_data.carrier_name} ({mission_data.carrier_identifier})",
                                   description=mission_description, color=embed_colour)
 
-            embed.add_field(name="System", value=f"{mission_data.system.upper()}", inline=True)
-            embed.add_field(name="Station", value=f"{mission_data.station.upper()} ({mission_data.pad_size}-pads)",
-                            inline=True)
-            embed.add_field(name="Commodity", value=f"{mission_data.commodity.upper()}", inline=True)
-            embed.add_field(name="Quantity and profit",
-                            value=f"{mission_data.demand} units at {mission_data.profit}k profit per unit", inline=True)
+            embed = _mission_summary_embed(mission_data, embed)
+
             embed.set_footer(text="You can use m.complete if the mission is complete.")
 
             await ctx.send(embed=embed)
             return
 
+def _mission_summary_embed(mission_data, embed):
+    embed.add_field(name="System", value=f"{mission_data.system.upper()}", inline=True)
+    embed.add_field(name="Station", value=f"{mission_data.station.upper()} ({mission_data.pad_size}-pads)",
+                    inline=True)
+    embed.add_field(name="Commodity", value=f"{mission_data.commodity.upper()}", inline=True)
+    embed.add_field(name="Quantity and profit",
+                    value=f"{mission_data.demand} units at {mission_data.profit}k profit per unit", inline=True)
+    return embed
 
 # list all active carrier trade missions from DB
 @bot.command(name='issions', help='List all active trade missions.')
