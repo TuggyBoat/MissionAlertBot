@@ -495,8 +495,9 @@ async def on_ready():
                                '<system> should be in quotes\n'
                                '<station> should also be in quotes\n'
                                '<profit> is a number of thousands without the k\n'
-                               '<pads> is the largest pad size available (M for outposts, L for everything else)'
-                               '<demand> is how much your carrier is buying'
+                               '<pads> is the largest pad size available (M for outposts, L for everything else)\n'
+                               '<demand> is how much your carrier is buying\n'
+                               'Optional: a number in minds for the carrier\'s ETA\n'
                                '\n'
                                'Case is automatically corrected for all inputs.')
 @commands.has_role('Carrier Owner')
@@ -528,8 +529,9 @@ async def loadrp(ctx, carrier_name, commodity_short_name, system, station, profi
                                  '<system> should be in quotes\n'
                                  '<station> should also be in quotes\n'
                                  '<profit> is a number of thousands without the k\n'
-                                 '<pads> is the largest pad size available (M for outposts, L for everything else)'
-                                 '<demand> is how much your carrier is buying'
+                                 '<pads> is the largest pad size available (M for outposts, L for everything else)\n'
+                                 '<demand> is how much your carrier is buying\n'
+                                 'Optional: a number in minds for the carrier\'s <ETA>\n'
                                  '\n'
                                  'Case is automatically corrected for all inputs.')
 @commands.has_role('Carrier Owner')
@@ -596,7 +598,7 @@ async def gen_mission(ctx, carrier_name, commodity_short_name, system, station, 
         # Anything outwith this grouping will cause all to fail. Use set to throw away any duplicate objects.
         # not sure if the msg.content can ever be None, but lets gate it anyway
         return message.content and message.author == ctx.author and message.channel == ctx.channel and \
-               all(character in 'drtx' for character in set(message.content.lower()))
+               all(character in 'drtnx' for character in set(message.content.lower()))
 
     def check_rp(message):
         return message.author == ctx.author and message.channel == ctx.channel
@@ -649,9 +651,10 @@ async def gen_mission(ctx, carrier_name, commodity_short_name, system, station, 
     await message_gen.delete()
 
     embed = discord.Embed(title="Where would you like to send the alert?",
-                          description="(**d**)iscord, (**r**)eddit, (**t**)ext for copy/pasting or (**x**) to cancel",
+                          description="(**d**)iscord, (**r**)eddit, (**t**)ext for copy/pasting or (**x**) to cancel\n"
+                          "Use (**n**) to also notify your crew.",
                           color=constants.EMBED_COLOUR_QU)
-    embed.set_footer(text="Enter all that apply, e.g. **drt** will print text and send alerts to Discord and Reddit.")
+    embed.set_footer(text="Enter all that apply, e.g. **drn** will send alerts to Discord and Reddit and notify your crew.")
     message_confirm = await ctx.send(embed=embed)
 
     try:
@@ -762,6 +765,41 @@ async def gen_mission(ctx, carrier_name, commodity_short_name, system, station, 
                                   color=constants.EMBED_COLOUR_REDDIT)
             channel = bot.get_channel(conf['CHANNEL_UPVOTES'])
             await channel.send(embed=embed)
+
+        if "n" in msg.content.lower():
+
+            embed = discord.Embed(title="Trade Alert (Discord)", description=f"`{discord_text}`",
+                                  color=constants.EMBED_COLOUR_DISCORD)
+            await ctx.send(embed=embed)
+            if rp:
+                embed = discord.Embed(title="Roleplay Text (Discord)", description=f"`> {rp_text}`",
+                                      color=constants.EMBED_COLOUR_DISCORD)
+                await ctx.send(embed=embed)
+
+            embed = discord.Embed(title="Reddit Post Title", description=f"`{reddit_title}`",
+                                  color=constants.EMBED_COLOUR_REDDIT)
+            await ctx.send(embed=embed)
+            if rp:
+                embed = discord.Embed(title="Reddit Post Body - PASTE INTO MARKDOWN MODE",
+                                      description=f"```> {rp_text}\n\n{reddit_body}```",
+                                      color=constants.EMBED_COLOUR_REDDIT)
+            else:
+                embed = discord.Embed(title="Reddit Post Body - PASTE INTO MARKDOWN MODE",
+                                      description=f"```{reddit_body}```", color=constants.EMBED_COLOUR_REDDIT)
+            embed.set_footer(text="**REMEMBER TO USE MARKDOWN MODE WHEN PASTING TEXT TO REDDIT.**")
+            await ctx.send(embed=embed)
+            await ctx.send(file=discord.File('result.png'))
+            embed = discord.Embed(title=f"Alert Generation Complete for {carrier_data.carrier_long_name}",
+                                  description="Paste Reddit content into **MARKDOWN MODE** in the editor. You can swap "
+                                              "back to Fancy Pants afterwards and make any changes/additions or embed "
+                                              "the image.\n\nBest practice for Reddit is an image post with a top level"
+                                              " comment that contains the text version of the advert. This ensures the "
+                                              "image displays with highest possible compatibility across platforms and "
+                                              "apps. When mission complete, flag the post as *Spoiler* to prevent "
+                                              "image showing and add a comment to inform.",
+                                  color=constants.EMBED_COLOUR_OK)
+            await ctx.send(embed=embed)
+
     except asyncio.TimeoutError:
         await ctx.send("**Mission not generated or broadcast (no valid response from user).**")
         return
