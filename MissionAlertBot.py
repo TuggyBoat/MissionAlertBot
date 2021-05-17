@@ -460,8 +460,6 @@ def txt_create_reddit_body(carrier_data, mission_type, commodity, station, syste
             f" and discussion, channel **#{carrier_data.discord_channel}**.")
     return reddit_body
 
-def txt_create_mission_summary():
-
 #
 #                       OTHER
 #
@@ -718,7 +716,7 @@ async def gen_mission(ctx, carrier_name, commodity_short_name, system, station, 
             discord_alert_id = trade_alert_msg.id
 
             channel = bot.get_channel(carrier_data.channel_id)
-            # channel = bot.get_channel(824383348628783144) # this for TEST SERVER only
+
             file = discord.File("result.png", filename="image.png")
 
             embed_colour = constants.EMBED_COLOUR_LOADING if mission_type == 'load' \
@@ -770,36 +768,15 @@ async def gen_mission(ctx, carrier_name, commodity_short_name, system, station, 
 
         if "n" in msg.content.lower():
 
-            embed = discord.Embed(title="Trade Alert (Discord)", description=f"`{discord_text}`",
-                                  color=constants.EMBED_COLOUR_DISCORD)
-            await ctx.send(embed=embed)
-            if rp:
-                embed = discord.Embed(title="Roleplay Text (Discord)", description=f"`> {rp_text}`",
-                                      color=constants.EMBED_COLOUR_DISCORD)
-                await ctx.send(embed=embed)
+            # get carrier's channel object
 
-            embed = discord.Embed(title="Reddit Post Title", description=f"`{reddit_title}`",
-                                  color=constants.EMBED_COLOUR_REDDIT)
-            await ctx.send(embed=embed)
-            if rp:
-                embed = discord.Embed(title="Reddit Post Body - PASTE INTO MARKDOWN MODE",
-                                      description=f"```> {rp_text}\n\n{reddit_body}```",
-                                      color=constants.EMBED_COLOUR_REDDIT)
-            else:
-                embed = discord.Embed(title="Reddit Post Body - PASTE INTO MARKDOWN MODE",
-                                      description=f"```{reddit_body}```", color=constants.EMBED_COLOUR_REDDIT)
-            embed.set_footer(text="**REMEMBER TO USE MARKDOWN MODE WHEN PASTING TEXT TO REDDIT.**")
-            await ctx.send(embed=embed)
-            await ctx.send(file=discord.File('result.png'))
-            embed = discord.Embed(title=f"Alert Generation Complete for {carrier_data.carrier_long_name}",
-                                  description="Paste Reddit content into **MARKDOWN MODE** in the editor. You can swap "
-                                              "back to Fancy Pants afterwards and make any changes/additions or embed "
-                                              "the image.\n\nBest practice for Reddit is an image post with a top level"
-                                              " comment that contains the text version of the advert. This ensures the "
-                                              "image displays with highest possible compatibility across platforms and "
-                                              "apps. When mission complete, flag the post as *Spoiler* to prevent "
-                                              "image showing and add a comment to inform.",
-                                  color=constants.EMBED_COLOUR_OK)
+            channel = bot.get_channel(carrier_data.channel_id)
+
+            await channel.send(f"<@&{carrier_data.roleid}>: {discord_text}")
+
+            embed = discord.Embed(title=f"Crew notification sent for {carrier_data.carrier_long_name}",
+                        description=f"Pinged <@&{carrier_data.roleid}> in <#{carrier_data.channel_id}>",
+                        color=constants.EMBED_COLOUR_DISCORD)
             await ctx.send(embed=embed)
 
     except asyncio.TimeoutError:
@@ -810,8 +787,8 @@ async def gen_mission(ctx, carrier_name, commodity_short_name, system, station, 
     await msg.delete()
     await message_confirm.delete()
     await mission_add(ctx, carrier_data, commodity_data, mission_type, system, station, profit, pads, demand,
-                      rp_text, reddit_post_id, reddit_post_url, reddit_comment_id, reddit_comment_url, discord_alert_id,
-                      rp, message_pending, eta_text)
+                      rp_text, reddit_post_id, reddit_post_url, reddit_comment_id, reddit_comment_url, discord_alert_id)
+    await mission_generation_complete(ctx, carrier_data, message_pending, eta_text)
 
 
 #
@@ -829,7 +806,7 @@ async def mission_add(ctx, carrier_data, commodity_data, mission_type, system, s
     ))
     missions_conn.commit()
 
-async def mission_generation_complete(ctx, rp, message_pending, eta_text):
+async def mission_generation_complete(ctx, carrier_data, message_pending, eta_text):
 
     # fetch data we just committed back
 
