@@ -280,8 +280,8 @@ def find_carrier_from_long_name(find_long_name):
         (f'%{find_long_name}%',))
     carrier_data = CarrierData(carrier_db.fetchone())
     print(f"FC {carrier_data.pid} is {carrier_data.carrier_long_name} {carrier_data.carrier_identifier} called by "
-          f"shortname {carrier_data.carrier_short_name} with channel <#{carrier_data.channel_id}> called from "
-          f"find_carrier_from_long_name.")
+          f"shortname {carrier_data.carrier_short_name} with channel <#{carrier_data.channel_id}> "
+          f"and owner {carrier_data.ownerid} called from find_carrier_from_long_name.")
 
     return carrier_data
 
@@ -495,8 +495,9 @@ async def on_ready():
                                '<system> should be in quotes\n'
                                '<station> should also be in quotes\n'
                                '<profit> is a number of thousands without the k\n'
-                               '<pads> is the largest pad size available (M for outposts, L for everything else)'
-                               '<demand> is how much your carrier is buying'
+                               '<pads> is the largest pad size available (M for outposts, L for everything else)\n'
+                               '<demand> is how much your carrier is buying\n'
+                               'Optional: a number in minds for the carrier\'s ETA\n'
                                '\n'
                                'Case is automatically corrected for all inputs.')
 @commands.has_role('Carrier Owner')
@@ -528,8 +529,9 @@ async def loadrp(ctx, carrier_name, commodity_short_name, system, station, profi
                                  '<system> should be in quotes\n'
                                  '<station> should also be in quotes\n'
                                  '<profit> is a number of thousands without the k\n'
-                                 '<pads> is the largest pad size available (M for outposts, L for everything else)'
-                                 '<demand> is how much your carrier is buying'
+                                 '<pads> is the largest pad size available (M for outposts, L for everything else)\n'
+                                 '<demand> is how much your carrier is buying\n'
+                                 'Optional: a number in minds for the carrier\'s <ETA>\n'
                                  '\n'
                                  'Case is automatically corrected for all inputs.')
 @commands.has_role('Carrier Owner')
@@ -596,7 +598,7 @@ async def gen_mission(ctx, carrier_name, commodity_short_name, system, station, 
         # Anything outwith this grouping will cause all to fail. Use set to throw away any duplicate objects.
         # not sure if the msg.content can ever be None, but lets gate it anyway
         return message.content and message.author == ctx.author and message.channel == ctx.channel and \
-               all(character in 'drtx' for character in set(message.content.lower()))
+               all(character in 'drtnx' for character in set(message.content.lower()))
 
     def check_rp(message):
         return message.author == ctx.author and message.channel == ctx.channel
@@ -649,9 +651,10 @@ async def gen_mission(ctx, carrier_name, commodity_short_name, system, station, 
     await message_gen.delete()
 
     embed = discord.Embed(title="Where would you like to send the alert?",
-                          description="(**d**)iscord, (**r**)eddit, (**t**)ext for copy/pasting or (**x**) to cancel",
+                          description="(**d**)iscord, (**r**)eddit, (**t**)ext for copy/pasting or (**x**) to cancel\n"
+                          "Use (**n**) to also notify your crew.",
                           color=constants.EMBED_COLOUR_QU)
-    embed.set_footer(text="Enter all that apply, e.g. **drt** will print text and send alerts to Discord and Reddit.")
+    embed.set_footer(text="Enter all that apply, e.g. **drn** will send alerts to Discord and Reddit and notify your crew.")
     message_confirm = await ctx.send(embed=embed)
 
     try:
@@ -713,7 +716,7 @@ async def gen_mission(ctx, carrier_name, commodity_short_name, system, station, 
             discord_alert_id = trade_alert_msg.id
 
             channel = bot.get_channel(carrier_data.channel_id)
-            # channel = bot.get_channel(824383348628783144) # this for TEST SERVER only
+
             file = discord.File("result.png", filename="image.png")
 
             embed_colour = constants.EMBED_COLOUR_LOADING if mission_type == 'load' \
@@ -762,6 +765,20 @@ async def gen_mission(ctx, carrier_name, commodity_short_name, system, station, 
                                   color=constants.EMBED_COLOUR_REDDIT)
             channel = bot.get_channel(conf['CHANNEL_UPVOTES'])
             await channel.send(embed=embed)
+
+        if "n" in msg.content.lower():
+
+            # get carrier's channel object
+
+            channel = bot.get_channel(carrier_data.channel_id)
+
+            await channel.send(f"<@&{carrier_data.roleid}>: {discord_text}")
+
+            embed = discord.Embed(title=f"Crew notification sent for {carrier_data.carrier_long_name}",
+                        description=f"Pinged <@&{carrier_data.roleid}> in <#{carrier_data.channel_id}>",
+                        color=constants.EMBED_COLOUR_DISCORD)
+            await ctx.send(embed=embed)
+
     except asyncio.TimeoutError:
         await ctx.send("**Mission not generated or broadcast (no valid response from user).**")
         return
@@ -770,8 +787,8 @@ async def gen_mission(ctx, carrier_name, commodity_short_name, system, station, 
     await msg.delete()
     await message_confirm.delete()
     await mission_add(ctx, carrier_data, commodity_data, mission_type, system, station, profit, pads, demand,
-                      rp_text, reddit_post_id, reddit_post_url, reddit_comment_id, reddit_comment_url, discord_alert_id,
-                      rp, message_pending, eta_text)
+                      rp_text, reddit_post_id, reddit_post_url, reddit_comment_id, reddit_comment_url, discord_alert_id)
+    await mission_generation_complete(ctx, carrier_data, message_pending, eta_text)
 
 
 #
@@ -779,8 +796,7 @@ async def gen_mission(ctx, carrier_name, commodity_short_name, system, station, 
 #
 # add mission to DB, called from mission generator
 async def mission_add(ctx, carrier_data, commodity_data, mission_type, system, station, profit, pads, demand,
-                      rp_text, reddit_post_id, reddit_post_url, reddit_comment_id, reddit_comment_url, discord_alert_id,
-                      rp, message_pending, eta_text):
+                      rp_text, reddit_post_id, reddit_post_url, reddit_comment_id, reddit_comment_url, discord_alert_id):
     backup_database('missions')  # backup the missions database before going any further
 
     mission_db.execute(''' INSERT INTO missions VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ''', (
@@ -790,21 +806,33 @@ async def mission_add(ctx, carrier_data, commodity_data, mission_type, system, s
     ))
     missions_conn.commit()
 
-    embed_colour = constants.EMBED_COLOUR_LOADING if mission_type == 'load' else constants.EMBED_COLOUR_UNLOADING
-    embed = discord.Embed(title=f"Mission now in progress for {carrier_data.carrier_long_name}{eta_text}",
-                          description="Use **m.done** to mark complete and **m.issions** to list all active missions.",
-                          color=embed_colour)
+async def mission_generation_complete(ctx, carrier_data, message_pending, eta_text):
 
-    file = discord.File("result.png", filename="image.png")
-    embed.set_image(url="attachment://image.png")
-    embed.add_field(name="Type", value=f"{mission_type.title()}ing", inline=True)
-    embed.add_field(name="Commodity", value=f"{demand} of {commodity_data.name.title()} at {profit}k/unit", inline=True)
-    embed.add_field(name="Location",
-                    value=f"{station.upper()} station ({pads.upper()}-pads) in system {system.upper()}", inline=True)
-    embed.set_footer(text="Remember to use m.done when mission is complete.")
-    if rp:
-        embed.add_field(name="Roleplay text", value=rp_text, inline=False)
-    await ctx.send(file=file, embed=embed)
+    # fetch data we just committed back
+
+    mission_db.execute('''SELECT * FROM missions WHERE carrier LIKE (?)''',
+                        ('%' + carrier_data.carrier_long_name + '%',))
+    print('DB command ran, go fetch the result')
+    mission_data = MissionData(mission_db.fetchone())
+    print(f'Found mission data: {mission_data}')
+
+    # return result to user
+
+    embed_colour = constants.EMBED_COLOUR_LOADING if mission_data.mission_type == 'load' else \
+        constants.EMBED_COLOUR_UNLOADING
+
+    mission_description = ''
+    if mission_data.rp_text and mission_data.rp_text != 'NULL':
+        mission_description = f"> {mission_data.rp_text}"
+
+    embed = discord.Embed(title=f"{mission_data.mission_type.upper()}ING {mission_data.carrier_name} ({mission_data.carrier_identifier}) {eta_text}",
+                            description=mission_description, color=embed_colour)
+
+    embed = _mission_summary_embed(mission_data, embed)
+
+    embed.set_footer(text="You can use m.done <carrier> to mark the mission complete.")
+
+    await ctx.send(embed=embed)
     await message_pending.delete()
 
 
@@ -851,17 +879,21 @@ async def ission(ctx):
             embed = discord.Embed(title=f"{mission_data.mission_type.upper()}ING {mission_data.carrier_name} ({mission_data.carrier_identifier})",
                                   description=mission_description, color=embed_colour)
 
-            embed.add_field(name="System", value=f"{mission_data.system.upper()}", inline=True)
-            embed.add_field(name="Station", value=f"{mission_data.station.upper()} ({mission_data.pad_size}-pads)",
-                            inline=True)
-            embed.add_field(name="Commodity", value=f"{mission_data.commodity.upper()}", inline=False)
-            embed.add_field(name="Quantity and profit",
-                            value=f"{mission_data.demand} units at {mission_data.profit}k profit per unit", inline=True)
+            embed = _mission_summary_embed(mission_data, embed)
+
             embed.set_footer(text="You can use m.complete if the mission is complete.")
 
             await ctx.send(embed=embed)
             return
 
+def _mission_summary_embed(mission_data, embed):
+    embed.add_field(name="System", value=f"{mission_data.system.upper()}", inline=True)
+    embed.add_field(name="Station", value=f"{mission_data.station.upper()} ({mission_data.pad_size}-pads)",
+                    inline=True)
+    embed.add_field(name="Commodity", value=f"{mission_data.commodity.upper()}", inline=True)
+    embed.add_field(name="Quantity and profit",
+                    value=f"{mission_data.demand} units at {mission_data.profit}k profit per unit", inline=True)
+    return embed
 
 # list all active carrier trade missions from DB
 @bot.command(name='issions', help='List all active trade missions.')
@@ -1010,7 +1042,7 @@ async def complete(ctx):
     msg_ctx_id = ctx.channel.id
     msg_usr_id = ctx.author.id
     # look for a match for the channel ID in the carrier DB
-    carrier_db.execute(f"SELECT longname FROM carriers WHERE channelid = {msg_ctx_id}")
+    carrier_db.execute(f"SELECT * FROM carriers WHERE channelid = {msg_ctx_id}")
     carrier_data = CarrierData(carrier_db.fetchone())
     if not carrier_data:
         # if there's no channel match, return an error
@@ -1030,6 +1062,7 @@ async def complete(ctx):
                                               f"mission right now.**",
                                   color=constants.EMBED_COLOUR_ERROR)
             await ctx.send(embed=embed)
+
         else:
             # user is in correct channel and carrier is on a mission, so check whether user is sure they want to proceed
             embed = discord.Embed(
@@ -1053,9 +1086,10 @@ async def complete(ctx):
                     return
                 elif msg.content.lower() == "y":
                     embed = discord.Embed(title=f"{mission_data.carrier_name} MISSION COMPLETE",
-                                          description=f"<@{msg_usr_id}> reports that mission is complete!",
+                                          description=f"<@{msg_usr_id}> reports mission complete!",
                                           color=constants.EMBED_COLOUR_OK)
                     await ctx.send(embed=embed)
+                    await ctx.send(f"Notifying carrier owner: <@{carrier_data.ownerid}>")
                     # now we need to go do all the mission cleanup stuff
 
                     # delete Discord trade alert
@@ -1519,9 +1553,12 @@ async def findshort(ctx, lookshort):
 def _add_common_embed_fields(embed, carrier_data):
     embed.add_field(name="Carrier Name", value=f"{carrier_data.carrier_long_name}", inline=True)
     embed.add_field(name="Carrier ID", value=f"{carrier_data.carrier_identifier}", inline=True)
-    embed.add_field(name="Shortname", value=f"{carrier_data.carrier_short_name}", inline=True)
-    embed.add_field(name="Discord Channel", value=f"<#{carrier_data.channel_id}>", inline=True)
     embed.add_field(name="Database Entry", value=f"{carrier_data.pid}", inline=True)
+    embed.add_field(name="Discord Channel", value=f"<#{carrier_data.channel_id}>", inline=True)
+    embed.add_field(name="Crew Role", value=f"<@&{carrier_data.roleid}>", inline=True)
+    embed.add_field(name="Owner", value=f"<@{carrier_data.ownerid}>", inline=True)
+    embed.add_field(name="Shortname", value=f"{carrier_data.carrier_short_name}", inline=True)
+    # shortname is not relevant to users and will be auto-generated in future
     return embed
 
 
