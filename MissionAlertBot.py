@@ -274,7 +274,14 @@ def _delete_all_from_database(database):
 
 # function to search for a carrier by longname
 def find_carrier_from_long_name(find_long_name):
+    """
+    Finds any carriers matching a long name
 
+    :param str find_long_name: A short name of the carrier.
+    :returns: CarrierData object for the exact match
+    :rtype: CarrierData
+    """
+    # TODO: This needs to check an exact not a `LIKE`
     carrier_db.execute(
         f"SELECT * FROM carriers WHERE longname LIKE (?)",
         (f'%{find_long_name}%',))
@@ -288,15 +295,21 @@ def find_carrier_from_long_name(find_long_name):
 
 # function to search for a carrier by shortname
 def find_carrier_from_short_name(find_short_name):
+    """
+    Finds any carriers matching a short name
 
-    carrier_db.execute(f"SELECT * FROM carriers WHERE shortname LIKE (?)",
-                       (f'%{find_short_name}%',))
-    carrier_data = CarrierData(carrier_db.fetchone())
-    print(f"FC {carrier_data.pid} is {carrier_data.carrier_long_name} {carrier_data.carrier_identifier} called by "
-          f"shortname {carrier_data.carrier_short_name} with channel <#{carrier_data.channel_id}> called from "
-          f"find_carrier_from_short_name.")
+    :param str find_short_name: A short name of the carrier.
+    :returns: List of CarrierData
+    :rtype: list[CarrierData]
+    """
+    carrier_db.execute(f"SELECT * FROM carriers WHERE shortname LIKE (?)", (f'%{find_short_name}%',))
+    carriers = [CarrierData(carrier) for carrier in carrier_db.fetchall()]
+    for carrier_data in carriers:
+        print(f"FC {carrier_data.pid} is {carrier_data.carrier_long_name} {carrier_data.carrier_identifier} called by "
+              f"shortname {carrier_data.carrier_short_name} with channel <#{carrier_data.channel_id}> called from "
+              f"find_carrier_from_short_name.")
 
-    return carrier_data
+    return carriers
 
 
 # function to search for a carrier by p_ID
@@ -1538,13 +1551,60 @@ async def carrier_image(ctx, lookname=None):
                                     'command.')
 async def findshort(ctx, lookshort):
     try:
-        carrier_data = find_carrier_from_short_name(lookshort)
-        if carrier_data:
-            embed = discord.Embed(title="Fleet Carrier Shortname Search Result",
-                                  description=f"Displaying first match for {lookshort}",
-                                  color=constants.EMBED_COLOUR_OK)
-            embed = _add_common_embed_fields(embed, carrier_data)
-            return await ctx.send(embed=embed)
+        carriers = find_carrier_from_short_name(lookshort)
+        if carriers:
+            carrier_data = None
+
+            if len(carriers) == 1:
+                print('Single carrier found, returning that directly')
+                # if only 1 match, just assign it directly
+                carrier_data = carriers[0]
+            elif len(carriers) > 3:
+                # If we ever get into a scenario where more than 3 commodities can be found with the same search
+                # directly, then we need to revisit this limit
+                print(f'More than 3 carriers found for: "{lookshort}", {ctx.author} needs to search better.')
+                await ctx.send(f'Please narrow down your commodity search, we found {len(carriers)} matches for your '
+                               f'input choice: "{lookshort}"')
+                return None  # Just return None here and let the calling method figure out what is needed to happen
+            else:
+                print(f'Between 1 and 3 carriers found for: "{lookshort}", asking {ctx.author} which they want.')
+                # The database runs a partial match, in the case we have more than 1 ask the user which they want.
+                # here we have less than 3, but more than 1 match
+                embed = discord.Embed(title=f"Multiple carriers found for input: {lookshort}",
+                                      color=constants.EMBED_COLOUR_OK)
+
+                count = 0
+                response = None  # just in case we try to do something before it is assigned, give it a value of None
+                for carrier in carriers:
+                    count += 1
+                    embed = _add_common_embed_fields(embed, carrier)
+
+                embed.set_footer(text='Please select the carrier with 1, 2 or 3')
+
+                def check(message):
+                    return message.author == ctx.author and message.channel == ctx.channel and \
+                           len(message.content) == 1 and message.content.lower() in ["1", "2", "3"]
+
+                message_confirm = await ctx.send(embed=embed)
+                try:
+                    # Wait on the user input, this might be better by using a reaction?
+                    response = await bot.wait_for("message", check=check, timeout=15)
+                    print(f'{ctx.author} responded with: "{response.content}", type: {type(response.content)}.')
+                    index = int(response.content) - 1  # Users count from 1, computers count from 0
+                    carrier_data = carriers[index]
+                except asyncio.TimeoutError:
+                    print('User failed to respond in time')
+                    pass
+                await message_confirm.delete()
+                if response:
+                    await response.delete()
+
+            if carrier_data:
+                embed = discord.Embed(title="Fleet Carrier Shortname Search Result",
+                                      description=f"Displaying first match for {lookshort}",
+                                      color=constants.EMBED_COLOUR_OK)
+                embed = _add_common_embed_fields(embed, carrier_data)
+                return await ctx.send(embed=embed)
     except TypeError as e:
         print('Error in carrier search: {}'.format(e))
     await ctx.send(f'No result for {lookshort}.')
