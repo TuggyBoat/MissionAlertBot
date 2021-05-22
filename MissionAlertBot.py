@@ -1385,10 +1385,10 @@ async def carrier_add(ctx, short_name, long_name, carrier_id, owner_id):
         print(f"Set permissions for {owner} in {channel}")
     except Forbidden:
         raise EnvironmentError(f"Could not set channel permissions for {owner.display_name} in {channel}, reason: Bot does not have permissions to edit channel specific permissions.")
-    except HTTPException:
-        raise EnvironmentError(f"Could not set channel permissions for {owner.display_name} in {channel}, reason: Editing channel specific permissions failed.")
     except NotFound:
         raise EnvironmentError(f"Could not set channel permissions for {owner.display_name} in {channel}, reason: The role or member being edited is not part of the guild.")
+    except HTTPException:
+        raise EnvironmentError(f"Could not set channel permissions for {owner.display_name} in {channel}, reason: Editing channel specific permissions failed.")
     except InvalidArgument:
         raise EnvironmentError(f"Could not set channel permissions for {owner.display_name} in {channel}, reason: The overwrite parameter invalid or the target type was not Role or Member.")
     except:
@@ -1706,6 +1706,16 @@ async def edit_carrier(ctx, carrier_name):
 
         # Go update the details to the database
         _update_carrier_details_in_database(ctx, edit_carrier_data, carrier_data.carrier_long_name)
+
+        # Double check if we need to edit the carrier shortname, if so then we also need to edit the backup image
+        if edit_carrier_data.carrier_short_name != carrier_data.carrier_short_name:
+            print('Renaming the carriers image')
+            os.rename(
+                f'images/{carrier_data.carrier_short_name}.png',
+                f'images/{edit_carrier_data.carrier_short_name}.png'
+            )
+            print(f'Carrier image renamed from: images/{carrier_data.carrier_short_name}.png to '
+                  f'images/{edit_carrier_data.carrier_short_name}.png')
 
         # Go grab the details again, make sure it is correct and display to the user
         updated_carrier_data = find_carrier_from_long_name(edit_carrier_data.carrier_long_name)
