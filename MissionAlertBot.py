@@ -1570,14 +1570,14 @@ async def findshort(ctx, lookshort):
                 print(f'Between 1 and 3 carriers found for: "{lookshort}", asking {ctx.author} which they want.')
                 # The database runs a partial match, in the case we have more than 1 ask the user which they want.
                 # here we have less than 3, but more than 1 match
-                embed = discord.Embed(title=f"Multiple carriers found for input: {lookshort}",
+                embed = discord.Embed(title=f"Multiple carriers ({len(carriers)}) found for input: {lookshort}",
                                       color=constants.EMBED_COLOUR_OK)
 
                 count = 0
                 response = None  # just in case we try to do something before it is assigned, give it a value of None
                 for carrier in carriers:
                     count += 1
-                    embed = _add_common_embed_fields(embed, carrier)
+                    embed.add_field(name='Carrier Name', value=f'{carrier.carrier_long_name}', inline=True)
 
                 embed.set_footer(text='Please select the carrier with 1, 2 or 3')
 
