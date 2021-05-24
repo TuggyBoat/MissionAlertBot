@@ -7,8 +7,6 @@
 import ast
 import copy
 import time
-from itertools import islice
-from math import ceil
 
 from PIL import Image, ImageFont, ImageDraw
 import os
@@ -234,8 +232,7 @@ def add_carrier_to_database(short_name, long_name, carrier_id, channel, channel_
     carrier_db_lock.acquire()
     try:
         carrier_db.execute(''' INSERT INTO carriers VALUES(NULL, ?, ?, ?, ?, ?, ?, ?) ''',
-                           (short_name.lower(), long_name.upper(), carrier_id.upper(), channel, channel_id, roleid,
-                            owner_id))
+                           (short_name.lower(), long_name.upper(), carrier_id.upper(), channel, channel_id, roleid, owner_id))
         carriers_conn.commit()
     finally:
         carrier_db_lock.release()
@@ -307,7 +304,7 @@ def find_carrier_with_role_id(roleid):
     carrier_db.execute(
         f"SELECT * FROM carriers WHERE roleid LIKE (?)", (f'%{roleid}%',)
     )
-    carrier_data = [CarrierData(carrier) for carrier in carrier_db.fetchall()]
+    carrier_data = [CarrierData(carrier)  for carrier in carrier_db.fetchall() ]
     for carrier in carrier_data:
         print(f"FC {carrier.pid} is {carrier.carrier_long_name} {carrier.carrier_identifier} called by "
               f"shortname {carrier.carrier_short_name} with channel <#{carrier.channel_id}> "
@@ -409,7 +406,6 @@ async def find_commodity(lookfor, ctx):
               f"maxsell {commodity.max_sell} minbuy {commodity.min_buy} maxprofit {commodity.max_profit}")
     return commodity
 
-
 #
 #                       IMAGE GEN STUFF
 #
@@ -465,7 +461,7 @@ def txt_create_discord(carrier_data, mission_type, commodity, station, system, p
     discord_text = f"<#{carrier_data.channel_id}> {'load' if mission_type == 'load' else 'unload'}ing " \
                    f"{commodity.name} " \
                    f"{'from' if mission_type == 'load' else 'to'} **{station.upper()}** station in system " \
-                   f"**{system.upper()}** : {profit}k per unit profit : " \
+                   f"**{system.upper()}** : {profit}k per unit profit : "\
                    f"{demand} {'demand' if mission_type == 'load' else 'supply'} : {pads.upper()}-pads" \
                    f".{eta_text}"
     return discord_text
@@ -478,6 +474,7 @@ def txt_create_reddit_title(carrier_data):
 
 
 def txt_create_reddit_body(carrier_data, mission_type, commodity, station, system, profit, pads, demand, eta_text):
+
     if mission_type == 'load':
         reddit_body = (
             f"    INCOMING WIDEBAND TRANSMISSION: P.T.N. CARRIER LOADING MISSION IN PROGRESS\n\n**BUY FROM**: station "
@@ -496,7 +493,6 @@ def txt_create_reddit_body(carrier_data, mission_type, commodity, station, syste
             f" and discussion, channel **#{carrier_data.discord_channel}**.")
     return reddit_body
 
-
 #
 #                       OTHER
 #
@@ -513,7 +509,6 @@ def user_exit():
 
 bot = commands.Bot(command_prefix='m.', intents=discord.Intents.all())
 slash = SlashCommand(bot, sync_commands=True)
-
 
 @bot.event
 async def on_ready():
@@ -690,10 +685,9 @@ async def gen_mission(ctx, carrier_name, commodity_short_name, system, station, 
 
     embed = discord.Embed(title="Where would you like to send the alert?",
                           description="(**d**)iscord, (**r**)eddit, (**t**)ext for copy/pasting or (**x**) to cancel\n"
-                                      "Use (**n**) to also notify your crew.",
+                          "Use (**n**) to also notify your crew.",
                           color=constants.EMBED_COLOUR_QU)
-    embed.set_footer(
-        text="Enter all that apply, e.g. **drn** will send alerts to Discord and Reddit and notify your crew.")
+    embed.set_footer(text="Enter all that apply, e.g. **drn** will send alerts to Discord and Reddit and notify your crew.")
     message_confirm = await ctx.send(embed=embed)
 
     try:
@@ -763,10 +757,9 @@ async def gen_mission(ctx, carrier_name, commodity_short_name, system, station, 
             embed = discord.Embed(title="P.T.N TRADE MISSION STARTING",
                                   description=f"> {rp_text}" if rp else "", color=embed_colour)
 
-            embed.add_field(name="Destination", value=f"Station: {station.upper()}\nSystem: {system.upper()}",
-                            inline=True)
+            embed.add_field(name="Destination", value=f"Station: {station.upper()}\nSystem: {system.upper()}", inline=True)
             if eta: embed.add_field(name="ETA", value=f"{eta} minutes", inline=True)
-
+        
             embed.set_image(url="attachment://image.png")
             embed.set_footer(
                 text="m.complete will mark this mission complete\nm.ission will display info to channel\nm.issions "
@@ -807,6 +800,7 @@ async def gen_mission(ctx, carrier_name, commodity_short_name, system, station, 
             await channel.send(embed=embed)
 
         if "n" in msg.content.lower():
+
             # get carrier's channel object
 
             channel = bot.get_channel(carrier_data.channel_id)
@@ -814,8 +808,8 @@ async def gen_mission(ctx, carrier_name, commodity_short_name, system, station, 
             await channel.send(f"<@&{carrier_data.roleid}>: {discord_text}")
 
             embed = discord.Embed(title=f"Crew notification sent for {carrier_data.carrier_long_name}",
-                                  description=f"Pinged <@&{carrier_data.roleid}> in <#{carrier_data.channel_id}>",
-                                  color=constants.EMBED_COLOUR_DISCORD)
+                        description=f"Pinged <@&{carrier_data.roleid}> in <#{carrier_data.channel_id}>",
+                        color=constants.EMBED_COLOUR_DISCORD)
             await ctx.send(embed=embed)
 
     except asyncio.TimeoutError:
@@ -835,8 +829,7 @@ async def gen_mission(ctx, carrier_name, commodity_short_name, system, station, 
 #
 # add mission to DB, called from mission generator
 async def mission_add(ctx, carrier_data, commodity_data, mission_type, system, station, profit, pads, demand,
-                      rp_text, reddit_post_id, reddit_post_url, reddit_comment_id, reddit_comment_url,
-                      discord_alert_id):
+                      rp_text, reddit_post_id, reddit_post_url, reddit_comment_id, reddit_comment_url, discord_alert_id):
     backup_database('missions')  # backup the missions database before going any further
 
     mission_db.execute(''' INSERT INTO missions VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ''', (
@@ -846,12 +839,12 @@ async def mission_add(ctx, carrier_data, commodity_data, mission_type, system, s
     ))
     missions_conn.commit()
 
-
 async def mission_generation_complete(ctx, carrier_data, message_pending, eta_text):
+
     # fetch data we just committed back
 
     mission_db.execute('''SELECT * FROM missions WHERE carrier LIKE (?)''',
-                       ('%' + carrier_data.carrier_long_name + '%',))
+                        ('%' + carrier_data.carrier_long_name + '%',))
     print('DB command ran, go fetch the result')
     mission_data = MissionData(mission_db.fetchone())
     print(f'Found mission data: {mission_data}')
@@ -865,9 +858,8 @@ async def mission_generation_complete(ctx, carrier_data, message_pending, eta_te
     if mission_data.rp_text and mission_data.rp_text != 'NULL':
         mission_description = f"> {mission_data.rp_text}"
 
-    embed = discord.Embed(
-        title=f"{mission_data.mission_type.upper()}ING {mission_data.carrier_name} ({mission_data.carrier_identifier}) {eta_text}",
-        description=mission_description, color=embed_colour)
+    embed = discord.Embed(title=f"{mission_data.mission_type.upper()}ING {mission_data.carrier_name} ({mission_data.carrier_identifier}) {eta_text}",
+                            description=mission_description, color=embed_colour)
 
     embed = _mission_summary_embed(mission_data, embed)
 
@@ -917,9 +909,8 @@ async def ission(ctx):
             if mission_data.rp_text and mission_data.rp_text != 'NULL':
                 mission_description = f"> {mission_data.rp_text}"
 
-            embed = discord.Embed(
-                title=f"{mission_data.mission_type.upper()}ING {mission_data.carrier_name} ({mission_data.carrier_identifier})",
-                description=mission_description, color=embed_colour)
+            embed = discord.Embed(title=f"{mission_data.mission_type.upper()}ING {mission_data.carrier_name} ({mission_data.carrier_identifier})",
+                                  description=mission_description, color=embed_colour)
 
             embed = _mission_summary_embed(mission_data, embed)
 
@@ -927,7 +918,6 @@ async def ission(ctx):
 
             await ctx.send(embed=embed)
             return
-
 
 def _mission_summary_embed(mission_data, embed):
     embed.add_field(name="System", value=f"{mission_data.system.upper()}", inline=True)
@@ -938,10 +928,10 @@ def _mission_summary_embed(mission_data, embed):
                     value=f"{mission_data.demand} units at {mission_data.profit}k profit per unit", inline=True)
     return embed
 
-
 # list all active carrier trade missions from DB
 @bot.command(name='issions', help='List all active trade missions.')
 async def issions(ctx):
+
     print(f'User {ctx.author} asked for all active missions.')
 
     co_role = discord.utils.get(ctx.guild.roles, name='Carrier Owner')
@@ -1007,6 +997,7 @@ def _format_missions_embedd(mission_data_list, embed):
                                'quote to be sent along with the completion notice. This can be used for RP if desired.')
 @commands.has_role('Carrier Owner')
 async def done(ctx, carrier_name, rp=None):
+
     # Check we are in the designated mission channel, if not go no farther.
     mission_gen_channel = bot.get_channel(conf['MISSION_CHANNEL'])
     current_channel = ctx.channel
@@ -1079,6 +1070,7 @@ async def done(ctx, carrier_name, rp=None):
 # a command for users to mark a carrier mission complete from within the carrier channel
 @bot.command(name='complete', help="Use in a carrier's channel to mark the current trade mission complete.")
 async def complete(ctx):
+
     # take a note of user and channel ID
     msg_ctx_id = ctx.channel.id
     msg_usr_id = ctx.author.id
@@ -1095,8 +1087,7 @@ async def complete(ctx):
         backup_database('missions')  # backup the missions database before going any further
 
         # now look to see if the carrier is on an active mission
-        mission_db.execute('''SELECT * FROM missions WHERE carrier LIKE (?)''',
-                           ('%' + carrier_data.carrier_long_name + '%',))
+        mission_db.execute('''SELECT * FROM missions WHERE carrier LIKE (?)''', ('%' + carrier_data.carrier_long_name + '%',))
         mission_data = MissionData(mission_db.fetchone())
         if not mission_data:
             # if there's no result, return an error
@@ -1178,6 +1169,7 @@ async def complete(ctx):
 @bot.command(name='backup', help='Backs up the carrier and mission databases.')
 @commands.has_role('Admin')
 async def backup(ctx):
+
     # make sure we are in the right channel
     bot_command_channel = bot.get_channel(conf['BOT_COMMAND_CHANNEL'])
     current_channel = ctx.channel
@@ -1186,8 +1178,8 @@ async def backup(ctx):
         return await ctx.send(f'Sorry, you can only run this command out of: {bot_command_channel}.')
 
     print(f"{ctx.author} requested a manual DB backup")
-    backup_database('missions')
-    backup_database('carriers')
+    backup_database('missions') 
+    backup_database('carriers') 
     await ctx.send("Database backup complete.")
 
 
@@ -1219,10 +1211,9 @@ async def _crew(ctx: SlashContext):
         crew_role = discord.utils.get(ctx.guild.roles, id=carrier_data.roleid)
 
         # check if role exists
-        if not crew_role:
+        if not crew_role: 
             await ctx.send("Sorry, I couldn't find a crew for this carrier. Please alert an Admin.", hidden=True)
-            await channel.send(
-                f"**ERROR**: {ctx.author} tried to use **/crew** in <#{ctx.channel.id}> but received an error (role does not exist).")
+            await channel.send(f"**ERROR**: {ctx.author} tried to use **/crew** in <#{ctx.channel.id}> but received an error (role does not exist).")
             print(f"No crew role found matching {ctx.channel}")
             return
 
@@ -1232,17 +1223,13 @@ async def _crew(ctx: SlashContext):
         if crew_role not in ctx.author.roles:
             # they don't so give it to them
             await ctx.author.add_roles(crew_role)
-            embed = discord.Embed(title=f"You've joined the crew for {carrier_data.carrier_long_name}!",
-                                  description="You'll receive notifications about this carrier's activity. You can leave the crew at any time by using **/crew** again in this channel.",
-                                  color=constants.EMBED_COLOUR_QU)
+            embed = discord.Embed(title=f"You've joined the crew for {carrier_data.carrier_long_name}!", description="You'll receive notifications about this carrier's activity. You can leave the crew at any time by using **/crew** again in this channel.", color=constants.EMBED_COLOUR_QU)
             await ctx.send(embed=embed, hidden=True)
             await channel.send(f"{ctx.author} joined the crew in <#{ctx.channel.id}>")
         else:
             # they do so take it from them
             await ctx.author.remove_roles(crew_role)
-            embed = discord.Embed(title=f"You've left the crew for {carrier_data.carrier_long_name}.",
-                                  description="You'll no longer receive notifications about this carrier's activity. You can rejoin the crew at any time by using **/crew** again in this channel.",
-                                  color=constants.EMBED_COLOUR_OK)
+            embed = discord.Embed(title=f"You've left the crew for {carrier_data.carrier_long_name}.", description="You'll no longer receive notifications about this carrier's activity. You can rejoin the crew at any time by using **/crew** again in this channel.", color=constants.EMBED_COLOUR_OK)
             await ctx.send(embed=embed, hidden=True)
             await channel.send(f"{ctx.author} left the crew in <#{ctx.channel.id}>")
 
@@ -1280,69 +1267,10 @@ async def _crews(ctx: SlashContext):
     pass
 
 
-@slash.slash(name="crewcount", guild_ids=[bot_guild_id],
-             description="Use /crewcount find the number of people with each crew role.")
-async def _crews(ctx: SlashContext):
-    """
-    Returns a list of every @Crew:xyz role and the number of current users assigned to the role.
-
-    We might want this only to be returned to the requesting user, for now just print it out wherever it was called
-    from. This command currently is not channel locked in any way.
-    """
-    print(f'{ctx.author} requested to run crewcount.')
-    all_crew_roles = [role for role in ctx.guild.roles if role.name.lower().startswith('crew')]
-    result = {}
-    for role in all_crew_roles:
-        role_count = 0
-        print(f'Searching for crew role: {role.name}')
-        for user in ctx.guild.members:
-            if role in user.roles:
-                # The user have the role we are checking for.
-                role_count += 1
-        result[role.name] = role_count
-    print(dict(reversed(sorted(result.items(), key=lambda item: item[1]))))
-
-    sorted_dict = dict(reversed(sorted(result.items(), key=lambda item: item[1])))
-    print(f'Sorted dict is: {sorted_dict}')
-
-    def chunk(data, max_size):
-        """
-        Take an input dictionary, and an expected max_size.
-
-        :param dict data: The dictionary you wish to chunk.
-        :param int max_size: How many elements in your chunk?
-        :returns: A chunked list that is yielded back to the caller
-        :rtype: iterator
-        """
-        it = iter(data)
-        for i in range(0, len(data), max_size):
-            yield {k: data[k] for k in islice(it, max_size)}
-
-    current_page = 0
-    max_page_size = 10
-    max_pages = int(ceil(len(sorted_dict) / max_page_size))
-
-    embed_list = []
-    for page in chunk(sorted_dict, max_page_size):
-        print(f'Current working page: {page}')
-
-        current_page += 1
-        nextembed = discord.Embed(title=f"{len(sorted_dict)} Roles Found Page: {current_page} of {max_pages}.")
-        for key, value in page.items():
-            # We might prefer just the long list, for now set inline as True to reduce the length of the display
-            # somewhat
-            nextembed.add_field(name=f"{key}", value=f"{value} members.", inline=True)
-
-        embed_list.append(nextembed)
-        print(nextembed)
-        print(embed_list)
-
-    await ctx.send(embeds=embed_list)
-
-
 # list FCs
 @bot.command(name='carrier_list', help='List all Fleet Carriers in the database. This times out after 60 seconds')
 async def carrier_list(ctx):
+
     print(f'Carrier List requested by user: {ctx.author}')
 
     carrier_db.execute(f"SELECT * FROM carriers")
@@ -1369,7 +1297,7 @@ async def carrier_list(ctx):
     current_page = 1
 
     embed = discord.Embed(title=f"{len(carriers)} Registered Fleet Carriers Page:#{current_page} of {max_pages}")
-    count = 0  # Track the overall count for all carriers
+    count = 0   # Track the overall count for all carriers
     # Go populate page 0 by default
     for carrier in pages[0]:
         count += 1
@@ -1388,9 +1316,9 @@ async def carrier_list(ctx):
             if str(reaction.emoji) == "▶️" and current_page != max_pages:
 
                 print(f'{ctx.author} requested to go forward a page.')
-                current_page += 1  # Forward a page
+                current_page += 1   # Forward a page
                 new_embed = discord.Embed(title=f"{len(carriers)} Registered Fleet Carriers Page:{current_page}")
-                for carrier in pages[current_page - 1]:
+                for carrier in pages[current_page-1]:
                     # Page -1 as humans think page 1, 2, but python thinks 0, 1, 2
                     count += 1
                     new_embed.add_field(name=f"{count}: {carrier.carrier_long_name} ({carrier.carrier_identifier})",
@@ -1407,7 +1335,7 @@ async def carrier_list(ctx):
 
             elif str(reaction.emoji) == "◀️" and current_page > 1:
                 print(f'{ctx.author} requested to go back a page.')
-                current_page -= 1  # Go back a page
+                current_page -= 1   # Go back a page
 
                 new_embed = discord.Embed(title=f"{len(carriers)} Registered Fleet Carriers Page:{current_page}")
                 # Start by counting back however many carriers are in the current page, minus the new page, that way
@@ -1454,6 +1382,7 @@ async def carrier_list(ctx):
                                       '<owner_id> is the owner\'s Discord ID')
 @commands.has_role('Admin')
 async def carrier_add(ctx, short_name, long_name, carrier_id, owner_id):
+
     # make sure we are in the right channel
     bot_command_channel = bot.get_channel(conf['BOT_COMMAND_CHANNEL'])
     current_channel = ctx.channel
@@ -1508,31 +1437,27 @@ async def carrier_add(ctx, short_name, long_name, carrier_id, owner_id):
 
     try:
         await channel.set_permissions(owner, read_messages=True,
-                                      manage_channels=True,
-                                      manage_roles=True,
-                                      manage_webhooks=True,
-                                      create_instant_invite=True,
-                                      send_messages=True,
-                                      embed_links=True,
-                                      attach_files=True,
-                                      add_reactions=True,
-                                      external_emojis=True,
-                                      manage_messages=True,
-                                      read_message_history=True,
-                                      use_slash_commands=True)
+                                            manage_channels=True,
+                                            manage_roles=True,
+                                            manage_webhooks=True,
+                                            create_instant_invite=True,
+                                            send_messages=True,
+                                            embed_links=True,
+                                            attach_files=True,
+                                            add_reactions=True,
+                                            external_emojis=True,
+                                            manage_messages=True,
+                                            read_message_history=True,
+                                            use_slash_commands=True)
         print(f"Set permissions for {owner} in {channel}")
     except Forbidden:
-        raise EnvironmentError(
-            f"Could not set channel permissions for {owner.display_name} in {channel}, reason: Bot does not have permissions to edit channel specific permissions.")
+        raise EnvironmentError(f"Could not set channel permissions for {owner.display_name} in {channel}, reason: Bot does not have permissions to edit channel specific permissions.")
     except NotFound:
-        raise EnvironmentError(
-            f"Could not set channel permissions for {owner.display_name} in {channel}, reason: The role or member being edited is not part of the guild.")
+        raise EnvironmentError(f"Could not set channel permissions for {owner.display_name} in {channel}, reason: The role or member being edited is not part of the guild.")
     except HTTPException:
-        raise EnvironmentError(
-            f"Could not set channel permissions for {owner.display_name} in {channel}, reason: Editing channel specific permissions failed.")
+        raise EnvironmentError(f"Could not set channel permissions for {owner.display_name} in {channel}, reason: Editing channel specific permissions failed.")
     except InvalidArgument:
-        raise EnvironmentError(
-            f"Could not set channel permissions for {owner.display_name} in {channel}, reason: The overwrite parameter invalid or the target type was not Role or Member.")
+        raise EnvironmentError(f"Could not set channel permissions for {owner.display_name} in {channel}, reason: The overwrite parameter invalid or the target type was not Role or Member.")
     except:
         raise EnvironmentError(f'Could not set channel permissions for {owner.display_name} in {channel}')
 
@@ -1549,7 +1474,7 @@ async def carrier_add(ctx, short_name, long_name, carrier_id, owner_id):
     else:
         role = await ctx.guild.create_role(name=f"CREW: {long_name}")
         print(f'Created {role}')
-
+  
     # finally, send all the info to the db
     add_carrier_to_database(short_name, long_name, carrier_id, str(channel), channel.id, role.id, owner_id)
 
@@ -1565,6 +1490,7 @@ async def carrier_add(ctx, short_name, long_name, carrier_id, owner_id):
 @bot.command(name='carrier_del', help='Delete a Fleet Carrier from the database using its database entry ID#.')
 @commands.has_role('Admin')
 async def carrier_del(ctx, db_id):
+
     # make sure we are in the right channel
     bot_command_channel = bot.get_channel(conf['BOT_COMMAND_CHANNEL'])
     current_channel = ctx.channel
@@ -1592,7 +1518,7 @@ async def carrier_del(ctx, db_id):
             try:
                 msg = await bot.wait_for("message", check=check, timeout=30)
                 if msg.content.lower() == "n":
-                    embed = discord.Embed(description="Deletion cancelled.", color=constants.EMBED_COLOUR_OK)
+                    embed=discord.Embed(description="Deletion cancelled.", color=constants.EMBED_COLOUR_OK)
                     await ctx.send(embed=embed)
                     return
                 elif msg.content.lower() == "y":
@@ -1990,7 +1916,7 @@ async def _determine_db_fields_to_edit(ctx, carrier_data):
 
     async def check_confirm(message):
         return message.content and message.author == ctx.author and message.channel == ctx.channel and \
-               all(character in 'ynx' for character in set(message.content.lower())) and len(message.content) == 1
+            all(character in 'ynx' for character in set(message.content.lower())) and len(message.content) == 1
 
     def check_user(message):
         return message.content and message.author == ctx.author and message.channel == ctx.channel
@@ -2042,10 +1968,10 @@ async def _determine_db_fields_to_edit(ctx, carrier_data):
 
                 # Log a message and skip over
                 print(f'User {ctx.author} wants to edit the field: {field}')
-                embed.remove_field(0)  # Remove the current field, add a new one and resend
+                embed.remove_field(0)   # Remove the current field, add a new one and resend
 
                 embed.add_field(name=f'What is the new value for: {field}?', value='Type your response now.')
-                embed.set_footer()  # Clear the foot as well
+                embed.set_footer()   # Clear the foot as well
                 message_confirm = await ctx.send(embed=embed)
 
                 msg = await bot.wait_for("message", check=check_user, timeout=30)
