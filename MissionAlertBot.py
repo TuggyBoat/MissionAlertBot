@@ -1248,8 +1248,8 @@ async def _crews(ctx: SlashContext):
 
             embed.add_field(name=f'{crew.name}', value=f'Channels: {carrier_channels}', inline=True)
     else:
-        embed = discord.Embed(description=f"You are signed up for **no** crews. Go use /crew in a carrier channel to "
-                                          f"sign up", color=constants.EMBED_COLOUR_ERROR)
+        embed = discord.Embed(description=f"You aren't signed up for any crews! Use **/crew** in a carrier channel to "
+                                          f"sign up.", color=constants.EMBED_COLOUR_ERROR)
     await ctx.send(embed=embed, hidden=True)
     pass
 
