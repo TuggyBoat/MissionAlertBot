@@ -395,7 +395,7 @@ def get_formatted_date_string():
     """
     dt_now = datetime.now(tz=timezone.utc)
     # elite_time_string is the Elite Dangerous time this is running in, today plus 1286 years
-    elite_time_string = (dt_now + relativedelta(years=1286)).strftime("%d %B %Y %H%M%S %Z")
+    elite_time_string = (dt_now + relativedelta(years=1286)).strftime("%d %B %Y %H:%M %Z")
     current_time_string = dt_now.strftime("%Y%m%d %H%M%S")
     return elite_time_string, current_time_string
 
@@ -436,7 +436,7 @@ def txt_create_discord(carrier_data, mission_type, commodity, station, system, p
 
 def txt_create_reddit_title(carrier_data):
     reddit_title = f"P.T.N. News - Trade mission - {carrier_data.carrier_long_name} {carrier_data.carrier_identifier}" \
-                   f" - {get_formatted_date_string()[0]} UTC"
+                   f" - {get_formatted_date_string()[0]}"
     return reddit_title
 
 
