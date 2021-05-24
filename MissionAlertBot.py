@@ -286,6 +286,26 @@ def find_carrier_from_long_name(find_long_name):
     return carrier_data
 
 
+def find_carrier_with_role_id(roleid):
+    """
+    Returns all carriers matching the roleid
+
+    :param int roleid: The role id  to match
+    :returns: A list of carrier data objects
+    :rtype: list[CarrierData]
+    """
+    carrier_db.execute(
+        f"SELECT * FROM carriers WHERE roleid LIKE (?)", (f'%{roleid}%',)
+    )
+    carrier_data = [CarrierData(carrier)  for carrier in carrier_db.fetchall() ]
+    for carrier in carrier_data:
+        print(f"FC {carrier.pid} is {carrier.carrier_long_name} {carrier.carrier_identifier} called by "
+              f"shortname {carrier.carrier_short_name} with channel <#{carrier.channel_id}> "
+              f"and owner {carrier.ownerid} and role id: {carrier.roleid} called from find_carrier_with_role_id.")
+
+    return carrier_data
+
+
 # function to search for a carrier by shortname
 def find_carrier_from_short_name(find_short_name):
 
@@ -1149,9 +1169,10 @@ async def backup(ctx):
     backup_database('carriers') 
     await ctx.send("Database backup complete.")
 
+
 # join a carrier's crew
 @slash.slash(name="crew", guild_ids=[bot_guild_id],
-            description="Use in a carrier's channel to join or leave that carrier's crew.")
+             description="Use in a carrier's channel to join or leave that carrier's crew.")
 async def _crew(ctx: SlashContext):
     print(f"{ctx.author} used /crew in {ctx.channel}")
 
@@ -1198,6 +1219,39 @@ async def _crew(ctx: SlashContext):
             embed = discord.Embed(title=f"You've left the crew for {carrier_data.carrier_long_name}.", description="You'll no longer receive notifications about this carrier's activity. You can rejoin the crew at any time by using **/crew** again in this channel.", color=constants.EMBED_COLOUR_OK)
             await ctx.send(embed=embed, hidden=True)
             await channel.send(f"{ctx.author} left the crew in <#{ctx.channel.id}>")
+
+
+@slash.slash(name="crews", guild_ids=[bot_guild_id],
+             description="Use /crews to find out all of the screws you are signed up for.")
+async def _crews(ctx: SlashContext):
+    print(f'{ctx.author} wants to find all of the crews they are part of.')
+    # Find all the crews the user is a part of
+    author = ctx.author
+    crew_roles = [role for role in author.roles if role.name.lower().startswith('crew')]
+    print(f'{ctx.author} has the following crew roles: {crew_roles}')
+
+    if crew_roles:
+        embed = discord.Embed(description=f"You are signed up for {len(crew_roles)} crews.",
+                              color=constants.EMBED_COLOUR_ERROR)
+        for crew in crew_roles:
+            carrier_list = find_carrier_with_role_id(crew.id)
+            if len(carrier_list) > 1:
+                carrier_channels = ''
+                for carrier in carrier_list:
+                    carrier_channels += f'<#{carrier.carrier_long_name}>, '
+
+                if carrier_channels.endswith(', '):
+                    carrier_channels = carrier_channels[:-2:]
+
+            else:
+                carrier_channels = f'<#{carrier_list[0].channel_id}>'
+
+            embed.add_field(name=f'{crew.name}', value=f'Channels: {carrier_channels}', inline=True)
+    else:
+        embed = discord.Embed(description=f"You aren't signed up for any crews! Use **/crew** in a carrier channel to "
+                                          f"sign up.", color=constants.EMBED_COLOUR_ERROR)
+    await ctx.send(embed=embed, hidden=True)
+    pass
 
 
 # list FCs
