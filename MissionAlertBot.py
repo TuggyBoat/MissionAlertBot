@@ -1236,17 +1236,17 @@ async def _crews(ctx: SlashContext):
         for crew in crew_roles:
             carrier_list = find_carrier_with_role_id(crew.id)
             if len(carrier_list) > 1:
-                carrier_names = ''   # Empty to start
+                carrier_channels = ''
                 for carrier in carrier_list:
-                    carrier_names += f'/{carrier.carrier_long_name}'
+                    carrier_channels += f'<#{carrier.carrier_long_name}>, '
 
-                # just go get rid of the first /
-                if carrier_names.startswith('/'):
-                    carrier_names = carrier_names[1::]
+                if carrier_channels.endswith(', '):
+                    carrier_channels = carrier_channels[:-2:]
 
             else:
-                carrier_names = carrier_list[0].carrier_long_name
-            embed.add_field(name=f'{carrier_names}', value=f'{crew.name}', inline=True)
+                carrier_channels = f'<#{carrier_list[0].channel_id}>'
+
+            embed.add_field(name=f'{crew.name}', value=f'Channels: {carrier_channels}', inline=True)
     else:
         embed = discord.Embed(description=f"You are signed up for **no** crews. Go use /crew in a carrier channel to "
                                           f"sign up", color=constants.EMBED_COLOUR_ERROR)
