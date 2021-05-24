@@ -2002,6 +2002,66 @@ def _configure_all_carrier_detail_embed(embed, carrier_data):
     return embed
 
 
+@slash.slash(name="crewcount", guild_ids=[bot_guild_id],
+             description="Use /crewcount find the number of people with each crew role.")
+async def _crews(ctx: SlashContext):
+    """
+    Returns a list of every @Crew:xyz role and the number of current users assigned to the role.
+
+    We might want this only to be returned to the requesting user, for now just print it out wherever it was called
+    from. This command currently is not channel locked in any way.
+    """
+    print(f'{ctx.author} requested to run crewcount.')
+    all_crew_roles = [role for role in ctx.guild.roles if role.name.lower().startswith('crew')]
+    result = {}
+    for role in all_crew_roles:
+        role_count = 0
+        print(f'Searching for crew role: {role.name}')
+        for user in ctx.guild.members:
+            if role in user.roles:
+                # The user have the role we are checking for.
+                role_count += 1
+        result[role.name] = role_count
+    print(dict(reversed(sorted(result.items(), key=lambda item: item[1]))))
+
+    sorted_dict = dict(reversed(sorted(result.items(), key=lambda item: item[1])))
+    print(f'Sorted dict is: {sorted_dict}')
+
+    def chunk(data, max_size):
+        """
+        Take an input dictionary, and an expected max_size.
+
+        :param dict data: The dictionary you wish to chunk.
+        :param int max_size: How many elements in your chunk?
+        :returns: A chunked list that is yielded back to the caller
+        :rtype: iterator
+        """
+        it = iter(data)
+        for i in range(0, len(data), max_size):
+            yield {k: data[k] for k in islice(it, max_size)}
+
+    current_page = 0
+    max_page_size = 10
+    max_pages = int(ceil(len(sorted_dict) / max_page_size))
+
+    embed_list = []
+    for page in chunk(sorted_dict, max_page_size):
+        print(f'Current working page: {page}')
+
+        current_page += 1
+        nextembed = discord.Embed(title=f"{len(sorted_dict)} Roles Found Page: {current_page} of {max_pages}.")
+        for key, value in page.items():
+            # We might prefer just the long list, for now set inline as True to reduce the length of the display
+            # somewhat
+            nextembed.add_field(name=f"{key}", value=f"{value} members.", inline=True)
+
+        embed_list.append(nextembed)
+        print(nextembed)
+        print(embed_list)
+
+    await ctx.send(embeds=embed_list)
+
+
 # ping the bot
 @bot.command(name='ping', help='Ping the bot')
 @commands.has_role('Carrier Owner')
