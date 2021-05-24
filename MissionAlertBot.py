@@ -1785,17 +1785,17 @@ async def edit_carrier(ctx, carrier_name):
             return
 
         # Now we know what fields to edit, go do something with them, first display them to the user
-        embed = discord.Embed(title=f"Please validate the inputs are correct",
-                              description=f"Validate the new settings for {carrier_data.carrier_long_name}",
-                              color=constants.EMBED_COLOUR_OK)
-        embed = _configure_all_carrier_detail_embed(embed, edit_carrier_data)
-        await ctx.send(embed=embed)
+        edited_embed = discord.Embed(title=f"Please validate the inputs are correct",
+                                     description=f"Validate the new settings for {carrier_data.carrier_long_name}",
+                                     color=constants.EMBED_COLOUR_OK)
+        edited_embed = _configure_all_carrier_detail_embed(edited_embed, edit_carrier_data)
+        edit_send = await ctx.send(embed=edited_embed)
 
         # Get the user to agree before we write
-        embed = discord.Embed(title="Confirm you want to write these values to the database please",
-                              description="Yes or No.", color=constants.EMBED_COLOUR_QU)
-        embed.set_footer(text='y/n - yes, no.')
-        message_confirm = await ctx.send(embed=embed)
+        confirm_embed = discord.Embed(title="Confirm you want to write these values to the database please",
+                                      description="Yes or No.", color=constants.EMBED_COLOUR_QU)
+        confirm_embed.set_footer(text='y/n - yes, no.')
+        message_confirm = await ctx.send(embed=confirm_embed)
 
         def check_confirm(message):
             return message.content and message.author == ctx.author and message.channel == ctx.channel and \
@@ -1810,14 +1810,20 @@ async def edit_carrier(ctx, carrier_name):
                 await ctx.send("**Edit operation cancelled by the user.**")
                 await msg.delete()
                 await message_confirm.delete()
+                await edit_send.delete()
+                await initial_message.delete()
                 return None  # Exit the check logic
 
             elif 'y' in msg.content.lower():
                 await ctx.send("**Writing the values now ...**")
-
+                await message_confirm.delete()
+                await msg.delete()
+                await edit_send.delete()
         except asyncio.TimeoutError:
             await ctx.send("**Write operation from {ctx.author} timed out.**")
+            await edit_send.delete()
             await message_confirm.delete()
+            await initial_message.delete()
             return None  # Exit the check logic
 
         # Go update the details to the database
@@ -1837,13 +1843,14 @@ async def edit_carrier(ctx, carrier_name):
         updated_carrier_data = find_carrier_from_long_name(edit_carrier_data.carrier_long_name)
         if updated_carrier_data:
             embed = discord.Embed(title=f"Reading the settings from DB:",
-                                  description=f"Double check and rerun if incorrect the settings for old name: "
+                                  description=f"Double check and re-run if incorrect the settings for old name: "
                                               f"{carrier_data.carrier_long_name}",
                                   color=constants.EMBED_COLOUR_OK)
             embed = _configure_all_carrier_detail_embed(embed, updated_carrier_data)
+            await initial_message.delete()
             return await ctx.send(embed=embed)
         else:
-            await ctx.send('We did not find the new database entry - thats not good.')
+            await ctx.send('We did not find the new database entry - that is not good.')
 
     else:
         return await ctx.send(f'No result found for the carrier: "{carrier_name}".')
@@ -1916,7 +1923,18 @@ async def _determine_db_fields_to_edit(ctx, carrier_data):
     def check_user(message):
         return message.content and message.author == ctx.author and message.channel == ctx.channel
 
+    # These two are used below, initial value so we can wipe the message out if needed
+    message_confirm = None  # type: discord.Message
+    msg = None  # type: discord.Message
+
     for field in vars(carrier_data):
+
+        # Remove any pre-existing messages/responses if they were present.
+        if message_confirm:
+            await message_confirm.delete()
+        if msg:
+            await msg.delete()
+
         if field == 'pid':
             # We cant edit the DB ID here, so skip over it.
             # TODO: DB ID uses autoincrement, we probably want our own index if we want to use this.
@@ -1946,6 +1964,10 @@ async def _determine_db_fields_to_edit(ctx, carrier_data):
                 print(f'User {ctx.author} does not want to edit the field: {field}')
                 # We do not care, just move on
             elif 'y' in msg.content.lower():
+                # Remove this, we re-assign it now.
+                await msg.delete()
+                await message_confirm.delete()
+
                 # Log a message and skip over
                 print(f'User {ctx.author} wants to edit the field: {field}')
                 embed.remove_field(0)   # Remove the current field, add a new one and resend
@@ -1963,7 +1985,7 @@ async def _determine_db_fields_to_edit(ctx, carrier_data):
             else:
                 # Should never be hitting this as we gate the message
                 await ctx.send(f"**I cannot do anything with that entry '{msg.content}', please stick to y, n or x.**")
-                return None # Break condition just in case
+                return None  # Break condition just in case
         except asyncio.TimeoutError:
             await ctx.send("**Edit operation timed out (no valid response from user).**")
             await message_confirm.delete()
