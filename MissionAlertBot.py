@@ -6,7 +6,6 @@
 # Git repo: https://github.com/PilotsTradeNetwork/MissionAlertBot
 import ast
 import copy
-import time
 from itertools import islice
 from math import ceil
 
@@ -2028,7 +2027,7 @@ def _configure_all_carrier_detail_embed(embed, carrier_data):
 
 @commands.has_role('Carrier Owner')
 @slash.slash(name="crewcount", guild_ids=[bot_guild_id],
-             description="Use /crewcount find the number of people with each crew role.")
+             description="Use /crewcount find the number of people with each crew role. Requires CarrierOwner role.")
 async def _crews(ctx: SlashContext):
     """
     Returns a list of every @Crew:xyz role and the number of current users assigned to the role.
@@ -2043,9 +2042,10 @@ async def _crews(ctx: SlashContext):
     current_channel = ctx.channel
 
     if current_channel not in allowed_channels:
-        # urroh
+        # urroh, not in the correct channel.
+        allowed_channel_names = [f'#{allowed.name}' for allowed in allowed_channels]
         print(f'Request for crewcount was not from the correct channel {ctx.channel}, expected {allowed_channels}.')
-        return ctx.send(f'Sorry, you can only run this command out of: {allowed_channels}.')
+        return await ctx.send(f'Sorry, you can only run this command out of: {allowed_channel_names}.')
 
     all_crew_roles = [role for role in ctx.guild.roles if role.name.lower().startswith('crew')]
     result = {}
