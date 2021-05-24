@@ -7,6 +7,8 @@
 import ast
 import copy
 import time
+from itertools import islice
+from math import ceil
 
 from PIL import Image, ImageFont, ImageDraw
 import os
@@ -2002,6 +2004,7 @@ def _configure_all_carrier_detail_embed(embed, carrier_data):
     return embed
 
 
+@commands.has_role('Carrier Owner')
 @slash.slash(name="crewcount", guild_ids=[bot_guild_id],
              description="Use /crewcount find the number of people with each crew role.")
 async def _crews(ctx: SlashContext):
@@ -2011,7 +2014,17 @@ async def _crews(ctx: SlashContext):
     We might want this only to be returned to the requesting user, for now just print it out wherever it was called
     from. This command currently is not channel locked in any way.
     """
-    print(f'{ctx.author} requested to run crewcount.')
+    print(f'{ctx.author} requested to run crewcount from channel: {ctx.channel}.')
+
+    # Check we are in the designated mission channel, if not go no farther.
+    allowed_channels = [bot.get_channel(conf['MISSION_CHANNEL']), bot.get_channel(conf['BOT_COMMAND_CHANNEL'])]
+    current_channel = ctx.channel
+
+    if current_channel not in allowed_channels:
+        # urroh
+        print(f'Request for crewcount was not from the correct channel {ctx.channel}, expected {allowed_channels}.')
+        return ctx.send(f'Sorry, you can only run this command out of: {allowed_channels}.')
+
     all_crew_roles = [role for role in ctx.guild.roles if role.name.lower().startswith('crew')]
     result = {}
     for role in all_crew_roles:
