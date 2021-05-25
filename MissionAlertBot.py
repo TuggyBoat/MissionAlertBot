@@ -1235,7 +1235,7 @@ async def _crew(ctx: SlashContext):
 
 
 @slash.slash(name="crews", guild_ids=[bot_guild_id],
-             description="Use /crews to find out all of the screws you are signed up for.")
+             description="Use to find out which carrier crews you're signed up to.")
 async def _crews(ctx: SlashContext):
     print(f'{ctx.author} wants to find all of the crews they are part of.')
     # Find all the crews the user is a part of
