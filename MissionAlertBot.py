@@ -1883,13 +1883,15 @@ def _update_carrier_details_in_database(ctx, carrier_data, original_name):
             carrier_data.carrier_identifier,
             carrier_data.discord_channel,
             carrier_data.channel_id,
+            carrier_data.roleid,
+            carrier_data.ownerid,
             f'%{original_name}%'
         )
         # Handy number to print out what the database connection is actually doing
         carriers_conn.set_trace_callback(print)
         carrier_db.execute(
             ''' UPDATE carriers 
-            SET shortname=?, longname=?, cid=?, discordchannel=?, channelid=?
+            SET shortname=?, longname=?, cid=?, discordchannel=?, channelid=?, roleid=?, ownerid=?
             WHERE longname LIKE (?) ''', data
         )
 
@@ -2022,6 +2024,8 @@ def _configure_all_carrier_detail_embed(embed, carrier_data):
     embed.add_field(name='Short Name', value=f'{carrier_data.carrier_short_name}', inline=True)
     embed.add_field(name='Discord Channel', value=f'<#{carrier_data.channel_id}>', inline=True)
     embed.add_field(name='Channel ID', value=f'{carrier_data.channel_id}', inline=True)
+    embed.add_field(name='Crew Role', value=f'<@&{carrier_data.roleid}>', inline=True)
+    embed.add_field(name='Carrier Owner', value=f'<@{carrier_data.ownerid}>', inline=True)
     embed.add_field(name='DB ID', value=f'{carrier_data.pid}', inline=True)
     embed.set_footer(text="Note: DB ID is not an editable field.")
     return embed
