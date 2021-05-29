@@ -1915,7 +1915,7 @@ async def _determine_db_fields_to_edit(ctx, carrier_data):
                           description=f"Editing in progress for {carrier_data.carrier_long_name}",
                           color=constants.EMBED_COLOUR_OK)
 
-    async def check_confirm(message):
+    def check_confirm(message):
         return message.content and message.author == ctx.author and message.channel == ctx.channel and \
             all(character in 'ynx' for character in set(message.content.lower())) and len(message.content) == 1
 
