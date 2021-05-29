@@ -1236,7 +1236,7 @@ async def _crew(ctx: SlashContext):
 
 
 @slash.slash(name="crews", guild_ids=[bot_guild_id],
-             description="Use /crews to find out all of the screws you are signed up for.")
+             description="Use to find out which carrier crews you're signed up to.")
 async def _crews(ctx: SlashContext):
     print(f'{ctx.author} wants to find all of the crews they are part of.')
     # Find all the crews the user is a part of
@@ -1883,13 +1883,15 @@ def _update_carrier_details_in_database(ctx, carrier_data, original_name):
             carrier_data.carrier_identifier,
             carrier_data.discord_channel,
             carrier_data.channel_id,
+            carrier_data.roleid,
+            carrier_data.ownerid,
             f'%{original_name}%'
         )
         # Handy number to print out what the database connection is actually doing
         carriers_conn.set_trace_callback(print)
         carrier_db.execute(
             ''' UPDATE carriers 
-            SET shortname=?, longname=?, cid=?, discordchannel=?, channelid=?
+            SET shortname=?, longname=?, cid=?, discordchannel=?, channelid=?, roleid=?, ownerid=?
             WHERE longname LIKE (?) ''', data
         )
 
@@ -1915,7 +1917,7 @@ async def _determine_db_fields_to_edit(ctx, carrier_data):
                           description=f"Editing in progress for {carrier_data.carrier_long_name}",
                           color=constants.EMBED_COLOUR_OK)
 
-    async def check_confirm(message):
+    def check_confirm(message):
         return message.content and message.author == ctx.author and message.channel == ctx.channel and \
             all(character in 'ynx' for character in set(message.content.lower())) and len(message.content) == 1
 
@@ -1982,10 +1984,12 @@ async def _determine_db_fields_to_edit(ctx, carrier_data):
                 # Use setattr to change the value of the variable field object to the user input
                 setattr(new_carrier_data, field, msg.content.strip())
             else:
+                print(f'{ctx.author} provided the invalid input: {msg.content} from object: {ctx}.')
                 # Should never be hitting this as we gate the message
                 await ctx.send(f"**I cannot do anything with that entry '{msg.content}', please stick to y, n or x.**")
                 return None  # Break condition just in case
         except asyncio.TimeoutError:
+            print(f'Carrier edit requested by {ctx.author} timed out. Context: {ctx}')
             await ctx.send("**Edit operation timed out (no valid response from user).**")
             await message_confirm.delete()
             return None
@@ -2020,6 +2024,8 @@ def _configure_all_carrier_detail_embed(embed, carrier_data):
     embed.add_field(name='Short Name', value=f'{carrier_data.carrier_short_name}', inline=True)
     embed.add_field(name='Discord Channel', value=f'<#{carrier_data.channel_id}>', inline=True)
     embed.add_field(name='Channel ID', value=f'{carrier_data.channel_id}', inline=True)
+    embed.add_field(name='Crew Role', value=f'<@&{carrier_data.roleid}>', inline=True)
+    embed.add_field(name='Carrier Owner', value=f'<@{carrier_data.ownerid}>', inline=True)
     embed.add_field(name='DB ID', value=f'{carrier_data.pid}', inline=True)
     embed.set_footer(text="Note: DB ID is not an editable field.")
     return embed
