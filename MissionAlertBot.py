@@ -1915,7 +1915,7 @@ async def _determine_db_fields_to_edit(ctx, carrier_data):
                           description=f"Editing in progress for {carrier_data.carrier_long_name}",
                           color=constants.EMBED_COLOUR_OK)
 
-    async def check_confirm(message):
+    def check_confirm(message):
         return message.content and message.author == ctx.author and message.channel == ctx.channel and \
             all(character in 'ynx' for character in set(message.content.lower())) and len(message.content) == 1
 
@@ -1982,10 +1982,12 @@ async def _determine_db_fields_to_edit(ctx, carrier_data):
                 # Use setattr to change the value of the variable field object to the user input
                 setattr(new_carrier_data, field, msg.content.strip())
             else:
+                print(f'{ctx.author} provided the invalid input: {msg.content} from object: {ctx}.')
                 # Should never be hitting this as we gate the message
                 await ctx.send(f"**I cannot do anything with that entry '{msg.content}', please stick to y, n or x.**")
                 return None  # Break condition just in case
         except asyncio.TimeoutError:
+            print(f'Carrier edit requested by {ctx.author} timed out. Context: {ctx}')
             await ctx.send("**Edit operation timed out (no valid response from user).**")
             await message_confirm.delete()
             return None
