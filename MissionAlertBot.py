@@ -314,6 +314,24 @@ def find_carrier_with_role_id(roleid):
 
     return carrier_data
 
+def find_carrier_with_owner_id(ownerid):
+    """
+    Returns all carriers matching the ownerid
+
+    :param int ownerid: The owner id to match
+    :returns: A list of carrier data objects
+    :rtype: list[CarrierData]
+    """
+    carrier_db.execute(
+        f"SELECT * FROM carriers WHERE ownerid LIKE (?)", (f'%{ownerid}%',)
+    )
+    carrier_data = [CarrierData(carrier)  for carrier in carrier_db.fetchall() ]
+    for carrier in carrier_data:
+        print(f"FC {carrier.pid} is {carrier.carrier_long_name} {carrier.carrier_identifier} called by "
+              f"shortname {carrier.carrier_short_name} with channel <#{carrier.channel_id}> "
+              f"and owner {carrier.ownerid} and role id: {carrier.roleid} called from find_carrier_with_owner_id.")
+
+    return carrier_data
 
 # function to search for a carrier by shortname
 def find_carrier_from_short_name(find_short_name):
@@ -957,6 +975,105 @@ def _mission_summary_embed(mission_data, embed):
                     value=f"{mission_data.demand} units at {mission_data.profit}k profit per unit", inline=True)
     return embed
 
+
+# find what fleet carriers are owned by a user - private slash command
+@slash.slash(name="owner", guild_ids=[bot_guild_id],
+             description="Use with a Discord @ to find out what fleet carriers a user owns. (Don't worry, it's private.)")
+async def _mission(ctx: SlashContext, at_owner_discord):
+
+    # strip off the guff and get us a pure owner ID
+    stripped_owner = at_owner_discord.replace('<', '').replace('>', '').replace('!', '').replace('@', '')
+
+    print(f"{ctx.author} used /owner in {ctx.channel} to find carriers owned by user with ID {stripped_owner}")
+
+    try:
+        owner = await bot.fetch_user(stripped_owner)
+        print(f"Found user as {owner.display_name}")
+    except HTTPException:
+        await ctx.send("Couldn't find any users by that name.", hidden=True)
+        raise EnvironmentError(f'Could not find Discord user matching ID {stripped_owner}')
+
+    try:
+        # look for matches for the owner ID in the carrier DB
+        carrier_list = find_carrier_with_owner_id(stripped_owner)
+
+        if not carrier_list:
+            await ctx.send(f"No carriers found owned by <@{stripped_owner}>", hidden=True) 
+            return print(f"No carriers found for owner {owner.id}")
+
+        embed = discord.Embed(description=f"Showing registered Fleet Carriers owned by <@{stripped_owner}>:",
+                              color=constants.EMBED_COLOUR_OK)
+      
+        for carrier_data in carrier_list:
+            embed.add_field(name=f"{carrier_data.carrier_long_name} ({carrier_data.carrier_identifier})",
+                            value=f"Channel: <#{carrier_data.channel_id}>\nCrew: <@&{carrier_data.roleid}>",
+                            inline=False)
+
+        await ctx.send(embed=embed, hidden=True)
+
+    except TypeError as e:
+        print('Error: {}'.format(e))
+
+
+# mission slash command - private, non spammy
+@slash.slash(name="mission", guild_ids=[bot_guild_id],
+             description="Use in a Fleet Carrier's channel to privately display any active mission.")
+async def _mission(ctx: SlashContext):
+
+    # send a message to bot-spam to monitor use
+    channel = bot.get_channel(bot_spam_id)
+    await channel.send(f"{ctx.author} asked for active mission in <#{ctx.channel.id}> (used /mission)")
+    print(f"{ctx.author} asked for active mission in <#{ctx.channel.id}> (used /mission)")
+
+    # take a note channel ID
+    msg_ctx_id = ctx.channel.id
+
+    # look for a match for the channel ID in the carrier DB
+    carrier_db.execute(f"SELECT * FROM carriers WHERE "
+                       f"channelid = {msg_ctx_id}")
+    carrier_data = CarrierData(carrier_db.fetchone())
+    print(f'Mission command carrier_data: {carrier_data}')
+    if not carrier_data.channel_id:
+        # if there's no channel match, return an error
+        embed = discord.Embed(description="Try again in the carrier's channel.", color=constants.EMBED_COLOUR_QU)
+        await ctx.send(embed=embed, hidden=True)
+        return
+    else:
+        print(f'Searching if carrier ({carrier_data.carrier_long_name}) has active mission.')
+        # now look to see if the carrier is on an active mission
+        mission_db.execute('''SELECT * FROM missions WHERE carrier LIKE (?)''',
+                           ('%' + carrier_data.carrier_long_name + '%',))
+        print('DB command ran, go fetch the result')
+        mission_data = MissionData(mission_db.fetchone())
+        print(f'Found mission data: {mission_data}')
+
+        if not mission_data:
+            # if there's no result, return an error
+            embed = discord.Embed(description=f"**{carrier_data.carrier_long_name}** doesn't seem to be on a trade"
+                                              f" mission right now.",
+                                  color=constants.EMBED_COLOUR_OK)
+            await ctx.send(embed=embed, hidden=True)
+        else:
+            # user is in correct channel and carrier is on a mission, so show the current trade mission for selected
+            # carrier
+            embed_colour = constants.EMBED_COLOUR_LOADING if mission_data.mission_type == 'load' else \
+                constants.EMBED_COLOUR_UNLOADING
+
+            mission_description = ''
+            if mission_data.rp_text and mission_data.rp_text != 'NULL':
+                mission_description = f"> {mission_data.rp_text}"
+
+            embed = discord.Embed(title=f"{mission_data.mission_type.upper()}ING {mission_data.carrier_name} ({mission_data.carrier_identifier})",
+                                  description=mission_description, color=embed_colour)
+
+            embed = _mission_summary_embed(mission_data, embed)
+
+            embed.set_footer(text="You can use m.complete if the mission is complete.")
+
+            await ctx.send(embed=embed, hidden=True)
+            return
+
+
 # list all active carrier trade missions from DB
 @bot.command(name='issions', help='List all active trade missions.')
 async def issions(ctx):
@@ -1017,6 +1134,54 @@ def _format_missions_embedd(mission_data_list, embed):
         embed.add_field(name=f"{mission_data.system.upper()} system",
                         value=f"{mission_data.station} ({mission_data.pad_size}-pads)", inline=True)
     return embed
+
+# missions slash command - private, non-spammy
+@slash.slash(name="missions", guild_ids=[bot_guild_id],
+             description="Privately display all missions in progress.")
+async def _missions(ctx: SlashContext):
+
+    # send a message to bot-spam to monitor use
+    channel = bot.get_channel(bot_spam_id)
+    await channel.send(f"{ctx.author} asked for all active missions in <#{ctx.channel.id}> (used /missions)")
+
+    print(f'User {ctx.author} asked for all active missions via /missions in {ctx.channel}.')
+
+    print(f'Generating full unloading mission list requested by: {ctx.author}')
+    mission_db.execute('''SELECT * FROM missions WHERE missiontype="unload";''')
+    unload_records = [MissionData(mission_data) for mission_data in mission_db.fetchall()]
+
+    mission_db.execute('''SELECT * FROM missions WHERE missiontype="load";''')
+    print(f'Generating full loading mission list requested by: {ctx.author}')
+    load_records = [MissionData(mission_data) for mission_data in mission_db.fetchall()]
+
+    trade_channel = bot.get_channel(trade_alerts_id)
+    number_of_missions = len(load_records) + len(unload_records)
+
+    description_text = f'For full details of all current trade missions follow the link to <#{trade_channel.id}>'
+    if not number_of_missions:
+        description_text = f'Currently no active missions listed in <#{trade_channel.id}>'
+
+    embed = discord.Embed(
+        title=f"{number_of_missions} P.T.N Fleet Carrier missions in progress:",
+        description=description_text,
+        color=constants.EMBED_COLOUR_LOADING
+    )
+
+    await ctx.send(embed=embed, hidden=True)
+
+    if not number_of_missions:
+        return
+    else:
+
+        embed = discord.Embed(title=f"{len(load_records)} P.T.N Fleet Carrier LOADING missions in progress:",
+                            color=constants.EMBED_COLOUR_LOADING)
+        embed = _format_missions_embedd(load_records, embed)
+        await ctx.send(embed=embed, hidden=True)
+
+        embed = discord.Embed(title=f"{len(unload_records)} P.T.N Fleet Carrier UNLOADING missions in progress:",
+                            color=constants.EMBED_COLOUR_UNLOADING)
+        embed = _format_missions_embedd(unload_records, embed)
+        await ctx.send(embed=embed, hidden=True)
 
 
 # CO command to quickly mark mission as complete, optionally send some RP text
@@ -1190,6 +1355,7 @@ async def complete(ctx):
                 await ctx.send(embed=embed)
 
 
+
 #
 #                       UTILITY COMMANDS
 #
@@ -1267,6 +1433,11 @@ async def _crew(ctx: SlashContext):
              description="Use to find out which carrier crews you're signed up to.")
 async def _crews(ctx: SlashContext):
     print(f'{ctx.author} wants to find all of the crews they are part of.')
+
+    # send a message to bot-spam to monitor use
+    channel = bot.get_channel(bot_spam_id)
+    await channel.send(f"{ctx.author} wanted to see what crews they're on in <#{ctx.channel.id}> (used /crews)")
+
     # Find all the crews the user is a part of
     author = ctx.author
     crew_roles = [role for role in author.roles if role.name.lower().startswith('crew')]
@@ -1294,6 +1465,56 @@ async def _crews(ctx: SlashContext):
                                           f"sign up.", color=constants.EMBED_COLOUR_ERROR)
     await ctx.send(embed=embed, hidden=True)
     pass
+
+@slash.slash(name="info", guild_ids=[bot_guild_id],
+             description="Use in a Fleet Carrier's channel to show information about it.")
+async def _info(ctx: SlashContext):
+
+    # send a message to bot-spam to monitor use
+    channel = bot.get_channel(bot_spam_id)
+    await channel.send(f"{ctx.author} asked for carrier info in <#{ctx.channel.id}> (used /info)")
+
+    # take a note channel ID
+    msg_ctx_id = ctx.channel.id
+    # look for a match for the channel ID in the carrier DB
+    carrier_db.execute(f"SELECT * FROM carriers WHERE "
+                       f"channelid = {msg_ctx_id}")
+    carrier_data = CarrierData(carrier_db.fetchone())
+    print(f'/info command carrier_data called by {ctx.author} in {ctx.channel}')
+    if not carrier_data.channel_id:
+        print(f"/info failed, {ctx.channel} doesn't seem to be a carrier channel")
+        # if there's no channel match, return an error
+        embed = discord.Embed(description="Try again in a Fleet Carrier's channel.", color=constants.EMBED_COLOUR_QU)
+        await ctx.send(embed=embed, hidden=True)
+        return
+    else:
+        print(f'Found data: {carrier_data}')
+        embed = discord.Embed(title=f"Welcome to {carrier_data.carrier_long_name} ({carrier_data.carrier_identifier})", color=constants.EMBED_COLOUR_OK)
+        embed = _add_common_embed_fields(embed, carrier_data)
+        return await ctx.send(embed=embed, hidden=True)
+
+
+@slash.slash(name="find", guild_ids=[bot_guild_id],
+             description="Search for a fleet carrier by partial match for its name.")
+async def _find(ctx: SlashContext, carrier_name):
+
+    # send a message to bot-spam to monitor use
+    channel = bot.get_channel(bot_spam_id)
+    await channel.send(f"{ctx.author} is looking for a specific carrier in <#{ctx.channel.id}> (used /find)")
+    print(f"{ctx.author} used /find for '{carrier_name}' in {ctx.channel}")
+
+    try:
+        carrier_data = find_carrier_from_long_name(carrier_name)
+        if carrier_data:
+            print(f"Found {carrier_data}")
+            embed = discord.Embed(title="Fleet Carrier Search Result",
+                                  description=f"Displaying first match for {carrier_name}", color=constants.EMBED_COLOUR_OK)
+            embed = _add_common_embed_fields(embed, carrier_data)
+            return await ctx.send(embed=embed, hidden=True)
+          
+    except TypeError as e:
+        print('Error in carrier long search: {}'.format(e))
+    await ctx.send(f'No result for {carrier_name}.', hidden=True)
 
 
 # list FCs
