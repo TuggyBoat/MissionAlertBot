@@ -6,6 +6,7 @@
 # Git repo: https://github.com/PilotsTradeNetwork/MissionAlertBot
 import ast
 import copy
+import tempfile
 from itertools import islice
 from math import ceil
 
@@ -436,6 +437,9 @@ def get_formatted_date_string():
 
 # function to create image for loading
 def create_carrier_mission_image(carrier_data, commodity, system, station, profit, pads, demand, mission_type):
+    """
+    Builds the carrier image and returns the relative path
+    """
     my_image = Image.open(f"images/{carrier_data.carrier_short_name}.png")
     image_editable = ImageDraw.Draw(my_image)
     mission_action = 'LOADING' if mission_type == 'load' else 'UNLOADING'
@@ -451,7 +455,12 @@ def create_carrier_mission_image(carrier_data, commodity, system, station, profi
     image_editable.text((150, 400), f"{station.upper()} ({pads.upper()} pads)", (255, 255, 255), font=normal_font)
     image_editable.text((27, 440), "PROFIT:", (255, 255, 255), font=field_font)
     image_editable.text((150, 440), f"{profit}k per unit, {demand} units", (255, 255, 255), font=normal_font)
-    my_image.save("result.png")
+
+    # Check if this will work fine, we might need to delete=False and clean it ourselves
+    result_name = tempfile.NamedTemporaryFile(suffix='.png', delete=False)
+    print(f'Saving temporary mission file for carrier: {carrier_data.carrier_long_name} to: {result_name.name}')
+    my_image.save(result_name.name)
+    return result_name.name
 
 
 #
@@ -663,7 +672,8 @@ async def gen_mission(ctx, carrier_name, commodity_short_name, system, station, 
         raise ValueError('Missing commodity data')
     carrier_data = find_carrier_from_long_name(carrier_name)
 
-    create_carrier_mission_image(carrier_data, commodity_data, system, station, profit, pads, demand, mission_type)
+    file_name = create_carrier_mission_image(carrier_data, commodity_data, system, station, profit, pads, demand,
+                                             mission_type)
     discord_text = txt_create_discord(carrier_data, mission_type, commodity_data, station, system, profit, pads,
                                       demand, eta_text)
     reddit_title = txt_create_reddit_title(carrier_data)
@@ -723,7 +733,9 @@ async def gen_mission(ctx, carrier_name, commodity_short_name, system, station, 
                                       description=f"```{reddit_body}```", color=constants.EMBED_COLOUR_REDDIT)
             embed.set_footer(text="**REMEMBER TO USE MARKDOWN MODE WHEN PASTING TEXT TO REDDIT.**")
             await ctx.send(embed=embed)
-            await ctx.send(file=discord.File('result.png'))
+            await ctx.send(file=discord.File(file_name))
+            cleanup_temp_image_file(file_name)
+
             embed = discord.Embed(title=f"Alert Generation Complete for {carrier_data.carrier_long_name}",
                                   description="Paste Reddit content into **MARKDOWN MODE** in the editor. You can swap "
                                               "back to Fancy Pants afterwards and make any changes/additions or embed "
@@ -751,7 +763,7 @@ async def gen_mission(ctx, carrier_name, commodity_short_name, system, station, 
 
             channel = bot.get_channel(carrier_data.channel_id)
 
-            file = discord.File("result.png", filename="image.png")
+            discord_file = discord.File(file_name, filename="image.png")
 
             embed_colour = constants.EMBED_COLOUR_LOADING if mission_type == 'load' \
                 else constants.EMBED_COLOUR_UNLOADING
@@ -759,14 +771,15 @@ async def gen_mission(ctx, carrier_name, commodity_short_name, system, station, 
                                   description=f"> {rp_text}" if rp else "", color=embed_colour)
 
             embed.add_field(name="Destination", value=f"Station: {station.upper()}\nSystem: {system.upper()}", inline=True)
-            if eta: embed.add_field(name="ETA", value=f"{eta} minutes", inline=True)
+            if eta:
+                embed.add_field(name="ETA", value=f"{eta} minutes", inline=True)
         
             embed.set_image(url="attachment://image.png")
             embed.set_footer(
                 text="m.complete will mark this mission complete\nm.ission will display info to channel\nm.issions "
                      "will list trade missions for all carriers\nUse /crew to join or leave this carrier's crew")
-            await channel.send(file=file, embed=embed)
-
+            await channel.send(file=discord_file, embed=embed)
+            cleanup_temp_image_file(file_name)
             embed = discord.Embed(title=f"Discord trade alerts sent for {carrier_data.carrier_long_name}",
                                   description=f"Check <#{trade_alerts_id}> for trade alert and "
                                               f"<#{carrier_data.channel_id}> for image.",
@@ -824,6 +837,21 @@ async def gen_mission(ctx, carrier_name, commodity_short_name, system, station, 
                       rp_text, reddit_post_id, reddit_post_url, reddit_comment_id, reddit_comment_url, discord_alert_id)
     await mission_generation_complete(ctx, carrier_data, message_pending, eta_text)
 
+
+def cleanup_temp_image_file(file_name):
+    """
+    Takes an input file path and removes it.
+
+    :param str file_name: The file path
+    :returns: None
+    """
+    # Now we delete the temp file, clean up after ourselves!
+    try:
+        print(f'Deleting the carriers temp file at: {file_name}')
+        os.remove(file_name)
+    except Exception as e:
+        print(f'There was a problem removing the carrier image file located {file_name}')
+        print(e)
 
 #
 #                       MISSION DB
