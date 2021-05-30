@@ -979,11 +979,14 @@ def _mission_summary_embed(mission_data, embed):
 # find what fleet carriers are owned by a user - private slash command
 @slash.slash(name="owner", guild_ids=[bot_guild_id],
              description="Use with a Discord @ to find out what fleet carriers a user owns. (Don't worry, it's private.)")
-async def _mission(ctx: SlashContext, at_owner_discord):
+async def _owner(ctx: SlashContext, at_owner_discord):
 
     # strip off the guff and get us a pure owner ID
     stripped_owner = at_owner_discord.replace('<', '').replace('>', '').replace('!', '').replace('@', '')
 
+    # send a message to bot-spam to monitor use
+    channel = bot.get_channel(bot_spam_id)
+    await channel.send(f"{ctx.author} used /owner in <#{ctx.channel.id}> to find carriers owned by user with ID {stripped_owner}")
     print(f"{ctx.author} used /owner in {ctx.channel} to find carriers owned by user with ID {stripped_owner}")
 
     try:
