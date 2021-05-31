@@ -323,9 +323,9 @@ def find_carrier_with_owner_id(ownerid):
     :rtype: list[CarrierData]
     """
     carrier_db.execute(
-        f"SELECT * FROM carriers WHERE ownerid LIKE (?)", (f'%{ownerid}%',)
+        "SELECT * FROM carriers WHERE ownerid LIKE (?)", (f'%{ownerid}%',)
     )
-    carrier_data = [CarrierData(carrier)  for carrier in carrier_db.fetchall() ]
+    carrier_data = [CarrierData(carrier) for carrier in carrier_db.fetchall()]
     for carrier in carrier_data:
         print(f"FC {carrier.pid} is {carrier.carrier_long_name} {carrier.carrier_identifier} called by "
               f"shortname {carrier.carrier_short_name} with channel <#{carrier.channel_id}> "
@@ -994,7 +994,7 @@ async def _owner(ctx: SlashContext, at_owner_discord):
         print(f"Found user as {owner.display_name}")
     except HTTPException:
         await ctx.send("Couldn't find any users by that name.", hidden=True)
-        raise EnvironmentError(f'Could not find Discord user matching ID {stripped_owner}')
+        raise EnvironmentError(f'Could not find Discord user matching ID {at_owner_discord} ({stripped_owner})')
 
     try:
         # look for matches for the owner ID in the carrier DB
