@@ -1572,35 +1572,44 @@ async def carrier_del(ctx, db_id):
 
 # change FC background image
 @bot.command(name='carrier_image', help='Change the background image for the specified carrier:\n\n'
-                                        'Type without argument to receive a blank PNG suitable for overlaying on top of'
-                                        ' your carrier\'s image.\nType with carrier as argument to check the '
+                                        'Use on its own to receive a blank template image.\n'
+                                        'Use with carrier\'s name as argument to check the '
                                         'carrier\'s image or begin upload of a new image.')
 @commands.has_role('Carrier Owner')
 async def carrier_image(ctx, lookname=None):
     if not lookname:
+        print(f"{ctx.author} called m.carrier_image without argument")
         file = discord.File(f"blank.png", filename="image.png")
-        embed = discord.Embed(title=f"Blank foreground image",
-                              description="Overlay atop your carrier's image then use m.carrier_image <carrier> "
-                                          "to upload.",
+        embed = discord.Embed(title=f"Instructions to create your own custom carrier mission image",
+                              description="1. Copy the below image into your editor of choice\n(GIMP and Inkscape are both free)\n"
+                                          "Make sure it's 500x500 pixels.\n"
+                                          "2. Create a new layer underneath the image\n"
+                                          "3. Arrange your chosen background image on your new background layer\n"
+                                          "4. Save it and use `m.carrier_image <carriername>` to upload it.",
                               color=constants.EMBED_COLOUR_OK)
         embed.set_image(url="attachment://image.png")
         await ctx.send(file=file, embed=embed)
     else:
+        print(f"{ctx.author} called m.carrier_image for {lookname}")
         carrier_data = find_carrier_from_long_name(lookname)
         file = discord.File(f"images/{carrier_data.carrier_short_name}.png", filename="image.png")
-        embed = discord.Embed(title=f"View or change background image for {carrier_data.carrier_long_name}",
-                              description="You can upload a replacement image now. Images should be 500x500, in .png "
-                                          "format, and based on the standard PTN image template. Or input **x** to "
-                                          "cancel upload and just view.",
+        embed = discord.Embed(title=f"{carrier_data.carrier_long_name} MISSION IMAGE",
                               color=constants.EMBED_COLOUR_QU)
         embed.set_image(url="attachment://image.png")
-        message_upload_now = await ctx.send(file=file, embed=embed)
+        await ctx.send(file=file, embed=embed)
+        embed = discord.Embed(title="Change carrier's mission image?",
+                              description="If you want to replace this image you can upload the new image now.\n\n"
+                                          "To get a blank image template use `m.carrier_image` on its own.\n\n"
+                                          "Images should be 500x500 pixels, in .png format, and based on the standard PTN image template from `m.carrier_image`.\n\n"
+                                          "Input \"x\" or wait 60 seconds if you don't want to upload and just want to view.",
+                              color=constants.EMBED_COLOUR_QU)
+        message_upload_now = await ctx.send(embed=embed)
 
         def check(message_to_check):
             return message_to_check.author == ctx.author and message_to_check.channel == ctx.channel
 
         try:
-            message = await bot.wait_for("message", check=check, timeout=30)
+            message = await bot.wait_for("message", check=check, timeout=60)
             if message.attachments:
                 shutil.move(f'images/{carrier_data.carrier_short_name}.png',
                             f'images/old/{carrier_data.carrier_short_name}.{get_formatted_date_string()[1]}.png')
@@ -1613,13 +1622,18 @@ async def carrier_image(ctx, lookname=None):
                 await ctx.send(file=file, embed=embed)
                 await message.delete()
                 await message_upload_now.delete()
+                print(f"{ctx.author} updated carrier image for {carrier_data.carrier_long_name}")
             elif message.content.lower() == "x":
-                await ctx.send("**Upload cancelled**")
+                embed = discord.Embed(description="Existing image retained.",
+                                      color=constants.EMBED_COLOUR_OK)
+                await ctx.send(embed=embed)
                 await message.delete()
-                # await message_upload_now.delete()
+                await message_upload_now.delete()
                 return
         except asyncio.TimeoutError:
-            await ctx.send("**Cancelled - timed out**")
+            embed = discord.Embed(description="Existing image retained (no response from user).",
+                                  color=constants.EMBED_COLOUR_OK)
+            await ctx.send(embed=embed)
             await message_upload_now.delete()
             return
 
