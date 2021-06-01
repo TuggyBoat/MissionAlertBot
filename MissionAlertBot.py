@@ -752,7 +752,6 @@ async def gen_mission(ctx, carrier_name, commodity_short_name, system, station, 
             embed.set_footer(text="**REMEMBER TO USE MARKDOWN MODE WHEN PASTING TEXT TO REDDIT.**")
             await ctx.send(embed=embed)
             await ctx.send(file=discord.File(file_name))
-            cleanup_temp_image_file(file_name)
 
             embed = discord.Embed(title=f"Alert Generation Complete for {carrier_data.carrier_long_name}",
                                   description="Paste Reddit content into **MARKDOWN MODE** in the editor. You can swap "
@@ -797,7 +796,6 @@ async def gen_mission(ctx, carrier_name, commodity_short_name, system, station, 
                 text="m.complete will mark this mission complete\nm.ission will display info to channel\nm.issions "
                      "will list trade missions for all carriers\nUse /crew to join or leave this carrier's crew")
             await channel.send(file=discord_file, embed=embed)
-            cleanup_temp_image_file(file_name)
             embed = discord.Embed(title=f"Discord trade alerts sent for {carrier_data.carrier_long_name}",
                                   description=f"Check <#{trade_alerts_id}> for trade alert and "
                                               f"<#{carrier_data.channel_id}> for image.",
@@ -810,7 +808,7 @@ async def gen_mission(ctx, carrier_name, commodity_short_name, system, station, 
 
             # post to reddit
             subreddit = await reddit.subreddit(to_subreddit)
-            submission = await subreddit.submit_image(reddit_title, image_path="result.png",
+            submission = await subreddit.submit_image(reddit_title, image_path=file_name,
                                                       flair_id=flair_mission_start)
             reddit_post_url = submission.permalink
             reddit_post_id = submission.id
@@ -854,6 +852,7 @@ async def gen_mission(ctx, carrier_name, commodity_short_name, system, station, 
     await mission_add(ctx, carrier_data, commodity_data, mission_type, system, station, profit, pads, demand,
                       rp_text, reddit_post_id, reddit_post_url, reddit_comment_id, reddit_comment_url, discord_alert_id)
     await mission_generation_complete(ctx, carrier_data, message_pending, eta_text)
+    cleanup_temp_image_file(file_name)
 
 
 def cleanup_temp_image_file(file_name):
