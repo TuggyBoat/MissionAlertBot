@@ -20,6 +20,7 @@ import asyncio
 import shutil
 from discord.errors import HTTPException, InvalidArgument, Forbidden, NotFound
 from discord.ext import commands
+from discord.utils import get
 from discord_slash import SlashCommand, SlashContext
 from datetime import datetime
 from datetime import timezone
@@ -56,6 +57,9 @@ flair_mission_stop = conf['MISSION_STOP']
 trade_alerts_id = conf['TRADE_ALERTS_ID']
 bot_spam_id = conf['BOT_SPAM_CHANNEL']
 to_subreddit = conf['SUB_REDDIT']
+
+# emoji IDs
+upvote_emoji = conf['UPVOTE_EMOJI']
 
 # Get the discord token from the local .env file. Deliberately not hosted in the repo or Discord takes the bot down
 # because the keys are exposed. DO NOT HOST IN THE REPO. Seriously do not do it ...
@@ -289,10 +293,30 @@ def find_carrier_from_long_name(find_long_name):
         (f'%{find_long_name}%',))
     carrier_data = CarrierData(carrier_db.fetchone())
     print(f"FC {carrier_data.pid} is {carrier_data.carrier_long_name} {carrier_data.carrier_identifier} called by "
-          f"shortname {carrier_data.carrier_short_name} with channel <#{carrier_data.channel_id}> "
-          f"and owner {carrier_data.ownerid} called from find_carrier_from_long_name.")
-
+          f"shortname {carrier_data.carrier_short_name} with channel <#{carrier_data.channel_id}> called "
+          f"from find_carrier_from_pid.")
     return carrier_data
+
+# find carriers from long name - temporary solution for m.find
+# TODO: make every carrier longname search prompt with multiple results and use this function
+def find_carrier_from_long_name_multiple(find_long_name):
+    """
+    Finds any carriers matching a long name
+
+    :param str find_long_name: A short name of the carrier.
+    :returns: CarrierData object for the exact match
+    :rtype: CarrierData
+    """
+    carrier_db.execute(
+        f"SELECT * FROM carriers WHERE longname LIKE (?)",
+        (f'%{find_long_name}%',))
+    carriers = [CarrierData(carrier) for carrier in carrier_db.fetchall()]
+    for carrier_data in carriers:
+        print(f"FC {carrier_data.pid} is {carrier_data.carrier_long_name} {carrier_data.carrier_identifier} called by "
+              f"shortname {carrier_data.carrier_short_name} with channel <#{carrier_data.channel_id}> called from "
+              f"find_carrier_from_long_name.")
+
+    return carriers
 
 
 def find_carrier_with_role_id(roleid):
@@ -363,15 +387,15 @@ def find_carrier_from_pid(db_id):
 
 
 # function to search for a commodity by name or partial name
-async def find_commodity(lookfor, ctx):
+async def find_commodity(commodity_search_term, ctx):
     # TODO: Where do we get set up this database? it is searching for things, but what is the source of the data, do
     #  we update it periodically?
 
-    print(f'Searching for commodity against match "{lookfor}" requested by {ctx.author}')
+    print(f'Searching for commodity against match "{commodity_search_term}" requested by {ctx.author}')
 
     carrier_db.execute(
         f"SELECT * FROM commodities WHERE commodity LIKE (?)",
-        (f'%{lookfor}%',))
+        (f'%{commodity_search_term}%',))
 
     commodities = [Commodity(commodity) for commodity in carrier_db.fetchall()]
     commodity = None
@@ -386,15 +410,15 @@ async def find_commodity(lookfor, ctx):
     elif len(commodities) > 3:
         # If we ever get into a scenario where more than 3 commodities can be found with the same search directly, then
         # we need to revisit this limit
-        print(f'More than 3 commodities found for: "{lookfor}", {ctx.author} needs to search better.')
+        print(f'More than 3 commodities found for: "{commodity_search_term}", {ctx.author} needs to search better.')
         await ctx.send(f'Please narrow down your commodity search, we found {len(commodities)} matches for your '
-                       f'input choice: "{lookfor}"')
+                       f'input choice: "{commodity_search_term}"')
         return None  # Just return None here and let the calling method figure out what is needed to happen
     else:
-        print(f'Between 1 and 3 commodities found for: "{lookfor}", asking {ctx.author} which they want.')
+        print(f'Between 1 and 3 commodities found for: "{commodity_search_term}", asking {ctx.author} which they want.')
         # The database runs a partial match, in the case we have more than 1 ask the user which they want.
         # here we have less than 3, but more than 1 match
-        embed = discord.Embed(title=f"Multiple commodities found for input: {lookfor}", color=constants.EMBED_COLOUR_OK)
+        embed = discord.Embed(title=f"Multiple commodities found for input: {commodity_search_term}", color=constants.EMBED_COLOUR_OK)
 
         count = 0
         response = None  # just in case we try to do something before it is assigned, give it a value of None
@@ -550,22 +574,19 @@ async def on_ready():
 # load commands
 @bot.command(name='load', help='Generate details for a loading mission and optionally broadcast to Discord.\n'
                                '\n'
-                               '<lookname> is the carrier\'s shortname.\n'
-                               '<commshort> is the commodity shortened to anything that will still successfully search,'
-                               ' e.g. agro\n'
-                               '<system> should be in quotes\n'
-                               '<station> should also be in quotes\n'
-                               '<profit> is a number of thousands without the k\n'
-                               '<pads> is the largest pad size available (M for outposts, L for everything else)\n'
-                               '<demand> is how much your carrier is buying\n'
-                               'Optional: a number in minds for the carrier\'s ETA\n'
-                               '\n'
+                               'carrier_name_search_term should be a unique part of your carrier\'s name. (Use quotes if spaces are required)\n'
+                               'commodity_name_partial should be a unique part of any commodity\'s name.\n'
+                               'System and Station names should be enclosed in quotes if they contain spaces.\n'
+                               'Profit should be expressed as a simple number e.g. enter 10 for 10k/unit profit.\n'
+                               'Pad size should be expressed as L or M.\n'
+                               'Demand should be expressed as an absolute number e.g. 20k, 20,000, etc.\n'
+                               'ETA is optional and should be expressed as a number of minutes e.g. 15.\n'
                                'Case is automatically corrected for all inputs.')
 @commands.has_role('Carrier Owner')
-async def load(ctx, carrier_name, commodity_short_name, system, station, profit, pads, demand, eta=None):
+async def load(ctx, carrier_name_search_term, commodity_search_term, system, station, profit, pads, demand, eta=None):
     rp = False
     mission_type = 'load'
-    await gen_mission(ctx, carrier_name, commodity_short_name, system, station, profit, pads, demand, rp, mission_type,
+    await gen_mission(ctx, carrier_name_search_term, commodity_search_term, system, station, profit, pads, demand, rp, mission_type,
                       eta)
 
 
@@ -574,32 +595,29 @@ async def load(ctx, carrier_name, commodity_short_name, system, station, profit,
                                  'and sent to the carrier\'s Discord channel in quote format if those options are '
                                  'chosen')
 @commands.has_role('Carrier Owner')
-async def loadrp(ctx, carrier_name, commodity_short_name, system, station, profit, pads, demand, eta=None):
+async def loadrp(ctx, carrier_name_search_term, commodity_search_term, system, station, profit, pads, demand, eta=None):
     rp = True
     mission_type = 'load'
-    await gen_mission(ctx, carrier_name, commodity_short_name, system, station, profit, pads, demand, rp, mission_type,
+    await gen_mission(ctx, carrier_name_search_term, commodity_search_term, system, station, profit, pads, demand, rp, mission_type,
                       eta)
 
 
 # unload commands
 @bot.command(name='unload', help='Generate details for an unloading mission.\n'
                                  '\n'
-                                 '<lookname> is the carrier\'s shortname.\n'
-                                 '<commshort> is the commodity shortened to anything that will still successfully '
-                                 'search, e.g. agro\n'
-                                 '<system> should be in quotes\n'
-                                 '<station> should also be in quotes\n'
-                                 '<profit> is a number of thousands without the k\n'
-                                 '<pads> is the largest pad size available (M for outposts, L for everything else)\n'
-                                 '<demand> is how much your carrier is buying\n'
-                                 'Optional: a number in minds for the carrier\'s <ETA>\n'
-                                 '\n'
+                                 'carrier_name_search_term should be a unique part of your carrier\'s name. (Use quotes if spaces are required)\n'
+                                 'commodity_name_partial should be a unique part of any commodity\'s name.\n'
+                                 'System and Station names should be enclosed in quotes if they contain spaces.\n'
+                                 'Profit should be expressed as a simple number e.g. enter 10 for 10k/unit profit.\n'
+                                 'Pad size should be expressed as L or M.\n'
+                                 'Supply should be expressed as an absolute number e.g. 20k, 20,000, etc.\n'
+                                 'ETA is optional and should be expressed as a number of minutes e.g. 15.\n'
                                  'Case is automatically corrected for all inputs.')
 @commands.has_role('Carrier Owner')
-async def unload(ctx, carrier_name, commodity_short_name, system, station, profit, pads, demand, eta=None):
+async def unload(ctx, carrier_name_search_term, commodity_search_term, system, station, profit, pads, supply, eta=None):
     rp = False
     mission_type = 'unload'
-    await gen_mission(ctx, carrier_name, commodity_short_name, system, station, profit, pads, demand, rp, mission_type,
+    await gen_mission(ctx, carrier_name_search_term, commodity_search_term, system, station, profit, pads, supply, rp, mission_type,
                       eta)
 
 
@@ -608,15 +626,15 @@ async def unload(ctx, carrier_name, commodity_short_name, system, station, profi
                                    'and sent to the carrier\'s Discord channel in quote format if those options are '
                                    'chosen')
 @commands.has_role('Carrier Owner')
-async def unloadrp(ctx, carrier_name, commodity_short_name, system, station, profit, pads, demand, eta=None):
+async def unloadrp(ctx, carrier_name_search_term, commodity_search_term, system, station, profit, pads, demand, eta=None):
     rp = True
     mission_type = 'unload'
-    await gen_mission(ctx, carrier_name, commodity_short_name, system, station, profit, pads, demand, rp, mission_type,
+    await gen_mission(ctx, carrier_name_search_term, commodity_search_term, system, station, profit, pads, demand, rp, mission_type,
                       eta)
 
 
 # mission generator called by loading/unloading commands
-async def gen_mission(ctx, carrier_name, commodity_short_name, system, station, profit, pads, demand, rp, mission_type,
+async def gen_mission(ctx, carrier_name_search_term, commodity_search_term, system, station, profit, pads, demand, rp, mission_type,
                       eta):
     # Check we are in the designated mission channel, if not go no farther.
     mission_gen_channel = bot.get_channel(conf['MISSION_CHANNEL'])
@@ -644,7 +662,7 @@ async def gen_mission(ctx, carrier_name, commodity_short_name, system, station, 
     embed = discord.Embed(title="Generating and fetching mission alerts...", color=constants.EMBED_COLOUR_QU)
     message_gen = await ctx.send(embed=embed)
 
-    mission_db.execute(f'''SELECT * FROM missions WHERE carrier LIKE (?)''', ('%' + carrier_name + '%',))
+    mission_db.execute(f'''SELECT * FROM missions WHERE carrier LIKE (?)''', ('%' + carrier_name_search_term + '%',))
     mission_data = MissionData(mission_db.fetchone())
     if mission_data:
         embed = discord.Embed(title="Error",
@@ -685,10 +703,10 @@ async def gen_mission(ctx, carrier_name, commodity_short_name, system, station, 
             return
 
     # generate the mission elements
-    commodity_data = await find_commodity(commodity_short_name, ctx)
+    commodity_data = await find_commodity(commodity_search_term, ctx)
     if not commodity_data:
         raise ValueError('Missing commodity data')
-    carrier_data = find_carrier_from_long_name(carrier_name)
+    carrier_data = find_carrier_from_long_name(carrier_name_search_term)
 
     file_name = create_carrier_mission_image(carrier_data, commodity_data, system, station, profit, pads, demand,
                                              mission_type)
@@ -793,8 +811,8 @@ async def gen_mission(ctx, carrier_name, commodity_short_name, system, station, 
         
             embed.set_image(url="attachment://image.png")
             embed.set_footer(
-                text="m.complete will mark this mission complete\nm.ission will display info to channel\nm.issions "
-                     "will list trade missions for all carriers\nUse /crew to join or leave this carrier's crew")
+                text="m.complete will mark this mission complete\n/mission will show this mission info\n/missions "
+                     "will show all current trade missions\nUse /crew to join or leave this carrier's crew")
             await channel.send(file=discord_file, embed=embed)
             embed = discord.Embed(title=f"Discord trade alerts sent for {carrier_data.carrier_long_name}",
                                   description=f"Check <#{trade_alerts_id}> for trade alert and "
@@ -827,7 +845,9 @@ async def gen_mission(ctx, carrier_name, commodity_short_name, system, station, 
                                   description=f"https://www.reddit.com{reddit_post_url}",
                                   color=constants.EMBED_COLOUR_REDDIT)
             channel = bot.get_channel(conf['CHANNEL_UPVOTES'])
-            await channel.send(embed=embed)
+            upvote_message = await channel.send(embed=embed)
+            emoji = bot.get_emoji(upvote_emoji)
+            await upvote_message.add_reaction(emoji)
 
         if "n" in msg.content.lower():
 
@@ -977,7 +997,7 @@ def _mission_summary_embed(mission_data, embed):
 
 # find what fleet carriers are owned by a user - private slash command
 @slash.slash(name="owner", guild_ids=[bot_guild_id],
-             description="Use with a Discord @ to find out what fleet carriers a user owns. (Don't worry, it's private.)")
+             description="Private command: Use with @User to find out what fleet carriers that user owns.")
 async def _owner(ctx: SlashContext, at_owner_discord):
 
     # strip off the guff and get us a pure owner ID
@@ -1192,24 +1212,24 @@ async def _missions(ctx: SlashContext):
                                'appropriate.\n\nAnything put in quotes after the carrier name will be treated as a '
                                'quote to be sent along with the completion notice. This can be used for RP if desired.')
 @commands.has_role('Carrier Owner')
-async def done(ctx, carrier_name, rp=None):
+async def done(ctx, carrier_name_search_term, rp=None):
 
     # Check we are in the designated mission channel, if not go no farther.
     mission_gen_channel = bot.get_channel(conf['MISSION_CHANNEL'])
     current_channel = ctx.channel
 
-    print(f'Request received from {ctx.author} to mark the mission of {carrier_name} as done from channel: '
+    print(f'Request received from {ctx.author} to mark the mission of {carrier_name_search_term} as done from channel: '
           f'{current_channel}')
 
     if current_channel != mission_gen_channel:
         # problem, wrong channel, no progress
         return await ctx.send(f'Sorry, you can only run this command out of: <#{mission_gen_channel.id}>.')
 
-    mission_db.execute(f'''SELECT * FROM missions WHERE carrier LIKE (?)''', ('%' + carrier_name + '%',))
+    mission_db.execute(f'''SELECT * FROM missions WHERE carrier LIKE (?)''', ('%' + carrier_name_search_term + '%',))
     mission_data = MissionData(mission_db.fetchone())
     if not mission_data:
         embed = discord.Embed(
-            description=f"**ERROR**: no trade missions found for carriers matching \"**{carrier_name}\"**.",
+            description=f"**ERROR**: no trade missions found for carriers matching \"**{carrier_name_search_term}\"**.",
             color=constants.EMBED_COLOUR_ERROR)
         await ctx.send(embed=embed)
 
@@ -1253,7 +1273,7 @@ async def done(ctx, carrier_name, rp=None):
                 await ctx.send("Failed updating Reddit :(")
 
         # delete mission entry from db
-        mission_db.execute(f'''DELETE FROM missions WHERE carrier LIKE (?)''', ('%' + carrier_name + '%',))
+        mission_db.execute(f'''DELETE FROM missions WHERE carrier LIKE (?)''', ('%' + carrier_name_search_term + '%',))
         missions_conn.commit()
 
         embed = discord.Embed(title=f"Mission complete for {mission_data.carrier_name}",
@@ -1382,7 +1402,7 @@ async def backup(ctx):
 
 # join a carrier's crew
 @slash.slash(name="crew", guild_ids=[bot_guild_id],
-             description="Use in a carrier's channel to join or leave that carrier's crew.")
+             description="Private command: Use in a carrier's channel to join or leave that carrier's crew.")
 async def _crew(ctx: SlashContext):
     print(f"{ctx.author} used /crew in {ctx.channel}")
 
@@ -1432,7 +1452,7 @@ async def _crew(ctx: SlashContext):
 
 
 @slash.slash(name="crews", guild_ids=[bot_guild_id],
-             description="Use to find out which carrier crews you're signed up to.")
+             description="Private command: Use to find out which carrier crews you're signed up to.")
 async def _crews(ctx: SlashContext):
     print(f'{ctx.author} wants to find all of the crews they are part of.')
 
@@ -1497,26 +1517,26 @@ async def _info(ctx: SlashContext):
 
 
 @slash.slash(name="find", guild_ids=[bot_guild_id],
-             description="Search for a fleet carrier by partial match for its name.")
-async def _find(ctx: SlashContext, carrier_name):
+             description="Private command: Search for a fleet carrier by partial match for its name.")
+async def _find(ctx: SlashContext, carrier_name_search_term):
 
     # send a message to bot-spam to monitor use
     channel = bot.get_channel(bot_spam_id)
     await channel.send(f"{ctx.author} is looking for a specific carrier in <#{ctx.channel.id}> (used /find)")
-    print(f"{ctx.author} used /find for '{carrier_name}' in {ctx.channel}")
+    print(f"{ctx.author} used /find for '{carrier_name_search_term}' in {ctx.channel}")
 
     try:
-        carrier_data = find_carrier_from_long_name(carrier_name)
+        carrier_data = find_carrier_from_long_name(carrier_name_search_term)
         if carrier_data:
             print(f"Found {carrier_data}")
             embed = discord.Embed(title="Fleet Carrier Search Result",
-                                  description=f"Displaying first match for {carrier_name}", color=constants.EMBED_COLOUR_OK)
+                                  description=f"Displaying first match for {carrier_name_search_term}", color=constants.EMBED_COLOUR_OK)
             embed = _add_common_embed_fields(embed, carrier_data)
             return await ctx.send(embed=embed, hidden=True)
           
     except TypeError as e:
         print('Error in carrier long search: {}'.format(e))
-    await ctx.send(f'No result for {carrier_name}.', hidden=True)
+    await ctx.send(f'No result for {carrier_name_search_term}.', hidden=True)
 
 
 # list FCs
@@ -1627,8 +1647,8 @@ async def carrier_list(ctx):
 # add FC to database
 @bot.command(name='carrier_add', help='Add a Fleet Carrier to the database:\n'
                                       '\n'
-                                      '<shortname> should be a short one-word string with no special characters\n'
-                                      '<longname> is the carrier\'s full name including P.T.N. etc - surround this '
+                                      '<short_name> is used as a filename and should be a short one-word string with no special characters\n'
+                                      '<long_name> is the carrier\'s full name including P.T.N. etc - surround this '
                                       'with quotes.\n'
                                       '<carrier_id> is the carrier\'s unique identifier in the format ABC-XYZ\n'
                                       '<owner_id> is the owner\'s Discord ID')
@@ -1862,16 +1882,16 @@ async def carrier_image(ctx, lookname=None):
 
 
 # find FC based on shortname
-@bot.command(name='findshort', help='Find a carrier based on its shortname.\n'
+@bot.command(name='findshort', help='DEPRECATED. Use to find a carrier by searching for its image file name (shortname).\n'
                                     '\n'
-                                    'Syntax: findshort <string>\n'
+                                    'Syntax: m.findshort <search_term>\n'
                                     '\n'
                                     'Partial matches will work but only if they incorporate part of the shortname.\n'
-                                    'To find a carrier based on a match with part of its full name, use the findlong '
+                                    'To find a carrier based on a match with part of its full name, use the /find '
                                     'command.')
-async def findshort(ctx, lookshort):
+async def findshort(ctx, shortname_search_term):
     try:
-        carriers = find_carrier_from_short_name(lookshort)
+        carriers = find_carrier_from_short_name(shortname_search_term)
         if carriers:
             carrier_data = None
 
@@ -1882,15 +1902,15 @@ async def findshort(ctx, lookshort):
             elif len(carriers) > 3:
                 # If we ever get into a scenario where more than 3 commodities can be found with the same search
                 # directly, then we need to revisit this limit
-                print(f'More than 3 carriers found for: "{lookshort}", {ctx.author} needs to search better.')
-                await ctx.send(f'Please narrow down your commodity search, we found {len(carriers)} matches for your '
-                               f'input choice: "{lookshort}"')
+                print(f'More than 3 carriers found for: "{shortname_search_term}", {ctx.author} needs to search better.')
+                await ctx.send(f'Please narrow down your search, we found {len(carriers)} matches for your '
+                               f'input choice: "{shortname_search_term}"')
                 return None  # Just return None here and let the calling method figure out what is needed to happen
             else:
-                print(f'Between 1 and 3 carriers found for: "{lookshort}", asking {ctx.author} which they want.')
+                print(f'Between 1 and 3 carriers found for: "{shortname_search_term}", asking {ctx.author} which they want.')
                 # The database runs a partial match, in the case we have more than 1 ask the user which they want.
                 # here we have less than 3, but more than 1 match
-                embed = discord.Embed(title=f"Multiple carriers ({len(carriers)}) found for input: {lookshort}",
+                embed = discord.Embed(title=f"Multiple carriers ({len(carriers)}) found for input: {shortname_search_term}",
                                       color=constants.EMBED_COLOUR_OK)
 
                 count = 0
@@ -1921,13 +1941,13 @@ async def findshort(ctx, lookshort):
 
             if carrier_data:
                 embed = discord.Embed(title="Fleet Carrier Shortname Search Result",
-                                      description=f"Displaying first match for {lookshort}",
+                                      description=f"Displaying first match for {shortname_search_term}",
                                       color=constants.EMBED_COLOUR_OK)
                 embed = _add_common_embed_fields(embed, carrier_data)
                 return await ctx.send(embed=embed)
     except TypeError as e:
         print('Error in carrier search: {}'.format(e))
-    await ctx.send(f'No result for {lookshort}.')
+    await ctx.send(f'No result for {shortname_search_term}.')
 
 
 def _add_common_embed_fields(embed, carrier_data):
@@ -1945,21 +1965,66 @@ def _add_common_embed_fields(embed, carrier_data):
 # find FC based on longname
 @bot.command(name='find', help='Find a carrier based on a partial match with any part of its full name\n'
                                '\n'
-                               'Syntax: find <string>\n'
-                               '\n'
-                               'If there are multiple carriers with similar names, only the first on the list will '
-                               'return.')
-async def find(ctx, looklong):
+                               'Syntax: m.find <search_term>')
+async def find(ctx, carrier_name_search_term):
     try:
-        carrier_data = find_carrier_from_long_name(looklong)
-        if carrier_data:
-            embed = discord.Embed(title="Fleet Carrier Search Result",
-                                  description=f"Displaying first match for {looklong}", color=constants.EMBED_COLOUR_OK)
-            embed = _add_common_embed_fields(embed, carrier_data)
-            return await ctx.send(embed=embed)
+        carriers = find_carrier_from_long_name_multiple(carrier_name_search_term)
+        if carriers:
+            carrier_data = None
+
+            if len(carriers) == 1:
+                print('Single carrier found, returning that directly')
+                # if only 1 match, just assign it directly
+                carrier_data = carriers[0]
+            elif len(carriers) > 3:
+                # If we ever get into a scenario where more than 3 commodities can be found with the same search
+                # directly, then we need to revisit this limit
+                print(f'More than 3 carriers found for: "{carrier_name_search_term}", {ctx.author} needs to search better.')
+                await ctx.send(f'Please narrow down your search, we found {len(carriers)} matches for your '
+                               f'input choice: "{carrier_name_search_term}"')
+                return None  # Just return None here and let the calling method figure out what is needed to happen
+            else:
+                print(f'Between 1 and 3 carriers found for: "{carrier_name_search_term}", asking {ctx.author} which they want.')
+                # The database runs a partial match, in the case we have more than 1 ask the user which they want.
+                # here we have less than 3, but more than 1 match
+                embed = discord.Embed(title=f"Multiple carriers ({len(carriers)}) found for input: {carrier_name_search_term}",
+                                      color=constants.EMBED_COLOUR_OK)
+
+                count = 0
+                response = None  # just in case we try to do something before it is assigned, give it a value of None
+                for carrier in carriers:
+                    count += 1
+                    embed.add_field(name='Carrier Name', value=f'{carrier.carrier_long_name}', inline=True)
+
+                embed.set_footer(text='Please select the carrier with 1, 2 or 3')
+
+                def check(message):
+                    return message.author == ctx.author and message.channel == ctx.channel and \
+                           len(message.content) == 1 and message.content.lower() in ["1", "2", "3"]
+
+                message_confirm = await ctx.send(embed=embed)
+                try:
+                    # Wait on the user input, this might be better by using a reaction?
+                    response = await bot.wait_for("message", check=check, timeout=15)
+                    print(f'{ctx.author} responded with: "{response.content}", type: {type(response.content)}.')
+                    index = int(response.content) - 1  # Users count from 1, computers count from 0
+                    carrier_data = carriers[index]
+                except asyncio.TimeoutError:
+                    print('User failed to respond in time')
+                    pass
+                await message_confirm.delete()
+                if response:
+                    await response.delete()
+
+            if carrier_data:
+                embed = discord.Embed(title="Fleet Carrier Search Result",
+                                      description=f"Displaying match for {carrier_name_search_term}",
+                                      color=constants.EMBED_COLOUR_OK)
+                embed = _add_common_embed_fields(embed, carrier_data)
+                return await ctx.send(embed=embed)
     except TypeError as e:
-        print('Error in carrier long search: {}'.format(e))
-    await ctx.send(f'No result for {looklong}.')
+        print('Error in carrier search: {}'.format(e))
+    await ctx.send(f'No result for {carrier_name_search_term}.')
 
 
 # find FC based on ID
@@ -1992,35 +2057,31 @@ async def findid(ctx, db_id):
 
 # find commodity
 @bot.command(name='findcomm', help='Find a commodity based on a search term\n'
-                                   'Any term which has multiple partial matches will return the first result.\n'
-                                   'In this case make your term more specific.\n'
-                                   'e.g. searching for "plat" will return Reinforced Mounting Plate as it\'s higher '
-                                   'up the list.\n'
-                                   'To find Platinum, you\'d have to type at least "plati".')
-async def search_for_commodity(ctx, lookfor):
-    print(f'search_for_commodity called by {ctx.author} to search for {lookfor}')
+                                   'If a term has too many possible matches try a longer search term.\n')
+async def search_for_commodity(ctx, commodity_search_term):
+    print(f'search_for_commodity called by {ctx.author} to search for {commodity_search_term}')
     try:
-        commodity = await find_commodity(lookfor, ctx)
+        commodity = await find_commodity(commodity_search_term, ctx)
         if commodity:
             return await ctx.send(commodity)
     except:
         # Catch any exception
         pass
-    await ctx.send(f'No such commodity found for: "{lookfor}".')
+    await ctx.send(f'No such commodity found for: "{commodity_search_term}".')
 
 
 @bot.command(name='carrier_edit', help='Edit a specific carrier in the database by providing specific inputs')
 @commands.has_role('Admin')
-async def edit_carrier(ctx, carrier_name):
+async def edit_carrier(ctx, carrier_name_search_term):
     """
     Edits a carriers information in the database. Provide a carrier name that can be partially matched and follow the
     steps.
 
     :param discord.ext.commands.Context ctx: The discord context
-    :param str carrier_name: The carrier name to find
+    :param str carrier_name_search_term: The carrier name to find
     :returns: None
     """
-    print(f'edit_carrier called by {ctx.author} to update the carrier: {carrier_name} from channel: {ctx.channel}')
+    print(f'edit_carrier called by {ctx.author} to update the carrier: {carrier_name_search_term} from channel: {ctx.channel}')
 
     # make sure we are in the right channel
     bot_command_channel = bot.get_channel(conf['BOT_COMMAND_CHANNEL'])
@@ -2031,7 +2092,7 @@ async def edit_carrier(ctx, carrier_name):
 
     # Go fetch the carrier details by searching for the name
 
-    carrier_data = copy.copy(find_carrier_from_long_name(carrier_name))
+    carrier_data = copy.copy(find_carrier_from_long_name(carrier_name_search_term))
     print(carrier_data)
     if carrier_data:
         embed = discord.Embed(title=f"Edit DB request received.",
@@ -2117,7 +2178,7 @@ async def edit_carrier(ctx, carrier_name):
             await ctx.send('We did not find the new database entry - that is not good.')
 
     else:
-        return await ctx.send(f'No result found for the carrier: "{carrier_name}".')
+        return await ctx.send(f'No result found for the carrier: "{carrier_name_search_term}".')
 
 
 def _update_carrier_details_in_database(ctx, carrier_data, original_name):
