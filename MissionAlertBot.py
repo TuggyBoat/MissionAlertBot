@@ -1039,7 +1039,7 @@ async def _owner(ctx: SlashContext, at_owner_discord):
 
 # mission slash command - private, non spammy
 @slash.slash(name="mission", guild_ids=[bot_guild_id],
-             description="Use in a Fleet Carrier's channel to privately display any active mission.")
+             description="Private command: Use in a Fleet Carrier's channel to display its current mission.")
 async def _mission(ctx: SlashContext):
 
     # send a message to bot-spam to monitor use
@@ -1159,7 +1159,7 @@ def _format_missions_embedd(mission_data_list, embed):
 
 # missions slash command - private, non-spammy
 @slash.slash(name="missions", guild_ids=[bot_guild_id],
-             description="Privately display all missions in progress.")
+             description="Private command: Display all missions in progress.")
 async def _missions(ctx: SlashContext):
 
     # send a message to bot-spam to monitor use
@@ -1489,7 +1489,7 @@ async def _crews(ctx: SlashContext):
     pass
 
 @slash.slash(name="info", guild_ids=[bot_guild_id],
-             description="Use in a Fleet Carrier's channel to show information about it.")
+             description="Private command: Use in a Fleet Carrier's channel to show information about it.")
 async def _info(ctx: SlashContext):
 
     # send a message to bot-spam to monitor use
@@ -2359,7 +2359,7 @@ def _configure_all_carrier_detail_embed(embed, carrier_data):
 
 @commands.has_role('Carrier Owner')
 @slash.slash(name="crewcount", guild_ids=[bot_guild_id],
-             description="Use /crewcount find the number of people with each crew role. Requires CarrierOwner role.")
+             description="Public command (Carrier Owners only): shows totals for each crew role.")
 async def _crews(ctx: SlashContext):
     """
     Returns a list of every @Crew:xyz role and the number of current users assigned to the role.
