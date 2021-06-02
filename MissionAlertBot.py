@@ -628,9 +628,10 @@ async def gen_mission(ctx, carrier_name, commodity_short_name, system, station, 
     if current_channel != mission_gen_channel:
         # problem, wrong channel, no progress
         return await ctx.send(f'Sorry, you can only run this command out of: {mission_gen_channel}.')
-    if pads not in ['M', 'L']:
+    if pads.upper() not in ['M', 'L']:
         # In case a user provides some junk for pads size, gate it
-        return await ctx.send(f'Sorry, your pad size is not L or M. Provided: {pads}.')
+        print(f'Exiting mission generation requested by {ctx.author} as pad size is invalid, provided: {pads}')
+        return await ctx.send(f'Sorry, your pad size is not L or M. Provided: {pads}. Mission generation cancelled.')
 
     # TODO: This method is way too long, break it up into logical steps.
 
@@ -808,9 +809,9 @@ async def gen_mission(ctx, carrier_name, commodity_short_name, system, station, 
 
         if "r" in msg.content.lower():
 
-            if profit < 10:
+            if int(profit) < 10:
                 print(f'Not posting the mission from {ctx.author} to reddit due to low profit margin <10k/t.')
-                await ctx.send(f'Skipped Reddit posting due to profit margin og {profit} being below the PTN 10k '
+                await ctx.send(f'Skipped Reddit posting due to profit margin of {profit}k/t being below the PTN 10k/t '
                                f'minimum.')
             else:
                 message_send = await ctx.send("**Sending to Reddit...**")
