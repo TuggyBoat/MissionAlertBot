@@ -628,6 +628,9 @@ async def gen_mission(ctx, carrier_name, commodity_short_name, system, station, 
     if current_channel != mission_gen_channel:
         # problem, wrong channel, no progress
         return await ctx.send(f'Sorry, you can only run this command out of: {mission_gen_channel}.')
+    if pads not in ['M', 'L']:
+        # In case a user provides some junk for pads size, gate it
+        return await ctx.send(f'Sorry, your pad size is not L or M. Provided: {pads}.')
 
     # TODO: This method is way too long, break it up into logical steps.
 
@@ -804,30 +807,36 @@ async def gen_mission(ctx, carrier_name, commodity_short_name, system, station, 
             await message_send.delete()
 
         if "r" in msg.content.lower():
-            message_send = await ctx.send("**Sending to Reddit...**")
 
-            # post to reddit
-            subreddit = await reddit.subreddit(to_subreddit)
-            submission = await subreddit.submit_image(reddit_title, image_path=file_name,
-                                                      flair_id=flair_mission_start)
-            reddit_post_url = submission.permalink
-            reddit_post_id = submission.id
-            if rp:
-                comment = await submission.reply(f"> {rp_text}\n\n&#x200B;\n\n{reddit_body}")
+            if profit < 10:
+                print(f'Not posting the mission from {ctx.author} to reddit due to low profit margin <10k/t.')
+                await ctx.send(f'Skipped Reddit posting due to profit margin og {profit} being below the PTN 10k '
+                               f'minimum.')
             else:
-                comment = await submission.reply(reddit_body)
-            reddit_comment_url = comment.permalink
-            reddit_comment_id = comment.id
-            embed = discord.Embed(title=f"Reddit trade alert sent for {carrier_data.carrier_long_name}",
-                                  description=f"https://www.reddit.com{reddit_post_url}",
-                                  color=constants.EMBED_COLOUR_REDDIT)
-            await ctx.send(embed=embed)
-            await message_send.delete()
-            embed = discord.Embed(title=f"{carrier_data.carrier_long_name} REQUIRES YOUR UPDOOTS",
-                                  description=f"https://www.reddit.com{reddit_post_url}",
-                                  color=constants.EMBED_COLOUR_REDDIT)
-            channel = bot.get_channel(conf['CHANNEL_UPVOTES'])
-            await channel.send(embed=embed)
+                message_send = await ctx.send("**Sending to Reddit...**")
+
+                # post to reddit
+                subreddit = await reddit.subreddit(to_subreddit)
+                submission = await subreddit.submit_image(reddit_title, image_path=file_name,
+                                                          flair_id=flair_mission_start)
+                reddit_post_url = submission.permalink
+                reddit_post_id = submission.id
+                if rp:
+                    comment = await submission.reply(f"> {rp_text}\n\n&#x200B;\n\n{reddit_body}")
+                else:
+                    comment = await submission.reply(reddit_body)
+                reddit_comment_url = comment.permalink
+                reddit_comment_id = comment.id
+                embed = discord.Embed(title=f"Reddit trade alert sent for {carrier_data.carrier_long_name}",
+                                      description=f"https://www.reddit.com{reddit_post_url}",
+                                      color=constants.EMBED_COLOUR_REDDIT)
+                await ctx.send(embed=embed)
+                await message_send.delete()
+                embed = discord.Embed(title=f"{carrier_data.carrier_long_name} REQUIRES YOUR UPDOOTS",
+                                      description=f"https://www.reddit.com{reddit_post_url}",
+                                      color=constants.EMBED_COLOUR_REDDIT)
+                channel = bot.get_channel(conf['CHANNEL_UPVOTES'])
+                await channel.send(embed=embed)
 
         if "n" in msg.content.lower():
 
