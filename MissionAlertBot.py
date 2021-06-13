@@ -743,11 +743,13 @@ async def gen_mission(ctx, carrier_name_search_term, commodity_search_term, syst
     message_confirm = await ctx.send(embed=embed)
 
     
-    # TODO: WINE CATCH STATEMENT
+    #Wine load guard, bool for altering behaviour dependent on whether carrier is loading wine
+    #(should there be one for an unloading?)
     wineFlag = False
     if commodity_data.name.Title() == "Wine":
         wineFlag = True
-
+    
+    #TODO: Apply any additional desired behaviour via the wine flag
     try:
         msg = await bot.wait_for("message", check=check_confirm, timeout=30)
 
@@ -759,7 +761,6 @@ async def gen_mission(ctx, carrier_name_search_term, commodity_search_term, syst
             return
 
         if "t" in msg.content.lower():
-            #TODO: apply wine flag adjustments
             embed = discord.Embed(title="Trade Alert (Discord)", description=f"`{discord_text}`",
                                   color=constants.EMBED_COLOUR_DISCORD)
             await ctx.send(embed=embed)
