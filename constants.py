@@ -4,6 +4,7 @@ PROD_FLAIR_MISSION_STOP = "eea2d818-9235-11eb-b86f-0e50eec082f5"
 
 PROD_DISCORD_GUILD = 800080948716503040 # PTN Discord server
 PROD_TRADE_ALERTS_ID = 801798469189763073  # trade alerts channel ID for PTN main server
+PROD_WINE_ALERTS_ID = 0000 #TODO: get ID for #booze-cruise-loading-operations
 PROD_SUB_REDDIT = "PilotsTradeNetwork"  # subreddit for live
 PROD_CHANNEL_UPVOTES = 828279034387103744    # The ID for the updoots channel
 PROD_MISSION_CHANNEL = 822603169104265276    # The ID for the production mission channel
@@ -19,6 +20,7 @@ TEST_FLAIR_MISSION_STOP = "4242a2e2-8e8e-11eb-b443-0e664851dbff"
 
 TEST_DISCORD_GUILD = 818174236480897055 # test Discord server
 TEST_TRADE_ALERTS_ID = 843252609057423361  # trade alerts channel ID for PTN test server
+TEST_WINE_ALERTS_ID = 0000 #TODO: get ID for #booze-cruise-loading-operations on test server
 TEST_SUB_REDDIT = "PTNBotTesting"  # subreddit for testing
 TEST_CHANNEL_UPVOTES = 839918504676294666    # The ID for the updoots channel on test
 TEST_MISSION_CHANNEL = 842138710651961364    # The ID for the production mission channel
@@ -54,6 +56,7 @@ def get_constant(production: bool):
             'BOT_GUILD': PROD_DISCORD_GUILD,
             'SUB_REDDIT': PROD_SUB_REDDIT,
             'TRADE_ALERTS_ID': PROD_TRADE_ALERTS_ID,
+            'WINE_ALERTS_ID' : PROD_WINE_ALERTS_ID,
             'CHANNEL_UPVOTES': PROD_CHANNEL_UPVOTES,
             'MISSION_CHANNEL': PROD_MISSION_CHANNEL,
             'BOT_COMMAND_CHANNEL': PROD_BOT_COMMAND_CHANNEL,
@@ -67,6 +70,7 @@ def get_constant(production: bool):
             'BOT_GUILD': TEST_DISCORD_GUILD,
             'SUB_REDDIT': TEST_SUB_REDDIT,
             'TRADE_ALERTS_ID': TEST_TRADE_ALERTS_ID,
+            'WINE_ALERTS_ID' : TEST_WINE_ALERTS_ID,
             'CHANNEL_UPVOTES': TEST_CHANNEL_UPVOTES,
             'MISSION_CHANNEL': TEST_MISSION_CHANNEL,
             'BOT_COMMAND_CHANNEL': TEST_BOT_COMMAND_CHANNEL,
