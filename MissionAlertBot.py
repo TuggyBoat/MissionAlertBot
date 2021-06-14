@@ -55,6 +55,7 @@ flair_mission_stop = conf['MISSION_STOP']
 
 # channel IDs
 trade_alerts_id = conf['TRADE_ALERTS_ID']
+wine_alerts_id = conf['WINE_ALERTS_ID']
 bot_spam_id = conf['BOT_SPAM_CHANNEL']
 to_subreddit = conf['SUB_REDDIT']
 
@@ -752,7 +753,6 @@ async def gen_mission(ctx, carrier_name_search_term, commodity_search_term, syst
             return
 
         if "t" in msg.content.lower():
-
             embed = discord.Embed(title="Trade Alert (Discord)", description=f"`{discord_text}`",
                                   color=constants.EMBED_COLOUR_DISCORD)
             await ctx.send(embed=embed)
@@ -789,9 +789,14 @@ async def gen_mission(ctx, carrier_name_search_term, commodity_search_term, syst
         if "d" in msg.content.lower():
             message_send = await ctx.send("**Sending to Discord...**")
 
-            # send trade alert to trade alerts channel
-            channel = bot.get_channel(trade_alerts_id)
-
+            # send trade alert to trade alerts channel, or to wine alerts channel if loading wine
+            if commodity_data.name.title() == "Wine":
+                channel = bot.get_channel(wine_alerts_id)
+                channelId = wine_alerts_id
+            else:
+                channel = bot.get_channel(trade_alerts_id)
+                channelId = trade_alerts_id
+                
             if mission_type == 'load':
                 embed = discord.Embed(description=discord_text, color=constants.EMBED_COLOUR_LOADING)
             else:
@@ -819,18 +824,17 @@ async def gen_mission(ctx, carrier_name_search_term, commodity_search_term, syst
                      "will show all current trade missions\nUse /crew to join or leave this carrier's crew")
             await channel.send(file=discord_file, embed=embed)
             embed = discord.Embed(title=f"Discord trade alerts sent for {carrier_data.carrier_long_name}",
-                                  description=f"Check <#{trade_alerts_id}> for trade alert and "
+                                  description=f"Check <#{channelId}> for trade alert and "
                                               f"<#{carrier_data.channel_id}> for image.",
                                   color=constants.EMBED_COLOUR_DISCORD)
             await ctx.send(embed=embed)
             await message_send.delete()
 
         if "r" in msg.content.lower():
-
             if int(profit) < 10:
                 print(f'Not posting the mission from {ctx.author} to reddit due to low profit margin <10k/t.')
                 await ctx.send(f'Skipped Reddit posting due to profit margin of {profit}k/t being below the PTN 10k/t '
-                               f'minimum.')
+                               f'minimum. (Did you try to post a Wine load?)')
             else:
                 message_send = await ctx.send("**Sending to Reddit...**")
 
@@ -871,10 +875,10 @@ async def gen_mission(ctx, carrier_name_search_term, commodity_search_term, syst
                         description=f"Pinged <@&{carrier_data.roleid}> in <#{carrier_data.channel_id}>",
                         color=constants.EMBED_COLOUR_DISCORD)
             await ctx.send(embed=embed)
-
     except asyncio.TimeoutError:
         await ctx.send("**Mission not generated or broadcast (no valid response from user).**")
         return
+
 
     # now clear up by deleting the prompt message and user response
     await msg.delete()
