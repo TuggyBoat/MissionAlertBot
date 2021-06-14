@@ -742,14 +742,6 @@ async def gen_mission(ctx, carrier_name_search_term, commodity_search_term, syst
     embed.set_footer(text="Enter all that apply, e.g. **drn** will send alerts to Discord and Reddit and notify your crew.")
     message_confirm = await ctx.send(embed=embed)
 
-    
-    #Wine load guard, bool for altering behaviour dependent on whether carrier is loading wine
-    #(should there be one for an unloading?)
-    wineFlag = False
-    if commodity_data.name.Title() == "Wine":
-        wineFlag = True
-    
-    #TODO: Apply any additional desired behaviour via the wine flag
     try:
         msg = await bot.wait_for("message", check=check_confirm, timeout=30)
 
@@ -799,7 +791,7 @@ async def gen_mission(ctx, carrier_name_search_term, commodity_search_term, syst
             message_send = await ctx.send("**Sending to Discord...**")
 
             # send trade alert to trade alerts channel, or to wine alerts channel if loading wine
-            if wineFlag:
+            if commodity_data.name.Title() == "Wine":
                 channel = bot.get_channel(wine_alerts_id)
                 channelId = wine_alerts_id
             else:

@@ -20,7 +20,7 @@ TEST_FLAIR_MISSION_STOP = "4242a2e2-8e8e-11eb-b443-0e664851dbff"
 
 TEST_DISCORD_GUILD = 818174236480897055 # test Discord server
 TEST_TRADE_ALERTS_ID = 843252609057423361  # trade alerts channel ID for PTN test server
-TEST_WINE_ALERTS_ID = 843252609057423361 # currently this ID is the same as that of Test Trade Alert
+TEST_WINE_ALERTS_ID = 848492679079395371 # currently this ID is the testing channel in the test server
 TEST_SUB_REDDIT = "PTNBotTesting"  # subreddit for testing
 TEST_CHANNEL_UPVOTES = 839918504676294666    # The ID for the updoots channel on test
 TEST_MISSION_CHANNEL = 842138710651961364    # The ID for the production mission channel
