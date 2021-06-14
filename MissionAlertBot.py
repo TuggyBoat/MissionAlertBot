@@ -787,17 +787,16 @@ async def gen_mission(ctx, carrier_name_search_term, commodity_search_term, syst
             await ctx.send(embed=embed)
 
         if "d" in msg.content.lower():
-            #TODO: apply wine flag adjustments
             message_send = await ctx.send("**Sending to Discord...**")
 
             # send trade alert to trade alerts channel, or to wine alerts channel if loading wine
-            if commodity_data.name.Title() == "Wine":
+            if commodity_data.name.title() == "Wine":
                 channel = bot.get_channel(wine_alerts_id)
                 channelId = wine_alerts_id
             else:
                 channel = bot.get_channel(trade_alerts_id)
                 channelId = trade_alerts_id
-
+                
             if mission_type == 'load':
                 embed = discord.Embed(description=discord_text, color=constants.EMBED_COLOUR_LOADING)
             else:
@@ -876,10 +875,10 @@ async def gen_mission(ctx, carrier_name_search_term, commodity_search_term, syst
                         description=f"Pinged <@&{carrier_data.roleid}> in <#{carrier_data.channel_id}>",
                         color=constants.EMBED_COLOUR_DISCORD)
             await ctx.send(embed=embed)
-
     except asyncio.TimeoutError:
         await ctx.send("**Mission not generated or broadcast (no valid response from user).**")
         return
+
 
     # now clear up by deleting the prompt message and user response
     await msg.delete()
