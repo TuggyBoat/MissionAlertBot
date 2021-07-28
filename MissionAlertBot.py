@@ -583,7 +583,7 @@ async def on_ready():
                                'Demand should be expressed as an absolute number e.g. 20k, 20,000, etc.\n'
                                'ETA is optional and should be expressed as a number of minutes e.g. 15.\n'
                                'Case is automatically corrected for all inputs.')
-@commands.has_role('Carrier Owner')
+@commands.has_role('Certified Carrier')
 async def load(ctx, carrier_name_search_term, commodity_search_term, system, station, profit, pads, demand, eta=None):
     rp = False
     mission_type = 'load'
@@ -595,7 +595,7 @@ async def load(ctx, carrier_name_search_term, commodity_search_term, system, sta
                                  'This is added to the Reddit comment as as a quote above the mission details\n'
                                  'and sent to the carrier\'s Discord channel in quote format if those options are '
                                  'chosen')
-@commands.has_role('Carrier Owner')
+@commands.has_role('Certified Carrier')
 async def loadrp(ctx, carrier_name_search_term, commodity_search_term, system, station, profit, pads, demand, eta=None):
     rp = True
     mission_type = 'load'
@@ -614,7 +614,7 @@ async def loadrp(ctx, carrier_name_search_term, commodity_search_term, system, s
                                  'Supply should be expressed as an absolute number e.g. 20k, 20,000, etc.\n'
                                  'ETA is optional and should be expressed as a number of minutes e.g. 15.\n'
                                  'Case is automatically corrected for all inputs.')
-@commands.has_role('Carrier Owner')
+@commands.has_role('Certified Carrier')
 async def unload(ctx, carrier_name_search_term, commodity_search_term, system, station, profit, pads, supply, eta=None):
     rp = False
     mission_type = 'unload'
@@ -626,7 +626,7 @@ async def unload(ctx, carrier_name_search_term, commodity_search_term, system, s
                                    'This is added to the Reddit comment as as a quote above the mission details\n'
                                    'and sent to the carrier\'s Discord channel in quote format if those options are '
                                    'chosen')
-@commands.has_role('Carrier Owner')
+@commands.has_role('Certified Carrier')
 async def unloadrp(ctx, carrier_name_search_term, commodity_search_term, system, station, profit, pads, demand, eta=None):
     rp = True
     mission_type = 'unload'
@@ -1116,7 +1116,7 @@ async def issions(ctx):
 
     print(f'User {ctx.author} asked for all active missions.')
 
-    co_role = discord.utils.get(ctx.guild.roles, name='Carrier Owner')
+    co_role = discord.utils.get(ctx.guild.roles, name='Certified Carrier')
     print(f'Check is user has role: "{co_role}"')
     print(f'User has roles: {ctx.author.roles}')
 
@@ -1225,7 +1225,7 @@ async def _missions(ctx: SlashContext):
                                'Deletes trade alert in Discord and sends messages to carrier channel and reddit if '
                                'appropriate.\n\nAnything put in quotes after the carrier name will be treated as a '
                                'quote to be sent along with the completion notice. This can be used for RP if desired.')
-@commands.has_role('Carrier Owner')
+@commands.has_role('Certified Carrier')
 async def done(ctx, carrier_name_search_term, rp=None):
 
     # Check we are in the designated mission channel, if not go no farther.
@@ -1832,7 +1832,7 @@ async def carrier_del(ctx, db_id):
                                         'Use on its own to receive a blank template image.\n'
                                         'Use with carrier\'s name as argument to check the '
                                         'carrier\'s image or begin upload of a new image.')
-@commands.has_role('Carrier Owner')
+@commands.has_role('Certified Carrier')
 async def carrier_image(ctx, lookname=None):
     if not lookname:
         print(f"{ctx.author} called m.carrier_image without argument")
@@ -2371,7 +2371,7 @@ def _configure_all_carrier_detail_embed(embed, carrier_data):
     return embed
 
 
-@commands.has_role('Carrier Owner')
+@commands.has_role('Certified Carrier')
 @slash.slash(name="crewcount", guild_ids=[bot_guild_id],
              description="Public command (Carrier Owners only): shows totals for each crew role.")
 async def _crews(ctx: SlashContext):
@@ -2445,7 +2445,7 @@ async def _crews(ctx: SlashContext):
 
 # ping the bot
 @bot.command(name='ping', help='Ping the bot')
-@commands.has_role('Carrier Owner')
+@commands.has_role('Certified Carrier')
 async def ping(ctx):
     await ctx.send("**PING? PONG!**")
 
