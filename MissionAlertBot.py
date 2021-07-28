@@ -55,6 +55,7 @@ flair_mission_stop = conf['MISSION_STOP']
 
 # channel IDs
 trade_alerts_id = conf['TRADE_ALERTS_ID']
+wine_alerts_id = conf['WINE_ALERTS_ID']
 bot_spam_id = conf['BOT_SPAM_CHANNEL']
 to_subreddit = conf['SUB_REDDIT']
 
@@ -582,7 +583,7 @@ async def on_ready():
                                'Demand should be expressed as an absolute number e.g. 20k, 20,000, etc.\n'
                                'ETA is optional and should be expressed as a number of minutes e.g. 15.\n'
                                'Case is automatically corrected for all inputs.')
-@commands.has_role('Carrier Owner')
+@commands.has_role('Certified Carrier')
 async def load(ctx, carrier_name_search_term, commodity_search_term, system, station, profit, pads, demand, eta=None):
     rp = False
     mission_type = 'load'
@@ -594,7 +595,7 @@ async def load(ctx, carrier_name_search_term, commodity_search_term, system, sta
                                  'This is added to the Reddit comment as as a quote above the mission details\n'
                                  'and sent to the carrier\'s Discord channel in quote format if those options are '
                                  'chosen')
-@commands.has_role('Carrier Owner')
+@commands.has_role('Certified Carrier')
 async def loadrp(ctx, carrier_name_search_term, commodity_search_term, system, station, profit, pads, demand, eta=None):
     rp = True
     mission_type = 'load'
@@ -613,7 +614,7 @@ async def loadrp(ctx, carrier_name_search_term, commodity_search_term, system, s
                                  'Supply should be expressed as an absolute number e.g. 20k, 20,000, etc.\n'
                                  'ETA is optional and should be expressed as a number of minutes e.g. 15.\n'
                                  'Case is automatically corrected for all inputs.')
-@commands.has_role('Carrier Owner')
+@commands.has_role('Certified Carrier')
 async def unload(ctx, carrier_name_search_term, commodity_search_term, system, station, profit, pads, supply, eta=None):
     rp = False
     mission_type = 'unload'
@@ -625,7 +626,7 @@ async def unload(ctx, carrier_name_search_term, commodity_search_term, system, s
                                    'This is added to the Reddit comment as as a quote above the mission details\n'
                                    'and sent to the carrier\'s Discord channel in quote format if those options are '
                                    'chosen')
-@commands.has_role('Carrier Owner')
+@commands.has_role('Certified Carrier')
 async def unloadrp(ctx, carrier_name_search_term, commodity_search_term, system, station, profit, pads, demand, eta=None):
     rp = True
     mission_type = 'unload'
@@ -752,7 +753,6 @@ async def gen_mission(ctx, carrier_name_search_term, commodity_search_term, syst
             return
 
         if "t" in msg.content.lower():
-
             embed = discord.Embed(title="Trade Alert (Discord)", description=f"`{discord_text}`",
                                   color=constants.EMBED_COLOUR_DISCORD)
             await ctx.send(embed=embed)
@@ -789,9 +789,14 @@ async def gen_mission(ctx, carrier_name_search_term, commodity_search_term, syst
         if "d" in msg.content.lower():
             message_send = await ctx.send("**Sending to Discord...**")
 
-            # send trade alert to trade alerts channel
-            channel = bot.get_channel(trade_alerts_id)
-
+            # send trade alert to trade alerts channel, or to wine alerts channel if loading wine
+            if commodity_data.name.title() == "Wine":
+                channel = bot.get_channel(wine_alerts_id)
+                channelId = wine_alerts_id
+            else:
+                channel = bot.get_channel(trade_alerts_id)
+                channelId = trade_alerts_id
+                
             if mission_type == 'load':
                 embed = discord.Embed(description=discord_text, color=constants.EMBED_COLOUR_LOADING)
             else:
@@ -819,18 +824,17 @@ async def gen_mission(ctx, carrier_name_search_term, commodity_search_term, syst
                      "will show all current trade missions\nUse /crew to join or leave this carrier's crew")
             await channel.send(file=discord_file, embed=embed)
             embed = discord.Embed(title=f"Discord trade alerts sent for {carrier_data.carrier_long_name}",
-                                  description=f"Check <#{trade_alerts_id}> for trade alert and "
+                                  description=f"Check <#{channelId}> for trade alert and "
                                               f"<#{carrier_data.channel_id}> for image.",
                                   color=constants.EMBED_COLOUR_DISCORD)
             await ctx.send(embed=embed)
             await message_send.delete()
 
         if "r" in msg.content.lower():
-
             if int(profit) < 10:
                 print(f'Not posting the mission from {ctx.author} to reddit due to low profit margin <10k/t.')
                 await ctx.send(f'Skipped Reddit posting due to profit margin of {profit}k/t being below the PTN 10k/t '
-                               f'minimum.')
+                               f'minimum. (Did you try to post a Wine load?)')
             else:
                 message_send = await ctx.send("**Sending to Reddit...**")
 
@@ -871,10 +875,10 @@ async def gen_mission(ctx, carrier_name_search_term, commodity_search_term, syst
                         description=f"Pinged <@&{carrier_data.roleid}> in <#{carrier_data.channel_id}>",
                         color=constants.EMBED_COLOUR_DISCORD)
             await ctx.send(embed=embed)
-
     except asyncio.TimeoutError:
         await ctx.send("**Mission not generated or broadcast (no valid response from user).**")
         return
+
 
     # now clear up by deleting the prompt message and user response
     await msg.delete()
@@ -1112,7 +1116,7 @@ async def issions(ctx):
 
     print(f'User {ctx.author} asked for all active missions.')
 
-    co_role = discord.utils.get(ctx.guild.roles, name='Carrier Owner')
+    co_role = discord.utils.get(ctx.guild.roles, name='Certified Carrier')
     print(f'Check is user has role: "{co_role}"')
     print(f'User has roles: {ctx.author.roles}')
 
@@ -1221,7 +1225,7 @@ async def _missions(ctx: SlashContext):
                                'Deletes trade alert in Discord and sends messages to carrier channel and reddit if '
                                'appropriate.\n\nAnything put in quotes after the carrier name will be treated as a '
                                'quote to be sent along with the completion notice. This can be used for RP if desired.')
-@commands.has_role('Carrier Owner')
+@commands.has_role('Certified Carrier')
 async def done(ctx, carrier_name_search_term, rp=None):
 
     # Check we are in the designated mission channel, if not go no farther.
@@ -1828,7 +1832,7 @@ async def carrier_del(ctx, db_id):
                                         'Use on its own to receive a blank template image.\n'
                                         'Use with carrier\'s name as argument to check the '
                                         'carrier\'s image or begin upload of a new image.')
-@commands.has_role('Carrier Owner')
+@commands.has_role('Certified Carrier')
 async def carrier_image(ctx, lookname=None):
     if not lookname:
         print(f"{ctx.author} called m.carrier_image without argument")
@@ -2367,7 +2371,7 @@ def _configure_all_carrier_detail_embed(embed, carrier_data):
     return embed
 
 
-@commands.has_role('Carrier Owner')
+@commands.has_role('Certified Carrier')
 @slash.slash(name="crewcount", guild_ids=[bot_guild_id],
              description="Public command (Carrier Owners only): shows totals for each crew role.")
 async def _crews(ctx: SlashContext):
@@ -2441,7 +2445,7 @@ async def _crews(ctx: SlashContext):
 
 # ping the bot
 @bot.command(name='ping', help='Ping the bot')
-@commands.has_role('Carrier Owner')
+@commands.has_role('Certified Carrier')
 async def ping(ctx):
     await ctx.send("**PING? PONG!**")
 
