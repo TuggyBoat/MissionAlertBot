@@ -4,7 +4,7 @@ PROD_FLAIR_MISSION_STOP = "eea2d818-9235-11eb-b86f-0e50eec082f5"
 
 PROD_DISCORD_GUILD = 800080948716503040 # PTN Discord server
 PROD_TRADE_ALERTS_ID = 801798469189763073  # trade alerts channel ID for PTN main server
-PROD_WINE_ALERTS_ID = 853596290460811265 # booze alerts channel ID for PTN main server
+PROD_WINE_ALERTS_ID = 849249916676603944 # booze alerts channel ID for PTN main server
 PROD_SUB_REDDIT = "PilotsTradeNetwork"  # subreddit for live
 PROD_CHANNEL_UPVOTES = 828279034387103744    # The ID for the updoots channel
 PROD_MISSION_CHANNEL = 822603169104265276    # The ID for the production mission channel
