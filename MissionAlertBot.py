@@ -1257,8 +1257,14 @@ async def done(ctx, carrier_name_search_term, rp=None):
         if mission_data.discord_alert_id and mission_data.discord_alert_id != 'NULL':
             try:  # try in case it's already been deleted, which doesn't matter to us in the slightest but we don't
                 # want it messing up the rest of the function
+
+                # first check if it's Wine, in which case it went to the booze cruise channel
+                if mission_data.commodity.title() == "Wine":
+                    channel = bot.get_channel(wine_alerts_id)
+                else:
+                    channel = bot.get_channel(trade_alerts_id)
+
                 discord_alert_id = mission_data.discord_alert_id
-                channel = bot.get_channel(trade_alerts_id)
                 msg = await channel.fetch_message(discord_alert_id)
                 await msg.delete()
             except:
@@ -1358,7 +1364,11 @@ async def complete(ctx):
                     # delete Discord trade alert
                     if mission_data.discord_alert_id and mission_data.discord_alert_id != 'NULL':
                         try:
-                            channel = bot.get_channel(trade_alerts_id)
+                            # check if it's Wine, in which case it went to the booze cruise channel
+                            if mission_data.commodity.title() == "Wine":
+                                channel = bot.get_channel(wine_alerts_id)
+                            else:
+                                channel = bot.get_channel(trade_alerts_id)
                             msg = await channel.fetch_message(mission_data.discord_alert_id)
                             await msg.delete()
                         except:
