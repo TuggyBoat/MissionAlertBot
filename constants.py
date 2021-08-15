@@ -11,6 +11,7 @@ PROD_MISSION_CHANNEL = 822603169104265276    # The ID for the production mission
 PROD_BOT_COMMAND_CHANNEL = 802523724674891826   # Bot backend commands are locked to a channel
 PROD_BOT_SPAM_CHANNEL = 801258393205604372 # Certain bot logging messages go here
 PROD_UPVOTE_EMOJI = 828287733227192403 # upvote emoji on live server
+PROD_HAULER_ROLE = 875313960834965544 # hauler role ID on live server
 
 # Testing variables
 
@@ -27,6 +28,7 @@ TEST_MISSION_CHANNEL = 842138710651961364    # The ID for the production mission
 TEST_BOT_COMMAND_CHANNEL = 842152343441375283   # Bot backend commands are locked to a channel
 TEST_BOT_SPAM_CHANNEL = 842525081858867211 # Bot logging messages on the test server
 TEST_UPVOTE_EMOJI = 849388681382068225 # upvote emoji on test server
+TEST_HAULER_ROLE = 875439909102575647 # hauler role ID on test server
 
 EMBED_COLOUR_LOADING = 0x80ffff         # blue
 EMBED_COLOUR_UNLOADING = 0x80ff80       # green
@@ -61,7 +63,8 @@ def get_constant(production: bool):
             'MISSION_CHANNEL': PROD_MISSION_CHANNEL,
             'BOT_COMMAND_CHANNEL': PROD_BOT_COMMAND_CHANNEL,
             'BOT_SPAM_CHANNEL': PROD_BOT_SPAM_CHANNEL,
-            'UPVOTE_EMOJI': PROD_UPVOTE_EMOJI
+            'UPVOTE_EMOJI': PROD_UPVOTE_EMOJI,
+            'HAULER_ROLE' : PROD_HAULER_ROLE
         }
     else:
         result = {
@@ -75,7 +78,8 @@ def get_constant(production: bool):
             'MISSION_CHANNEL': TEST_MISSION_CHANNEL,
             'BOT_COMMAND_CHANNEL': TEST_BOT_COMMAND_CHANNEL,
             'BOT_SPAM_CHANNEL': TEST_BOT_SPAM_CHANNEL,
-            'UPVOTE_EMOJI': TEST_UPVOTE_EMOJI
+            'UPVOTE_EMOJI': TEST_UPVOTE_EMOJI,
+            'HAULER_ROLE' : TEST_HAULER_ROLE
         }
 
     return result
