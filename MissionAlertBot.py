@@ -168,7 +168,7 @@ if not check_database_table_exists('missions', mission_db):
             CREATE TABLE missions(
                 "carrier"	TEXT NOT NULL UNIQUE,
                 "cid"	TEXT,
-                "channelid"	INTEGER,
+                "channelid"	INT,
                 "commodity"	TEXT,
                 "missiontype"	TEXT,
                 "system"	TEXT NOT NULL,
@@ -181,8 +181,7 @@ if not check_database_table_exists('missions', mission_db):
                 "reddit_post_url"	TEXT,
                 "reddit_comment_id"	TEXT,
                 "reddit_comment_url"	TEXT,
-                "discord_alert_id"	INT,
-                "mission_channel_id"	INT
+                "discord_alert_id"	INT
             )
         ''')
 else:
