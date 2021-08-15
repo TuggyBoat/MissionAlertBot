@@ -59,6 +59,9 @@ wine_alerts_id = conf['WINE_ALERTS_ID']
 bot_spam_id = conf['BOT_SPAM_CHANNEL']
 to_subreddit = conf['SUB_REDDIT']
 
+# role IDs
+hauler_role_id = conf['HAULER_ROLE']
+
 # emoji IDs
 upvote_emoji = conf['UPVOTE_EMOJI']
 
@@ -130,7 +133,6 @@ if not check_database_table_exists('carriers', carrier_db):
                 cid TEXT NOT NULL, 
                 discordchannel TEXT NOT NULL,
                 channelid INT,
-                roleid INT,
                 ownerid INT
             ) 
         ''')
@@ -225,7 +227,7 @@ def backup_database(database_name):
 
 
 # function to add carrier, being sure to correct case
-def add_carrier_to_database(short_name, long_name, carrier_id, channel, channel_id, roleid, owner_id):
+def add_carrier_to_database(short_name, long_name, carrier_id, channel, channel_id, owner_id):
     """
     Inserts a carrier's details into the database.
 
@@ -238,8 +240,8 @@ def add_carrier_to_database(short_name, long_name, carrier_id, channel, channel_
     """
     carrier_db_lock.acquire()
     try:
-        carrier_db.execute(''' INSERT INTO carriers VALUES(NULL, ?, ?, ?, ?, ?, ?, ?) ''',
-                           (short_name.lower(), long_name.upper(), carrier_id.upper(), channel, channel_id, roleid, owner_id))
+        carrier_db.execute(''' INSERT INTO carriers VALUES(NULL, ?, ?, ?, ?, ?, ?) ''',
+                           (short_name.lower(), long_name.upper(), carrier_id.upper(), channel, channel_id, owner_id))
         carriers_conn.commit()
     finally:
         carrier_db_lock.release()
@@ -320,25 +322,6 @@ def find_carrier_from_long_name_multiple(find_long_name):
     return carriers
 
 
-def find_carrier_with_role_id(roleid):
-    """
-    Returns all carriers matching the roleid
-
-    :param int roleid: The role id  to match
-    :returns: A list of carrier data objects
-    :rtype: list[CarrierData]
-    """
-    carrier_db.execute(
-        f"SELECT * FROM carriers WHERE roleid LIKE (?)", (f'%{roleid}%',)
-    )
-    carrier_data = [CarrierData(carrier)  for carrier in carrier_db.fetchall() ]
-    for carrier in carrier_data:
-        print(f"FC {carrier.pid} is {carrier.carrier_long_name} {carrier.carrier_identifier} called by "
-              f"shortname {carrier.carrier_short_name} with channel <#{carrier.channel_id}> "
-              f"and owner {carrier.ownerid} and role id: {carrier.roleid} called from find_carrier_with_role_id.")
-
-    return carrier_data
-
 def find_carrier_with_owner_id(ownerid):
     """
     Returns all carriers matching the ownerid
@@ -354,7 +337,7 @@ def find_carrier_with_owner_id(ownerid):
     for carrier in carrier_data:
         print(f"FC {carrier.pid} is {carrier.carrier_long_name} {carrier.carrier_identifier} called by "
               f"shortname {carrier.carrier_short_name} with channel <#{carrier.channel_id}> "
-              f"and owner {carrier.ownerid} and role id: {carrier.roleid} called from find_carrier_with_owner_id.")
+              f"and owner {carrier.ownerid} called from find_carrier_with_owner_id.")
 
     return carrier_data
 
@@ -737,9 +720,9 @@ async def gen_mission(ctx, carrier_name_search_term, commodity_search_term, syst
 
     embed = discord.Embed(title="Where would you like to send the alert?",
                           description="(**d**)iscord, (**r**)eddit, (**t**)ext for copy/pasting or (**x**) to cancel\n"
-                          "Use (**n**) to also notify your crew.",
+                          "Use (**n**) to also notify PTN Haulers.",
                           color=constants.EMBED_COLOUR_QU)
-    embed.set_footer(text="Enter all that apply, e.g. **drn** will send alerts to Discord and Reddit and notify your crew.")
+    embed.set_footer(text="Enter all that apply, e.g. **drn** will send alerts to Discord and Reddit and notify PTN Haulers.")
     message_confirm = await ctx.send(embed=embed)
 
     try:
@@ -821,7 +804,7 @@ async def gen_mission(ctx, carrier_name_search_term, commodity_search_term, syst
             embed.set_image(url="attachment://image.png")
             embed.set_footer(
                 text="m.complete will mark this mission complete\n/mission will show this mission info\n/missions "
-                     "will show all current trade missions\nUse /crew to join or leave this carrier's crew")
+                     "will show all current trade missions")
             await channel.send(file=discord_file, embed=embed)
             embed = discord.Embed(title=f"Discord trade alerts sent for {carrier_data.carrier_long_name}",
                                   description=f"Check <#{channelId}> for trade alert and "
@@ -869,10 +852,10 @@ async def gen_mission(ctx, carrier_name_search_term, commodity_search_term, syst
 
             channel = bot.get_channel(carrier_data.channel_id)
 
-            await channel.send(f"<@&{carrier_data.roleid}>: {discord_text}")
+            await channel.send(f"<@&{hauler_role_id}>: {discord_text}")
 
-            embed = discord.Embed(title=f"Crew notification sent for {carrier_data.carrier_long_name}",
-                        description=f"Pinged <@&{carrier_data.roleid}> in <#{carrier_data.channel_id}>",
+            embed = discord.Embed(title=f"Mission notification sent for {carrier_data.carrier_long_name}",
+                        description=f"Pinged <@&{hauler_role_id}> in <#{carrier_data.channel_id}>",
                         color=constants.EMBED_COLOUR_DISCORD)
             await ctx.send(embed=embed)
     except asyncio.TimeoutError:
@@ -1042,7 +1025,7 @@ async def _owner(ctx: SlashContext, at_owner_discord):
       
         for carrier_data in carrier_list:
             embed.add_field(name=f"{carrier_data.carrier_long_name} ({carrier_data.carrier_identifier})",
-                            value=f"Channel: <#{carrier_data.channel_id}>\nCrew: <@&{carrier_data.roleid}>",
+                            value=f"Channel: <#{carrier_data.channel_id}>",
                             inline=False)
 
         await ctx.send(embed=embed, hidden=True)
@@ -1424,94 +1407,6 @@ async def backup(ctx):
     await ctx.send("Database backup complete.")
 
 
-# join a carrier's crew
-@slash.slash(name="crew", guild_ids=[bot_guild_id],
-             description="Private command: Use in a carrier's channel to join or leave that carrier's crew.")
-async def _crew(ctx: SlashContext):
-    print(f"{ctx.author} used /crew in {ctx.channel}")
-
-    # note channel ID
-    msg_ctx_id = ctx.channel.id
-
-    # define bot spam channel so we can notify
-    channel = bot.get_channel(bot_spam_id)
-
-    # look for a match for the channel ID in the carrier DB
-    carrier_db.execute(f"SELECT * FROM carriers WHERE "
-                       f"channelid = {msg_ctx_id}")
-    carrier_data = CarrierData(carrier_db.fetchone())
-    print(f'Crew command carrier_data: {carrier_data}')
-    if not carrier_data.channel_id:
-        # if there's no channel match, return an error
-        embed = discord.Embed(description="Try again in a carrier's channel.", color=constants.EMBED_COLOUR_ERROR)
-        await ctx.send(embed=embed, hidden=True)
-        return
-    else:
-        # we're in a carrier's channel, now we define its crew role from db
-        print(f"/crew used in channel for {carrier_data.carrier_long_name}")
-        crew_role = discord.utils.get(ctx.guild.roles, id=carrier_data.roleid)
-
-        # check if role exists
-        if not crew_role: 
-            await ctx.send("Sorry, I couldn't find a crew for this carrier. Please alert an Admin.", hidden=True)
-            await channel.send(f"**ERROR**: {ctx.author} tried to use **/crew** in <#{ctx.channel.id}> but received an error (role does not exist).")
-            print(f"No crew role found matching {ctx.channel}")
-            return
-
-        # check if user has this role
-        print(f'Check whether user has role: "{crew_role}"')
-        print(f'User has roles: {ctx.author.roles}')
-        if crew_role not in ctx.author.roles:
-            # they don't so give it to them
-            await ctx.author.add_roles(crew_role)
-            embed = discord.Embed(title=f"You've joined the crew for {carrier_data.carrier_long_name}!", description="You'll receive notifications about this carrier's activity. You can leave the crew at any time by using **/crew** again in this channel.", color=constants.EMBED_COLOUR_QU)
-            await ctx.send(embed=embed, hidden=True)
-            await channel.send(f"{ctx.author} joined the crew in <#{ctx.channel.id}>")
-        else:
-            # they do so take it from them
-            await ctx.author.remove_roles(crew_role)
-            embed = discord.Embed(title=f"You've left the crew for {carrier_data.carrier_long_name}.", description="You'll no longer receive notifications about this carrier's activity. You can rejoin the crew at any time by using **/crew** again in this channel.", color=constants.EMBED_COLOUR_OK)
-            await ctx.send(embed=embed, hidden=True)
-            await channel.send(f"{ctx.author} left the crew in <#{ctx.channel.id}>")
-
-
-@slash.slash(name="crews", guild_ids=[bot_guild_id],
-             description="Private command: Use to find out which carrier crews you're signed up to.")
-async def _crews(ctx: SlashContext):
-    print(f'{ctx.author} wants to find all of the crews they are part of.')
-
-    # send a message to bot-spam to monitor use
-    channel = bot.get_channel(bot_spam_id)
-    await channel.send(f"{ctx.author} wanted to see what crews they're on in <#{ctx.channel.id}> (used /crews)")
-
-    # Find all the crews the user is a part of
-    author = ctx.author
-    crew_roles = [role for role in author.roles if role.name.lower().startswith('crew')]
-    print(f'{ctx.author} has the following crew roles: {crew_roles}')
-
-    if crew_roles:
-        embed = discord.Embed(description=f"You are signed up for {len(crew_roles)} crews.",
-                              color=constants.EMBED_COLOUR_ERROR)
-        for crew in crew_roles:
-            carrier_list = find_carrier_with_role_id(crew.id)
-            if len(carrier_list) > 1:
-                carrier_channels = ''
-                for carrier in carrier_list:
-                    carrier_channels += f'<#{carrier.carrier_long_name}>, '
-
-                if carrier_channels.endswith(', '):
-                    carrier_channels = carrier_channels[:-2:]
-
-            else:
-                carrier_channels = f'<#{carrier_list[0].channel_id}>'
-
-            embed.add_field(name=f'{crew.name}', value=f'Channels: {carrier_channels}', inline=True)
-    else:
-        embed = discord.Embed(description=f"You aren't signed up for any crews! Use **/crew** in a carrier channel to "
-                                          f"sign up.", color=constants.EMBED_COLOUR_ERROR)
-    await ctx.send(embed=embed, hidden=True)
-    pass
-
 @slash.slash(name="info", guild_ids=[bot_guild_id],
              description="Private command: Use in a Fleet Carrier's channel to show information about it.")
 async def _info(ctx: SlashContext):
@@ -1757,28 +1652,14 @@ async def carrier_add(ctx, short_name, long_name, carrier_id, owner_id):
     except:
         raise EnvironmentError(f'Could not set channel permissions for {owner.display_name} in {channel}')
 
-    # create crew role
-
-    # check whether one already exists, otherwise create one
-
-    role = discord.utils.get(ctx.guild.roles, name=f"CREW: {long_name}")
-
-    if role:
-        await ctx.send('Crew role creation skipped: a role by that name already exists')
-        print(f'Found existing {role}')
-
-    else:
-        role = await ctx.guild.create_role(name=f"CREW: {long_name}")
-        print(f'Created {role}')
-  
     # finally, send all the info to the db
-    add_carrier_to_database(short_name, long_name, carrier_id, str(channel), channel.id, role.id, owner_id)
+    add_carrier_to_database(short_name, long_name, carrier_id, str(channel), channel.id, owner_id)
 
     carrier_data = find_carrier_from_long_name(long_name)
     await ctx.send(
         f"Added **{carrier_data.carrier_long_name.upper()}** **{carrier_data.carrier_identifier.upper()}** "
         f"with shortname **{carrier_data.carrier_short_name.lower()}**, channel "
-        f"**<#{carrier_data.channel_id}>** and Crew Role <@&{carrier_data.roleid}> "
+        f"**<#{carrier_data.channel_id}>** "
         f"owned by <@{owner_id}> at ID **{carrier_data.pid}**")
 
 
@@ -1979,7 +1860,6 @@ def _add_common_embed_fields(embed, carrier_data):
     embed.add_field(name="Carrier ID", value=f"{carrier_data.carrier_identifier}", inline=True)
     embed.add_field(name="Database Entry", value=f"{carrier_data.pid}", inline=True)
     embed.add_field(name="Discord Channel", value=f"<#{carrier_data.channel_id}>", inline=True)
-    embed.add_field(name="Crew Role", value=f"<@&{carrier_data.roleid}>", inline=True)
     embed.add_field(name="Owner", value=f"<@{carrier_data.ownerid}>", inline=True)
     embed.add_field(name="Shortname", value=f"{carrier_data.carrier_short_name}", inline=True)
     # shortname is not relevant to users and will be auto-generated in future
@@ -2233,7 +2113,6 @@ def _update_carrier_details_in_database(ctx, carrier_data, original_name):
             carrier_data.carrier_identifier,
             carrier_data.discord_channel,
             carrier_data.channel_id,
-            carrier_data.roleid,
             carrier_data.ownerid,
             f'%{original_name}%'
         )
@@ -2241,7 +2120,7 @@ def _update_carrier_details_in_database(ctx, carrier_data, original_name):
         carriers_conn.set_trace_callback(print)
         carrier_db.execute(
             ''' UPDATE carriers 
-            SET shortname=?, longname=?, cid=?, discordchannel=?, channelid=?, roleid=?, ownerid=?
+            SET shortname=?, longname=?, cid=?, discordchannel=?, channelid=?, ownerid=?
             WHERE longname LIKE (?) ''', data
         )
 
@@ -2374,83 +2253,11 @@ def _configure_all_carrier_detail_embed(embed, carrier_data):
     embed.add_field(name='Short Name', value=f'{carrier_data.carrier_short_name}', inline=True)
     embed.add_field(name='Discord Channel', value=f'<#{carrier_data.channel_id}>', inline=True)
     embed.add_field(name='Channel ID', value=f'{carrier_data.channel_id}', inline=True)
-    embed.add_field(name='Crew Role', value=f'<@&{carrier_data.roleid}>', inline=True)
     embed.add_field(name='Carrier Owner', value=f'<@{carrier_data.ownerid}>', inline=True)
     embed.add_field(name='DB ID', value=f'{carrier_data.pid}', inline=True)
     embed.set_footer(text="Note: DB ID is not an editable field.")
     return embed
 
-
-@commands.has_role('Certified Carrier')
-@slash.slash(name="crewcount", guild_ids=[bot_guild_id],
-             description="Public command (Carrier Owners only): shows totals for each crew role.")
-async def _crews(ctx: SlashContext):
-    """
-    Returns a list of every @Crew:xyz role and the number of current users assigned to the role.
-
-    We might want this only to be returned to the requesting user, for now just print it out wherever it was called
-    from. This command currently is not channel locked in any way.
-    """
-    print(f'{ctx.author} requested to run crewcount from channel: {ctx.channel}.')
-
-    # Check we are in the designated mission channel, if not go no farther.
-    allowed_channels = [bot.get_channel(conf['MISSION_CHANNEL']), bot.get_channel(conf['BOT_COMMAND_CHANNEL'])]
-    current_channel = ctx.channel
-
-    if current_channel not in allowed_channels:
-        # urroh, not in the correct channel.
-        allowed_channel_names = [f'#{allowed.name}' for allowed in allowed_channels]
-        print(f'Request for crewcount was not from the correct channel {ctx.channel}, expected {allowed_channels}.')
-        return await ctx.send(f'Sorry, you can only run this command out of: {allowed_channel_names}.')
-
-    all_crew_roles = [role for role in ctx.guild.roles if role.name.lower().startswith('crew')]
-    result = {}
-    for role in all_crew_roles:
-        role_count = 0
-        print(f'Searching for crew role: {role.name}')
-        for user in ctx.guild.members:
-            if role in user.roles:
-                # The user have the role we are checking for.
-                role_count += 1
-        result[role.name] = role_count
-    print(dict(reversed(sorted(result.items(), key=lambda item: item[1]))))
-
-    sorted_dict = dict(reversed(sorted(result.items(), key=lambda item: item[1])))
-    print(f'Sorted dict is: {sorted_dict}')
-
-    def chunk(data, max_size):
-        """
-        Take an input dictionary, and an expected max_size.
-
-        :param dict data: The dictionary you wish to chunk.
-        :param int max_size: How many elements in your chunk?
-        :returns: A chunked list that is yielded back to the caller
-        :rtype: iterator
-        """
-        it = iter(data)
-        for i in range(0, len(data), max_size):
-            yield {k: data[k] for k in islice(it, max_size)}
-
-    current_page = 0
-    max_page_size = 10
-    max_pages = int(ceil(len(sorted_dict) / max_page_size))
-
-    embed_list = []
-    for page in chunk(sorted_dict, max_page_size):
-        print(f'Current working page: {page}')
-
-        current_page += 1
-        nextembed = discord.Embed(title=f"{len(sorted_dict)} Roles Found Page: {current_page} of {max_pages}.")
-        for key, value in page.items():
-            # We might prefer just the long list, for now set inline as True to reduce the length of the display
-            # somewhat
-            nextembed.add_field(name=f"{key}", value=f"{value} members.", inline=True)
-
-        embed_list.append(nextembed)
-        print(nextembed)
-        print(embed_list)
-
-    await ctx.send(embeds=embed_list)
 
 
 # ping the bot
