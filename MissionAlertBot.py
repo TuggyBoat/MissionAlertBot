@@ -5,7 +5,6 @@
 # Discord Developer Portal: https://discord.com/developers/applications/822146046934384640/information
 # Git repo: https://github.com/PilotsTradeNetwork/MissionAlertBot
 import ast
-from asyncio.windows_events import NULL
 import copy
 import tempfile
 from itertools import islice
