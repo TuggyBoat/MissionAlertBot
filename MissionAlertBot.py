@@ -43,6 +43,7 @@ _production = ast.literal_eval(os.environ.get('PTN_MISSION_ALERT_SERVICE', 'Fals
 # We need some locks to we wait on the DB queries
 carrier_db_lock = threading.Lock()
 mission_db_lock = threading.Lock()
+carrier_channel_lock = threading.Lock()
 
 # setting some variables, you can toggle between production and test by setting an env variable flag now,
 # PTN-MISSION-ALERT-SERVICE
@@ -67,7 +68,7 @@ upvote_emoji = conf['UPVOTE_EMOJI']
 
 # channel removal timers
 seconds_short = 120
-seconds_long = 900
+seconds_long = 20
 
 # Get the discord token from the local .env file. Deliberately not hosted in the repo or Discord takes the bot down
 # because the keys are exposed. DO NOT HOST IN THE REPO. Seriously do not do it ...
@@ -705,9 +706,11 @@ async def gen_mission(ctx, carrier_name_search_term, commodity_search_term, syst
                                              mission_type)
     discord_text = txt_create_discord(carrier_data, mission_type, commodity_data, station, system, profit, pads,
                                       demand, eta_text, mission_temp_channel_id)
+    print("Generated discord elements")
     reddit_title = txt_create_reddit_title(carrier_data)
     reddit_body = txt_create_reddit_body(carrier_data, mission_type, commodity_data, station, system, profit, pads,
                                          demand, eta_text)
+    print("Generated Reddit elements")
 
     # check they're happy with output and offer to send
     embed = discord.Embed(title=f"Mission pending for {carrier_data.carrier_long_name}{eta_text}",
@@ -722,6 +725,7 @@ async def gen_mission(ctx, carrier_name_search_term, commodity_search_term, syst
         embed.add_field(name="Roleplay text", value=rp_text, inline=False)
     message_pending = await ctx.send(embed=embed)
     await message_gen.delete()
+    print("Output check displayed")
 
     embed = discord.Embed(title="Where would you like to send the alert?",
                           description="(**d**)iscord, (**r**)eddit, (**t**)ext for copy/pasting or (**x**) to cancel\n"
@@ -729,6 +733,7 @@ async def gen_mission(ctx, carrier_name_search_term, commodity_search_term, syst
                           color=constants.EMBED_COLOUR_QU)
     embed.set_footer(text="Enter all that apply, e.g. **drn** will send alerts to Discord and Reddit and notify PTN Haulers.")
     message_confirm = await ctx.send(embed=embed)
+    print("Prompted user for alert destination")
 
     try:
         msg = await bot.wait_for("message", check=check_confirm, timeout=30)
@@ -740,9 +745,11 @@ async def gen_mission(ctx, carrier_name_search_term, commodity_search_term, syst
             await remove_carrier_channel(mission_temp_channel_id, seconds_short)
             await msg.delete()
             await message_confirm.delete()
+            print("User cancelled mission generation")
             return
 
         if "t" in msg.content.lower():
+            print("User used option t")
             embed = discord.Embed(title="Trade Alert (Discord)", description=f"`{discord_text}`",
                                   color=constants.EMBED_COLOUR_DISCORD)
             await ctx.send(embed=embed)
@@ -777,6 +784,7 @@ async def gen_mission(ctx, carrier_name_search_term, commodity_search_term, syst
             await ctx.send(embed=embed)
 
         if "d" in msg.content.lower():
+            print("User used option d")
             message_send = await ctx.send("**Sending to Discord...**")
 
             # send trade alert to trade alerts channel, or to wine alerts channel if loading wine
@@ -821,6 +829,7 @@ async def gen_mission(ctx, carrier_name_search_term, commodity_search_term, syst
             await message_send.delete()
 
         if "r" in msg.content.lower():
+            print("User used option r")
             if int(profit) < 10:
                 print(f'Not posting the mission from {ctx.author} to reddit due to low profit margin <10k/t.')
                 await ctx.send(f'Skipped Reddit posting due to profit margin of {profit}k/t being below the PTN 10k/t '
@@ -854,6 +863,7 @@ async def gen_mission(ctx, carrier_name_search_term, commodity_search_term, syst
                 await upvote_message.add_reaction(emoji)
 
         if "n" in msg.content.lower():
+            print("User used option n")
 
             # get carrier's channel object
 
@@ -869,6 +879,7 @@ async def gen_mission(ctx, carrier_name_search_term, commodity_search_term, syst
         await ctx.send("**Mission not generated or broadcast (no valid response from user).**")
         return
 
+    print("All options worked through, now clean up")
 
     # now clear up by deleting the prompt message and user response
     await msg.delete()
@@ -877,10 +888,17 @@ async def gen_mission(ctx, carrier_name_search_term, commodity_search_term, syst
                       rp_text, reddit_post_id, reddit_post_url, reddit_comment_id, reddit_comment_url, discord_alert_id, mission_temp_channel_id)
     await mission_generation_complete(ctx, carrier_data, message_pending, eta_text)
     cleanup_temp_image_file(file_name)
+    print("Reached end of mission generator")
+    return
 
 
 async def create_mission_temp_channel(ctx, discord_channel, owner_id):
     # create the carrier's channel for the mission
+
+    # lock the channel so it can't be deleted during mission creation
+
+    carrier_channel_lock.acquire()
+    print("Locking carrier channel")
 
     # first check whether channel already exists
 
@@ -968,12 +986,19 @@ async def mission_add(ctx, carrier_data, commodity_data, mission_type, system, s
                       rp_text, reddit_post_id, reddit_post_url, reddit_comment_id, reddit_comment_url, discord_alert_id, mission_temp_channel_id):
     backup_database('missions')  # backup the missions database before going any further
 
+    print("Called mission_add to write to database")
     mission_db.execute(''' INSERT INTO missions VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ''', (
         carrier_data.carrier_long_name, carrier_data.carrier_identifier, mission_temp_channel_id,
         commodity_data.name.title(), mission_type.lower(), system.title(), station.title(), profit, pads.upper(),
         demand, rp_text, reddit_post_id, reddit_post_url, reddit_comment_id, reddit_comment_url, discord_alert_id
     ))
     missions_conn.commit()
+    print("Mission added to db")
+
+    # now we can release the channel lock
+    carrier_channel_lock.release()
+    print("Unlocking carrier channel")
+    return
 
 async def mission_generation_complete(ctx, carrier_data, message_pending, eta_text):
 
@@ -1003,6 +1028,8 @@ async def mission_generation_complete(ctx, carrier_data, message_pending, eta_te
 
     await ctx.send(embed=embed)
     await message_pending.delete()
+    print("Mission generation complete")
+    return
 
 
 # list active carrier trade mission from DB
@@ -1229,10 +1256,6 @@ def _format_missions_embedd(mission_data_list, embed):
              description="Private command: Display all missions in progress.")
 async def _missions(ctx: SlashContext):
 
-    # send a message to bot-spam to monitor use
-    channel = bot.get_channel(bot_spam_id)
-    await channel.send(f"{ctx.author} asked for all active missions in <#{ctx.channel.id}> (used /missions)")
-
     print(f'User {ctx.author} asked for all active missions via /missions in {ctx.channel}.')
 
     print(f'Generating full unloading mission list requested by: {ctx.author}')
@@ -1368,6 +1391,11 @@ async def remove_carrier_channel(mission_channel_id, seconds):
     # start a timer for 5 minutes
     print(f"Starting {seconds} second countdown for deletion of {delchannel}")
     await asyncio.sleep(seconds)
+    print("Channel removal timer complete")
+
+    # acquire channel lock
+    carrier_channel_lock.acquire()
+    print("Locking carrier channel")
 
     # check whether channel is in-use for a new mission
     mission_db.execute(f"SELECT * FROM missions WHERE "
@@ -1378,11 +1406,14 @@ async def remove_carrier_channel(mission_channel_id, seconds):
     if mission_data:
         # abort abort abort
         print(f'New mission underway in this channel, aborting removal')
-        return
     else:
         # delete channel
         await delchannel.delete()
         print(f'Deleted {delchannel}')
+
+    # now release the channel lock
+    carrier_channel_lock.release()
+    print("Unlocking carrier channel")
     return
 
 
