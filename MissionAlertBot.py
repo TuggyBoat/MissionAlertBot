@@ -67,8 +67,8 @@ hauler_role_id = conf['HAULER_ROLE']
 upvote_emoji = conf['UPVOTE_EMOJI']
 
 # channel removal timers
-seconds_short = 20
-seconds_long = 20
+seconds_short = 120
+seconds_long = 900
 
 # Get the discord token from the local .env file. Deliberately not hosted in the repo or Discord takes the bot down
 # because the keys are exposed. DO NOT HOST IN THE REPO. Seriously do not do it ...
