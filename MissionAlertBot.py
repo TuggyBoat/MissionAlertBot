@@ -68,7 +68,7 @@ upvote_emoji = conf['UPVOTE_EMOJI']
 
 # channel removal timers
 seconds_short = 120
-seconds_long = 20
+seconds_long = 900
 
 # Get the discord token from the local .env file. Deliberately not hosted in the repo or Discord takes the bot down
 # because the keys are exposed. DO NOT HOST IN THE REPO. Seriously do not do it ...
@@ -640,6 +640,15 @@ async def gen_mission(ctx, carrier_name_search_term, commodity_search_term, syst
         print(f'Exiting mission generation requested by {ctx.author} as pad size is invalid, provided: {pads}')
         return await ctx.send(f'Sorry, your pad size is not L or M. Provided: {pads}. Mission generation cancelled.')
 
+    # lock the carrier's channel so it can't be deleted during mission creation
+    if carrier_channel_lock.locked():
+        await ctx.send("Channel cleanup in progress. Please try again in a few seconds.")
+        print("Channel is locked by channel remover, aborting")
+        return
+    else:
+        carrier_channel_lock.acquire()
+        print("Locking carrier channel")
+
     # TODO: This method is way too long, break it up into logical steps.
 
     # None-strings, should hopefully not break the database. If it does revert these to 'NULL'
@@ -742,6 +751,7 @@ async def gen_mission(ctx, carrier_name_search_term, commodity_search_term, syst
             # immediately stop if there's an x anywhere in the message, even if there are other proper inputs
             message_cancelled = await ctx.send("**Mission creation cancelled.**")
             # remove the channel we just created
+            carrier_channel_lock.release()
             await remove_carrier_channel(mission_temp_channel_id, seconds_short)
             await msg.delete()
             await message_confirm.delete()
@@ -877,6 +887,8 @@ async def gen_mission(ctx, carrier_name_search_term, commodity_search_term, syst
             await ctx.send(embed=embed)
     except asyncio.TimeoutError:
         await ctx.send("**Mission not generated or broadcast (no valid response from user).**")
+        carrier_channel_lock.release()
+        await remove_carrier_channel(mission_temp_channel_id, seconds_short)
         return
 
     print("All options worked through, now clean up")
@@ -894,11 +906,6 @@ async def gen_mission(ctx, carrier_name_search_term, commodity_search_term, syst
 
 async def create_mission_temp_channel(ctx, discord_channel, owner_id):
     # create the carrier's channel for the mission
-
-    # lock the channel so it can't be deleted during mission creation
-
-    carrier_channel_lock.acquire()
-    print("Locking carrier channel")
 
     # first check whether channel already exists
 
@@ -1388,33 +1395,37 @@ async def remove_carrier_channel(mission_channel_id, seconds):
     # get channel ID to remove
     delchannel = bot.get_channel(mission_channel_id)
 
-    # start a timer for 5 minutes
+    # start a timer
     print(f"Starting {seconds} second countdown for deletion of {delchannel}")
     await asyncio.sleep(seconds)
     print("Channel removal timer complete")
 
     # acquire channel lock
-    carrier_channel_lock.acquire()
-    print("Locking carrier channel")
-
-    # check whether channel is in-use for a new mission
-    mission_db.execute(f"SELECT * FROM missions WHERE "
-                       f"channelid = {mission_channel_id}")
-    mission_data = MissionData(mission_db.fetchone())
-    print(f'Mission data from remove_carrier_channel: {mission_data}')
-
-    if mission_data:
-        # abort abort abort
-        print(f'New mission underway in this channel, aborting removal')
+    if carrier_channel_lock.locked():
+        print("Channel is locked by mission generator, aborting")
+        return
     else:
-        # delete channel
-        await delchannel.delete()
-        print(f'Deleted {delchannel}')
+        carrier_channel_lock.acquire()
+        print("Locking carrier channel")
 
-    # now release the channel lock
-    carrier_channel_lock.release()
-    print("Unlocking carrier channel")
-    return
+        # check whether channel is in-use for a new mission
+        mission_db.execute(f"SELECT * FROM missions WHERE "
+                        f"channelid = {mission_channel_id}")
+        mission_data = MissionData(mission_db.fetchone())
+        print(f'Mission data from remove_carrier_channel: {mission_data}')
+
+        if mission_data:
+            # abort abort abort
+            print(f'New mission underway in this channel, aborting removal')
+        else:
+            # delete channel
+            await delchannel.delete()
+            print(f'Deleted {delchannel}')
+
+        # now release the channel lock
+        carrier_channel_lock.release()
+        print("Unlocking carrier channel")
+        return
 
 
 # a command for users to mark a carrier mission complete from within the carrier channel
