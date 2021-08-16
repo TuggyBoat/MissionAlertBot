@@ -701,6 +701,10 @@ async def gen_mission(ctx, carrier_name_search_term, commodity_search_term, syst
 
         except asyncio.TimeoutError:
             await ctx.send("**Mission generation cancelled (waiting too long for user input)**")
+            try:
+                carrier_channel_lock.release()
+            finally:
+                await remove_carrier_channel(mission_temp_channel_id, seconds_short)
             await message_rp.delete()
             return
 
@@ -751,8 +755,10 @@ async def gen_mission(ctx, carrier_name_search_term, commodity_search_term, syst
             # immediately stop if there's an x anywhere in the message, even if there are other proper inputs
             message_cancelled = await ctx.send("**Mission creation cancelled.**")
             # remove the channel we just created
-            carrier_channel_lock.release()
-            await remove_carrier_channel(mission_temp_channel_id, seconds_short)
+            try:
+                carrier_channel_lock.release()
+            finally:
+                await remove_carrier_channel(mission_temp_channel_id, seconds_short)
             await msg.delete()
             await message_confirm.delete()
             print("User cancelled mission generation")
@@ -887,8 +893,10 @@ async def gen_mission(ctx, carrier_name_search_term, commodity_search_term, syst
             await ctx.send(embed=embed)
     except asyncio.TimeoutError:
         await ctx.send("**Mission not generated or broadcast (no valid response from user).**")
-        carrier_channel_lock.release()
-        await remove_carrier_channel(mission_temp_channel_id, seconds_short)
+        try:
+            carrier_channel_lock.release()
+        finally:
+            await remove_carrier_channel(mission_temp_channel_id, seconds_short)
         return
 
     print("All options worked through, now clean up")
@@ -1400,28 +1408,29 @@ async def remove_carrier_channel(mission_channel_id, seconds):
     await asyncio.sleep(seconds)
     print("Channel removal timer complete")
 
-    # acquire channel lock
-    if carrier_channel_lock.locked():
-        print("Channel is locked by mission generator, aborting")
-        return
-    else:
-        carrier_channel_lock.acquire()
-        print("Locking carrier channel")
-
-        # check whether channel is in-use for a new mission
-        mission_db.execute(f"SELECT * FROM missions WHERE "
-                        f"channelid = {mission_channel_id}")
-        mission_data = MissionData(mission_db.fetchone())
-        print(f'Mission data from remove_carrier_channel: {mission_data}')
-
-        if mission_data:
-            # abort abort abort
-            print(f'New mission underway in this channel, aborting removal')
+    try:
+        # acquire channel lock
+        if carrier_channel_lock.locked():
+            print("Channel is locked by mission generator, aborting")
+            return
         else:
-            # delete channel
-            await delchannel.delete()
-            print(f'Deleted {delchannel}')
+            carrier_channel_lock.acquire()
+            print("Locking carrier channel")
 
+            # check whether channel is in-use for a new mission
+            mission_db.execute(f"SELECT * FROM missions WHERE "
+                            f"channelid = {mission_channel_id}")
+            mission_data = MissionData(mission_db.fetchone())
+            print(f'Mission data from remove_carrier_channel: {mission_data}')
+
+            if mission_data:
+                # abort abort abort
+                print(f'New mission underway in this channel, aborting removal')
+            else:
+                # delete channel
+                await delchannel.delete()
+                print(f'Deleted {delchannel}')
+    finally:
         # now release the channel lock
         carrier_channel_lock.release()
         print("Unlocking carrier channel")
