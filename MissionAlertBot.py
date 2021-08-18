@@ -765,6 +765,9 @@ async def gen_mission(ctx, carrier_name_search_term, commodity_search_term, syst
         def check_rp(message):
             return message.author == ctx.author and message.channel == ctx.channel
 
+        carrier_data = find_carrier_from_long_name(carrier_name_search_term)
+        mission_temp_channel_id = await create_mission_temp_channel(ctx, carrier_data.discord_channel, carrier_data.ownerid)
+
         if rp:
             embed = discord.Embed(title="Input roleplay text",
                                 description="Roleplay text is sent in quote style like this:\n\n> This is a quote!"
@@ -794,9 +797,7 @@ async def gen_mission(ctx, carrier_name_search_term, commodity_search_term, syst
         commodity_data = await find_commodity(commodity_search_term, ctx)
         if not commodity_data:
             raise ValueError('Missing commodity data')
-        carrier_data = find_carrier_from_long_name(carrier_name_search_term)
 
-        mission_temp_channel_id = await create_mission_temp_channel(ctx, carrier_data.discord_channel, carrier_data.ownerid)
         file_name = create_carrier_mission_image(carrier_data, commodity_data, system, station, profit, pads, demand,
                                                 mission_type)
         discord_text = txt_create_discord(carrier_data, mission_type, commodity_data, station, system, profit, pads,
