@@ -19,6 +19,7 @@ import asyncpraw
 import asyncio
 import shutil
 from discord import channel
+from discord.colour import Color
 from discord.errors import HTTPException, InvalidArgument, Forbidden, NotFound
 from discord.ext import commands
 from discord.utils import get
@@ -39,6 +40,7 @@ from CarrierData import CarrierData
 from Commodity import Commodity
 from MissionData import MissionData
 from CommunityCarrierData import CommunityCarrierData
+from NomineesData import NomineesData
 
 _production = ast.literal_eval(os.environ.get('PTN_MISSION_ALERT_SERVICE', 'False'))
 
@@ -197,6 +199,33 @@ if not check_database_table_exists('community_carriers', carrier_db):
 else:
     print('Community Carrier database exists, do nothing')
 
+
+print('Starting up - checking nominees database if it exists or not')
+# create nominees table if necessary
+if not check_database_table_exists('nominees', carrier_db):
+    print('Nominees database missing - creating it now')
+
+    if os.path.exists(os.path.join(os.getcwd(), 'db_sql', 'nominees_dump.sql')):
+        # recreate from backup file
+        print('Recreating database from backup ...')
+        with open(os.path.join(os.getcwd(), 'db_sql', 'nominees_dump.sql')) as f:
+            sql_script = f.read()
+            carrier_db.executescript(sql_script)
+
+    else:
+        # Create a new version
+        print('No backup found - Creating empty database')
+        carrier_db.execute('''
+            CREATE TABLE nominees( 
+                nominatorid INT NOT NULL,
+                pillarid INT NOT NULL,
+                note TEXT
+            ) 
+        ''')
+else:
+    print('Nominees database exists, do nothing')
+
+
 print('Starting up - checking missions database if it exists or not')
 # create missions db if necessary
 if not check_database_table_exists('missions', mission_db):
@@ -330,7 +359,6 @@ async def delete_carrier_from_db(p_id):
 
 # function to remove a community carrier
 async def delete_community_carrier_from_db(ownerid):
-    carrier = find_community_carrier_with_owner_id(ownerid)
     try:
         await carrier_db_lock.acquire()
         carrier_db.execute(f"DELETE FROM community_carriers WHERE ownerid = {ownerid}")
@@ -338,6 +366,29 @@ async def delete_community_carrier_from_db(ownerid):
     finally:
         carrier_db_lock.release()
     return
+
+
+# remove a nominee from the database
+async def delete_nominee_from_db(pillarid):
+    try:
+        await carrier_db_lock.acquire()
+        carrier_db.execute(f"DELETE FROM nominees WHERE pillarid = {pillarid}")
+        carriers_conn.commit()
+    finally:
+        carrier_db_lock.release()
+    return
+
+
+# function to remove a nominee
+async def delete_nominee_by_nominator(nomid, pillarid):
+    print("Attempting to delete {nomid} {pillarid} match.")
+    try:
+        await carrier_db_lock.acquire()
+        carrier_db.execute(f"DELETE FROM nominees WHERE nominatorid = {nomid} AND pillarid = {pillarid}")
+        carriers_conn.commit()
+    finally:
+        carrier_db_lock.release()
+    return print("Deleted")
 
 
 # function to remove all carriers, not currently used by any bot command
@@ -428,6 +479,43 @@ def find_community_carrier_with_owner_id(ownerid):
               f" called from find_carrier_with_owner_id.")
 
     return community_carrier_data
+
+
+def find_nominee_with_id(pillarid):
+    """
+    Returns nominee, nominator and note matching the nominee's user ID
+
+    :param int pillarid: The user id to match
+    :returns: A list of nominees data objects
+    :rtype: list[NomineesData]
+    """
+    carrier_db.execute(f"SELECT * FROM nominees WHERE "
+                       f"pillarid = {pillarid} ")
+    nominees_data = [NomineesData(nominees) for nominees in carrier_db.fetchall()]
+    for nominees in nominees_data:
+        print(f"{nominees.pillar_id} nominated by {nominees.nom_id} for reason {nominees.note}" 
+              f" called from find_nominee_with_id.")
+
+    return nominees_data
+
+
+def find_nominator_with_id(nomid):
+    """
+    Returns nominee, nominator and note matching the nominator's user ID
+
+    :param int nomid: The user id to match
+    :returns: A list of nominees data objects
+    :rtype: list[NomineesData]
+    """
+    carrier_db.execute(f"SELECT * FROM nominees WHERE "
+                       f"nominatorid = {nomid} ")
+    nominees_data = [NomineesData(nominees) for nominees in carrier_db.fetchall()]
+    for nominees in nominees_data:
+        print(f"{nominees.nom_id} nominated {nominees.pillar_id} for reason {nominees.note}" 
+              f" called from find_nominee_with_id.")
+
+    return nominees_data
+
 
 # function to search for a carrier by shortname
 def find_carrier_from_short_name(find_short_name):
@@ -654,7 +742,7 @@ async def on_ready():
                                'Demand should be expressed as an absolute number e.g. 20k, 20,000, etc.\n'
                                'ETA is optional and should be expressed as a number of minutes e.g. 15.\n'
                                'Case is automatically corrected for all inputs.')
-@commands.has_role('Certified Carrier')
+@commands.has_any_role('Certified Carrier', 'Trainee')
 async def load(ctx, carrier_name_search_term, commodity_search_term, system, station, profit, pads, demand, eta=None):
     rp = False
     mission_type = 'load'
@@ -666,7 +754,7 @@ async def load(ctx, carrier_name_search_term, commodity_search_term, system, sta
                                  'This is added to the Reddit comment as as a quote above the mission details\n'
                                  'and sent to the carrier\'s Discord channel in quote format if those options are '
                                  'chosen')
-@commands.has_role('Certified Carrier')
+@commands.has_any_role('Certified Carrier', 'Trainee')
 async def loadrp(ctx, carrier_name_search_term, commodity_search_term, system, station, profit, pads, demand, eta=None):
     rp = True
     mission_type = 'load'
@@ -685,7 +773,7 @@ async def loadrp(ctx, carrier_name_search_term, commodity_search_term, system, s
                                  'Supply should be expressed as an absolute number e.g. 20k, 20,000, etc.\n'
                                  'ETA is optional and should be expressed as a number of minutes e.g. 15.\n'
                                  'Case is automatically corrected for all inputs.')
-@commands.has_role('Certified Carrier')
+@commands.has_any_role('Certified Carrier', 'Trainee')
 async def unload(ctx, carrier_name_search_term, commodity_search_term, system, station, profit, pads, supply, eta=None):
     rp = False
     mission_type = 'unload'
@@ -697,7 +785,7 @@ async def unload(ctx, carrier_name_search_term, commodity_search_term, system, s
                                    'This is added to the Reddit comment as as a quote above the mission details\n'
                                    'and sent to the carrier\'s Discord channel in quote format if those options are '
                                    'chosen')
-@commands.has_role('Certified Carrier')
+@commands.has_any_role('Certified Carrier', 'Trainee')
 async def unloadrp(ctx, carrier_name_search_term, commodity_search_term, system, station, profit, pads, demand, eta=None):
     rp = True
     mission_type = 'unload'
@@ -1408,7 +1496,7 @@ async def _missions(ctx: SlashContext):
                                'Deletes trade alert in Discord and sends messages to carrier channel and reddit if '
                                'appropriate.\n\nAnything put in quotes after the carrier name will be treated as a '
                                'quote to be sent along with the completion notice. This can be used for RP if desired.')
-@commands.has_role('Certified Carrier')
+@commands.has_any_role('Certified Carrier', 'Trainee')
 async def done(ctx, carrier_name_search_term, rp=None):
 
     # Check we are in the designated mission channel, if not go no farther.
@@ -1594,7 +1682,7 @@ async def complete(ctx):
                     await ctx.send(f"Notifying carrier owner: <@{carrier_data.ownerid}>")
 
                     # notify owner by DM
-                    user = bot.get_user(carrier_data.ownerid)
+                    user = await bot.fetch_user(carrier_data.ownerid)
                     await user.send(f"Ahoy CMDR! The trade mission for your Fleet Carrier **{carrier_data.carrier_long_name}** has been marked as complete by {ctx.author.display_name}. Its mission channel will be removed in {seconds_long//60} minutes unless a new mission is started.")
 
                     # record command user in bot-spam
@@ -1953,7 +2041,7 @@ async def carrier_del(ctx, db_id):
                                         'Use on its own to receive a blank template image.\n'
                                         'Use with carrier\'s name as argument to check the '
                                         'carrier\'s image or begin upload of a new image.')
-@commands.has_role('Certified Carrier')
+@commands.has_any_role('Certified Carrier', 'Trainee')
 async def carrier_image(ctx, lookname=None):
     if not lookname:
         print(f"{ctx.author} called m.carrier_image without argument")
@@ -2884,10 +2972,214 @@ async def cc_del(ctx, owner: discord.Member):
             return await ctx.send(f"Error, channel not deleted: {e}")
 
 
+#
+#                       COMMUNITY NOMINATION COMMANDS
+#
+
+@slash.slash(name="nominate", guild_ids=[bot_guild_id],
+             description="Private command: Nominate an @member to become a Community Pillar.")
+async def _nominate(ctx: SlashContext, user: discord.Member, *, reason):
+
+    # TODO: command to list nominations for a nominator
+
+    # first check the user is not nominating themselves because seriously dude
+
+    if ctx.author.id == user.id:
+        print(f"{ctx.author} tried to nominate themselves for Community Pillar :]")
+        return await ctx.send("You can't nominate yourself! But congrats on the positive self-esteem :)", hidden=True)
+
+    print(f"{ctx.author} wants to nominate {user}")
+    spamchannel = bot.get_channel(bot_spam_id)
+
+    # first check this user has not already nominated the same person
+    nominees_data = find_nominator_with_id(ctx.author.id)
+    if nominees_data:
+        for nominees in nominees_data:
+            if nominees.pillar_id == user.id:
+                print("This user already nommed this dude")
+                embed = discord.Embed(title="Nomination Failed", description=f"You've already nominated <@{user.id}> for reason **{nominees.note}**.\n\n"
+                                                                             f"You can nominate any number of users, but only once for each user.", color=constants.EMBED_COLOUR_ERROR)
+                await ctx.send(embed=embed, hidden=True)
+                return
+            else:
+                print("No matching nomination, proceeding")
+
+    # enter nomination into nominees db
+    try:
+        print("Locking carrier db...")
+        await carrier_db_lock.acquire()
+        print("Carrier DB locked.")
+        try:
+            carrier_db.execute(''' INSERT INTO nominees VALUES(?, ?, ?) ''',
+                            (ctx.author.id, user.id, reason))
+            carriers_conn.commit()
+            print("Registered nomination to database")
+        finally:
+            print("Unlocking carrier db...")
+            carrier_db_lock.release()
+            print("Carrier DB unlocked.")
+    except Exception as e:
+        await ctx.send("Sorry, something went wrong and developers have been notified.", hidden=True)
+        # notify in bot_spam
+        await spamchannel.send(f"Error on /nominate by {ctx.author}: {e}")
+        return print(f"Error on /nominate by {ctx.author}: {e}")
+
+    # notify user of success
+    embed = discord.Embed(title="Nomination Successful", description=f"Thank you! You've nominated <@{user.id}> "
+                                f"to become a Community Pillar.\n\nReason: **{reason}**", color=constants.EMBED_COLOUR_OK)
+    await ctx.send(embed=embed, hidden=True)
+
+    # also tell bot-spam
+    await spamchannel.send(f"<@{user.id}> was nominated for Community Pillar.")
+    return print("Nomination successful")
+
+
+@slash.slash(name="nominate_remove", guild_ids=[bot_guild_id],
+             description="Private command: Remove your Pillar nomination for a user.")
+async def _nominate_remove(ctx: SlashContext, user: discord.Member):
+
+    print(f"{ctx.author} wants to un-nominate {user}")
+
+    # find the nomination
+    nominees_data = find_nominator_with_id(ctx.author.id)
+    if nominees_data:
+        for nominees in nominees_data:
+            if nominees.pillar_id == user.id:
+                await delete_nominee_by_nominator(ctx.author.id, user.id)
+                embed = discord.Embed(title="Nomination Removed", description=f"Your nomination for <@{user.id}> "
+                                           f"has been removed. If they're being a jerk, consider reporting privately "
+                                           f"to a Mod or Council member.", color=constants.EMBED_COLOUR_OK)
+                await ctx.send(embed=embed, hidden=True)
+
+                # notify bot-spam
+                spamchannel = bot.get_channel(bot_spam_id)
+                await spamchannel.send(f"A nomination for <@{user.id}> was withdrawn.")
+                return
+
+    # otherwise return an error
+    print("No such nomination")
+    return await ctx.send("No nomination found by you for that user.")
+
+def nom_count_user(pillarid):
+    """
+    Counts how many active nominations a nominee has.
+    """
+    nominees_data = find_nominee_with_id(pillarid)
+
+    count = len(nominees_data)
+    print(f"{count} for {pillarid}")
+
+    return count
+
+@bot.command(name='nom_count', help='Shows all users with more than X nominations')
+@commands.has_any_role('Community Team', 'Mod', 'Admin', 'Council')
+async def nom_count(ctx, number):
+
+    # make sure we are in the right channel
+    bot_command_channel = bot.get_channel(conf['ADMIN_BOT_CHANNEL'])
+    current_channel = ctx.channel
+    if current_channel != bot_command_channel:
+        # problem, wrong channel, no progress
+        return await ctx.send(f'Sorry, you can only run this command out of: {bot_command_channel}.')
+
+    numberint = int(number)
+
+    print(f"nom_list called by {ctx.author}")
+    embed=discord.Embed(title="Community Pillar nominees", description=f"Showing all with {number} nominations or more.", color=constants.EMBED_COLOUR_OK)
+
+    print("reading database")
+    carrier_db.execute(f"SELECT * FROM nominees")
+    nominees_data = [NomineesData(nominees) for nominees in carrier_db.fetchall()]
+    for nominees in nominees_data:
+        print("Counting...")
+        count = nom_count_user(nominees.pillar_id)
+        print(f"{nominees.pillar_id} has {count}")
+        if count >= numberint:
+            embed.add_field(name=f'{count} nominations', value=f"<@{nominees.pillar_id}>", inline=False)
+    
+    await ctx.send(embed=embed)
+    return print("nom_count complete")
+
+
+@bot.command(name='nom_details', help='Shows nomination details for given @user')
+@commands.has_any_role('Community Team', 'Mod', 'Admin', 'Council')
+async def nom_details(ctx, userid):
+    print(f"nom_details called by {ctx.author}")
+
+    member = await bot.fetch_user(userid)
+    print(f"looked for member with {userid} and found {member}")
+
+    # make sure we are in the right channel
+    bot_command_channel = bot.get_channel(conf['ADMIN_BOT_CHANNEL'])
+    current_channel = ctx.channel
+    if current_channel != bot_command_channel:
+        # problem, wrong channel, no progress
+        return await ctx.send(f'Sorry, you can only run this command out of: {bot_command_channel}.')
+
+    embed=discord.Embed(title=f"Nomination details", description=f"Discord user <@{member.id}>", color=constants.EMBED_COLOUR_OK)
+
+    # look up specified user and return every entry for them as embed fields. TODO: This will break after too many nominations, would need to be paged.
+    nominees_data = find_nominee_with_id(userid)
+    for nominees in nominees_data:
+        nominator = await bot.fetch_user(nominees.nom_id)
+        embed.add_field(name=f'Nominator: {nominator.name}',
+                        value=f"{nominees.note}", inline=False)
+
+    await ctx.send(embed=embed)
+
+
+@bot.command(name='nom_delete', help='Completely removes all nominations for a user by Discord ID. NOT RECOVERABLE.')
+@commands.has_any_role('Admin', 'Council')
+async def nom_delete(ctx, userid):
+    print(f"nom_delete called by {ctx.author}")
+
+    member = await bot.fetch_user(userid)
+
+    # make sure we are in the right channel
+    bot_command_channel = bot.get_channel(conf['ADMIN_BOT_CHANNEL'])
+    current_channel = ctx.channel
+    if current_channel != bot_command_channel:
+        # problem, wrong channel, no progress
+        return await ctx.send(f'Sorry, you can only run this command out of: {bot_command_channel}.')
+
+    # are they sure?
+
+    def check(message):
+        return message.author == ctx.author and message.channel == ctx.channel and \
+                                 message.content.lower() in ["y", "n"]
+
+    await ctx.send(f"Are you **sure** you want to completely remove {member} from the nominees database? **The data is gone forever**.\n**y**/**n**")
+
+    try:
+        msg = await bot.wait_for("message", check=check, timeout=30)
+        if msg.content.lower() == "n":
+            await ctx.send("OK, cancelling.")
+            print("User cancelled cc_del command.")
+            return
+        elif msg.content.lower() == "y":
+            print("User wants to proceed with removal.")
+            await ctx.send("You're the boss, boss.")
+
+    except asyncio.TimeoutError:
+        await ctx.send("Cancelled: no response.")
+        return
+
+    # remove the database entry
+    try:
+        error_msg = await delete_nominee_from_db(userid)
+        if error_msg:
+            return await ctx.send(error_msg)
+
+        print("User removed from nominees database.")
+    except Exception as e:
+        return await ctx.send(f'Something went wrong, go tell the bot team "computer said: {e}"')
+
+    await ctx.send(f"User {member} removed from nominees database.")
+
 
 # ping the bot
 @bot.command(name='ping', help='Ping the bot')
-@commands.has_role('Certified Carrier')
+@commands.has_any_role('Certified Carrier', 'Trainee', 'Developer')
 async def ping(ctx):
     await ctx.send("**PING? PONG!**")
 
