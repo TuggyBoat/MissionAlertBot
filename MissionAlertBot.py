@@ -1686,8 +1686,8 @@ async def complete(ctx):
                     await user.send(f"Ahoy CMDR! The trade mission for your Fleet Carrier **{carrier_data.carrier_long_name}** has been marked as complete by {ctx.author.display_name}. Its mission channel will be removed in {seconds_long//60} minutes unless a new mission is started.")
 
                     # record command user in bot-spam
-                    channel = bot.get_channel(bot_spam_id)
-                    await channel.send(f"{ctx.author} used m.complete in #{carrier_data.discord_channel}")
+                    spamchannel = bot.get_channel(bot_spam_id)
+                    await spamchannel.send(f"{ctx.author} used m.complete in #{carrier_data.discord_channel}")
                     # now we need to go do all the mission cleanup stuff
 
                     # delete Discord trade alert
@@ -2578,7 +2578,11 @@ def _configure_all_carrier_detail_embed(embed, carrier_data):
                              'The owner will receive the @Community Carrier role\n'
                              'as well as full permissions in the channel.')
 @commands.has_any_role('Community Team', 'Mod', 'Admin', 'Council')
-async def cc(ctx, owner: discord.Member, channel_name):
+async def cc(ctx, owner: discord.Member, *, channel_name):
+
+    # check the channel name isn't something utterly stupid
+    if len(channel_name) > 30:
+        return await ctx.send("Error: Channel name should be fewer than 30 characters. (Preferably a *lot* fewer.)")
 
     # TODO:
     # - embeds instead of normal messages for all cc interactions?
@@ -2593,7 +2597,7 @@ async def cc(ctx, owner: discord.Member, channel_name):
         # TODO: this should be fetchone() not fetchall but I can't make it work otherwise
         for community_carrier in community_carrier_data:
             print(f"Found data: {community_carrier.owner_id} owner of {community_carrier.channel_id}")
-            await ctx.send(f"User {owner.name} is already registered as a Community Carrier with channel <#{community_carrier.channel_id}>")
+            await ctx.send(f"User {owner.display_name} is already registered as a Community Carrier with channel <#{community_carrier.channel_id}>")
             return
         
     # get the CC category as a discord channel category object
@@ -2618,7 +2622,7 @@ async def cc(ctx, owner: discord.Member, channel_name):
                 return
             elif msg.content.lower() == "y":
                 # they want to use the existing channel, so we have to move it to the right category
-                print(f"Using existing channel {new_channel} and making {owner.name} its owner.")
+                print(f"Using existing channel {new_channel} and making {owner.display_name} its owner.")
                 try:
                     await new_channel.edit(category=category)
                     await ctx.send(f"Channel moved to {category.name}.")
@@ -2715,8 +2719,8 @@ async def cc(ctx, owner: discord.Member, channel_name):
     await ctx.send(embed=embed)
 
     # add a note in bot_spam
-    channel = bot.get_channel(bot_spam_id)
-    await channel.send(f"{ctx.author} used m.cc in <#{ctx.channel.id}> to add {owner.name} as a Community Carrier with channel <#{new_channel.id}>")
+    spamchannel = bot.get_channel(bot_spam_id)
+    await spamchannel.send(f"{ctx.author} used m.cc in <#{ctx.channel.id}> to add {owner.display_name} as a Community Carrier with channel <#{new_channel.id}>")
 
     return
 
@@ -2826,19 +2830,20 @@ async def cc_list(ctx):
 
 
 # find a community carrier channel by owner
-@bot.command(name='cc_owner', help='Search for an owner in the Community Carrier database.\n'
+@bot.command(name='cc_owner', help='Search for an owner by @ mention in the Community Carrier database.\n'
                              'Format: m.cc_owner @owner\n')
 @commands.has_any_role('Community Team', 'Mod', 'Admin', 'Council')
-async def cc_owner(ctx, owner: discord.User):
+async def cc_owner(ctx, owner: discord.Member):
+
     community_carrier_data = find_community_carrier_with_owner_id(owner.id)
     if community_carrier_data:
         # TODO: this should be fetchone() not fetchall but I can't make it work otherwise
         for community_carrier in community_carrier_data:
             print(f"Found data: {community_carrier.owner_id} owner of {community_carrier.channel_id}")
-            await ctx.send(f"User {owner.name} is registered as a Community Carrier with channel <#{community_carrier.channel_id}>")
+            await ctx.send(f"User {owner.display_name} is registered as a Community Carrier with channel <#{community_carrier.channel_id}>")
             return
     else:
-        await ctx.send(f"No Community Carrier registered to {owner.name}")
+        await ctx.send(f"No Community Carrier registered to {owner.display_name}")
 
 
 # delete a Community Carrier
@@ -2858,14 +2863,14 @@ async def cc_del(ctx, owner: discord.Member):
     # search for the user's database entry
     community_carrier_data = find_community_carrier_with_owner_id(owner.id)
     if not community_carrier_data:
-        await ctx.send(f"No Community Carrier registered to {owner.name}")
+        await ctx.send(f"No Community Carrier registered to {owner.display_name}")
         return
     elif community_carrier_data:
         # TODO: this should be fetchone() not fetchall but I can't make it work otherwise
         for community_carrier in community_carrier_data:
             print(f"Found data: {community_carrier.owner_id} owner of {community_carrier.channel_id}")
             channel_id = community_carrier.channel_id
-            await ctx.send(f"User {owner.name} is registered as a Community Carrier with channel <#{channel_id}>")
+            await ctx.send(f"User {owner.display_name} is registered as a Community Carrier with channel <#{channel_id}>")
 
     await ctx.send("Remove Community Carrier role and de-register user? **y**/**n**")
     try:
@@ -2944,11 +2949,11 @@ async def cc_del(ctx, owner: discord.Member):
             await channel.edit(sync_permissions=True)
             print("Synced permissions")
 
-            await ctx.send(f"{owner.name} removed from database and <#{channel_id}> archived.")
+            await ctx.send(f"{owner.display_name} removed from database and <#{channel_id}> archived.")
 
             # notify in bot_spam
-            channel = bot.get_channel(bot_spam_id)
-            await channel.send(f"{ctx.author} used m.cc_del in <#{ctx.channel.id}> to remove {owner.name} as a Community Carrier. Channel <#{channel_id} was archived.")
+            spamchannel = bot.get_channel(bot_spam_id)
+            await spamchannel.send(f"{ctx.author} used m.cc_del in <#{ctx.channel.id}> to remove {owner.name} as a Community Carrier. Channel <#{channel_id}> was archived.")
             return
         except Exception as e:
             print(e)
@@ -2964,8 +2969,8 @@ async def cc_del(ctx, owner: discord.Member):
             await ctx.send(f"{owner.name} removed from database and #{channel} deleted.")
 
             # notify in bot_spam
-            channel = bot.get_channel(bot_spam_id)
-            await channel.send(f"{ctx.author} used m.cc_del in <#{ctx.channel.id}> to remove {owner.name} as a Community Carrier. Channel #{channel} was deleted.")
+            spamchannel = bot.get_channel(bot_spam_id)
+            await spamchannel.send(f"{ctx.author} used m.cc_del in <#{ctx.channel.id}> to remove {owner.name} as a Community Carrier. Channel #{channel} was deleted.")
             return
         except Exception as e:
             print(e)
@@ -3001,8 +3006,8 @@ async def _nominate(ctx: SlashContext, user: discord.Member, *, reason):
                                                                              f"You can nominate any number of users, but only once for each user.", color=constants.EMBED_COLOUR_ERROR)
                 await ctx.send(embed=embed, hidden=True)
                 return
-            else:
-                print("No matching nomination, proceeding")
+
+    print("No matching nomination, proceeding")
 
     # enter nomination into nominees db
     try:
@@ -3088,12 +3093,20 @@ async def nom_count(ctx, number):
     embed=discord.Embed(title="Community Pillar nominees", description=f"Showing all with {number} nominations or more.", color=constants.EMBED_COLOUR_OK)
 
     print("reading database")
-    carrier_db.execute(f"SELECT * FROM nominees")
+
+    # we need to 1: get a list of unique pillars then 2: send only one instance of each unique pillar to nom_count_user
+
+    # 1: get a list of unique pillars
+    carrier_db.execute(f"SELECT DISTINCT pillarid FROM nominees")
     nominees_data = [NomineesData(nominees) for nominees in carrier_db.fetchall()]
     for nominees in nominees_data:
-        print("Counting...")
+        print(nominees.pillar_id)
+
+        # 2: pass each unique pillar through to the counting function to retrieve the number of times they appear in the table
         count = nom_count_user(nominees.pillar_id)
         print(f"{nominees.pillar_id} has {count}")
+
+        # only show those with a count >= the number the user specified
         if count >= numberint:
             embed.add_field(name=f'{count} nominations', value=f"<@{nominees.pillar_id}>", inline=False)
     
@@ -3101,9 +3114,13 @@ async def nom_count(ctx, number):
     return print("nom_count complete")
 
 
-@bot.command(name='nom_details', help='Shows nomination details for given @user')
+@bot.command(name='nom_details', help='Shows nomination details for given user by ID or @ mention')
 @commands.has_any_role('Community Team', 'Mod', 'Admin', 'Council')
 async def nom_details(ctx, userid):
+
+    # sanitise userid in case they used an @ mention
+    userid = userid.replace('<', '').replace('>', '').replace('@', '').replace('!', '')
+
     print(f"nom_details called by {ctx.author}")
 
     member = await bot.fetch_user(userid)
@@ -3122,16 +3139,19 @@ async def nom_details(ctx, userid):
     nominees_data = find_nominee_with_id(userid)
     for nominees in nominees_data:
         nominator = await bot.fetch_user(nominees.nom_id)
-        embed.add_field(name=f'Nominator: {nominator.name}',
+        embed.add_field(name=f'Nominator: {nominator.display_name}',
                         value=f"{nominees.note}", inline=False)
 
     await ctx.send(embed=embed)
 
 
-@bot.command(name='nom_delete', help='Completely removes all nominations for a user by Discord ID. NOT RECOVERABLE.')
+@bot.command(name='nom_delete', help='Completely removes all nominations for a user by user ID or @ mention. NOT RECOVERABLE.')
 @commands.has_any_role('Admin', 'Council')
 async def nom_delete(ctx, userid):
     print(f"nom_delete called by {ctx.author}")
+
+    # sanitise userid in case they used an @ mention
+    userid = userid.replace('<', '').replace('>', '').replace('@', '').replace('!', '')
 
     member = await bot.fetch_user(userid)
 
@@ -3142,7 +3162,12 @@ async def nom_delete(ctx, userid):
         # problem, wrong channel, no progress
         return await ctx.send(f'Sorry, you can only run this command out of: {bot_command_channel}.')
 
-    # are they sure?
+    # check whether user has any nominations
+    nominees_data = find_nominee_with_id(userid)
+    if not nominees_data:
+        return await ctx.send(f'No results for {member.display_name} (user ID {userid})')
+
+    # now check they're sure they want to delete
 
     def check(message):
         return message.author == ctx.author and message.channel == ctx.channel and \
@@ -3154,7 +3179,7 @@ async def nom_delete(ctx, userid):
         msg = await bot.wait_for("message", check=check, timeout=30)
         if msg.content.lower() == "n":
             await ctx.send("OK, cancelling.")
-            print("User cancelled cc_del command.")
+            print("User cancelled nom_del command.")
             return
         elif msg.content.lower() == "y":
             print("User wants to proceed with removal.")
