@@ -929,7 +929,8 @@ async def gen_mission(ctx, carrier_name_search_term, commodity_search_term, syst
 
             if "r" in msg.content.lower():
                 print("User used option r")
-                if int(profit) < 10:
+                # profit is a float, not an int.
+                if float(profit) < 10:
                     print(f'Not posting the mission from {ctx.author} to reddit due to low profit margin <10k/t.')
                     await ctx.send(f'Skipped Reddit posting due to profit margin of {profit}k/t being below the PTN 10k/t '
                                 f'minimum. (Did you try to post a Wine load?)')
