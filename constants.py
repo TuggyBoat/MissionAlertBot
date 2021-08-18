@@ -12,6 +12,12 @@ PROD_BOT_COMMAND_CHANNEL = 802523724674891826   # Bot backend commands are locke
 PROD_BOT_SPAM_CHANNEL = 801258393205604372 # Certain bot logging messages go here
 PROD_UPVOTE_EMOJI = 828287733227192403 # upvote emoji on live server
 PROD_HAULER_ROLE = 875313960834965544 # hauler role ID on live server
+PROD_CC_ROLE = 869340261057196072 # CC role on live server
+PROD_CC_CAT = 877107894452117544 # Community Carrier category on live server
+PROD_TRADE_CAT = 801558838414409738 # Trade Carrier category on live server
+PROD_ARCHIVE_CAT = 821542402836660284 # Archive category on live server
+PROD_SECONDS_SHORT = 120
+PROD_SECONDS_LONG = 900
 
 # Testing variables
 
@@ -29,6 +35,12 @@ TEST_BOT_COMMAND_CHANNEL = 842152343441375283   # Bot backend commands are locke
 TEST_BOT_SPAM_CHANNEL = 842525081858867211 # Bot logging messages on the test server
 TEST_UPVOTE_EMOJI = 849388681382068225 # upvote emoji on test server
 TEST_HAULER_ROLE = 875439909102575647 # hauler role ID on test server
+TEST_CC_ROLE = 877220476827619399 # CC role on test server
+TEST_CC_CAT = 877108931699310592 # Community Carrier category on test server
+TEST_TRADE_CAT = 876569219259580436 # Trade Carrier category on live server
+TEST_ARCHIVE_CAT = 877244591579992144 # Archive category on live server
+TEST_SECONDS_SHORT = 5
+TEST_SECONDS_LONG = 10
 
 EMBED_COLOUR_LOADING = 0x80ffff         # blue
 EMBED_COLOUR_UNLOADING = 0x80ff80       # green
@@ -64,7 +76,13 @@ def get_constant(production: bool):
             'BOT_COMMAND_CHANNEL': PROD_BOT_COMMAND_CHANNEL,
             'BOT_SPAM_CHANNEL': PROD_BOT_SPAM_CHANNEL,
             'UPVOTE_EMOJI': PROD_UPVOTE_EMOJI,
-            'HAULER_ROLE' : PROD_HAULER_ROLE
+            'HAULER_ROLE' : PROD_HAULER_ROLE,
+            'CC_ROLE' : PROD_CC_ROLE,
+            'CC_CAT' : PROD_CC_CAT,
+            'TRADE_CAT' : PROD_TRADE_CAT,
+            'ARCHIVE_CAT' : PROD_ARCHIVE_CAT,
+            'SECONDS_SHORT' : PROD_SECONDS_SHORT,
+            'SECONDS_LONG' : PROD_SECONDS_LONG
         }
     else:
         result = {
@@ -79,7 +97,13 @@ def get_constant(production: bool):
             'BOT_COMMAND_CHANNEL': TEST_BOT_COMMAND_CHANNEL,
             'BOT_SPAM_CHANNEL': TEST_BOT_SPAM_CHANNEL,
             'UPVOTE_EMOJI': TEST_UPVOTE_EMOJI,
-            'HAULER_ROLE' : TEST_HAULER_ROLE
+            'HAULER_ROLE' : TEST_HAULER_ROLE,
+            'CC_ROLE' : TEST_CC_ROLE,
+            'CC_CAT' : TEST_CC_CAT,
+            'TRADE_CAT' : TEST_TRADE_CAT,
+            'ARCHIVE_CAT' : TEST_ARCHIVE_CAT,
+            'SECONDS_SHORT' : TEST_SECONDS_SHORT,
+            'SECONDS_LONG' : TEST_SECONDS_LONG
         }
 
     return result
