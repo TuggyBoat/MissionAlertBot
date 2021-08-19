@@ -113,6 +113,23 @@ boom_gifs = [
     'https://tenor.com/view/boom-explosion-moonbeam-city-gif-20743300',
 ]
 
+hello_gifs = [
+    'https://tenor.com/view/hello-there-hi-there-greetings-gif-9442662',
+    'https://tenor.com/view/hey-tom-hanks-forrest-gump-gif-5114770',
+    'https://tenor.com/view/hello-there-baby-yoda-mandolorian-hello-gif-20136589',
+    'https://tenor.com/view/oh-hello-there-sassy-fab-gif-14129058',
+    'https://tenor.com/view/world-star-hey-girl-hey-there-when-you-see-your-crush-feeling-yourself-gif-10605207',
+    'https://tenor.com/view/bye-jim-carrey-ciao-gif-5139786',
+    'https://tenor.com/view/hi-friends-baby-goat-saying-hello-saying-hi-hi-neighbor-gif-14737423',
+]
+
+error_gifs = [
+    'https://tenor.com/view/beaker-fire-shit-omg-disaster-gif-4767835',
+    'https://tenor.com/view/naked-gun-explosion-disaster-nothing-to-see-here-please-disperse-gif-13867629',
+    'https://tenor.com/view/spongebob-patrick-panic-run-scream-gif-4656335',
+    'https://tenor.com/view/angry-panda-rage-mad-gif-11780191',
+]
+
 #
 #                       DATABASE STUFF
 #
@@ -637,6 +654,56 @@ slash = SlashCommand(bot, sync_commands=True)
 @bot.event
 async def on_ready():
     print(f'{bot.user.name} has connected to Discord!')
+    await _monitor_reddit_comments()
+
+
+# monitor reddit comments
+async def _monitor_reddit_comments():
+    # TODO: what happens if there's an error in this process, e.g. reddit is down?
+
+    comment_channel = bot.get_channel(conf['REDDIT_CHANNEL'])
+    # establish a comment stream to the subreddit using async praw
+    subreddit = await reddit.subreddit(to_subreddit)
+    async for comment in subreddit.stream.comments(skip_existing=True):
+        print(f"New reddit comment: {comment}. Is_submitter is {comment.is_submitter}")
+        # ignore comments from the bot / post author
+        if not comment.is_submitter:
+            # log some data
+            print(f"{comment.author} wrote:\n {comment.body}\nAt: {comment.permalink}\nIn: {comment.submission}")
+
+            # lookup the parent post ID with the mission database
+            mission_db.execute(f"SELECT * FROM missions WHERE "
+                               f"reddit_post_id = '{comment.submission}' ")
+            
+            print('DB command ran, go fetch the result')
+            mission_data = MissionData(mission_db.fetchone())
+
+            if not mission_data:
+                print("No match in mission DB, mission must be complete.")
+                # we'll share the comment anyway, first we need to get the post title since we can't get info from db
+                submission = await reddit.submission(comment.submission)
+                embed = discord.Embed(title=f"{submission.title}",
+                                      description=f"Comment on **COMPLETED MISSION** by **{comment.author}**\n{comment.body}\n\nTo view this comment "
+                                      f"click here:\nhttps://www.reddit.com{comment.permalink}", color=constants.EMBED_COLOUR_REDDIT)
+                await comment_channel.send(embed=embed)
+                print("Sent comment to channel")
+            
+            elif mission_data:
+                # mission is active, we'll get info from the db and ping the CCO
+                print(f'Found mission data: {mission_data}')
+
+                # now we need to lookup the carrier data in the db
+                carrier_data = find_carrier_from_long_name(mission_data.carrier_name)
+                
+                # We can't easily moderate Reddit comments so we'll post it to a CCO-only channel
+                # get the owner to ping
+                
+                await comment_channel.send(f"<@{carrier_data.ownerid}> your Reddit trade post has received a new comment.")
+                embed = discord.Embed(title=f"{carrier_data.carrier_long_name} in {mission_data.system} has a new Reddit comment",
+                                      description=f"Comment by **{comment.author}**\n{comment.body}\n\nTo view this comment "
+                                      f"click here:\nhttps://www.reddit.com{comment.permalink}", color=constants.EMBED_COLOUR_REDDIT)
+                await comment_channel.send(embed=embed)
+                print("Sent comment to channel")
 
 
 #
@@ -1769,7 +1836,7 @@ async def carrier_list(ctx):
     for carrier in pages[0]:
         count += 1
         embed.add_field(name=f"{count}: {carrier.carrier_long_name} ({carrier.carrier_identifier})",
-                        value=f"<#{carrier.channel_id}>", inline=False)
+                        value=f"<@{carrier.ownerid}>", inline=False)
     # Now go send it and wait on a reaction
     message = await ctx.send(embed=embed)
 
@@ -1789,7 +1856,7 @@ async def carrier_list(ctx):
                     # Page -1 as humans think page 1, 2, but python thinks 0, 1, 2
                     count += 1
                     new_embed.add_field(name=f"{count}: {carrier.carrier_long_name} ({carrier.carrier_identifier})",
-                                        value=f"<#{carrier.channel_id}>", inline=False)
+                                        value=f"<@{carrier.ownerid}>", inline=False)
 
                 await message.edit(embed=new_embed)
 
@@ -1814,7 +1881,7 @@ async def carrier_list(ctx):
                     # Page -1 as humans think page 1, 2, but python thinks 0, 1, 2
                     count += 1
                     new_embed.add_field(name=f"{count}: {carrier.carrier_long_name} ({carrier.carrier_identifier})",
-                                        value=f"<#{carrier.channel_id}>", inline=False)
+                                        value=f"<@{carrier.ownerid}>", inline=False)
 
                 await message.edit(embed=new_embed)
                 # Ok now we can go forwards, check if we can also go backwards still
@@ -2891,7 +2958,9 @@ async def cc_del(ctx, owner: discord.Member):
 @bot.command(name='ping', help='Ping the bot')
 @commands.has_role('Certified Carrier')
 async def ping(ctx):
-    await ctx.send("**PING? PONG!**")
+    gif = random.choice(hello_gifs)
+    await ctx.send(gif)
+    # await ctx.send("**PING? PONG!**")
 
 
 # quit the bot
@@ -2907,6 +2976,7 @@ async def stopquit(ctx):
 #
 @bot.event
 async def on_command_error(ctx, error):
+    gif = random.choice(error_gifs)
     if isinstance(error, commands.BadArgument):
         await ctx.send('**Bad argument!**')
     elif isinstance(error, commands.CommandNotFound):
@@ -2916,6 +2986,7 @@ async def on_command_error(ctx, error):
     elif isinstance(error, commands.MissingPermissions):
         await ctx.send('**You must be a Carrier Owner to use this command.**')
     else:
+        await ctx.send(gif)
         await ctx.send(f"Sorry, that didn't work. Check your syntax and permissions, error: {error}")
 
 
