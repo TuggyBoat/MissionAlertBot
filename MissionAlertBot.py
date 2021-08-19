@@ -659,6 +659,7 @@ async def on_ready():
 
 # monitor reddit comments
 async def _monitor_reddit_comments():
+    comment_channel = bot.get_channel(conf['REDDIT_CHANNEL'])
     # establish a comment stream to the subreddit using async praw
     subreddit = await reddit.subreddit(to_subreddit)
     async for comment in subreddit.stream.comments(skip_existing=True):
@@ -675,8 +676,17 @@ async def _monitor_reddit_comments():
             print('DB command ran, go fetch the result')
             mission_data = MissionData(mission_db.fetchone())
 
-            # if there's no match we stop here, otherwise:
-            if mission_data:
+            if not mission_data:
+                print("No match in mission DB, mission must be complete.")
+                # we'll share the comment anyway, first we need to get the post title since we can't get info from db
+                submission = await reddit.submission(comment.submission)
+                embed = discord.Embed(title=f"{submission.title}",
+                                      description=f"Comment on **COMPLETED MISSION** by **{comment.author}**\n{comment.body}\n\nTo view this comment "
+                                      f"click here:\nhttps://www.reddit.com{comment.permalink}", color=constants.EMBED_COLOUR_REDDIT)
+                await comment_channel.send(embed=embed)
+            
+            elif mission_data:
+                # mission is active, we'll get info from the db and ping the CCO
                 print(f'Found mission data: {mission_data}')
 
                 # now we need to lookup the carrier data in the db
@@ -684,7 +694,7 @@ async def _monitor_reddit_comments():
                 
                 # We can't easily moderate Reddit comments so we'll post it to a CCO-only channel
                 # get the owner to ping
-                comment_channel = bot.get_channel(conf['REDDIT_CHANNEL'])
+                
                 await comment_channel.send(f"<@{carrier_data.ownerid}> your Reddit trade post has received a new comment.")
                 embed = discord.Embed(title=f"{carrier_data.carrier_long_name} in {mission_data.system} has a new Reddit comment",
                                       description=f"Comment by **{comment.author}**\n{comment.body}\n\nTo view this comment "
