@@ -480,7 +480,7 @@ async def find_commodity(commodity_search_term, ctx):
     # TODO: Where do we get set up this database? it is searching for things, but what is the source of the data, do
     #  we update it periodically?
 
-    commodity, is_error = 0, 0
+    commodity, is_error = False, False
     print(f'Searching for commodity against match "{commodity_search_term}" requested by {ctx.author}')
 
     carrier_db.execute(
@@ -492,7 +492,7 @@ async def find_commodity(commodity_search_term, ctx):
     if not commodities:
         print('No commodities found for request')
         await ctx.send(f"No commodities found for {commodity_search_term}")
-        is_error = 1
+        is_error = True
         # Did not find anything, short-circuit out of the next block
         return commodity, is_error
     elif len(commodities) == 1:
@@ -502,7 +502,7 @@ async def find_commodity(commodity_search_term, ctx):
     elif len(commodities) > 3:
         # If we ever get into a scenario where more than 3 commodities can be found with the same search directly, then
         # we need to revisit this limit
-        is_error = 1
+        is_error = True
         print(f'More than 3 commodities found for: "{commodity_search_term}", {ctx.author} needs to search better.')
         await ctx.send(f'Please narrow down your commodity search, we found {len(commodities)} matches for your '
                        f'input choice: "{commodity_search_term}"')
@@ -535,7 +535,7 @@ async def find_commodity(commodity_search_term, ctx):
         except asyncio.TimeoutError:
             await ctx.send("Commodity selection timed out. Cancelling.")
             print('User failed to respond in time')
-            is_error = 1
+            is_error = True
             pass
         await message_confirm.delete()
         if response:
