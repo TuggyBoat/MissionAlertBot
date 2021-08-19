@@ -682,12 +682,14 @@ async def _monitor_reddit_comments():
                 # now we need to lookup the carrier data in the db
                 carrier_data = find_carrier_from_long_name(mission_data.carrier_name)
                 
-                # We can't easily moderate Reddit comments so DM it to the owner TODO: maybe post in a CCO only channel
-                user = bot.get_user(carrier_data.ownerid)
+                # We can't easily moderate Reddit comments so we'll post it to a CCO-only channel
+                # get the owner to ping
+                comment_channel = bot.get_channel(conf['REDDIT_CHANNEL'])
+                await comment_channel.send(f"<@{carrier_data.ownerid}> your Reddit post has received a new comment.")
                 embed = discord.Embed(title=f"{carrier_data.carrier_long_name} in {mission_data.system} has a new Reddit comment",
                                       description=f"Comment by **{comment.author}**\n{comment.body}\n\nTo view this comment "
                                       f"click here:\nhttps://www.reddit.com{comment.permalink}", color=constants.EMBED_COLOUR_REDDIT)
-                await user.send(embed=embed)
+                await comment_channel.send(embed=embed)
 
 
 #
