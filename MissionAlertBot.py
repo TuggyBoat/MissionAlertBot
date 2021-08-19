@@ -659,6 +659,8 @@ async def on_ready():
 
 # monitor reddit comments
 async def _monitor_reddit_comments():
+    # TODO: what happens if there's an error in this process, e.g. reddit is down?
+
     comment_channel = bot.get_channel(conf['REDDIT_CHANNEL'])
     # establish a comment stream to the subreddit using async praw
     subreddit = await reddit.subreddit(to_subreddit)
@@ -684,6 +686,7 @@ async def _monitor_reddit_comments():
                                       description=f"Comment on **COMPLETED MISSION** by **{comment.author}**\n{comment.body}\n\nTo view this comment "
                                       f"click here:\nhttps://www.reddit.com{comment.permalink}", color=constants.EMBED_COLOUR_REDDIT)
                 await comment_channel.send(embed=embed)
+                print("Sent comment to channel")
             
             elif mission_data:
                 # mission is active, we'll get info from the db and ping the CCO
@@ -700,6 +703,7 @@ async def _monitor_reddit_comments():
                                       description=f"Comment by **{comment.author}**\n{comment.body}\n\nTo view this comment "
                                       f"click here:\nhttps://www.reddit.com{comment.permalink}", color=constants.EMBED_COLOUR_REDDIT)
                 await comment_channel.send(embed=embed)
+                print("Sent comment to channel")
 
 
 #
