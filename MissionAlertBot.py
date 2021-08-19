@@ -113,6 +113,23 @@ boom_gifs = [
     'https://tenor.com/view/boom-explosion-moonbeam-city-gif-20743300',
 ]
 
+hello_gifs = [
+    'https://tenor.com/view/hello-there-hi-there-greetings-gif-9442662',
+    'https://tenor.com/view/hey-tom-hanks-forrest-gump-gif-5114770',
+    'https://tenor.com/view/hello-there-baby-yoda-mandolorian-hello-gif-20136589',
+    'https://tenor.com/view/oh-hello-there-sassy-fab-gif-14129058',
+    'https://tenor.com/view/world-star-hey-girl-hey-there-when-you-see-your-crush-feeling-yourself-gif-10605207',
+    'https://tenor.com/view/bye-jim-carrey-ciao-gif-5139786',
+    'https://tenor.com/view/hi-friends-baby-goat-saying-hello-saying-hi-hi-neighbor-gif-14737423',
+]
+
+error_gifs = [
+    'https://tenor.com/view/beaker-fire-shit-omg-disaster-gif-4767835',
+    'https://tenor.com/view/naked-gun-explosion-disaster-nothing-to-see-here-please-disperse-gif-13867629',
+    'https://tenor.com/view/spongebob-patrick-panic-run-scream-gif-4656335',
+    'https://tenor.com/view/angry-panda-rage-mad-gif-11780191',
+]
+
 #
 #                       DATABASE STUFF
 #
@@ -2891,7 +2908,9 @@ async def cc_del(ctx, owner: discord.Member):
 @bot.command(name='ping', help='Ping the bot')
 @commands.has_role('Certified Carrier')
 async def ping(ctx):
-    await ctx.send("**PING? PONG!**")
+    gif = random.choice(hello_gifs)
+    await ctx.send(gif)
+    # await ctx.send("**PING? PONG!**")
 
 
 # quit the bot
@@ -2907,6 +2926,7 @@ async def stopquit(ctx):
 #
 @bot.event
 async def on_command_error(ctx, error):
+    gif = random.choice(error_gifs)
     if isinstance(error, commands.BadArgument):
         await ctx.send('**Bad argument!**')
     elif isinstance(error, commands.CommandNotFound):
@@ -2916,6 +2936,7 @@ async def on_command_error(ctx, error):
     elif isinstance(error, commands.MissingPermissions):
         await ctx.send('**You must be a Carrier Owner to use this command.**')
     else:
+        await ctx.send(gif)
         await ctx.send(f"Sorry, that didn't work. Check your syntax and permissions, error: {error}")
 
 
