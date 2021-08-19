@@ -654,6 +654,40 @@ slash = SlashCommand(bot, sync_commands=True)
 @bot.event
 async def on_ready():
     print(f'{bot.user.name} has connected to Discord!')
+    await _monitor_reddit_comments()
+
+
+# monitor reddit comments
+async def _monitor_reddit_comments():
+    # establish a comment stream to the subreddit using async praw
+    subreddit = await reddit.subreddit(to_subreddit)
+    async for comment in subreddit.stream.comments(skip_existing=True):
+        print(f"New reddit comment: {comment}. Is_submitter is {comment.is_submitter}")
+        # ignore comments from the bot / post author
+        if not comment.is_submitter:
+            # log some data
+            print(f"{comment.author} wrote:\n {comment.body}\nAt: {comment.permalink}\nIn: {comment.submission}")
+
+            # lookup the parent post ID with the mission database
+            mission_db.execute(f"SELECT * FROM missions WHERE "
+                               f"reddit_post_id = '{comment.submission}' ")
+            
+            print('DB command ran, go fetch the result')
+            mission_data = MissionData(mission_db.fetchone())
+
+            # if there's no match we stop here, otherwise:
+            if mission_data:
+                print(f'Found mission data: {mission_data}')
+
+                # now we need to lookup the carrier data in the db
+                carrier_data = find_carrier_from_long_name(mission_data.carrier_name)
+                
+                # We can't easily moderate Reddit comments so DM it to the owner TODO: maybe post in a CCO only channel
+                user = bot.get_user(carrier_data.ownerid)
+                embed = discord.Embed(title=f"{carrier_data.carrier_long_name} in {mission_data.system} has a new Reddit comment",
+                                      description=f"Comment by **{comment.author}**\n{comment.body}\n\nTo view this comment "
+                                      f"click here:\nhttps://www.reddit.com{comment.permalink}", color=constants.EMBED_COLOUR_REDDIT)
+                await user.send(embed=embed)
 
 
 #
