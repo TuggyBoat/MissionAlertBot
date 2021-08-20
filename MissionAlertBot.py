@@ -962,10 +962,6 @@ async def gen_mission(ctx, carrier_name_search_term, commodity_search_term, syst
     if not carrier_data:
         return await ctx.send(f"No carrier found for {carrier_name_search_term}. You can use `/find` or `/owner` to search for carrier names.")
 
-    print("Waiting for channel lock...")
-    await carrier_channel_lock.acquire()
-    print("Channel lock acquired")
-
     # TODO: This method is way too long, break it up into logical steps.
 
     try: # this try/except pair is to try and ensure the channel lock is released if something breaks during mission gen
@@ -1004,7 +1000,7 @@ async def gen_mission(ctx, carrier_name_search_term, commodity_search_term, syst
         def check_rp(message):
             return message.author == ctx.author and message.channel == ctx.channel
 
-
+        gen_mission.returnflag = False
         mission_temp_channel_id = await create_mission_temp_channel(ctx, carrier_data.discord_channel, carrier_data.ownerid)
         # flag is set to True if mission channel creation is successful
         if not gen_mission.returnflag:
@@ -1263,11 +1259,14 @@ async def create_mission_temp_channel(ctx, discord_channel, owner_id):
     else:
         # channel does not exist, create it
         print("Waiting for Mission Generator channel lock...")
+        lockwait_msg = await ctx.send("Waiting for channel lock to become available...")
         try:
             await asyncio.wait_for(lock_mission_channel(), timeout=10)
         except asyncio.TimeoutError:
             print("We couldn't get a channel lock after 10 seconds, let's abort rather than wait around.")
             return await ctx.send("Error: Channel lock could not be acquired, please try again. If the problem persists please contact an Admin.")
+
+        await lockwait_msg.delete()
 
         # we got a lock so we can change the returnflag
         gen_mission.returnflag = True
