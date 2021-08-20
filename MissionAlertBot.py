@@ -505,8 +505,8 @@ async def _is_carrier_channel(carrier_data):
         return
 
 # return active mission data (if any) for a carrier
-async def _return_mission_data(carrier_data):
-    print("Called _return_mission_data")
+async def _is_mission_active_embed(carrier_data):
+    print("Called _is_mission_active_embed")
     # look to see if the carrier is on an active mission
     mission_data = find_mission_by_carrier_name(carrier_data.carrier_long_name)
 
@@ -1303,7 +1303,7 @@ async def ission(ctx):
     embed = await _is_carrier_channel(carrier_data)
 
     if not embed:
-        embed = await _return_mission_data(carrier_data)
+        embed = await _is_mission_active_embed(carrier_data)
 
     await ctx.send(embed=embed)
     return
@@ -1371,7 +1371,7 @@ async def _mission(ctx: SlashContext):
     embed = await _is_carrier_channel(carrier_data)
 
     if not embed:
-        embed = await _return_mission_data(carrier_data)
+        embed = await _is_mission_active_embed(carrier_data)
 
     await ctx.send(embed=embed, hidden=True)
     return
