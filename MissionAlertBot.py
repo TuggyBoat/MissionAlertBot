@@ -829,6 +829,9 @@ async def _monitor_reddit_comments():
             # log some data
             print(f"{comment.author} wrote:\n {comment.body}\nAt: {comment.permalink}\nIn: {comment.submission}")
 
+            # get a submission object so we can interrogate it for the parent post title
+            submission = await reddit.submission(comment.submission)
+
             # lookup the parent post ID with the mission database
             mission_db.execute(f"SELECT * FROM missions WHERE "
                                f"reddit_post_id = '{comment.submission}' ")
@@ -838,13 +841,11 @@ async def _monitor_reddit_comments():
 
             if not mission_data:
                 print("No match in mission DB, mission must be complete.")
-                # we'll share the comment anyway, first we need to get the post title since we can't get info from db
-                submission = await reddit.submission(comment.submission)
+
                 embed = discord.Embed(title=f"{submission.title}",
-                                      description=f"Comment on **COMPLETED MISSION** by **{comment.author}**\n{comment.body}\n\nTo view this comment "
-                                      f"click here:\nhttps://www.reddit.com{comment.permalink}", color=constants.EMBED_COLOUR_REDDIT)
-                await comment_channel.send(embed=embed)
-                print("Sent comment to channel")
+                                      description=f"This mission is **COMPLETED**.\n\nComment by **{comment.author}**\n{comment.body}"
+                                                  f"\n\nTo view this comment click here:\nhttps://www.reddit.com{comment.permalink}",
+                                                  color=constants.EMBED_COLOUR_QU)
             
             elif mission_data:
                 # mission is active, we'll get info from the db and ping the CCO
@@ -854,14 +855,15 @@ async def _monitor_reddit_comments():
                 carrier_data = find_carrier_from_long_name(mission_data.carrier_name)
                 
                 # We can't easily moderate Reddit comments so we'll post it to a CCO-only channel
-                # get the owner to ping
                 
-                await comment_channel.send(f"<@{carrier_data.ownerid}> your Reddit trade post has received a new comment.")
-                embed = discord.Embed(title=f"{carrier_data.carrier_long_name} in {mission_data.system} has a new Reddit comment",
-                                      description=f"Comment by **{comment.author}**\n{comment.body}\n\nTo view this comment "
-                                      f"click here:\nhttps://www.reddit.com{comment.permalink}", color=constants.EMBED_COLOUR_REDDIT)
-                await comment_channel.send(embed=embed)
-                print("Sent comment to channel")
+                await comment_channel.send(f"<@{carrier_data.ownerid}>, your Reddit trade post has received a new comment:")
+                embed = discord.Embed(title=f"{submission.title}",
+                                      description=f"This mission is **IN PROGRESS**.\n\nComment by **{comment.author}**\n{comment.body}"
+                                                  f"\n\nTo view this comment click here:\nhttps://www.reddit.com{comment.permalink}",
+                                                  color=constants.EMBED_COLOUR_REDDIT)
+
+            await comment_channel.send(embed=embed)
+            print("Sent comment to channel")
 
 
 #
