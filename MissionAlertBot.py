@@ -1268,8 +1268,6 @@ async def create_mission_temp_channel(ctx, discord_channel, owner_id):
 
         await lockwait_msg.delete()
 
-        # we got a lock so we can change the returnflag
-        gen_mission.returnflag = True
         category = discord.utils.get(ctx.guild.categories, id=trade_cat_id)
         mission_temp_channel = await ctx.guild.create_text_channel(discord_channel, category=category)
         mission_temp_channel_id = mission_temp_channel.id
@@ -1279,6 +1277,9 @@ async def create_mission_temp_channel(ctx, discord_channel, owner_id):
 
     if not mission_temp_channel:
         raise EnvironmentError(f'Could not create carrier channel {discord_channel}')
+
+    # we made it this far, we can change the returnflag
+    gen_mission.returnflag = True
 
     # find carrier owner as a user object
 
