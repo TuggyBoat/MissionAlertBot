@@ -480,7 +480,6 @@ async def find_commodity(commodity_search_term, ctx):
     # TODO: Where do we get set up this database? it is searching for things, but what is the source of the data, do
     #  we update it periodically?
 
-    commodity, is_error = False, False
     print(f'Searching for commodity against match "{commodity_search_term}" requested by {ctx.author}')
 
     carrier_db.execute(
@@ -492,9 +491,8 @@ async def find_commodity(commodity_search_term, ctx):
     if not commodities:
         print('No commodities found for request')
         await ctx.send(f"No commodities found for {commodity_search_term}")
-        is_error = True
         # Did not find anything, short-circuit out of the next block
-        return commodity, is_error
+        return
     elif len(commodities) == 1:
         print('Single commodity found, returning that directly')
         # if only 1 match, just assign it directly
@@ -502,11 +500,10 @@ async def find_commodity(commodity_search_term, ctx):
     elif len(commodities) > 3:
         # If we ever get into a scenario where more than 3 commodities can be found with the same search directly, then
         # we need to revisit this limit
-        is_error = True
         print(f'More than 3 commodities found for: "{commodity_search_term}", {ctx.author} needs to search better.')
         await ctx.send(f'Please narrow down your commodity search, we found {len(commodities)} matches for your '
                        f'input choice: "{commodity_search_term}"')
-        return commodity, is_error  # Just return None here and let the calling method figure out what is needed to happen
+        return # Just return None here and let the calling method figure out what is needed to happen
     else:
         print(f'Between 1 and 3 commodities found for: "{commodity_search_term}", asking {ctx.author} which they want.')
         # The database runs a partial match, in the case we have more than 1 ask the user which they want.
@@ -535,15 +532,15 @@ async def find_commodity(commodity_search_term, ctx):
         except asyncio.TimeoutError:
             await ctx.send("Commodity selection timed out. Cancelling.")
             print('User failed to respond in time')
-            is_error = True
-            pass
+            return
         await message_confirm.delete()
         if response:
             await response.delete()
-    if commodity:
+    if commodity: # only if this is successful is returnflag set so mission gen will continue
+        gen_mission.returnflag = True
         print(f"Commodity {commodity.name} avgsell {commodity.average_sell} avgbuy {commodity.average_buy} "
               f"maxsell {commodity.max_sell} minbuy {commodity.min_buy} maxprofit {commodity.max_profit}")
-    return commodity, is_error
+    return commodity
 
 #
 #                       IMAGE GEN STUFF
@@ -747,9 +744,9 @@ async def gen_mission(ctx, carrier_name_search_term, commodity_search_term, syst
         return await ctx.send(f'Sorry, your pad size is not L or M. Provided: {pads}. Mission generation cancelled.')
 
     # check if commodity can be found, exit gracefully if not
-    commreturn = await find_commodity(commodity_search_term, ctx)
-    (commodity_data, is_error) = commreturn
-    if is_error:
+    gen_mission.returnflag = False
+    commodity_data = await find_commodity(commodity_search_term, ctx)
+    if not gen_mission.returnflag:
         return # we've already given the user feedback on why there's a problem, we just want to quit gracefully now
     if not commodity_data:
         raise ValueError('Missing commodity data')
