@@ -19,6 +19,7 @@ import asyncpraw
 import asyncio
 import shutil
 from discord import channel
+from discord.colour import Color
 from discord.errors import HTTPException, InvalidArgument, Forbidden, NotFound
 from discord.ext import commands
 from discord.utils import get
@@ -39,6 +40,7 @@ from CarrierData import CarrierData
 from Commodity import Commodity
 from MissionData import MissionData
 from CommunityCarrierData import CommunityCarrierData
+from NomineesData import NomineesData
 
 _production = ast.literal_eval(os.environ.get('PTN_MISSION_ALERT_SERVICE', 'False'))
 
@@ -93,6 +95,8 @@ carrier_db = carriers_conn.cursor()
 missions_conn = sqlite3.connect('missions.db')
 missions_conn.row_factory = sqlite3.Row
 mission_db = missions_conn.cursor()
+
+deletion_in_progress = False
 
 # channel go boom gifs
 
@@ -213,6 +217,33 @@ if not check_database_table_exists('community_carriers', carrier_db):
         ''')
 else:
     print('Community Carrier database exists, do nothing')
+
+
+print('Starting up - checking nominees database if it exists or not')
+# create nominees table if necessary
+if not check_database_table_exists('nominees', carrier_db):
+    print('Nominees database missing - creating it now')
+
+    if os.path.exists(os.path.join(os.getcwd(), 'db_sql', 'nominees_dump.sql')):
+        # recreate from backup file
+        print('Recreating database from backup ...')
+        with open(os.path.join(os.getcwd(), 'db_sql', 'nominees_dump.sql')) as f:
+            sql_script = f.read()
+            carrier_db.executescript(sql_script)
+
+    else:
+        # Create a new version
+        print('No backup found - Creating empty database')
+        carrier_db.execute('''
+            CREATE TABLE nominees( 
+                nominatorid INT NOT NULL,
+                pillarid INT NOT NULL,
+                note TEXT
+            ) 
+        ''')
+else:
+    print('Nominees database exists, do nothing')
+
 
 print('Starting up - checking missions database if it exists or not')
 # create missions db if necessary
@@ -347,7 +378,6 @@ async def delete_carrier_from_db(p_id):
 
 # function to remove a community carrier
 async def delete_community_carrier_from_db(ownerid):
-    carrier = find_community_carrier_with_owner_id(ownerid)
     try:
         await carrier_db_lock.acquire()
         carrier_db.execute(f"DELETE FROM community_carriers WHERE ownerid = {ownerid}")
@@ -355,6 +385,29 @@ async def delete_community_carrier_from_db(ownerid):
     finally:
         carrier_db_lock.release()
     return
+
+
+# remove a nominee from the database
+async def delete_nominee_from_db(pillarid):
+    try:
+        await carrier_db_lock.acquire()
+        carrier_db.execute(f"DELETE FROM nominees WHERE pillarid = {pillarid}")
+        carriers_conn.commit()
+    finally:
+        carrier_db_lock.release()
+    return
+
+
+# function to remove a nominee
+async def delete_nominee_by_nominator(nomid, pillarid):
+    print("Attempting to delete {nomid} {pillarid} match.")
+    try:
+        await carrier_db_lock.acquire()
+        carrier_db.execute(f"DELETE FROM nominees WHERE nominatorid = {nomid} AND pillarid = {pillarid}")
+        carriers_conn.commit()
+    finally:
+        carrier_db_lock.release()
+    return print("Deleted")
 
 
 # function to remove all carriers, not currently used by any bot command
@@ -446,6 +499,43 @@ def find_community_carrier_with_owner_id(ownerid):
 
     return community_carrier_data
 
+
+def find_nominee_with_id(pillarid):
+    """
+    Returns nominee, nominator and note matching the nominee's user ID
+
+    :param int pillarid: The user id to match
+    :returns: A list of nominees data objects
+    :rtype: list[NomineesData]
+    """
+    carrier_db.execute(f"SELECT * FROM nominees WHERE "
+                       f"pillarid = {pillarid} ")
+    nominees_data = [NomineesData(nominees) for nominees in carrier_db.fetchall()]
+    for nominees in nominees_data:
+        print(f"{nominees.pillar_id} nominated by {nominees.nom_id} for reason {nominees.note}" 
+              f" called from find_nominee_with_id.")
+
+    return nominees_data
+
+
+def find_nominator_with_id(nomid):
+    """
+    Returns nominee, nominator and note matching the nominator's user ID
+
+    :param int nomid: The user id to match
+    :returns: A list of nominees data objects
+    :rtype: list[NomineesData]
+    """
+    carrier_db.execute(f"SELECT * FROM nominees WHERE "
+                       f"nominatorid = {nomid} ")
+    nominees_data = [NomineesData(nominees) for nominees in carrier_db.fetchall()]
+    for nominees in nominees_data:
+        print(f"{nominees.nom_id} nominated {nominees.pillar_id} for reason {nominees.note}" 
+              f" called from find_nominee_with_id.")
+
+    return nominees_data
+
+
 # function to search for a carrier by shortname
 def find_carrier_from_short_name(find_short_name):
     """
@@ -474,6 +564,64 @@ def find_carrier_from_pid(db_id):
           f"from find_carrier_from_pid.")
     return carrier_data
 
+# find a carrier by its channel name
+def find_carrier_by_channel_name(channelname):
+    # look for a match for the channel name in the carrier DB
+    carrier_db.execute(f"SELECT * FROM carriers WHERE "
+                       f"discordchannel = '{channelname}' ;")
+    carrier_data = CarrierData(carrier_db.fetchone())
+    print(carrier_data)
+    return carrier_data
+
+# find a carrier in the mission database
+def find_mission_by_carrier_name(carriername):
+    print("called find_mission_by_carrier_name")
+    mission_db.execute('''SELECT * FROM missions WHERE carrier LIKE (?)''',
+                        ('%' + carriername + '%',))
+    mission_data = MissionData(mission_db.fetchone())
+    print(f'Found mission data: {mission_data}')
+    return mission_data
+
+
+# check if a carrier is for a registered PTN fleet carrier
+async def _is_carrier_channel(carrier_data):
+    if not carrier_data.discord_channel:
+        # if there's no channel match, return an error
+        embed = discord.Embed(description="Try again in a **🚛Trade Carriers** channel.", color=constants.EMBED_COLOUR_QU)
+        return embed
+    else:
+        return
+
+# return an embed featuring either the active mission or the not found message
+async def _is_mission_active_embed(carrier_data):
+    print("Called _is_mission_active_embed")
+    # look to see if the carrier is on an active mission
+    mission_data = find_mission_by_carrier_name(carrier_data.carrier_long_name)
+
+    if not mission_data:
+        # if there's no result, make our embed tell the user this
+        embed = discord.Embed(description=f"**{carrier_data.carrier_long_name}** doesn't seem to be on a trade"
+                                            f" mission right now.",
+                                color=constants.EMBED_COLOUR_OK)
+        return embed
+
+    # mission data exists so format it for the user as an embed
+
+    embed_colour = constants.EMBED_COLOUR_LOADING if mission_data.mission_type == 'load' else \
+        constants.EMBED_COLOUR_UNLOADING
+
+    mission_description = ''
+    if mission_data.rp_text and mission_data.rp_text != 'NULL':
+        mission_description = f"> {mission_data.rp_text}"
+
+    embed = discord.Embed(title=f"{mission_data.mission_type.upper()}ING {mission_data.carrier_name} ({mission_data.carrier_identifier})",
+                            description=mission_description, color=embed_colour)
+
+    embed = _mission_summary_embed(mission_data, embed)
+
+    embed.set_footer(text="You can use m.complete if the mission is complete.")
+    return embed
+
 
 # function to search for a commodity by name or partial name
 async def find_commodity(commodity_search_term, ctx):
@@ -490,8 +638,9 @@ async def find_commodity(commodity_search_term, ctx):
     commodity = None
     if not commodities:
         print('No commodities found for request')
+        await ctx.send(f"No commodities found for {commodity_search_term}")
         # Did not find anything, short-circuit out of the next block
-        return None
+        return
     elif len(commodities) == 1:
         print('Single commodity found, returning that directly')
         # if only 1 match, just assign it directly
@@ -502,7 +651,7 @@ async def find_commodity(commodity_search_term, ctx):
         print(f'More than 3 commodities found for: "{commodity_search_term}", {ctx.author} needs to search better.')
         await ctx.send(f'Please narrow down your commodity search, we found {len(commodities)} matches for your '
                        f'input choice: "{commodity_search_term}"')
-        return None  # Just return None here and let the calling method figure out what is needed to happen
+        return # Just return None here and let the calling method figure out what is needed to happen
     else:
         print(f'Between 1 and 3 commodities found for: "{commodity_search_term}", asking {ctx.author} which they want.')
         # The database runs a partial match, in the case we have more than 1 ask the user which they want.
@@ -529,12 +678,14 @@ async def find_commodity(commodity_search_term, ctx):
             index = int(response.content) - 1  # Users count from 1, computers count from 0
             commodity = commodities[index]
         except asyncio.TimeoutError:
+            await ctx.send("Commodity selection timed out. Cancelling.")
             print('User failed to respond in time')
-            pass
+            return
         await message_confirm.delete()
         if response:
             await response.delete()
-    if commodity:
+    if commodity: # only if this is successful is returnflag set so mission gen will continue
+        gen_mission.returnflag = True
         print(f"Commodity {commodity.name} avgsell {commodity.average_sell} avgbuy {commodity.average_buy} "
               f"maxsell {commodity.max_sell} minbuy {commodity.min_buy} maxprofit {commodity.max_profit}")
     return commodity
@@ -644,6 +795,11 @@ def user_exit():
     sys.exit("User requested exit.")
 
 
+async def lock_mission_channel():
+    print("Attempting channel lock...")
+    await carrier_channel_lock.acquire()
+    print("Channel lock acquired.")
+
 #
 #                       BOT STUFF STARTS HERE
 #
@@ -654,7 +810,9 @@ slash = SlashCommand(bot, sync_commands=True)
 @bot.event
 async def on_ready():
     print(f'{bot.user.name} has connected to Discord!')
+    # reddit monitor must be at the END of this function
     await _monitor_reddit_comments()
+
 
 
 # monitor reddit comments
@@ -721,7 +879,7 @@ async def _monitor_reddit_comments():
                                'Demand should be expressed as an absolute number e.g. 20k, 20,000, etc.\n'
                                'ETA is optional and should be expressed as a number of minutes e.g. 15.\n'
                                'Case is automatically corrected for all inputs.')
-@commands.has_role('Certified Carrier')
+@commands.has_any_role('Certified Carrier', 'Trainee')
 async def load(ctx, carrier_name_search_term, commodity_search_term, system, station, profit, pads, demand, eta=None):
     rp = False
     mission_type = 'load'
@@ -733,7 +891,7 @@ async def load(ctx, carrier_name_search_term, commodity_search_term, system, sta
                                  'This is added to the Reddit comment as as a quote above the mission details\n'
                                  'and sent to the carrier\'s Discord channel in quote format if those options are '
                                  'chosen')
-@commands.has_role('Certified Carrier')
+@commands.has_any_role('Certified Carrier', 'Trainee')
 async def loadrp(ctx, carrier_name_search_term, commodity_search_term, system, station, profit, pads, demand, eta=None):
     rp = True
     mission_type = 'load'
@@ -752,7 +910,7 @@ async def loadrp(ctx, carrier_name_search_term, commodity_search_term, system, s
                                  'Supply should be expressed as an absolute number e.g. 20k, 20,000, etc.\n'
                                  'ETA is optional and should be expressed as a number of minutes e.g. 15.\n'
                                  'Case is automatically corrected for all inputs.')
-@commands.has_role('Certified Carrier')
+@commands.has_any_role('Certified Carrier', 'Trainee')
 async def unload(ctx, carrier_name_search_term, commodity_search_term, system, station, profit, pads, supply, eta=None):
     rp = False
     mission_type = 'unload'
@@ -764,7 +922,7 @@ async def unload(ctx, carrier_name_search_term, commodity_search_term, system, s
                                    'This is added to the Reddit comment as as a quote above the mission details\n'
                                    'and sent to the carrier\'s Discord channel in quote format if those options are '
                                    'chosen')
-@commands.has_role('Certified Carrier')
+@commands.has_any_role('Certified Carrier', 'Trainee')
 async def unloadrp(ctx, carrier_name_search_term, commodity_search_term, system, station, profit, pads, demand, eta=None):
     rp = True
     mission_type = 'unload'
@@ -790,9 +948,19 @@ async def gen_mission(ctx, carrier_name_search_term, commodity_search_term, syst
         print(f'Exiting mission generation requested by {ctx.author} as pad size is invalid, provided: {pads}')
         return await ctx.send(f'Sorry, your pad size is not L or M. Provided: {pads}. Mission generation cancelled.')
 
-    print("Waiting for channel lock...")
-    await carrier_channel_lock.acquire()
-    print("Channel lock acquired")
+
+    # check if commodity can be found, exit gracefully if not
+    gen_mission.returnflag = False
+    commodity_data = await find_commodity(commodity_search_term, ctx)
+    if not gen_mission.returnflag:
+        return # we've already given the user feedback on why there's a problem, we just want to quit gracefully now
+    if not commodity_data:
+        raise ValueError('Missing commodity data')
+
+    # check if the carrier can be found, exit gracefully if not
+    carrier_data = find_carrier_from_long_name(carrier_name_search_term)
+    if not carrier_data:
+        return await ctx.send(f"No carrier found for {carrier_name_search_term}. You can use `/find` or `/owner` to search for carrier names.")
 
     # TODO: This method is way too long, break it up into logical steps.
 
@@ -832,8 +1000,13 @@ async def gen_mission(ctx, carrier_name_search_term, commodity_search_term, syst
         def check_rp(message):
             return message.author == ctx.author and message.channel == ctx.channel
 
-        carrier_data = find_carrier_from_long_name(carrier_name_search_term)
+        gen_mission.returnflag = False
         mission_temp_channel_id = await create_mission_temp_channel(ctx, carrier_data.discord_channel, carrier_data.ownerid)
+        # flag is set to True if mission channel creation is successful
+        if not gen_mission.returnflag:
+            return # we've already notified the user
+
+        # beyond this point any exits need to release the channel lock
 
         if rp:
             embed = discord.Embed(title="Input roleplay text",
@@ -861,9 +1034,6 @@ async def gen_mission(ctx, carrier_name_search_term, commodity_search_term, syst
                 return
 
         # generate the mission elements
-        commodity_data = await find_commodity(commodity_search_term, ctx)
-        if not commodity_data:
-            raise ValueError('Missing commodity data')
 
         file_name = create_carrier_mission_image(carrier_data, commodity_data, system, station, profit, pads, demand,
                                                 mission_type)
@@ -1088,6 +1258,18 @@ async def create_mission_temp_channel(ctx, discord_channel, owner_id):
         print(f"Found existing {mission_temp_channel}")
     else:
         # channel does not exist, create it
+        print("Waiting for Mission Generator channel lock...")
+        lockwait_msg = await ctx.send("Waiting for channel lock to become available...")
+        try:
+            await asyncio.wait_for(lock_mission_channel(), timeout=10)
+        except asyncio.TimeoutError:
+            print("We couldn't get a channel lock after 10 seconds, let's abort rather than wait around.")
+            return await ctx.send("Error: Channel lock could not be acquired, please try again. If the problem persists please contact an Admin.")
+
+        await lockwait_msg.delete()
+
+        # we got a lock so we can change the returnflag
+        gen_mission.returnflag = True
         category = discord.utils.get(ctx.guild.categories, id=trade_cat_id)
         mission_temp_channel = await ctx.guild.create_text_channel(discord_channel, category=category)
         mission_temp_channel_id = mission_temp_channel.id
@@ -1212,53 +1394,20 @@ async def mission_generation_complete(ctx, carrier_data, message_pending, eta_te
 # list active carrier trade mission from DB
 @bot.command(name='ission', help="Show carrier's active trade mission.")
 async def ission(ctx):
-    # take a note channel ID
+
+    # this is the spammy version of the command, prints details to open channel
+
+    # take a note of the channel name
     msg_ctx_name = ctx.channel.name
-    # look for a match for the channel name in the carrier DB
-    # TODO: this should be a separate function to search by carrier channel name
-    carrier_db.execute(f"SELECT * FROM carriers WHERE "
-                       f"discordchannel = {msg_ctx_name}")
-    carrier_data = CarrierData(carrier_db.fetchone())
-    print(f'Mission command carrier_data: {carrier_data}')
-    if not carrier_data.discord_channel:
-        # if there's no channel match, return an error
-        embed = discord.Embed(description="Try again in the carrier's mission channel.", color=constants.EMBED_COLOUR_QU)
-        await ctx.send(embed=embed)
-        return
-    else:
-        print(f'Searching if carrier ({carrier_data.carrier_long_name}) has active mission.')
-        # now look to see if the carrier is on an active mission
-        mission_db.execute('''SELECT * FROM missions WHERE carrier LIKE (?)''',
-                           ('%' + carrier_data.carrier_long_name + '%',))
-        print('DB command ran, go fetch the result')
-        mission_data = MissionData(mission_db.fetchone())
-        print(f'Found mission data: {mission_data}')
 
-        if not mission_data:
-            # if there's no result, return an error
-            embed = discord.Embed(description=f"**{carrier_data.carrier_long_name}** doesn't seem to be on a trade"
-                                              f" mission right now.",
-                                  color=constants.EMBED_COLOUR_OK)
-            await ctx.send(embed=embed)
-        else:
-            # user is in correct channel and carrier is on a mission, so show the current trade mission for selected
-            # carrier
-            embed_colour = constants.EMBED_COLOUR_LOADING if mission_data.mission_type == 'load' else \
-                constants.EMBED_COLOUR_UNLOADING
+    carrier_data = find_carrier_by_channel_name(msg_ctx_name)
+    embed = await _is_carrier_channel(carrier_data)
 
-            mission_description = ''
-            if mission_data.rp_text and mission_data.rp_text != 'NULL':
-                mission_description = f"> {mission_data.rp_text}"
+    if not embed:
+        embed = await _is_mission_active_embed(carrier_data)
 
-            embed = discord.Embed(title=f"{mission_data.mission_type.upper()}ING {mission_data.carrier_name} ({mission_data.carrier_identifier})",
-                                  description=mission_description, color=embed_colour)
-
-            embed = _mission_summary_embed(mission_data, embed)
-
-            embed.set_footer(text="You can use m.complete if the mission is complete.")
-
-            await ctx.send(embed=embed)
-            return
+    await ctx.send(embed=embed)
+    return
 
 def _mission_summary_embed(mission_data, embed):
     embed.add_field(name="System", value=f"{mission_data.system.upper()}", inline=True)
@@ -1316,54 +1465,21 @@ async def _mission(ctx: SlashContext):
 
     print(f"{ctx.author} asked for active mission in <#{ctx.channel.id}> (used /mission)")
 
-    # take a note channel name
+    # take a note of the channel name
     msg_ctx_name = ctx.channel.name
 
-    # look for a match for the channel name in the carrier DB
-    # TODO: This should be a separate function to search by carrier channel name
-    carrier_db.execute(f"SELECT * FROM carriers WHERE "
-                       f"discordchannel = '{msg_ctx_name}' ;")
-    carrier_data = CarrierData(carrier_db.fetchone())
-    print(f'Mission command carrier_data: {carrier_data}')
-    if not carrier_data.discord_channel:
-        # if there's no channel match, return an error
-        embed = discord.Embed(description="Try again in a **🚛Trade Carriers** channel.", color=constants.EMBED_COLOUR_QU)
-        await ctx.send(embed=embed, hidden=True)
-        return
-    else:
-        print(f'Searching if carrier ({carrier_data.carrier_long_name}) has active mission.')
-        # now look to see if the carrier is on an active mission
-        mission_db.execute('''SELECT * FROM missions WHERE carrier LIKE (?)''',
-                           ('%' + carrier_data.carrier_long_name + '%',))
-        print('DB command ran, go fetch the result')
-        mission_data = MissionData(mission_db.fetchone())
-        print(f'Found mission data: {mission_data}')
+    carrier_data = find_carrier_by_channel_name(msg_ctx_name)
+    embed = await _is_carrier_channel(carrier_data)
 
-        if not mission_data:
-            # if there's no result, return an error
-            embed = discord.Embed(description=f"**{carrier_data.carrier_long_name}** doesn't seem to be on a trade"
-                                              f" mission right now.",
-                                  color=constants.EMBED_COLOUR_OK)
-            await ctx.send(embed=embed, hidden=True)
-        else:
-            # user is in correct channel and carrier is on a mission, so show the current trade mission for selected
-            # carrier
-            embed_colour = constants.EMBED_COLOUR_LOADING if mission_data.mission_type == 'load' else \
-                constants.EMBED_COLOUR_UNLOADING
+    if not embed:
+        embed = await _is_mission_active_embed(carrier_data)
 
-            mission_description = ''
-            if mission_data.rp_text and mission_data.rp_text != 'NULL':
-                mission_description = f"> {mission_data.rp_text}"
+    await ctx.send(embed=embed, hidden=True)
+    return
 
-            embed = discord.Embed(title=f"{mission_data.mission_type.upper()}ING {mission_data.carrier_name} ({mission_data.carrier_identifier})",
-                                  description=mission_description, color=embed_colour)
 
-            embed = _mission_summary_embed(mission_data, embed)
 
-            embed.set_footer(text="You can use m.complete if the mission is complete.")
 
-            await ctx.send(embed=embed, hidden=True)
-            return
 
 
 # list all active carrier trade missions from DB
@@ -1477,7 +1593,7 @@ async def _missions(ctx: SlashContext):
                                'Deletes trade alert in Discord and sends messages to carrier channel and reddit if '
                                'appropriate.\n\nAnything put in quotes after the carrier name will be treated as a '
                                'quote to be sent along with the completion notice. This can be used for RP if desired.')
-@commands.has_role('Certified Carrier')
+@commands.has_any_role('Certified Carrier', 'Trainee')
 async def done(ctx, carrier_name_search_term, rp=None):
 
     # Check we are in the designated mission channel, if not go no farther.
@@ -1570,10 +1686,17 @@ async def remove_carrier_channel(mission_channel_id, seconds):
     print("Channel removal timer complete")
 
     try:
-        # acquire channel lock
-        print("Waiting for channel lock")
-        await carrier_channel_lock.acquire()
-        print("Channel lock acquired")
+        # try to acquire a channel lock, if unsuccessful after a period of time, abort and throw up an error
+        try:
+            await asyncio.wait_for(lock_mission_channel(), timeout=120)
+        except asyncio.TimeoutError:
+            print(f"No channel lock available for {delchannel}")
+            channel = bot.get_channel(bot_spam_id)
+            return await channel.send(f"<@211891698551226368> WARNING: No channel lock available on {delchannel} after 120 seconds. Deletion aborted.")
+
+        # this is clunky but we want to know if a channel lock is because it's about to be deleted
+        global deletion_in_progress
+        deletion_in_progress = True
 
         # check whether channel is in-use for a new mission
         mission_db.execute(f"SELECT * FROM missions WHERE "
@@ -1594,6 +1717,7 @@ async def remove_carrier_channel(mission_channel_id, seconds):
     finally:
         # now release the channel lock
         carrier_channel_lock.release()
+        deletion_in_progress = False
         print("Channel lock released")
         return
 
@@ -1663,12 +1787,12 @@ async def complete(ctx):
                     await ctx.send(f"Notifying carrier owner: <@{carrier_data.ownerid}>")
 
                     # notify owner by DM
-                    user = bot.get_user(carrier_data.ownerid)
+                    user = await bot.fetch_user(carrier_data.ownerid)
                     await user.send(f"Ahoy CMDR! The trade mission for your Fleet Carrier **{carrier_data.carrier_long_name}** has been marked as complete by {ctx.author.display_name}. Its mission channel will be removed in {seconds_long//60} minutes unless a new mission is started.")
 
                     # record command user in bot-spam
-                    channel = bot.get_channel(bot_spam_id)
-                    await channel.send(f"{ctx.author} used m.complete in #{carrier_data.discord_channel}")
+                    spamchannel = bot.get_channel(bot_spam_id)
+                    await spamchannel.send(f"{ctx.author} used m.complete in #{carrier_data.discord_channel}")
                     # now we need to go do all the mission cleanup stuff
 
                     # delete Discord trade alert
@@ -2022,7 +2146,7 @@ async def carrier_del(ctx, db_id):
                                         'Use on its own to receive a blank template image.\n'
                                         'Use with carrier\'s name as argument to check the '
                                         'carrier\'s image or begin upload of a new image.')
-@commands.has_role('Certified Carrier')
+@commands.has_any_role('Certified Carrier', 'Trainee')
 async def carrier_image(ctx, lookname=None):
     if not lookname:
         print(f"{ctx.author} called m.carrier_image without argument")
@@ -2559,7 +2683,11 @@ def _configure_all_carrier_detail_embed(embed, carrier_data):
                              'The owner will receive the @Community Carrier role\n'
                              'as well as full permissions in the channel.')
 @commands.has_any_role('Community Team', 'Mod', 'Admin', 'Council')
-async def cc(ctx, owner: discord.Member, channel_name):
+async def cc(ctx, owner: discord.Member, *, channel_name):
+
+    # check the channel name isn't something utterly stupid
+    if len(channel_name) > 30:
+        return await ctx.send("Error: Channel name should be fewer than 30 characters. (Preferably a *lot* fewer.)")
 
     # TODO:
     # - embeds instead of normal messages for all cc interactions?
@@ -2574,7 +2702,7 @@ async def cc(ctx, owner: discord.Member, channel_name):
         # TODO: this should be fetchone() not fetchall but I can't make it work otherwise
         for community_carrier in community_carrier_data:
             print(f"Found data: {community_carrier.owner_id} owner of {community_carrier.channel_id}")
-            await ctx.send(f"User {owner.name} is already registered as a Community Carrier with channel <#{community_carrier.channel_id}>")
+            await ctx.send(f"User {owner.display_name} is already registered as a Community Carrier with channel <#{community_carrier.channel_id}>")
             return
         
     # get the CC category as a discord channel category object
@@ -2599,7 +2727,7 @@ async def cc(ctx, owner: discord.Member, channel_name):
                 return
             elif msg.content.lower() == "y":
                 # they want to use the existing channel, so we have to move it to the right category
-                print(f"Using existing channel {new_channel} and making {owner.name} its owner.")
+                print(f"Using existing channel {new_channel} and making {owner.display_name} its owner.")
                 try:
                     await new_channel.edit(category=category)
                     await ctx.send(f"Channel moved to {category.name}.")
@@ -2696,8 +2824,8 @@ async def cc(ctx, owner: discord.Member, channel_name):
     await ctx.send(embed=embed)
 
     # add a note in bot_spam
-    channel = bot.get_channel(bot_spam_id)
-    await channel.send(f"{ctx.author} used m.cc in <#{ctx.channel.id}> to add {owner.name} as a Community Carrier with channel <#{new_channel.id}>")
+    spamchannel = bot.get_channel(bot_spam_id)
+    await spamchannel.send(f"{ctx.author} used m.cc in <#{ctx.channel.id}> to add {owner.display_name} as a Community Carrier with channel <#{new_channel.id}>")
 
     return
 
@@ -2807,19 +2935,20 @@ async def cc_list(ctx):
 
 
 # find a community carrier channel by owner
-@bot.command(name='cc_owner', help='Search for an owner in the Community Carrier database.\n'
+@bot.command(name='cc_owner', help='Search for an owner by @ mention in the Community Carrier database.\n'
                              'Format: m.cc_owner @owner\n')
 @commands.has_any_role('Community Team', 'Mod', 'Admin', 'Council')
-async def cc_owner(ctx, owner: discord.User):
+async def cc_owner(ctx, owner: discord.Member):
+
     community_carrier_data = find_community_carrier_with_owner_id(owner.id)
     if community_carrier_data:
         # TODO: this should be fetchone() not fetchall but I can't make it work otherwise
         for community_carrier in community_carrier_data:
             print(f"Found data: {community_carrier.owner_id} owner of {community_carrier.channel_id}")
-            await ctx.send(f"User {owner.name} is registered as a Community Carrier with channel <#{community_carrier.channel_id}>")
+            await ctx.send(f"User {owner.display_name} is registered as a Community Carrier with channel <#{community_carrier.channel_id}>")
             return
     else:
-        await ctx.send(f"No Community Carrier registered to {owner.name}")
+        await ctx.send(f"No Community Carrier registered to {owner.display_name}")
 
 
 # delete a Community Carrier
@@ -2839,14 +2968,14 @@ async def cc_del(ctx, owner: discord.Member):
     # search for the user's database entry
     community_carrier_data = find_community_carrier_with_owner_id(owner.id)
     if not community_carrier_data:
-        await ctx.send(f"No Community Carrier registered to {owner.name}")
+        await ctx.send(f"No Community Carrier registered to {owner.display_name}")
         return
     elif community_carrier_data:
         # TODO: this should be fetchone() not fetchall but I can't make it work otherwise
         for community_carrier in community_carrier_data:
             print(f"Found data: {community_carrier.owner_id} owner of {community_carrier.channel_id}")
             channel_id = community_carrier.channel_id
-            await ctx.send(f"User {owner.name} is registered as a Community Carrier with channel <#{channel_id}>")
+            await ctx.send(f"User {owner.display_name} is registered as a Community Carrier with channel <#{channel_id}>")
 
     await ctx.send("Remove Community Carrier role and de-register user? **y**/**n**")
     try:
@@ -2925,11 +3054,11 @@ async def cc_del(ctx, owner: discord.Member):
             await channel.edit(sync_permissions=True)
             print("Synced permissions")
 
-            await ctx.send(f"{owner.name} removed from database and <#{channel_id}> archived.")
+            await ctx.send(f"{owner.display_name} removed from database and <#{channel_id}> archived.")
 
             # notify in bot_spam
-            channel = bot.get_channel(bot_spam_id)
-            await channel.send(f"{ctx.author} used m.cc_del in <#{ctx.channel.id}> to remove {owner.name} as a Community Carrier. Channel <#{channel_id} was archived.")
+            spamchannel = bot.get_channel(bot_spam_id)
+            await spamchannel.send(f"{ctx.author} used m.cc_del in <#{ctx.channel.id}> to remove {owner.name} as a Community Carrier. Channel <#{channel_id}> was archived.")
             return
         except Exception as e:
             print(e)
@@ -2945,22 +3074,289 @@ async def cc_del(ctx, owner: discord.Member):
             await ctx.send(f"{owner.name} removed from database and #{channel} deleted.")
 
             # notify in bot_spam
-            channel = bot.get_channel(bot_spam_id)
-            await channel.send(f"{ctx.author} used m.cc_del in <#{ctx.channel.id}> to remove {owner.name} as a Community Carrier. Channel #{channel} was deleted.")
+            spamchannel = bot.get_channel(bot_spam_id)
+            await spamchannel.send(f"{ctx.author} used m.cc_del in <#{ctx.channel.id}> to remove {owner.name} as a Community Carrier. Channel #{channel} was deleted.")
             return
         except Exception as e:
             print(e)
             return await ctx.send(f"Error, channel not deleted: {e}")
 
 
+#
+#                       COMMUNITY NOMINATION COMMANDS
+#
+
+@slash.slash(name="nominate", guild_ids=[bot_guild_id],
+             description="Private command: Nominate an @member to become a Community Pillar.")
+async def _nominate(ctx: SlashContext, user: discord.Member, *, reason):
+
+    # TODO: command to list nominations for a nominator
+
+    # first check the user is not nominating themselves because seriously dude
+
+    if ctx.author.id == user.id:
+        print(f"{ctx.author} tried to nominate themselves for Community Pillar :]")
+        return await ctx.send("You can't nominate yourself! But congrats on the positive self-esteem :)", hidden=True)
+
+    print(f"{ctx.author} wants to nominate {user}")
+    spamchannel = bot.get_channel(bot_spam_id)
+
+    # first check this user has not already nominated the same person
+    nominees_data = find_nominator_with_id(ctx.author.id)
+    if nominees_data:
+        for nominees in nominees_data:
+            if nominees.pillar_id == user.id:
+                print("This user already nommed this dude")
+                embed = discord.Embed(title="Nomination Failed", description=f"You've already nominated <@{user.id}> for reason **{nominees.note}**.\n\n"
+                                                                             f"You can nominate any number of users, but only once for each user.", color=constants.EMBED_COLOUR_ERROR)
+                await ctx.send(embed=embed, hidden=True)
+                return
+
+    print("No matching nomination, proceeding")
+
+    # enter nomination into nominees db
+    try:
+        print("Locking carrier db...")
+        await carrier_db_lock.acquire()
+        print("Carrier DB locked.")
+        try:
+            carrier_db.execute(''' INSERT INTO nominees VALUES(?, ?, ?) ''',
+                            (ctx.author.id, user.id, reason))
+            carriers_conn.commit()
+            print("Registered nomination to database")
+        finally:
+            print("Unlocking carrier db...")
+            carrier_db_lock.release()
+            print("Carrier DB unlocked.")
+    except Exception as e:
+        await ctx.send("Sorry, something went wrong and developers have been notified.", hidden=True)
+        # notify in bot_spam
+        await spamchannel.send(f"Error on /nominate by {ctx.author}: {e}")
+        return print(f"Error on /nominate by {ctx.author}: {e}")
+
+    # notify user of success
+    embed = discord.Embed(title="Nomination Successful", description=f"Thank you! You've nominated <@{user.id}> "
+                                f"to become a Community Pillar.\n\nReason: **{reason}**", color=constants.EMBED_COLOUR_OK)
+    await ctx.send(embed=embed, hidden=True)
+
+    # also tell bot-spam
+    await spamchannel.send(f"<@{user.id}> was nominated for Community Pillar.")
+    return print("Nomination successful")
+
+
+@slash.slash(name="nominate_remove", guild_ids=[bot_guild_id],
+             description="Private command: Remove your Pillar nomination for a user.")
+async def _nominate_remove(ctx: SlashContext, user: discord.Member):
+
+    print(f"{ctx.author} wants to un-nominate {user}")
+
+    # find the nomination
+    nominees_data = find_nominator_with_id(ctx.author.id)
+    if nominees_data:
+        for nominees in nominees_data:
+            if nominees.pillar_id == user.id:
+                await delete_nominee_by_nominator(ctx.author.id, user.id)
+                embed = discord.Embed(title="Nomination Removed", description=f"Your nomination for <@{user.id}> "
+                                           f"has been removed. If they're being a jerk, consider reporting privately "
+                                           f"to a Mod or Council member.", color=constants.EMBED_COLOUR_OK)
+                await ctx.send(embed=embed, hidden=True)
+
+                # notify bot-spam
+                spamchannel = bot.get_channel(bot_spam_id)
+                await spamchannel.send(f"A nomination for <@{user.id}> was withdrawn.")
+                return
+
+    # otherwise return an error
+    print("No such nomination")
+    return await ctx.send("No nomination found by you for that user.")
+
+def nom_count_user(pillarid):
+    """
+    Counts how many active nominations a nominee has.
+    """
+    nominees_data = find_nominee_with_id(pillarid)
+
+    count = len(nominees_data)
+    print(f"{count} for {pillarid}")
+
+    return count
+
+@bot.command(name='nom_count', help='Shows all users with more than X nominations')
+@commands.has_any_role('Community Team', 'Mod', 'Admin', 'Council')
+async def nom_count(ctx, number):
+
+    # make sure we are in the right channel
+    bot_command_channel = bot.get_channel(conf['ADMIN_BOT_CHANNEL'])
+    current_channel = ctx.channel
+    if current_channel != bot_command_channel:
+        # problem, wrong channel, no progress
+        return await ctx.send(f'Sorry, you can only run this command out of: {bot_command_channel}.')
+
+    numberint = int(number)
+
+    print(f"nom_list called by {ctx.author}")
+    embed=discord.Embed(title="Community Pillar nominees", description=f"Showing all with {number} nominations or more.", color=constants.EMBED_COLOUR_OK)
+
+    print("reading database")
+
+    # we need to 1: get a list of unique pillars then 2: send only one instance of each unique pillar to nom_count_user
+
+    # 1: get a list of unique pillars
+    carrier_db.execute(f"SELECT DISTINCT pillarid FROM nominees")
+    nominees_data = [NomineesData(nominees) for nominees in carrier_db.fetchall()]
+    for nominees in nominees_data:
+        print(nominees.pillar_id)
+
+        # 2: pass each unique pillar through to the counting function to retrieve the number of times they appear in the table
+        count = nom_count_user(nominees.pillar_id)
+        print(f"{nominees.pillar_id} has {count}")
+
+        # only show those with a count >= the number the user specified
+        if count >= numberint:
+            embed.add_field(name=f'{count} nominations', value=f"<@{nominees.pillar_id}>", inline=False)
+    
+    await ctx.send(embed=embed)
+    return print("nom_count complete")
+
+
+@bot.command(name='nom_details', help='Shows nomination details for given user by ID or @ mention')
+@commands.has_any_role('Community Team', 'Mod', 'Admin', 'Council')
+async def nom_details(ctx, userid):
+
+    # sanitise userid in case they used an @ mention
+    userid = userid.replace('<', '').replace('>', '').replace('@', '').replace('!', '')
+
+    print(f"nom_details called by {ctx.author}")
+
+    member = await bot.fetch_user(userid)
+    print(f"looked for member with {userid} and found {member}")
+
+    # make sure we are in the right channel
+    bot_command_channel = bot.get_channel(conf['ADMIN_BOT_CHANNEL'])
+    current_channel = ctx.channel
+    if current_channel != bot_command_channel:
+        # problem, wrong channel, no progress
+        return await ctx.send(f'Sorry, you can only run this command out of: {bot_command_channel}.')
+
+    embed=discord.Embed(title=f"Nomination details", description=f"Discord user <@{member.id}>", color=constants.EMBED_COLOUR_OK)
+
+    # look up specified user and return every entry for them as embed fields. TODO: This will break after too many nominations, would need to be paged.
+    nominees_data = find_nominee_with_id(userid)
+    for nominees in nominees_data:
+        nominator = await bot.fetch_user(nominees.nom_id)
+        embed.add_field(name=f'Nominator: {nominator.display_name}',
+                        value=f"{nominees.note}", inline=False)
+
+    await ctx.send(embed=embed)
+
+
+@bot.command(name='nom_delete', help='Completely removes all nominations for a user by user ID or @ mention. NOT RECOVERABLE.')
+@commands.has_any_role('Admin', 'Council')
+async def nom_delete(ctx, userid):
+    print(f"nom_delete called by {ctx.author}")
+
+    # sanitise userid in case they used an @ mention
+    userid = userid.replace('<', '').replace('>', '').replace('@', '').replace('!', '')
+
+    member = await bot.fetch_user(userid)
+
+    # make sure we are in the right channel
+    bot_command_channel = bot.get_channel(conf['ADMIN_BOT_CHANNEL'])
+    current_channel = ctx.channel
+    if current_channel != bot_command_channel:
+        # problem, wrong channel, no progress
+        return await ctx.send(f'Sorry, you can only run this command out of: {bot_command_channel}.')
+
+    # check whether user has any nominations
+    nominees_data = find_nominee_with_id(userid)
+    if not nominees_data:
+        return await ctx.send(f'No results for {member.display_name} (user ID {userid})')
+
+    # now check they're sure they want to delete
+
+    def check(message):
+        return message.author == ctx.author and message.channel == ctx.channel and \
+                                 message.content.lower() in ["y", "n"]
+
+    await ctx.send(f"Are you **sure** you want to completely remove {member} from the nominees database? **The data is gone forever**.\n**y**/**n**")
+
+    try:
+        msg = await bot.wait_for("message", check=check, timeout=30)
+        if msg.content.lower() == "n":
+            await ctx.send("OK, cancelling.")
+            print("User cancelled nom_del command.")
+            return
+        elif msg.content.lower() == "y":
+            print("User wants to proceed with removal.")
+            await ctx.send("You're the boss, boss.")
+
+    except asyncio.TimeoutError:
+        await ctx.send("Cancelled: no response.")
+        return
+
+    # remove the database entry
+    try:
+        error_msg = await delete_nominee_from_db(userid)
+        if error_msg:
+            return await ctx.send(error_msg)
+
+        print("User removed from nominees database.")
+    except Exception as e:
+        return await ctx.send(f'Something went wrong, go tell the bot team "computer said: {e}"')
+
+    await ctx.send(f"User {member} removed from nominees database.")
+
+
 
 # ping the bot
 @bot.command(name='ping', help='Ping the bot')
-@commands.has_role('Certified Carrier')
+@commands.has_any_role('Certified Carrier', 'Trainee', 'Developer')
 async def ping(ctx):
     gif = random.choice(hello_gifs)
     await ctx.send(gif)
     # await ctx.send("**PING? PONG!**")
+
+@bot.command(name='unlock_override', help='Unlock the channel lock manually after Sheriff Benguin breaks it.')
+@commands.has_any_role('Council', 'Admin', 'Developer')
+async def unlock_override(ctx):
+    print(f"{ctx.author} called manual channel_lock release in {ctx.channel}")
+    if not carrier_channel_lock.locked():
+        return await ctx.send("Channel lock is not set.")
+    
+    await ctx.send("Make sure nobody is using the Mission Generator before proceeding.")
+    global deletion_in_progress
+
+    # this global variable is set when the channel deletion function acquires its lock
+    if deletion_in_progress:
+        await ctx.send("Lock appears to be set from a channel deletion task underway. This usually takes ~10 seconds per channel."
+                       " Please make sure no mission channels are about to be deleted. Deletion occurs 15 minutes after `m.complete`"
+                       " or `m.done` or 2 minutes following using a mission generator command without generating a mission "
+                       "(i.e. by error or user abort).")
+
+    await ctx.send("Do you still want to proceed? **y**/**n**")
+
+    def check(message):
+        return message.author == ctx.author and message.channel == ctx.channel and \
+                                    message.content.lower() in ["y", "n"]
+
+    try:
+        msg = await bot.wait_for("message", check=check, timeout=30)
+        if msg.content.lower() == "n":
+            await ctx.send("Manual lock release aborted.")
+            print("User cancelled manual unlock command.")
+            return
+        elif msg.content.lower() == "y":
+            print("User wants to manually release channel lock.")
+
+    except asyncio.TimeoutError:
+        await ctx.send("Cancelled: no response.")
+        return
+
+    await ctx.send("OK. Releasing channel lock.")
+    carrier_channel_lock.release()
+
+    deletion_in_progress = False
+    print("Channel lock manually released.")
 
 
 # quit the bot
