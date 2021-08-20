@@ -1330,10 +1330,10 @@ def cleanup_temp_image_file(file_name):
     """
     # Now we delete the temp file, clean up after ourselves!
     try:
-        print(f'Deleting the carriers temp file at: {file_name}')
+        print(f'Deleting the temp file at: {file_name}')
         os.remove(file_name)
     except Exception as e:
-        print(f'There was a problem removing the carrier image file located {file_name}')
+        print(f'There was a problem removing the temp image file located {file_name}')
         print(e)
 
 
@@ -2182,6 +2182,25 @@ async def carrier_image(ctx, lookname=None):
         try:
             message = await bot.wait_for("message", check=check, timeout=60)
             if message.attachments:
+                for attachment in message.attachments:
+                    result_name = tempfile.NamedTemporaryFile(suffix='.png', delete=False)
+                    print(f'Saving attachment as tempfile: {result_name.name}')
+                    file_name = result_name.name
+                    await attachment.save(file_name)
+
+                print("Checking image size")
+                # check it's the right size
+                image = Image.open(file_name)
+                width, height = image.size
+                print(f"{width}, {height}")
+                if not width == 500 and not height == 500:
+                    print("Image size fail")
+                    await ctx.send(f"**Images must be exactly 500x500 pixels.** Your image was {width}x{height}.")
+                    await message_upload_now.delete()
+                    # cleanup the temp file
+                    cleanup_temp_image_file(file_name)
+                    return
+
                 shutil.move(f'images/{carrier_data.carrier_short_name}.png',
                             f'images/old/{carrier_data.carrier_short_name}.{get_formatted_date_string()[1]}.png')
                 for attachment in message.attachments:
@@ -2194,6 +2213,7 @@ async def carrier_image(ctx, lookname=None):
                 await message.delete()
                 await message_upload_now.delete()
                 print(f"{ctx.author} updated carrier image for {carrier_data.carrier_long_name}")
+                cleanup_temp_image_file(file_name)
             elif message.content.lower() == "x":
                 embed = discord.Embed(description="Existing image retained.",
                                       color=constants.EMBED_COLOUR_OK)
