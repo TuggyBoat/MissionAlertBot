@@ -10,6 +10,7 @@ PROD_CHANNEL_UPVOTES = 828279034387103744    # The ID for the updoots channel
 PROD_REDDIT_CHANNEL = 878029150336720936 # the ID for the Reddit Comments channel
 PROD_MISSION_CHANNEL = 822603169104265276    # The ID for the production mission channel
 PROD_BOT_COMMAND_CHANNEL = 802523724674891826   # Bot backend commands are locked to a channel
+PROD_ADMIN_BOT_CHANNEL = 872760263378620426 # bot command channel for admins only
 PROD_BOT_SPAM_CHANNEL = 801258393205604372 # Certain bot logging messages go here
 PROD_UPVOTE_EMOJI = 828287733227192403 # upvote emoji on live server
 PROD_HAULER_ROLE = 875313960834965544 # hauler role ID on live server
@@ -34,6 +35,7 @@ TEST_CHANNEL_UPVOTES = 839918504676294666    # The ID for the updoots channel on
 TEST_REDDIT_CHANNEL = 878029350933520484 # the ID for the Reddit Comments channel
 TEST_MISSION_CHANNEL = 842138710651961364    # The ID for the production mission channel
 TEST_BOT_COMMAND_CHANNEL = 842152343441375283   # Bot backend commands are locked to a channel
+TEST_ADMIN_BOT_CHANNEL = 842152343441375283 # bot command channel for admins only
 TEST_BOT_SPAM_CHANNEL = 842525081858867211 # Bot logging messages on the test server
 TEST_UPVOTE_EMOJI = 849388681382068225 # upvote emoji on test server
 TEST_HAULER_ROLE = 875439909102575647 # hauler role ID on test server
@@ -77,6 +79,7 @@ def get_constant(production: bool):
             'REDDIT_CHANNEL' : PROD_REDDIT_CHANNEL,
             'MISSION_CHANNEL': PROD_MISSION_CHANNEL,
             'BOT_COMMAND_CHANNEL': PROD_BOT_COMMAND_CHANNEL,
+            'ADMIN_BOT_CHANNEL' : PROD_ADMIN_BOT_CHANNEL,
             'BOT_SPAM_CHANNEL': PROD_BOT_SPAM_CHANNEL,
             'UPVOTE_EMOJI': PROD_UPVOTE_EMOJI,
             'HAULER_ROLE' : PROD_HAULER_ROLE,
@@ -99,6 +102,7 @@ def get_constant(production: bool):
             'REDDIT_CHANNEL' : TEST_REDDIT_CHANNEL,
             'MISSION_CHANNEL': TEST_MISSION_CHANNEL,
             'BOT_COMMAND_CHANNEL': TEST_BOT_COMMAND_CHANNEL,
+            'ADMIN_BOT_CHANNEL' : TEST_ADMIN_BOT_CHANNEL,
             'BOT_SPAM_CHANNEL': TEST_BOT_SPAM_CHANNEL,
             'UPVOTE_EMOJI': TEST_UPVOTE_EMOJI,
             'HAULER_ROLE' : TEST_HAULER_ROLE,
