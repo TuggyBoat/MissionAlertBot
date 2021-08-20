@@ -578,8 +578,9 @@ async def find_commodity(commodity_search_term, ctx):
     commodity = None
     if not commodities:
         print('No commodities found for request')
+        await ctx.send(f"No commodities found for {commodity_search_term}")
         # Did not find anything, short-circuit out of the next block
-        return None
+        return
     elif len(commodities) == 1:
         print('Single commodity found, returning that directly')
         # if only 1 match, just assign it directly
@@ -590,7 +591,7 @@ async def find_commodity(commodity_search_term, ctx):
         print(f'More than 3 commodities found for: "{commodity_search_term}", {ctx.author} needs to search better.')
         await ctx.send(f'Please narrow down your commodity search, we found {len(commodities)} matches for your '
                        f'input choice: "{commodity_search_term}"')
-        return None  # Just return None here and let the calling method figure out what is needed to happen
+        return # Just return None here and let the calling method figure out what is needed to happen
     else:
         print(f'Between 1 and 3 commodities found for: "{commodity_search_term}", asking {ctx.author} which they want.')
         # The database runs a partial match, in the case we have more than 1 ask the user which they want.
@@ -617,12 +618,14 @@ async def find_commodity(commodity_search_term, ctx):
             index = int(response.content) - 1  # Users count from 1, computers count from 0
             commodity = commodities[index]
         except asyncio.TimeoutError:
+            await ctx.send("Commodity selection timed out. Cancelling.")
             print('User failed to respond in time')
-            pass
+            return
         await message_confirm.delete()
         if response:
             await response.delete()
-    if commodity:
+    if commodity: # only if this is successful is returnflag set so mission gen will continue
+        gen_mission.returnflag = True
         print(f"Commodity {commodity.name} avgsell {commodity.average_sell} avgbuy {commodity.average_buy} "
               f"maxsell {commodity.max_sell} minbuy {commodity.min_buy} maxprofit {commodity.max_profit}")
     return commodity
@@ -878,6 +881,19 @@ async def gen_mission(ctx, carrier_name_search_term, commodity_search_term, syst
         print(f'Exiting mission generation requested by {ctx.author} as pad size is invalid, provided: {pads}')
         return await ctx.send(f'Sorry, your pad size is not L or M. Provided: {pads}. Mission generation cancelled.')
 
+    # check if commodity can be found, exit gracefully if not
+    gen_mission.returnflag = False
+    commodity_data = await find_commodity(commodity_search_term, ctx)
+    if not gen_mission.returnflag:
+        return # we've already given the user feedback on why there's a problem, we just want to quit gracefully now
+    if not commodity_data:
+        raise ValueError('Missing commodity data')
+
+    # check if the carrier can be found, exit gracefully if not
+    carrier_data = find_carrier_from_long_name(carrier_name_search_term)
+    if not carrier_data:
+        return await ctx.send(f"No carrier found for {carrier_name_search_term}. You can use `/find` or `/owner` to search for carrier names.")
+
     print("Waiting for channel lock...")
     await carrier_channel_lock.acquire()
     print("Channel lock acquired")
@@ -920,7 +936,6 @@ async def gen_mission(ctx, carrier_name_search_term, commodity_search_term, syst
         def check_rp(message):
             return message.author == ctx.author and message.channel == ctx.channel
 
-        carrier_data = find_carrier_from_long_name(carrier_name_search_term)
         mission_temp_channel_id = await create_mission_temp_channel(ctx, carrier_data.discord_channel, carrier_data.ownerid)
 
         if rp:
@@ -949,9 +964,6 @@ async def gen_mission(ctx, carrier_name_search_term, commodity_search_term, syst
                 return
 
         # generate the mission elements
-        commodity_data = await find_commodity(commodity_search_term, ctx)
-        if not commodity_data:
-            raise ValueError('Missing commodity data')
 
         file_name = create_carrier_mission_image(carrier_data, commodity_data, system, station, profit, pads, demand,
                                                 mission_type)
