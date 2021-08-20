@@ -94,6 +94,8 @@ missions_conn = sqlite3.connect('missions.db')
 missions_conn.row_factory = sqlite3.Row
 mission_db = missions_conn.cursor()
 
+deletion_in_progress = False
+
 # channel go boom gifs
 
 byebye_gifs = [
@@ -474,6 +476,64 @@ def find_carrier_from_pid(db_id):
           f"from find_carrier_from_pid.")
     return carrier_data
 
+# find a carrier by its channel name
+def find_carrier_by_channel_name(channelname):
+    # look for a match for the channel name in the carrier DB
+    carrier_db.execute(f"SELECT * FROM carriers WHERE "
+                       f"discordchannel = '{channelname}' ;")
+    carrier_data = CarrierData(carrier_db.fetchone())
+    print(carrier_data)
+    return carrier_data
+
+# find a carrier in the mission database
+def find_mission_by_carrier_name(carriername):
+    print("called find_mission_by_carrier_name")
+    mission_db.execute('''SELECT * FROM missions WHERE carrier LIKE (?)''',
+                        ('%' + carriername + '%',))
+    mission_data = MissionData(mission_db.fetchone())
+    print(f'Found mission data: {mission_data}')
+    return mission_data
+
+
+# check if a carrier is for a registered PTN fleet carrier
+async def _is_carrier_channel(carrier_data):
+    if not carrier_data.discord_channel:
+        # if there's no channel match, return an error
+        embed = discord.Embed(description="Try again in a **🚛Trade Carriers** channel.", color=constants.EMBED_COLOUR_QU)
+        return embed
+    else:
+        return
+
+# return active mission data (if any) for a carrier
+async def _return_mission_data(carrier_data):
+    print("Called _return_mission_data")
+    # look to see if the carrier is on an active mission
+    mission_data = find_mission_by_carrier_name(carrier_data.carrier_long_name)
+
+    if not mission_data:
+        # if there's no result, return an error
+        embed = discord.Embed(description=f"**{carrier_data.carrier_long_name}** doesn't seem to be on a trade"
+                                            f" mission right now.",
+                                color=constants.EMBED_COLOUR_OK)
+        return embed
+    else:
+        # user is in correct channel and carrier is on a mission, so show the current trade mission for selected
+        # carrier
+        embed_colour = constants.EMBED_COLOUR_LOADING if mission_data.mission_type == 'load' else \
+            constants.EMBED_COLOUR_UNLOADING
+
+        mission_description = ''
+        if mission_data.rp_text and mission_data.rp_text != 'NULL':
+            mission_description = f"> {mission_data.rp_text}"
+
+        embed = discord.Embed(title=f"{mission_data.mission_type.upper()}ING {mission_data.carrier_name} ({mission_data.carrier_identifier})",
+                                description=mission_description, color=embed_colour)
+
+        embed = _mission_summary_embed(mission_data, embed)
+
+        embed.set_footer(text="You can use m.complete if the mission is complete.")
+        return embed
+
 
 # function to search for a commodity by name or partial name
 async def find_commodity(commodity_search_term, ctx):
@@ -644,6 +704,11 @@ def user_exit():
     sys.exit("User requested exit.")
 
 
+async def lock_mission_channel():
+    print("Attempting channel lock...")
+    await carrier_channel_lock.acquire()
+    print("Channel lock acquired.")
+
 #
 #                       BOT STUFF STARTS HERE
 #
@@ -654,7 +719,9 @@ slash = SlashCommand(bot, sync_commands=True)
 @bot.event
 async def on_ready():
     print(f'{bot.user.name} has connected to Discord!')
+    # reddit monitor must be at the END of this function
     await _monitor_reddit_comments()
+
 
 
 # monitor reddit comments
@@ -790,10 +857,6 @@ async def gen_mission(ctx, carrier_name_search_term, commodity_search_term, syst
         print(f'Exiting mission generation requested by {ctx.author} as pad size is invalid, provided: {pads}')
         return await ctx.send(f'Sorry, your pad size is not L or M. Provided: {pads}. Mission generation cancelled.')
 
-    print("Waiting for channel lock...")
-    await carrier_channel_lock.acquire()
-    print("Channel lock acquired")
-
     # TODO: This method is way too long, break it up into logical steps.
 
     try: # this try/except pair is to try and ensure the channel lock is released if something breaks during mission gen
@@ -832,8 +895,17 @@ async def gen_mission(ctx, carrier_name_search_term, commodity_search_term, syst
         def check_rp(message):
             return message.author == ctx.author and message.channel == ctx.channel
 
+
+
         carrier_data = find_carrier_from_long_name(carrier_name_search_term)
+
+        gen_mission.returnflag = False
         mission_temp_channel_id = await create_mission_temp_channel(ctx, carrier_data.discord_channel, carrier_data.ownerid)
+        # flag is set to True if mission channel creation is successful
+        if not gen_mission.returnflag:
+            return # we've already notified the user
+
+        # beyond this point any exits need to release the channel lock
 
         if rp:
             embed = discord.Embed(title="Input roleplay text",
@@ -1088,6 +1160,15 @@ async def create_mission_temp_channel(ctx, discord_channel, owner_id):
         print(f"Found existing {mission_temp_channel}")
     else:
         # channel does not exist, create it
+        print("Waiting for Mission Generator channel lock...")
+        try:
+            await asyncio.wait_for(lock_mission_channel(), timeout=10)
+        except asyncio.TimeoutError:
+            print("We couldn't get a channel lock after 10 seconds, let's abort rather than wait around.")
+            return await ctx.send("Error: Channel lock could not be acquired, please try again. If the problem persists please contact an Admin.")
+
+        # we got a lock so we can change the returnflag
+        gen_mission.returnflag = True
         category = discord.utils.get(ctx.guild.categories, id=trade_cat_id)
         mission_temp_channel = await ctx.guild.create_text_channel(discord_channel, category=category)
         mission_temp_channel_id = mission_temp_channel.id
@@ -1212,53 +1293,20 @@ async def mission_generation_complete(ctx, carrier_data, message_pending, eta_te
 # list active carrier trade mission from DB
 @bot.command(name='ission', help="Show carrier's active trade mission.")
 async def ission(ctx):
-    # take a note channel ID
+
+    # this is the spammy version of the command, prints details to open channel
+
+    # take a note of the channel name
     msg_ctx_name = ctx.channel.name
-    # look for a match for the channel name in the carrier DB
-    # TODO: this should be a separate function to search by carrier channel name
-    carrier_db.execute(f"SELECT * FROM carriers WHERE "
-                       f"discordchannel = {msg_ctx_name}")
-    carrier_data = CarrierData(carrier_db.fetchone())
-    print(f'Mission command carrier_data: {carrier_data}')
-    if not carrier_data.discord_channel:
-        # if there's no channel match, return an error
-        embed = discord.Embed(description="Try again in the carrier's mission channel.", color=constants.EMBED_COLOUR_QU)
-        await ctx.send(embed=embed)
-        return
-    else:
-        print(f'Searching if carrier ({carrier_data.carrier_long_name}) has active mission.')
-        # now look to see if the carrier is on an active mission
-        mission_db.execute('''SELECT * FROM missions WHERE carrier LIKE (?)''',
-                           ('%' + carrier_data.carrier_long_name + '%',))
-        print('DB command ran, go fetch the result')
-        mission_data = MissionData(mission_db.fetchone())
-        print(f'Found mission data: {mission_data}')
 
-        if not mission_data:
-            # if there's no result, return an error
-            embed = discord.Embed(description=f"**{carrier_data.carrier_long_name}** doesn't seem to be on a trade"
-                                              f" mission right now.",
-                                  color=constants.EMBED_COLOUR_OK)
-            await ctx.send(embed=embed)
-        else:
-            # user is in correct channel and carrier is on a mission, so show the current trade mission for selected
-            # carrier
-            embed_colour = constants.EMBED_COLOUR_LOADING if mission_data.mission_type == 'load' else \
-                constants.EMBED_COLOUR_UNLOADING
+    carrier_data = find_carrier_by_channel_name(msg_ctx_name)
+    embed = await _is_carrier_channel(carrier_data)
 
-            mission_description = ''
-            if mission_data.rp_text and mission_data.rp_text != 'NULL':
-                mission_description = f"> {mission_data.rp_text}"
+    if not embed:
+        embed = await _return_mission_data(carrier_data)
 
-            embed = discord.Embed(title=f"{mission_data.mission_type.upper()}ING {mission_data.carrier_name} ({mission_data.carrier_identifier})",
-                                  description=mission_description, color=embed_colour)
-
-            embed = _mission_summary_embed(mission_data, embed)
-
-            embed.set_footer(text="You can use m.complete if the mission is complete.")
-
-            await ctx.send(embed=embed)
-            return
+    await ctx.send(embed=embed)
+    return
 
 def _mission_summary_embed(mission_data, embed):
     embed.add_field(name="System", value=f"{mission_data.system.upper()}", inline=True)
@@ -1316,54 +1364,21 @@ async def _mission(ctx: SlashContext):
 
     print(f"{ctx.author} asked for active mission in <#{ctx.channel.id}> (used /mission)")
 
-    # take a note channel name
+    # take a note of the channel name
     msg_ctx_name = ctx.channel.name
 
-    # look for a match for the channel name in the carrier DB
-    # TODO: This should be a separate function to search by carrier channel name
-    carrier_db.execute(f"SELECT * FROM carriers WHERE "
-                       f"discordchannel = '{msg_ctx_name}' ;")
-    carrier_data = CarrierData(carrier_db.fetchone())
-    print(f'Mission command carrier_data: {carrier_data}')
-    if not carrier_data.discord_channel:
-        # if there's no channel match, return an error
-        embed = discord.Embed(description="Try again in a **🚛Trade Carriers** channel.", color=constants.EMBED_COLOUR_QU)
-        await ctx.send(embed=embed, hidden=True)
-        return
-    else:
-        print(f'Searching if carrier ({carrier_data.carrier_long_name}) has active mission.')
-        # now look to see if the carrier is on an active mission
-        mission_db.execute('''SELECT * FROM missions WHERE carrier LIKE (?)''',
-                           ('%' + carrier_data.carrier_long_name + '%',))
-        print('DB command ran, go fetch the result')
-        mission_data = MissionData(mission_db.fetchone())
-        print(f'Found mission data: {mission_data}')
+    carrier_data = find_carrier_by_channel_name(msg_ctx_name)
+    embed = await _is_carrier_channel(carrier_data)
 
-        if not mission_data:
-            # if there's no result, return an error
-            embed = discord.Embed(description=f"**{carrier_data.carrier_long_name}** doesn't seem to be on a trade"
-                                              f" mission right now.",
-                                  color=constants.EMBED_COLOUR_OK)
-            await ctx.send(embed=embed, hidden=True)
-        else:
-            # user is in correct channel and carrier is on a mission, so show the current trade mission for selected
-            # carrier
-            embed_colour = constants.EMBED_COLOUR_LOADING if mission_data.mission_type == 'load' else \
-                constants.EMBED_COLOUR_UNLOADING
+    if not embed:
+        embed = await _return_mission_data(carrier_data)
 
-            mission_description = ''
-            if mission_data.rp_text and mission_data.rp_text != 'NULL':
-                mission_description = f"> {mission_data.rp_text}"
+    await ctx.send(embed=embed, hidden=True)
+    return
 
-            embed = discord.Embed(title=f"{mission_data.mission_type.upper()}ING {mission_data.carrier_name} ({mission_data.carrier_identifier})",
-                                  description=mission_description, color=embed_colour)
 
-            embed = _mission_summary_embed(mission_data, embed)
 
-            embed.set_footer(text="You can use m.complete if the mission is complete.")
 
-            await ctx.send(embed=embed, hidden=True)
-            return
 
 
 # list all active carrier trade missions from DB
@@ -1570,10 +1585,17 @@ async def remove_carrier_channel(mission_channel_id, seconds):
     print("Channel removal timer complete")
 
     try:
-        # acquire channel lock
-        print("Waiting for channel lock")
-        await carrier_channel_lock.acquire()
-        print("Channel lock acquired")
+        # try to acquire a channel lock, if unsuccessful after a period of time, abort and throw up an error
+        try:
+            await asyncio.wait_for(lock_mission_channel(), timeout=120)
+        except asyncio.TimeoutError:
+            print(f"No channel lock available for {delchannel}")
+            channel = bot.get_channel(bot_spam_id)
+            return await channel.send(f"<@211891698551226368> WARNING: No channel lock available on {delchannel} after 120 seconds. Deletion aborted.")
+
+        # this is clunky but we want to know if a channel lock is because it's about to be deleted
+        global deletion_in_progress
+        deletion_in_progress = True
 
         # check whether channel is in-use for a new mission
         mission_db.execute(f"SELECT * FROM missions WHERE "
@@ -1594,6 +1616,7 @@ async def remove_carrier_channel(mission_channel_id, seconds):
     finally:
         # now release the channel lock
         carrier_channel_lock.release()
+        deletion_in_progress = False
         print("Channel lock released")
         return
 
@@ -2952,7 +2975,47 @@ async def cc_del(ctx, owner: discord.Member):
             print(e)
             return await ctx.send(f"Error, channel not deleted: {e}")
 
+@bot.command(name='unlock_override', help='Unlock the channel lock manually after Sheriff Benguin breaks it.')
+@commands.has_any_role('Council', 'Admin', 'Developer')
+async def unlock_override(ctx):
+    print(f"{ctx.author} called manual channel_lock release in {ctx.channel}")
+    if not carrier_channel_lock.locked():
+        return await ctx.send("Channel lock is not set.")
+    
+    await ctx.send("Make sure nobody is using the Mission Generator before proceeding.")
+    global deletion_in_progress
 
+    # this global variable is set when the channel deletion function acquires its lock
+    if deletion_in_progress:
+        await ctx.send("Lock appears to be set from a channel deletion task underway. This usually takes ~10 seconds per channel."
+                       " Please make sure no mission channels are about to be deleted. Deletion occurs 15 minutes after `m.complete`"
+                       " or `m.done` or 2 minutes following using a mission generator command without generating a mission "
+                       "(i.e. by error or user abort).")
+
+    await ctx.send("Do you still want to proceed? **y**/**n**")
+
+    def check(message):
+        return message.author == ctx.author and message.channel == ctx.channel and \
+                                    message.content.lower() in ["y", "n"]
+
+    try:
+        msg = await bot.wait_for("message", check=check, timeout=30)
+        if msg.content.lower() == "n":
+            await ctx.send("Manual lock release aborted.")
+            print("User cancelled manual unlock command.")
+            return
+        elif msg.content.lower() == "y":
+            print("User wants to manually release channel lock.")
+
+    except asyncio.TimeoutError:
+        await ctx.send("Cancelled: no response.")
+        return
+
+    await ctx.send("OK. Releasing channel lock.")
+    carrier_channel_lock.release()
+
+    deletion_in_progress = False
+    print("Channel lock manually released.")
 
 # ping the bot
 @bot.command(name='ping', help='Ping the bot')
