@@ -504,20 +504,20 @@ async def _is_carrier_channel(carrier_data):
     else:
         return
 
-# return active mission data (if any) for a carrier
+# return an embed featuring either the active mission or the not found message
 async def _is_mission_active_embed(carrier_data):
     print("Called _is_mission_active_embed")
     # look to see if the carrier is on an active mission
     mission_data = find_mission_by_carrier_name(carrier_data.carrier_long_name)
 
     if not mission_data:
-        # if there's no result, tell the user and go back
+        # if there's no result, make our embed tell the user this
         embed = discord.Embed(description=f"**{carrier_data.carrier_long_name}** doesn't seem to be on a trade"
                                             f" mission right now.",
                                 color=constants.EMBED_COLOUR_OK)
         return embed
 
-    # mission data exists so format it for the user
+    # mission data exists so format it for the user as an embed
 
     embed_colour = constants.EMBED_COLOUR_LOADING if mission_data.mission_type == 'load' else \
         constants.EMBED_COLOUR_UNLOADING
