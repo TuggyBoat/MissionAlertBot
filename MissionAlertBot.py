@@ -517,10 +517,10 @@ async def _is_mission_active_embed(carrier_data):
                                 color=constants.EMBED_COLOUR_OK)
         return embed
 
+    # mission data exists so format it for the user
+
     embed_colour = constants.EMBED_COLOUR_LOADING if mission_data.mission_type == 'load' else \
         constants.EMBED_COLOUR_UNLOADING
-
-    # mission data exists so format it for the user
 
     mission_description = ''
     if mission_data.rp_text and mission_data.rp_text != 'NULL':
