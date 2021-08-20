@@ -1251,6 +1251,17 @@ async def create_mission_temp_channel(ctx, discord_channel, owner_id):
 
     mission_temp_channel = discord.utils.get(ctx.guild.channels, name=discord_channel)
 
+    # we need to lock the channel to stop it being deleted mid process
+    print("Waiting for Mission Generator channel lock...")
+    lockwait_msg = await ctx.send("Waiting for channel lock to become available...")
+    try:
+        await asyncio.wait_for(lock_mission_channel(), timeout=10)
+    except asyncio.TimeoutError:
+        print("We couldn't get a channel lock after 10 seconds, let's abort rather than wait around.")
+        return await ctx.send("Error: Channel lock could not be acquired, please try again. If the problem persists please contact an Admin.")
+
+    await lockwait_msg.delete()
+
     if mission_temp_channel:
         # channel exists, so reuse it
         mission_temp_channel_id = mission_temp_channel.id
@@ -1258,15 +1269,6 @@ async def create_mission_temp_channel(ctx, discord_channel, owner_id):
         print(f"Found existing {mission_temp_channel}")
     else:
         # channel does not exist, create it
-        print("Waiting for Mission Generator channel lock...")
-        lockwait_msg = await ctx.send("Waiting for channel lock to become available...")
-        try:
-            await asyncio.wait_for(lock_mission_channel(), timeout=10)
-        except asyncio.TimeoutError:
-            print("We couldn't get a channel lock after 10 seconds, let's abort rather than wait around.")
-            return await ctx.send("Error: Channel lock could not be acquired, please try again. If the problem persists please contact an Admin.")
-
-        await lockwait_msg.delete()
 
         category = discord.utils.get(ctx.guild.categories, id=trade_cat_id)
         mission_temp_channel = await ctx.guild.create_text_channel(discord_channel, category=category)
