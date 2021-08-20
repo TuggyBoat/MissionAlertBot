@@ -2193,7 +2193,7 @@ async def carrier_image(ctx, lookname=None):
                 image = Image.open(file_name)
                 width, height = image.size
                 print(f"{width}, {height}")
-                if not width == 500 and not height == 500:
+                if not width == 500 or not height == 500:
                     print("Image size fail")
                     await ctx.send(f"**Images must be exactly 500x500 pixels.** Your image was {width}x{height}.")
                     await message_upload_now.delete()
