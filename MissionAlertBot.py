@@ -511,28 +511,28 @@ async def _is_mission_active_embed(carrier_data):
     mission_data = find_mission_by_carrier_name(carrier_data.carrier_long_name)
 
     if not mission_data:
-        # if there's no result, return an error
+        # if there's no result, tell the user and go back
         embed = discord.Embed(description=f"**{carrier_data.carrier_long_name}** doesn't seem to be on a trade"
                                             f" mission right now.",
                                 color=constants.EMBED_COLOUR_OK)
         return embed
-    else:
-        # user is in correct channel and carrier is on a mission, so show the current trade mission for selected
-        # carrier
-        embed_colour = constants.EMBED_COLOUR_LOADING if mission_data.mission_type == 'load' else \
-            constants.EMBED_COLOUR_UNLOADING
 
-        mission_description = ''
-        if mission_data.rp_text and mission_data.rp_text != 'NULL':
-            mission_description = f"> {mission_data.rp_text}"
+    embed_colour = constants.EMBED_COLOUR_LOADING if mission_data.mission_type == 'load' else \
+        constants.EMBED_COLOUR_UNLOADING
 
-        embed = discord.Embed(title=f"{mission_data.mission_type.upper()}ING {mission_data.carrier_name} ({mission_data.carrier_identifier})",
-                                description=mission_description, color=embed_colour)
+    # mission data exists so format it for the user
 
-        embed = _mission_summary_embed(mission_data, embed)
+    mission_description = ''
+    if mission_data.rp_text and mission_data.rp_text != 'NULL':
+        mission_description = f"> {mission_data.rp_text}"
 
-        embed.set_footer(text="You can use m.complete if the mission is complete.")
-        return embed
+    embed = discord.Embed(title=f"{mission_data.mission_type.upper()}ING {mission_data.carrier_name} ({mission_data.carrier_identifier})",
+                            description=mission_description, color=embed_colour)
+
+    embed = _mission_summary_embed(mission_data, embed)
+
+    embed.set_footer(text="You can use m.complete if the mission is complete.")
+    return embed
 
 
 # function to search for a commodity by name or partial name
