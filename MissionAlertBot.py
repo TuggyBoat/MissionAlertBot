@@ -113,7 +113,6 @@ boom_gifs = [
     'https://c.tenor.com/v_d_Flu6pY0AAAAM/countdown-lastseconds.gif',
     'https://tenor.com/view/final-countdown-countdown-europe-counting-music-video-gif-4789617',
     'https://tenor.com/view/self-destruct-mission-impossible-conversation-tape-match-gif-20113224',
-    'https://tenor.com/view/madagscar-penguins-kaboom-gif-9833865',
     'https://tenor.com/view/boom-explosion-moonbeam-city-gif-20743300',
 ]
 
@@ -129,7 +128,7 @@ hello_gifs = [
 
 error_gifs = [
     'https://tenor.com/view/beaker-fire-shit-omg-disaster-gif-4767835',
-    'https://tenor.com/view/naked-gun-explosion-disaster-nothing-to-see-here-please-disperse-gif-13867629',
+    'https://tenor.com/view/nothingtosee-disperse-casual-explosion-gif-4545906',
     'https://tenor.com/view/spongebob-patrick-panic-run-scream-gif-4656335',
     'https://tenor.com/view/angry-panda-rage-mad-gif-11780191',
 ]
