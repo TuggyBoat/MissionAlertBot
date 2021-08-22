@@ -1645,8 +1645,10 @@ async def _cleanup_completed_mission(ctx, mission_data, reddit_complete_text, di
         mission_channel = bot.get_channel(mission_data.channel_id)
         mission_gen_channel = bot.get_channel(conf['MISSION_CHANNEL'])
         if ctx.channel.id == mission_gen_channel.id: # tells us whether m.done was used or m.complete
+            m_done = True
             print("Processing mission complete by m.done")
         else:
+            m_done = False
             print("Processing mission complete by m.complete")
 
         backup_database('missions')  # backup the missions database before going any further
@@ -1692,9 +1694,8 @@ async def _cleanup_completed_mission(ctx, mission_data, reddit_complete_text, di
         # command feedback
         spamchannel = bot.get_channel(bot_spam_id)
         await spamchannel.send(f"{ctx.author} marked the mission complete for #{mission_channel} in {ctx.channel.name}")
-        if ctx.channel.id == mission_gen_channel.id: # tells us whether m.done was used or m.complete
+        if m_done:
             # notify user in mission gen channel
-            
             embed = discord.Embed(title=f"Mission complete for {mission_data.carrier_name}",
                                   description=f"{desc_msg}Updated any sent alerts and removed from mission list.",
                                   color=constants.EMBED_COLOUR_OK)
@@ -1708,8 +1709,11 @@ async def _cleanup_completed_mission(ctx, mission_data, reddit_complete_text, di
 
             # notify by DM
             owner = await bot.fetch_user(carrier_data.ownerid)
-            await owner.send(f"Ahoy CMDR! The trade mission for your Fleet Carrier **{carrier_data.carrier_long_name}** has been marked as complete by {ctx.author.display_name}. Its mission channel will be removed in {seconds_long//60} minutes unless a new mission is started.")
-
+            if m_done:
+                if desc_msg: reason = f"  Reason given: {desc_msg}."
+                await owner.send(f"Ahoy CMDR! {ctx.author.display_name} has concluded the trade mission for your Fleet Carrier **{carrier_data.carrier_long_name}** using `m.done`.{reason} Its mission channel will be removed in {seconds_long//60} minutes unless a new mission is started.")
+            else:
+                await owner.send(f"Ahoy CMDR! The trade mission for your Fleet Carrier **{carrier_data.carrier_long_name}** has been marked as complete by {ctx.author.display_name}. Its mission channel will be removed in {seconds_long//60} minutes unless a new mission is started.")
 
         # remove channel
         await remove_carrier_channel(mission_data.channel_id, seconds_long)
