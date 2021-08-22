@@ -1607,7 +1607,7 @@ async def _missions(ctx: SlashContext):
                                'appropriate.\n\nAnything put in quotes after the carrier name will be treated as a '
                                'quote to be sent along with the completion notice. This can be used for RP if desired.')
 @commands.has_any_role('Certified Carrier', 'Trainee')
-async def done(ctx, carrier_name_search_term, rp=None):
+async def done(ctx, carrier_name_search_term, *, rp=None):
 
     # Check we are in the designated mission channel, if not go no farther.
     mission_gen_channel = bot.get_channel(conf['MISSION_CHANNEL'])
@@ -1710,7 +1710,7 @@ async def _cleanup_completed_mission(ctx, mission_data, reddit_complete_text, di
             # notify by DM
             owner = await bot.fetch_user(carrier_data.ownerid)
             if m_done:
-                if desc_msg: reason = f"  Reason given: {desc_msg}."
+                if desc_msg: reason = f"  Reason given: {desc_msg}"
                 await owner.send(f"Ahoy CMDR! {ctx.author.display_name} has concluded the trade mission for your Fleet Carrier **{carrier_data.carrier_long_name}** using `m.done`.{reason} Its mission channel will be removed in {seconds_long//60} minutes unless a new mission is started.")
             else:
                 await owner.send(f"Ahoy CMDR! The trade mission for your Fleet Carrier **{carrier_data.carrier_long_name}** has been marked as complete by {ctx.author.display_name}. Its mission channel will be removed in {seconds_long//60} minutes unless a new mission is started.")
