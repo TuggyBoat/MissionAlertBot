@@ -1692,7 +1692,7 @@ async def _cleanup_completed_mission(ctx, mission_data, reddit_complete_text, di
                 await ctx.send("Failed updating Reddit :(")
 
         # delete mission entry from db
-        mission_db.execute(f"DELETE FROM missions WHERE carrier = '{mission_data.carrier_name}' ;")
+        mission_db.execute(f"DELETE FROM missions WHERE carrier = '{mission_data.carrier_name}' ")
         missions_conn.commit()
 
         # command feedback
@@ -1727,7 +1727,7 @@ async def _cleanup_completed_mission(ctx, mission_data, reddit_complete_text, di
                 desc_msg is "" if received from empty rp argument, so reason converts it to None if empty and adds a line break.
                 This can probably be reworked to be neater and use fewer than 3 separate variables for one short message in the future.
                 """
-                reason = None if desc_msg == "" else f"\n{desc_msg}"
+                reason = f"\n{desc_msg}" if desc_msg else None
                 await owner.send(f"Ahoy CMDR! {ctx.author.display_name} has concluded the trade mission for your Fleet Carrier **{carrier_data.carrier_long_name}** using `m.done`. **Reason given**: {reason}\nIts mission channel will be removed in {seconds_long//60} minutes unless a new mission is started.")
             else:
                 await owner.send(f"Ahoy CMDR! The trade mission for your Fleet Carrier **{carrier_data.carrier_long_name}** has been marked as complete by {ctx.author.display_name}. Its mission channel will be removed in {seconds_long//60} minutes unless a new mission is started.")
