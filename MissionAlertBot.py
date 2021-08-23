@@ -1629,7 +1629,7 @@ async def done(ctx, carrier_name_search_term, *, rp=None):
 
     else:
         # fill in some info for messages
-        desc_msg = f"> {rp}\n\n" if rp else ""
+        desc_msg = f"> {rp}\n" if rp else ""
         reddit_complete_text = f"    INCOMING WIDEBAND TRANSMISSION: P.T.N. CARRIER MISSION UPDATE\n\n**{mission_data.carrier_name}** mission complete. o7 CMDRs!\n\n{desc_msg}"
         discord_complete_embed = discord.Embed(title=f"{mission_data.carrier_name} MISSION COMPLETE", description=f"{desc_msg}",
                                   color=constants.EMBED_COLOUR_OK)
@@ -1672,7 +1672,11 @@ async def _cleanup_completed_mission(ctx, mission_data, reddit_complete_text, di
                       f" by someone else. We'll keep going anyway.")
 
             # send Discord carrier channel updates
-            await mission_channel.send(embed=discord_complete_embed)
+            # try in case channel already deleted
+            try:
+                await mission_channel.send(embed=discord_complete_embed)
+            except:
+                print(f"Unable to send completion message for {mission_data.carrier_name}, maybe channel deleted?")
 
         # add comment to Reddit post
         if mission_data.reddit_post_id and mission_data.reddit_post_id != 'NULL':
@@ -1697,8 +1701,9 @@ async def _cleanup_completed_mission(ctx, mission_data, reddit_complete_text, di
         if m_done:
             # notify user in mission gen channel
             embed = discord.Embed(title=f"Mission complete for {mission_data.carrier_name}",
-                                  description=f"{desc_msg}Updated any sent alerts and removed from mission list.",
+                                  description=f"{desc_msg}",
                                   color=constants.EMBED_COLOUR_OK)
+            embed.set_footer(text="Updated any sent alerts and removed from mission list.")
             await ctx.send(embed=embed)
         
         # notify owner if not command author
@@ -1710,7 +1715,19 @@ async def _cleanup_completed_mission(ctx, mission_data, reddit_complete_text, di
             # notify by DM
             owner = await bot.fetch_user(carrier_data.ownerid)
             if m_done:
-                reason = None if desc_msg == "" else desc_msg
+                """
+                desc_msg converts rp text received by m.done into a format that can be inserted directly into messages
+                without having to change the message's format depending on whether it exists or not. This was primarily
+                intended for CCOs to be able to send a message to their channel via the bot on mission completion.
+
+                Now it's pulling double-duty as a way for other CCOs to notify the owner why they used m.done on a
+                mission that wasn't theirs. In this case it's still useful for that information to be sent to the channel
+                (e.g. "Supply exhausted", "tick changed prices", etc)
+
+                desc_msg is "" if received from empty rp argument, so reason converts it to None if empty and adds a line break.
+                This can probably be reworked to be neater and use fewer than 3 separate variables for one short message in the future.
+                """
+                reason = None if desc_msg == "" else f"\n{desc_msg}"
                 await owner.send(f"Ahoy CMDR! {ctx.author.display_name} has concluded the trade mission for your Fleet Carrier **{carrier_data.carrier_long_name}** using `m.done`. **Reason given**: {reason}\nIts mission channel will be removed in {seconds_long//60} minutes unless a new mission is started.")
             else:
                 await owner.send(f"Ahoy CMDR! The trade mission for your Fleet Carrier **{carrier_data.carrier_long_name}** has been marked as complete by {ctx.author.display_name}. Its mission channel will be removed in {seconds_long//60} minutes unless a new mission is started.")
