@@ -581,6 +581,15 @@ def find_mission_by_carrier_name(carriername):
     print(f'Found mission data: {mission_data}')
     return mission_data
 
+# find a mission by its channel ID
+def find_mission_by_channel_id(channelid):
+    print("called find_mission_by_channel_id")
+    mission_db.execute(f"SELECT * FROM missions WHERE "
+                        f"channelid = {channelid} ")
+    mission_data = MissionData(mission_db.fetchone())
+    if mission_data: print(mission_data)
+    return mission_data
+
 
 # check if a carrier is for a registered PTN fleet carrier
 async def _is_carrier_channel(carrier_data):
@@ -1598,7 +1607,7 @@ async def _missions(ctx: SlashContext):
                                'appropriate.\n\nAnything put in quotes after the carrier name will be treated as a '
                                'quote to be sent along with the completion notice. This can be used for RP if desired.')
 @commands.has_any_role('Certified Carrier', 'Trainee')
-async def done(ctx, carrier_name_search_term, rp=None):
+async def done(ctx, carrier_name_search_term, *, rp=None):
 
     # Check we are in the designated mission channel, if not go no farther.
     mission_gen_channel = bot.get_channel(conf['MISSION_CHANNEL'])
@@ -1611,8 +1620,7 @@ async def done(ctx, carrier_name_search_term, rp=None):
         # problem, wrong channel, no progress
         return await ctx.send(f'Sorry, you can only run this command out of: <#{mission_gen_channel.id}>.')
 
-    mission_db.execute(f'''SELECT * FROM missions WHERE carrier LIKE (?)''', ('%' + carrier_name_search_term + '%',))
-    mission_data = MissionData(mission_db.fetchone())
+    mission_data = find_mission_by_carrier_name(carrier_name_search_term)
     if not mission_data:
         embed = discord.Embed(
             description=f"**ERROR**: no trade missions found for carriers matching \"**{carrier_name_search_term}\"**.",
@@ -1620,10 +1628,30 @@ async def done(ctx, carrier_name_search_term, rp=None):
         await ctx.send(embed=embed)
 
     else:
-        backup_database('missions')  # backup the missions database before going any further
-
         # fill in some info for messages
-        desc_msg = f"> {rp}\n\n" if rp else ""
+        desc_msg = f"> {rp}\n" if rp else ""
+        reddit_complete_text = f"    INCOMING WIDEBAND TRANSMISSION: P.T.N. CARRIER MISSION UPDATE\n\n**{mission_data.carrier_name}** mission complete. o7 CMDRs!\n\n{desc_msg}"
+        discord_complete_embed = discord.Embed(title=f"{mission_data.carrier_name} MISSION COMPLETE", description=f"{desc_msg}",
+                                  color=constants.EMBED_COLOUR_OK)
+        discord_complete_embed.set_footer(text=f"This mission channel will be removed in {seconds_long//60} minutes.")
+
+        await _cleanup_completed_mission(ctx, mission_data, reddit_complete_text, discord_complete_embed, desc_msg)
+
+
+
+# clean up a completed mission
+async def _cleanup_completed_mission(ctx, mission_data, reddit_complete_text, discord_complete_embed, desc_msg):
+
+        mission_channel = bot.get_channel(mission_data.channel_id)
+        mission_gen_channel = bot.get_channel(conf['MISSION_CHANNEL'])
+        if ctx.channel.id == mission_gen_channel.id: # tells us whether m.done was used or m.complete
+            m_done = True
+            print("Processing mission complete by m.done")
+        else:
+            m_done = False
+            print("Processing mission complete by m.complete")
+
+        backup_database('missions')  # backup the missions database before going any further
 
         # delete Discord trade alert
         if mission_data.discord_alert_id and mission_data.discord_alert_id != 'NULL':
@@ -1632,22 +1660,23 @@ async def done(ctx, carrier_name_search_term, rp=None):
 
                 # first check if it's Wine, in which case it went to the booze cruise channel
                 if mission_data.commodity.title() == "Wine":
-                    channel = bot.get_channel(wine_alerts_id)
+                    alert_channel = bot.get_channel(wine_alerts_id)
                 else:
-                    channel = bot.get_channel(trade_alerts_id)
+                    alert_channel = bot.get_channel(trade_alerts_id)
 
                 discord_alert_id = mission_data.discord_alert_id
-                msg = await channel.fetch_message(discord_alert_id)
+                msg = await alert_channel.fetch_message(discord_alert_id)
                 await msg.delete()
             except:
-                await ctx.send("Looks like this mission alert was already deleted. Not to worry.")
+                print(f"Looks like this mission alert for {mission_data.carrier_name} was already deleted"
+                      f" by someone else. We'll keep going anyway.")
 
             # send Discord carrier channel updates
-            channel = bot.get_channel(mission_data.channel_id)
-            embed = discord.Embed(title=f"{mission_data.carrier_name} MISSION COMPLETE", description=f"{desc_msg}",
-                                  color=constants.EMBED_COLOUR_OK)
-            embed.set_footer(text=f"This mission channel will be removed in {seconds_long//60} minutes.")
-            await channel.send(embed=embed)
+            # try in case channel already deleted
+            try:
+                await mission_channel.send(embed=discord_complete_embed)
+            except:
+                print(f"Unable to send completion message for {mission_data.carrier_name}, maybe channel deleted?")
 
         # add comment to Reddit post
         if mission_data.reddit_post_id and mission_data.reddit_post_id != 'NULL':
@@ -1655,10 +1684,7 @@ async def done(ctx, carrier_name_search_term, rp=None):
                 reddit_post_id = mission_data.reddit_post_id
                 await reddit.subreddit(to_subreddit)
                 submission = await reddit.submission(reddit_post_id)
-                await submission.reply(
-                    f"    INCOMING WIDEBAND TRANSMISSION: P.T.N. CARRIER MISSION UPDATE\n\n**"
-                    f"{mission_data.carrier_name}** mission complete. o7 CMDRs!\n\n{desc_msg}")
-
+                await submission.reply(reddit_complete_text)
                 # mark original post as spoiler, change its flair
                 await submission.flair.select(flair_mission_stop)
                 await submission.mod.spoiler()
@@ -1666,13 +1692,45 @@ async def done(ctx, carrier_name_search_term, rp=None):
                 await ctx.send("Failed updating Reddit :(")
 
         # delete mission entry from db
-        mission_db.execute(f'''DELETE FROM missions WHERE carrier LIKE (?)''', ('%' + carrier_name_search_term + '%',))
+        mission_db.execute(f"DELETE FROM missions WHERE carrier = '{mission_data.carrier_name}' ")
         missions_conn.commit()
 
-        embed = discord.Embed(title=f"Mission complete for {mission_data.carrier_name}",
-                              description=f"{desc_msg}Updated any sent alerts and removed from mission list.",
-                              color=constants.EMBED_COLOUR_OK)
-        await ctx.send(embed=embed)
+        # command feedback
+        spamchannel = bot.get_channel(bot_spam_id)
+        await spamchannel.send(f"{ctx.author} marked the mission complete for #{mission_channel} in {ctx.channel.name}")
+        if m_done:
+            # notify user in mission gen channel
+            embed = discord.Embed(title=f"Mission complete for {mission_data.carrier_name}",
+                                  description=f"{desc_msg}",
+                                  color=constants.EMBED_COLOUR_OK)
+            embed.set_footer(text="Updated any sent alerts and removed from mission list.")
+            await ctx.send(embed=embed)
+        
+        # notify owner if not command author
+        carrier_data = find_carrier_from_long_name(mission_data.carrier_name)
+        if not ctx.author.id == carrier_data.ownerid:
+            # notify in channel - not sure this is needed anymore, leaving out for now
+            # await ctx.send(f"Notifying carrier owner: <@{carrier_data.ownerid}>")
+
+            # notify by DM
+            owner = await bot.fetch_user(carrier_data.ownerid)
+            if m_done:
+                """
+                desc_msg converts rp text received by m.done into a format that can be inserted directly into messages
+                without having to change the message's format depending on whether it exists or not. This was primarily
+                intended for CCOs to be able to send a message to their channel via the bot on mission completion.
+
+                Now it's pulling double-duty as a way for other CCOs to notify the owner why they used m.done on a
+                mission that wasn't theirs. In this case it's still useful for that information to be sent to the channel
+                (e.g. "Supply exhausted", "tick changed prices", etc)
+
+                desc_msg is "" if received from empty rp argument, so reason converts it to None if empty and adds a line break.
+                This can probably be reworked to be neater and use fewer than 3 separate variables for one short message in the future.
+                """
+                reason = f"\n{desc_msg}" if desc_msg else None
+                await owner.send(f"Ahoy CMDR! {ctx.author.display_name} has concluded the trade mission for your Fleet Carrier **{carrier_data.carrier_long_name}** using `m.done`. **Reason given**: {reason}\nIts mission channel will be removed in {seconds_long//60} minutes unless a new mission is started.")
+            else:
+                await owner.send(f"Ahoy CMDR! The trade mission for your Fleet Carrier **{carrier_data.carrier_long_name}** has been marked as complete by {ctx.author.display_name}. Its mission channel will be removed in {seconds_long//60} minutes unless a new mission is started.")
 
         # remove channel
         await remove_carrier_channel(mission_data.channel_id, seconds_long)
@@ -1683,6 +1741,7 @@ async def done(ctx, carrier_name_search_term, rp=None):
 async def remove_carrier_channel(mission_channel_id, seconds):
     # get channel ID to remove
     delchannel = bot.get_channel(mission_channel_id)
+    spamchannel = bot.get_channel(bot_spam_id)
 
     # start a timer
     print(f"Starting {seconds} second countdown for deletion of {delchannel}")
@@ -1695,8 +1754,7 @@ async def remove_carrier_channel(mission_channel_id, seconds):
             await asyncio.wait_for(lock_mission_channel(), timeout=120)
         except asyncio.TimeoutError:
             print(f"No channel lock available for {delchannel}")
-            channel = bot.get_channel(bot_spam_id)
-            return await channel.send(f"<@211891698551226368> WARNING: No channel lock available on {delchannel} after 120 seconds. Deletion aborted.")
+            return await spamchannel.send(f"<@211891698551226368> WARNING: No channel lock available on {delchannel} after 120 seconds. Deletion aborted.")
 
         # this is clunky but we want to know if a channel lock is because it's about to be deleted
         global deletion_in_progress
@@ -1714,10 +1772,16 @@ async def remove_carrier_channel(mission_channel_id, seconds):
         else:
             # delete channel after a parting gift
             gif = random.choice(boom_gifs)
-            await delchannel.send(gif)
-            await asyncio.sleep(5)
-            await delchannel.delete()
-            print(f'Deleted {delchannel}')
+            try:
+                await delchannel.send(gif)
+                await asyncio.sleep(5)
+                await delchannel.delete()
+                print(f'Deleted {delchannel}')
+            except Forbidden:
+                raise EnvironmentError(f"Could not delete {delchannel}, reason: Bot does not have permission.")
+            except NotFound:
+                print("Channel appears to have been deleted by someone else, we'll just continue on.")
+                await spamchannel.send(f"Channel {delchannel} could not be deleted because it doesn't exist.")
     finally:
         # now release the channel lock
         carrier_channel_lock.release()
@@ -1730,117 +1794,62 @@ async def remove_carrier_channel(mission_channel_id, seconds):
 @bot.command(name='complete', help="Use in a carrier's channel to mark the current trade mission complete.")
 async def complete(ctx):
 
-    # take a note of user ID and channel name and ID
-    msg_ctx_name = ctx.channel.name
-    msg_ctx_id = ctx.channel.id
-    msg_usr_id = ctx.author.id
+    print(f"m.complete called in {ctx.channel} by {ctx.author}")
 
     # look for a match for the channel name in the carrier DB
-    # TODO: separate into separate function
-    carrier_db.execute(f"SELECT * FROM carriers WHERE "
-                       f"discordchannel = '{msg_ctx_name}' ;")
-    carrier_data = CarrierData(carrier_db.fetchone())
+    carrier_data = find_carrier_by_channel_name(ctx.channel.name)
     if not carrier_data:
         # if there's no channel match, return an error
         embed = discord.Embed(description="**You need to be in a carrier's channel to mark its mission as complete.**",
                               color=constants.EMBED_COLOUR_ERROR)
         await ctx.send(embed=embed)
         return
-    else:
-        backup_database('missions')  # backup the missions database before going any further
+    
+    # now look to see if the carrier is on an active mission
+    
+    mission_data = find_mission_by_channel_id(ctx.channel.id)
+    if not mission_data:
+        # if there's no result, return an error
+        embed = discord.Embed(description=f"**{carrier_data.carrier_long_name} doesn't seem to be on a trade "
+                                            f"mission right now.**",
+                                color=constants.EMBED_COLOUR_ERROR)
+        return await ctx.send(embed=embed)
 
-        # now look to see if the carrier is on an active mission
-        mission_db.execute(f"SELECT * FROM missions WHERE "
-                           f"channelid = {msg_ctx_id} ")
-        mission_data = MissionData(mission_db.fetchone())
-        if not mission_data:
-            # if there's no result, return an error
-            embed = discord.Embed(description=f"**{carrier_data.carrier_long_name} doesn't seem to be on a trade "
-                                              f"mission right now.**",
-                                  color=constants.EMBED_COLOUR_ERROR)
+
+    # user is in correct channel and carrier is on a mission, so check whether user is sure they want to proceed
+    embed = discord.Embed(
+        description=f"Please confirm that **{mission_data.carrier_name}** has been fully "
+                    f"{mission_data.mission_type}ed : **y** / **n**",
+        color=constants.EMBED_COLOUR_QU)
+    # embed.set_footer(text="For other issues (e.g. station price changes) please @ the Carrier Owner
+    # directly.")
+    await ctx.send(embed=embed)
+
+    def check(message):
+        return message.author == ctx.author and message.channel == ctx.channel and \
+                message.content.lower() in ["y", "n"]
+
+    try:
+        msg = await bot.wait_for("message", check=check, timeout=30)
+        if msg.content.lower() == "n":
+            # whoops lol actually no
+            embed = discord.Embed(description="OK, mission will remain listed as in-progress.",
+                                    color=constants.EMBED_COLOUR_OK)
             await ctx.send(embed=embed)
+            return
+        elif msg.content.lower() == "y":
+            # they said yes!
+            desc_msg = ""
+            reddit_complete_text = "    INCOMING WIDEBAND TRANSMISSION: P.T.N. CARRIER MISSION UPDATE\n\n**{mission_data.carrier_name}** mission complete. o7 CMDRs!\n\n\n\n*Reported on PTN Discord by {ctx.author.display_name}*"
+            discord_complete_embed = discord.Embed(title=f"{mission_data.carrier_name} MISSION COMPLETE",
+                                                   description=f"<@{ctx.author.id}> reports mission complete! **This mission channel will be removed in {seconds_long//60} minutes.**",
+                                                   color=constants.EMBED_COLOUR_OK)
 
-        else:
-            # user is in correct channel and carrier is on a mission, so check whether user is sure they want to proceed
-            embed = discord.Embed(
-                description=f"Please confirm that **{mission_data.carrier_name}** has been fully "
-                            f"{mission_data.mission_type}ed : **y** / **n**",
-                color=constants.EMBED_COLOUR_QU)
-            # embed.set_footer(text="For other issues (e.g. station price changes) please @ the Carrier Owner
-            # directly.")
-            await ctx.send(embed=embed)
+            await _cleanup_completed_mission(ctx, mission_data, reddit_complete_text, discord_complete_embed, desc_msg)
 
-            def check(message):
-                return message.author == ctx.author and message.channel == ctx.channel and \
-                       message.content.lower() in ["y", "n"]
-
-            try:
-                msg = await bot.wait_for("message", check=check, timeout=30)
-                if msg.content.lower() == "n":
-                    # whoops lol actually no
-                    embed = discord.Embed(description="OK, mission will remain listed as in-progress.",
-                                          color=constants.EMBED_COLOUR_OK)
-                    await ctx.send(embed=embed)
-                    return
-                elif msg.content.lower() == "y":
-                    # they said yes!
-                    embed = discord.Embed(title=f"{mission_data.carrier_name} MISSION COMPLETE",
-                                          description=f"<@{msg_usr_id}> reports mission complete! **This mission channel will be removed in {seconds_long//60} minutes.**",
-                                          color=constants.EMBED_COLOUR_OK)
-                    await ctx.send(embed=embed)
-                    await ctx.send(f"Notifying carrier owner: <@{carrier_data.ownerid}>")
-
-                    # notify owner by DM
-                    user = await bot.fetch_user(carrier_data.ownerid)
-                    await user.send(f"Ahoy CMDR! The trade mission for your Fleet Carrier **{carrier_data.carrier_long_name}** has been marked as complete by {ctx.author.display_name}. Its mission channel will be removed in {seconds_long//60} minutes unless a new mission is started.")
-
-                    # record command user in bot-spam
-                    spamchannel = bot.get_channel(bot_spam_id)
-                    await spamchannel.send(f"{ctx.author} used m.complete in #{carrier_data.discord_channel}")
-                    # now we need to go do all the mission cleanup stuff
-
-                    # delete Discord trade alert
-                    if mission_data.discord_alert_id and mission_data.discord_alert_id != 'NULL':
-                        try:
-                            # check if it's Wine, in which case it went to the booze cruise channel
-                            if mission_data.commodity.title() == "Wine":
-                                channel = bot.get_channel(wine_alerts_id)
-                            else:
-                                channel = bot.get_channel(trade_alerts_id)
-                            msg = await channel.fetch_message(mission_data.discord_alert_id)
-                            await msg.delete()
-                        except:
-                            print(f"Looks like this mission alert for {mission_data.carrier_name} was already deleted"
-                                  f" by someone else")
-
-                    # add comment to Reddit post
-                    if mission_data.reddit_post_id and mission_data.reddit_post_id != 'NULL':
-                        try:
-                            await reddit.subreddit(to_subreddit)
-                            submission = await reddit.submission(mission_data.reddit_post_id)
-                            await submission.reply(
-                                f"    INCOMING WIDEBAND TRANSMISSION: P.T.N. CARRIER MISSION UPDATE\n\n"
-                                f"**{mission_data.carrier_name}** mission complete. o7 CMDRs!\n\n\n\n*"
-                                f"Reported on PTN Discord by {ctx.author.display_name}*")
-
-                            # mark original post as spoiler, change its flair
-                            await submission.flair.select(flair_mission_stop)
-                            await submission.mod.spoiler()
-                        except:
-                            print(f"Reddit post failed to update for {mission_data.carrier_name}")
-
-                    # delete mission entry from db
-                    mission_db.execute(f'''DELETE FROM missions WHERE carrier LIKE (?)''',
-                                       ('%' + mission_data.carrier_name + '%',))
-                    missions_conn.commit()
-
-                    # remove channel
-                    await remove_carrier_channel(mission_data.channel_id, seconds_long)
-                    return
-
-            except asyncio.TimeoutError:
-                embed = discord.Embed(description="No response, mission will remain listed as in-progress.")
-                await ctx.send(embed=embed)
+    except asyncio.TimeoutError:
+        embed = discord.Embed(description="No response, mission will remain listed as in-progress.")
+        await ctx.send(embed=embed)
 
 
 
