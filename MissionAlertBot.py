@@ -1133,47 +1133,50 @@ async def gen_mission(ctx, carrier_name_search_term, commodity_search_term, syst
             if "d" in msg.content.lower():
                 print("User used option d")
                 message_send = await ctx.send("**Sending to Discord...**")
+                try:
+                    # send trade alert to trade alerts channel, or to wine alerts channel if loading wine
+                    if commodity_data.name.title() == "Wine":
+                        channel = bot.get_channel(wine_alerts_id)
+                        channelId = wine_alerts_id
+                    else:
+                        channel = bot.get_channel(trade_alerts_id)
+                        channelId = trade_alerts_id
+                        
+                    if mission_type == 'load':
+                        embed = discord.Embed(description=discord_text, color=constants.EMBED_COLOUR_LOADING)
+                    else:
+                        embed = discord.Embed(description=discord_text, color=constants.EMBED_COLOUR_UNLOADING)
 
-                # send trade alert to trade alerts channel, or to wine alerts channel if loading wine
-                if commodity_data.name.title() == "Wine":
-                    channel = bot.get_channel(wine_alerts_id)
-                    channelId = wine_alerts_id
-                else:
-                    channel = bot.get_channel(trade_alerts_id)
-                    channelId = trade_alerts_id
-                    
-                if mission_type == 'load':
-                    embed = discord.Embed(description=discord_text, color=constants.EMBED_COLOUR_LOADING)
-                else:
-                    embed = discord.Embed(description=discord_text, color=constants.EMBED_COLOUR_UNLOADING)
+                    trade_alert_msg = await channel.send(embed=embed)
+                    discord_alert_id = trade_alert_msg.id
 
-                trade_alert_msg = await channel.send(embed=embed)
-                discord_alert_id = trade_alert_msg.id
+                    channel = bot.get_channel(mission_temp_channel_id)
 
-                channel = bot.get_channel(mission_temp_channel_id)
+                    discord_file = discord.File(file_name, filename="image.png")
 
-                discord_file = discord.File(file_name, filename="image.png")
+                    embed_colour = constants.EMBED_COLOUR_LOADING if mission_type == 'load' \
+                        else constants.EMBED_COLOUR_UNLOADING
+                    embed = discord.Embed(title="P.T.N TRADE MISSION STARTING",
+                                        description=f"> {rp_text}" if rp else "", color=embed_colour)
 
-                embed_colour = constants.EMBED_COLOUR_LOADING if mission_type == 'load' \
-                    else constants.EMBED_COLOUR_UNLOADING
-                embed = discord.Embed(title="P.T.N TRADE MISSION STARTING",
-                                    description=f"> {rp_text}" if rp else "", color=embed_colour)
-
-                embed.add_field(name="Destination", value=f"Station: {station.upper()}\nSystem: {system.upper()}", inline=True)
-                if eta:
-                    embed.add_field(name="ETA", value=f"{eta} minutes", inline=True)
-            
-                embed.set_image(url="attachment://image.png")
-                embed.set_footer(
-                    text="m.complete will mark this mission complete\n/mission will show this mission info\n/missions "
-                        "will show all current trade missions")
-                await channel.send(file=discord_file, embed=embed)
-                embed = discord.Embed(title=f"Discord trade alerts sent for {carrier_data.carrier_long_name}",
-                                    description=f"Check <#{channelId}> for trade alert and "
-                                                f"<#{mission_temp_channel_id}> for image.",
-                                    color=constants.EMBED_COLOUR_DISCORD)
-                await ctx.send(embed=embed)
-                await message_send.delete()
+                    embed.add_field(name="Destination", value=f"Station: {station.upper()}\nSystem: {system.upper()}", inline=True)
+                    if eta:
+                        embed.add_field(name="ETA", value=f"{eta} minutes", inline=True)
+                
+                    embed.set_image(url="attachment://image.png")
+                    embed.set_footer(
+                        text="m.complete will mark this mission complete\n/mission will show this mission info\n/missions "
+                            "will show all current trade missions")
+                    await channel.send(file=discord_file, embed=embed)
+                    embed = discord.Embed(title=f"Discord trade alerts sent for {carrier_data.carrier_long_name}",
+                                        description=f"Check <#{channelId}> for trade alert and "
+                                                    f"<#{mission_temp_channel_id}> for image.",
+                                        color=constants.EMBED_COLOUR_DISCORD)
+                    await ctx.send(embed=embed)
+                    await message_send.delete()
+                except Exception as e:
+                    print(f"Error sending to Discord: {e}")
+                    await ctx.send(f"Error sending to Discord: {e}\nAttempting to continue with mission gen...")
 
             if "r" in msg.content.lower():
                 print("User used option r")
@@ -1185,30 +1188,35 @@ async def gen_mission(ctx, carrier_name_search_term, commodity_search_term, syst
                 else:
                     message_send = await ctx.send("**Sending to Reddit...**")
 
-                    # post to reddit
-                    subreddit = await reddit.subreddit(to_subreddit)
-                    submission = await subreddit.submit_image(reddit_title, image_path=file_name,
-                                                            flair_id=flair_mission_start)
-                    reddit_post_url = submission.permalink
-                    reddit_post_id = submission.id
-                    if rp:
-                        comment = await submission.reply(f"> {rp_text}\n\n&#x200B;\n\n{reddit_body}")
-                    else:
-                        comment = await submission.reply(reddit_body)
-                    reddit_comment_url = comment.permalink
-                    reddit_comment_id = comment.id
-                    embed = discord.Embed(title=f"Reddit trade alert sent for {carrier_data.carrier_long_name}",
-                                        description=f"https://www.reddit.com{reddit_post_url}",
-                                        color=constants.EMBED_COLOUR_REDDIT)
-                    await ctx.send(embed=embed)
-                    await message_send.delete()
-                    embed = discord.Embed(title=f"{carrier_data.carrier_long_name} REQUIRES YOUR UPDOOTS",
-                                        description=f"https://www.reddit.com{reddit_post_url}",
-                                        color=constants.EMBED_COLOUR_REDDIT)
-                    channel = bot.get_channel(conf['CHANNEL_UPVOTES'])
-                    upvote_message = await channel.send(embed=embed)
-                    emoji = bot.get_emoji(upvote_emoji)
-                    await upvote_message.add_reaction(emoji)
+                    try:
+
+                        # post to reddit
+                        subreddit = await reddit.subreddit(to_subreddit)
+                        submission = await subreddit.submit_image(reddit_title, image_path=file_name,
+                                                                flair_id=flair_mission_start)
+                        reddit_post_url = submission.permalink
+                        reddit_post_id = submission.id
+                        if rp:
+                            comment = await submission.reply(f"> {rp_text}\n\n&#x200B;\n\n{reddit_body}")
+                        else:
+                            comment = await submission.reply(reddit_body)
+                        reddit_comment_url = comment.permalink
+                        reddit_comment_id = comment.id
+                        embed = discord.Embed(title=f"Reddit trade alert sent for {carrier_data.carrier_long_name}",
+                                            description=f"https://www.reddit.com{reddit_post_url}",
+                                            color=constants.EMBED_COLOUR_REDDIT)
+                        await ctx.send(embed=embed)
+                        await message_send.delete()
+                        embed = discord.Embed(title=f"{carrier_data.carrier_long_name} REQUIRES YOUR UPDOOTS",
+                                            description=f"https://www.reddit.com{reddit_post_url}",
+                                            color=constants.EMBED_COLOUR_REDDIT)
+                        channel = bot.get_channel(conf['CHANNEL_UPVOTES'])
+                        upvote_message = await channel.send(embed=embed)
+                        emoji = bot.get_emoji(upvote_emoji)
+                        await upvote_message.add_reaction(emoji)
+                    except Exception as e:
+                        print(f"Error posting to Reddit: {e}")
+                        await ctx.send(f"Error posting to Reddit: {e}\nAttempting to continue with rest of mission gen...")
 
             if "n" in msg.content.lower():
                 print("User used option n")
@@ -1235,8 +1243,13 @@ async def gen_mission(ctx, carrier_name_search_term, commodity_search_term, syst
         print("All options worked through, now clean up")
 
         # now clear up by deleting the prompt message and user response
-        await msg.delete()
-        await message_confirm.delete()
+        try:
+            await msg.delete()
+            await message_confirm.delete()
+        except Exception as e:
+            print(f"Error during clearup: {e}")
+            await ctx.send(f"Oops, error detected: {e}\nAttempting to continue with mission gen.")
+
         await mission_add(ctx, carrier_data, commodity_data, mission_type, system, station, profit, pads, demand,
                         rp_text, reddit_post_id, reddit_post_url, reddit_comment_id, reddit_comment_url, discord_alert_id, mission_temp_channel_id)
         await mission_generation_complete(ctx, carrier_data, message_pending, eta_text)
