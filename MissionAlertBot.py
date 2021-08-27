@@ -1667,6 +1667,7 @@ async def _cleanup_completed_mission(ctx, mission_data, reddit_complete_text, di
         backup_database('missions')  # backup the missions database before going any further
 
         # delete Discord trade alert
+        print("Delete Discord trade alert...")
         if mission_data.discord_alert_id and mission_data.discord_alert_id != 'NULL':
             try:  # try in case it's already been deleted, which doesn't matter to us in the slightest but we don't
                 # want it messing up the rest of the function
@@ -1692,6 +1693,7 @@ async def _cleanup_completed_mission(ctx, mission_data, reddit_complete_text, di
                 print(f"Unable to send completion message for {mission_data.carrier_name}, maybe channel deleted?")
 
         # add comment to Reddit post
+        print("Add comment to Reddit post...")
         if mission_data.reddit_post_id and mission_data.reddit_post_id != 'NULL':
             try:  # try in case Reddit is down
                 reddit_post_id = mission_data.reddit_post_id
@@ -1705,10 +1707,12 @@ async def _cleanup_completed_mission(ctx, mission_data, reddit_complete_text, di
                 await ctx.send("Failed updating Reddit :(")
 
         # delete mission entry from db
-        mission_db.execute(f"DELETE FROM missions WHERE carrier = '{mission_data.carrier_name}' ")
+        print("Remove from mission database...")
+        mission_db.execute(f'''DELETE FROM missions WHERE carrier LIKE (?)''', ('%' + mission_data.carrier_name + '%',))
         missions_conn.commit()
 
         # command feedback
+        print("Send command feedback to user")
         spamchannel = bot.get_channel(bot_spam_id)
         await spamchannel.send(f"{ctx.author} marked the mission complete for #{mission_channel} in {ctx.channel.name}")
         if m_done:
@@ -1722,6 +1726,7 @@ async def _cleanup_completed_mission(ctx, mission_data, reddit_complete_text, di
         # notify owner if not command author
         carrier_data = find_carrier_from_long_name(mission_data.carrier_name)
         if not ctx.author.id == carrier_data.ownerid:
+            print("Notify carrier owner")
             # notify in channel - not sure this is needed anymore, leaving out for now
             # await ctx.send(f"Notifying carrier owner: <@{carrier_data.ownerid}>")
 
@@ -1810,6 +1815,7 @@ async def complete(ctx):
     print(f"m.complete called in {ctx.channel} by {ctx.author}")
 
     # look for a match for the channel name in the carrier DB
+    print("Looking for carrier by channel name match")
     carrier_data = find_carrier_by_channel_name(ctx.channel.name)
     if not carrier_data:
         # if there's no channel match, return an error
@@ -1819,7 +1825,7 @@ async def complete(ctx):
         return
     
     # now look to see if the carrier is on an active mission
-    
+    print("Looking for mission by channel ID match")
     mission_data = find_mission_by_channel_id(ctx.channel.id)
     if not mission_data:
         # if there's no result, return an error
@@ -1830,6 +1836,7 @@ async def complete(ctx):
 
 
     # user is in correct channel and carrier is on a mission, so check whether user is sure they want to proceed
+    print("Send user confirm prompt")
     embed = discord.Embed(
         description=f"Please confirm that **{mission_data.carrier_name}** has been fully "
                     f"{mission_data.mission_type}ed : **y** / **n**",
@@ -1846,18 +1853,20 @@ async def complete(ctx):
         msg = await bot.wait_for("message", check=check, timeout=30)
         if msg.content.lower() == "n":
             # whoops lol actually no
+            print("User responded no")
             embed = discord.Embed(description="OK, mission will remain listed as in-progress.",
                                     color=constants.EMBED_COLOUR_OK)
             await ctx.send(embed=embed)
             return
         elif msg.content.lower() == "y":
             # they said yes!
+            print("User responded yes")
             desc_msg = ""
             reddit_complete_text = "    INCOMING WIDEBAND TRANSMISSION: P.T.N. CARRIER MISSION UPDATE\n\n**{mission_data.carrier_name}** mission complete. o7 CMDRs!\n\n\n\n*Reported on PTN Discord by {ctx.author.display_name}*"
             discord_complete_embed = discord.Embed(title=f"{mission_data.carrier_name} MISSION COMPLETE",
                                                    description=f"<@{ctx.author.id}> reports mission complete! **This mission channel will be removed in {seconds_long//60} minutes.**",
                                                    color=constants.EMBED_COLOUR_OK)
-
+            print("Sending to _cleanup_completed_mission")
             await _cleanup_completed_mission(ctx, mission_data, reddit_complete_text, discord_complete_embed, desc_msg)
 
     except asyncio.TimeoutError:
