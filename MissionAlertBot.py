@@ -6,6 +6,7 @@
 # Git repo: https://github.com/PilotsTradeNetwork/MissionAlertBot
 import ast
 import copy
+import re
 import tempfile
 from typing import Union
 
@@ -3285,10 +3286,12 @@ async def nom_count(ctx, number: int):
 
 @bot.command(name='nom_details', help='Shows nomination details for given user by ID or @ mention')
 @commands.has_any_role('Community Team', 'Mod', 'Admin', 'Council')
-async def nom_details(ctx, userid: Union[discord.Member, int]):
+async def nom_details(ctx, userid: Union[str, int]):
+    # userID should really be a discord.Member object, but that lacks a sensible way to cast back to a userid,
+    # so just use a string and ignore the problem.
 
     # sanitise userid in case they used an @ mention
-    userid = userid.replace('<', '').replace('>', '').replace('@', '').replace('!', '')
+    userid = int(re.search(r'\d+', userid).group())
 
     print(f"nom_details called by {ctx.author}")
 
@@ -3316,11 +3319,14 @@ async def nom_details(ctx, userid: Union[discord.Member, int]):
 
 @bot.command(name='nom_delete', help='Completely removes all nominations for a user by user ID or @ mention. NOT RECOVERABLE.')
 @commands.has_any_role('Admin', 'Council')
-async def nom_delete(ctx, userid: Union[discord.Member, int]):
+async def nom_delete(ctx, userid: Union[str, int]):
     print(f"nom_delete called by {ctx.author}")
 
+    # userID should really be a discord.Member object, but that lacks a sensible way to cast back to a userid,
+    # so just use a string and ignore the problem.
+
     # sanitise userid in case they used an @ mention
-    userid = userid.replace('<', '').replace('>', '').replace('@', '').replace('!', '')
+    userid = int(re.search(r'\d+', userid).group())
 
     member = await bot.fetch_user(userid)
 
