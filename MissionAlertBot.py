@@ -6,9 +6,9 @@
 # Git repo: https://github.com/PilotsTradeNetwork/MissionAlertBot
 import ast
 import copy
+import re
 import tempfile
-from itertools import islice
-from math import ceil
+from typing import Union
 
 from PIL import Image, ImageFont, ImageDraw
 import os
@@ -18,11 +18,8 @@ import sqlite3
 import asyncpraw
 import asyncio
 import shutil
-from discord import channel
-from discord.colour import Color
 from discord.errors import HTTPException, InvalidArgument, Forbidden, NotFound
 from discord.ext import commands
-from discord.utils import get
 from discord_slash import SlashCommand, SlashContext
 from datetime import datetime
 from datetime import timezone
@@ -890,11 +887,12 @@ async def _monitor_reddit_comments():
                                'ETA is optional and should be expressed as a number of minutes e.g. 15.\n'
                                'Case is automatically corrected for all inputs.')
 @commands.has_any_role('Certified Carrier', 'Trainee')
-async def load(ctx, carrier_name_search_term, commodity_search_term, system, station, profit, pads, demand, eta=None):
+async def load(ctx, carrier_name_search_term: str, commodity_search_term: str, system: str, station: str,
+               profit: Union[int, float], pads: str, demand: str, eta: str = None):
     rp = False
     mission_type = 'load'
-    await gen_mission(ctx, carrier_name_search_term, commodity_search_term, system, station, profit, pads, demand, rp, mission_type,
-                      eta)
+    await gen_mission(ctx, carrier_name_search_term, commodity_search_term, system, station, profit, pads, demand,
+                      rp, mission_type, eta)
 
 
 @bot.command(name="loadrp", help='Same as load command but prompts user to enter roleplay text\n'
@@ -902,11 +900,12 @@ async def load(ctx, carrier_name_search_term, commodity_search_term, system, sta
                                  'and sent to the carrier\'s Discord channel in quote format if those options are '
                                  'chosen')
 @commands.has_any_role('Certified Carrier', 'Trainee')
-async def loadrp(ctx, carrier_name_search_term, commodity_search_term, system, station, profit, pads, demand, eta=None):
+async def loadrp(ctx, carrier_name_search_term: str, commodity_search_term: str, system: str, station: str,
+                 profit: Union[int, float], pads: str, demand: str, eta: str = None):
     rp = True
     mission_type = 'load'
-    await gen_mission(ctx, carrier_name_search_term, commodity_search_term, system, station, profit, pads, demand, rp, mission_type,
-                      eta)
+    await gen_mission(ctx, carrier_name_search_term, commodity_search_term, system, station, profit, pads, demand,
+                      rp, mission_type, eta)
 
 
 # unload commands
@@ -921,11 +920,12 @@ async def loadrp(ctx, carrier_name_search_term, commodity_search_term, system, s
                                  'ETA is optional and should be expressed as a number of minutes e.g. 15.\n'
                                  'Case is automatically corrected for all inputs.')
 @commands.has_any_role('Certified Carrier', 'Trainee')
-async def unload(ctx, carrier_name_search_term, commodity_search_term, system, station, profit, pads, supply, eta=None):
+async def unload(ctx, carrier_name_search_term: str, commodity_search_term: str, system: str, station: str,
+                 profit: Union[int, float], pads: str, supply: str, eta: str = None):
     rp = False
     mission_type = 'unload'
-    await gen_mission(ctx, carrier_name_search_term, commodity_search_term, system, station, profit, pads, supply, rp, mission_type,
-                      eta)
+    await gen_mission(ctx, carrier_name_search_term, commodity_search_term, system, station, profit, pads, supply, rp,
+                      mission_type, eta)
 
 
 @bot.command(name="unloadrp", help='Same as unload command but prompts user to enter roleplay text\n'
@@ -933,16 +933,18 @@ async def unload(ctx, carrier_name_search_term, commodity_search_term, system, s
                                    'and sent to the carrier\'s Discord channel in quote format if those options are '
                                    'chosen')
 @commands.has_any_role('Certified Carrier', 'Trainee')
-async def unloadrp(ctx, carrier_name_search_term, commodity_search_term, system, station, profit, pads, demand, eta=None):
+async def unloadrp(ctx, carrier_name_search_term: str, commodity_search_term: str, system: str, station: str,
+                   profit: Union[int, float], pads: str, demand: str, eta: str = None):
     rp = True
     mission_type = 'unload'
-    await gen_mission(ctx, carrier_name_search_term, commodity_search_term, system, station, profit, pads, demand, rp, mission_type,
-                      eta)
+    await gen_mission(ctx, carrier_name_search_term, commodity_search_term, system, station, profit, pads, demand,
+                      rp, mission_type, eta)
 
 
 # mission generator called by loading/unloading commands
-async def gen_mission(ctx, carrier_name_search_term, commodity_search_term, system, station, profit, pads, demand, rp, mission_type,
-                      eta):
+async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term: str, system: str, station: str,
+                      profit: Union[int, float], pads: str, demand: str, rp: str, mission_type: str,
+                      eta: str):
     # Check we are in the designated mission channel, if not go no farther.
     mission_gen_channel = bot.get_channel(conf['MISSION_CHANNEL'])
     current_channel = ctx.channel
@@ -1448,7 +1450,7 @@ def _mission_summary_embed(mission_data, embed):
 # find what fleet carriers are owned by a user - private slash command
 @slash.slash(name="owner", guild_ids=[bot_guild_id],
              description="Private command: Use with @User to find out what fleet carriers that user owns.")
-async def _owner(ctx: SlashContext, at_owner_discord):
+async def _owner(ctx: SlashContext, at_owner_discord: discord.Member):
 
     # strip off the guff and get us a pure owner ID
     stripped_owner = at_owner_discord.replace('<', '').replace('>', '').replace('!', '').replace('@', '')
@@ -1620,7 +1622,7 @@ async def _missions(ctx: SlashContext):
                                'appropriate.\n\nAnything put in quotes after the carrier name will be treated as a '
                                'quote to be sent along with the completion notice. This can be used for RP if desired.')
 @commands.has_any_role('Certified Carrier', 'Trainee')
-async def done(ctx, carrier_name_search_term, *, rp=None):
+async def done(ctx, carrier_name_search_term: str, *, rp: str = None):
 
     # Check we are in the designated mission channel, if not go no farther.
     mission_gen_channel = bot.get_channel(conf['MISSION_CHANNEL'])
@@ -1942,7 +1944,7 @@ async def _info(ctx: SlashContext):
 
 @slash.slash(name="find", guild_ids=[bot_guild_id],
              description="Private command: Search for a fleet carrier by partial match for its name.")
-async def _find(ctx: SlashContext, carrier_name_search_term):
+async def _find(ctx: SlashContext, carrier_name_search_term: str):
 
     print(f"{ctx.author} used /find for '{carrier_name_search_term}' in {ctx.channel}")
 
@@ -2074,7 +2076,7 @@ async def carrier_list(ctx):
                                       '<carrier_id> is the carrier\'s unique identifier in the format ABC-XYZ\n'
                                       '<owner_id> is the owner\'s Discord ID')
 @commands.has_role('Admin')
-async def carrier_add(ctx, short_name, long_name, carrier_id, owner_id):
+async def carrier_add(ctx, short_name: str, long_name: str, carrier_id: str, owner_id: int):
 
     # make sure we are in the right channel
     bot_command_channel = bot.get_channel(conf['BOT_COMMAND_CHANNEL'])
@@ -2124,7 +2126,7 @@ async def carrier_add(ctx, short_name, long_name, carrier_id, owner_id):
 # remove FC from database
 @bot.command(name='carrier_del', help='Delete a Fleet Carrier from the database using its database entry ID#.')
 @commands.has_role('Admin')
-async def carrier_del(ctx, db_id):
+async def carrier_del(ctx, db_id: int):
 
     # make sure we are in the right channel
     bot_command_channel = bot.get_channel(conf['BOT_COMMAND_CHANNEL'])
@@ -2182,7 +2184,7 @@ async def carrier_del(ctx, db_id):
                                         'Use with carrier\'s name as argument to check the '
                                         'carrier\'s image or begin upload of a new image.')
 @commands.has_any_role('Certified Carrier', 'Trainee')
-async def carrier_image(ctx, lookname=None):
+async def carrier_image(ctx, lookname: str = None):
     if not lookname:
         print(f"{ctx.author} called m.carrier_image without argument")
         file = discord.File(f"blank.png", filename="image.png")
@@ -2280,7 +2282,7 @@ async def carrier_image(ctx, lookname=None):
                                     'Partial matches will work but only if they incorporate part of the shortname.\n'
                                     'To find a carrier based on a match with part of its full name, use the /find '
                                     'command.')
-async def findshort(ctx, shortname_search_term):
+async def findshort(ctx, shortname_search_term: str):
     try:
         carriers = find_carrier_from_short_name(shortname_search_term)
         if carriers:
@@ -2356,7 +2358,7 @@ def _add_common_embed_fields(embed, carrier_data):
 @bot.command(name='find', help='Find a carrier based on a partial match with any part of its full name\n'
                                '\n'
                                'Syntax: m.find <search_term>')
-async def find(ctx, carrier_name_search_term):
+async def find(ctx, carrier_name_search_term: str):
     try:
         carriers = find_carrier_from_long_name_multiple(carrier_name_search_term)
         if carriers:
@@ -2420,7 +2422,7 @@ async def find(ctx, carrier_name_search_term):
 # find FC based on ID
 @bot.command(name='findid', help='Find a carrier based on its database ID\n'
                                  'Syntax: findid <integer>')
-async def findid(ctx, db_id):
+async def findid(ctx, db_id: int):
     try:
         if not isinstance(db_id, int):
             try:
@@ -2448,7 +2450,7 @@ async def findid(ctx, db_id):
 # find commodity
 @bot.command(name='findcomm', help='Find a commodity based on a search term\n'
                                    'If a term has too many possible matches try a longer search term.\n')
-async def search_for_commodity(ctx, commodity_search_term):
+async def search_for_commodity(ctx, commodity_search_term: str):
     print(f'search_for_commodity called by {ctx.author} to search for {commodity_search_term}')
     try:
         commodity = await find_commodity(commodity_search_term, ctx)
@@ -2462,7 +2464,7 @@ async def search_for_commodity(ctx, commodity_search_term):
 
 @bot.command(name='carrier_edit', help='Edit a specific carrier in the database by providing specific inputs')
 @commands.has_role('Admin')
-async def edit_carrier(ctx, carrier_name_search_term):
+async def edit_carrier(ctx, carrier_name_search_term: str):
     """
     Edits a carriers information in the database. Provide a carrier name that can be partially matched and follow the
     steps.
@@ -2719,7 +2721,7 @@ async def _determine_db_fields_to_edit(ctx, carrier_data):
     return new_carrier_data
 
 
-def _configure_all_carrier_detail_embed(embed, carrier_data):
+def _configure_all_carrier_detail_embed(embed, carrier_data: CarrierData):
     """
     Adds all the common fields to a message embed and returns the embed.
 
@@ -2746,7 +2748,7 @@ def _configure_all_carrier_detail_embed(embed, carrier_data):
                              'The owner will receive the @Community Carrier role\n'
                              'as well as full permissions in the channel.')
 @commands.has_any_role('Community Team', 'Mod', 'Admin', 'Council')
-async def cc(ctx, owner: discord.Member, *, channel_name):
+async def cc(ctx, owner: discord.Member, *, channel_name: str):
 
     # check the channel name isn't something utterly stupid
     if len(channel_name) > 30:
@@ -3151,7 +3153,7 @@ async def cc_del(ctx, owner: discord.Member):
 
 @slash.slash(name="nominate", guild_ids=[bot_guild_id],
              description="Private command: Nominate an @member to become a Community Pillar.")
-async def _nominate(ctx: SlashContext, user: discord.Member, *, reason):
+async def _nominate(ctx: SlashContext, user: discord.Member, *, reason: str):
 
     # TODO: command to list nominations for a nominator
 
@@ -3246,7 +3248,7 @@ def nom_count_user(pillarid):
 
 @bot.command(name='nom_count', help='Shows all users with more than X nominations')
 @commands.has_any_role('Community Team', 'Mod', 'Admin', 'Council')
-async def nom_count(ctx, number):
+async def nom_count(ctx, number: int):
 
     # make sure we are in the right channel
     bot_command_channel = bot.get_channel(conf['ADMIN_BOT_CHANNEL'])
@@ -3284,15 +3286,22 @@ async def nom_count(ctx, number):
 
 @bot.command(name='nom_details', help='Shows nomination details for given user by ID or @ mention')
 @commands.has_any_role('Community Team', 'Mod', 'Admin', 'Council')
-async def nom_details(ctx, userid):
+async def nom_details(ctx, userid: Union[discord.Member, int]):
+    # userID should really be a discord.Member object, but that lacks a sensible way to cast back to a userid,
+    # so just use a string and ignore the problem.
 
-    # sanitise userid in case they used an @ mention
-    userid = userid.replace('<', '').replace('>', '').replace('@', '').replace('!', '')
+    if not isinstance(userid, discord.Member):
+        # sanitise userid in case they used an @ mention
+        userid = int(re.search(r'\d+', userid).group())
+        member = await bot.fetch_user(userid)
+        print(f"looked for member with {userid} and found {member}")
 
-    print(f"nom_details called by {ctx.author}")
+    else:
+        # if we have a member object, then the member is the userid, and the id is the userid.id ... confused?
+        member = userid
+        userid = userid.id  # Actually the ID
 
-    member = await bot.fetch_user(userid)
-    print(f"looked for member with {userid} and found {member}")
+    print(f"nom_details called by {ctx.author} for member: {member}")
 
     # make sure we are in the right channel
     bot_command_channel = bot.get_channel(conf['ADMIN_BOT_CHANNEL'])
@@ -3315,13 +3324,23 @@ async def nom_details(ctx, userid):
 
 @bot.command(name='nom_delete', help='Completely removes all nominations for a user by user ID or @ mention. NOT RECOVERABLE.')
 @commands.has_any_role('Admin', 'Council')
-async def nom_delete(ctx, userid):
+async def nom_delete(ctx, userid: Union[str, int]):
     print(f"nom_delete called by {ctx.author}")
 
-    # sanitise userid in case they used an @ mention
-    userid = userid.replace('<', '').replace('>', '').replace('@', '').replace('!', '')
+    # userID should really be a discord.Member object, but that lacks a sensible way to cast back to a userid,
+    # so just use a string and ignore the problem.
 
-    member = await bot.fetch_user(userid)
+    # sanitise userid in case they used an @ mention
+    if not isinstance(userid, discord.Member):
+        # sanitise userid in case they used an @ mention
+        userid = int(re.search(r'\d+', userid).group())
+        member = await bot.fetch_user(userid)
+        print(f"looked for member with {userid} and found {member}")
+
+    else:
+        # if we have a member object, then the member is the userid, and the id is the userid.id ... confused?
+        member = userid
+        userid = userid.id  # Actually the ID
 
     # make sure we are in the right channel
     bot_command_channel = bot.get_channel(conf['ADMIN_BOT_CHANNEL'])
@@ -3437,7 +3456,7 @@ async def stopquit(ctx):
 async def on_command_error(ctx, error):
     gif = random.choice(error_gifs)
     if isinstance(error, commands.BadArgument):
-        await ctx.send('**Bad argument!**')
+        await ctx.send(f'**Bad argument!** {error}')
     elif isinstance(error, commands.CommandNotFound):
         await ctx.send("**Invalid command.**")
     elif isinstance(error, commands.MissingRequiredArgument):
