@@ -3286,17 +3286,22 @@ async def nom_count(ctx, number: int):
 
 @bot.command(name='nom_details', help='Shows nomination details for given user by ID or @ mention')
 @commands.has_any_role('Community Team', 'Mod', 'Admin', 'Council')
-async def nom_details(ctx, userid: Union[str, int]):
+async def nom_details(ctx, userid: Union[discord.Member, int]):
     # userID should really be a discord.Member object, but that lacks a sensible way to cast back to a userid,
     # so just use a string and ignore the problem.
 
-    # sanitise userid in case they used an @ mention
-    userid = int(re.search(r'\d+', userid).group())
+    if not isinstance(userid, discord.Member):
+        # sanitise userid in case they used an @ mention
+        userid = int(re.search(r'\d+', userid).group())
+        member = await bot.fetch_user(userid)
+        print(f"looked for member with {userid} and found {member}")
 
-    print(f"nom_details called by {ctx.author}")
+    else:
+        # if we have a member object, then the member is the userid, and the id is the userid.id ... confused?
+        member = userid
+        userid = userid.id  # Actually the ID
 
-    member = await bot.fetch_user(userid)
-    print(f"looked for member with {userid} and found {member}")
+    print(f"nom_details called by {ctx.author} for member: {member}")
 
     # make sure we are in the right channel
     bot_command_channel = bot.get_channel(conf['ADMIN_BOT_CHANNEL'])
@@ -3326,9 +3331,16 @@ async def nom_delete(ctx, userid: Union[str, int]):
     # so just use a string and ignore the problem.
 
     # sanitise userid in case they used an @ mention
-    userid = int(re.search(r'\d+', userid).group())
+    if not isinstance(userid, discord.Member):
+        # sanitise userid in case they used an @ mention
+        userid = int(re.search(r'\d+', userid).group())
+        member = await bot.fetch_user(userid)
+        print(f"looked for member with {userid} and found {member}")
 
-    member = await bot.fetch_user(userid)
+    else:
+        # if we have a member object, then the member is the userid, and the id is the userid.id ... confused?
+        member = userid
+        userid = userid.id  # Actually the ID
 
     # make sure we are in the right channel
     bot_command_channel = bot.get_channel(conf['ADMIN_BOT_CHANNEL'])
