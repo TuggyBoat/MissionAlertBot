@@ -1864,7 +1864,9 @@ async def complete(ctx):
             # they said yes!
             print("User responded yes")
             desc_msg = ""
-            reddit_complete_text = "    INCOMING WIDEBAND TRANSMISSION: P.T.N. CARRIER MISSION UPDATE\n\n**{mission_data.carrier_name}** mission complete. o7 CMDRs!\n\n\n\n*Reported on PTN Discord by {ctx.author.display_name}*"
+            reddit_complete_text = f"    INCOMING WIDEBAND TRANSMISSION: P.T.N. CARRIER MISSION UPDATE\n\n**" \
+                                   f"{mission_data.carrier_name}** mission complete. o7 CMDRs!\n\n\n\n*Reported on " \
+                                   f"PTN Discord by {ctx.author.display_name}*"
             discord_complete_embed = discord.Embed(title=f"{mission_data.carrier_name} MISSION COMPLETE",
                                                    description=f"<@{ctx.author.id}> reports mission complete! **This mission channel will be removed in {seconds_long//60} minutes.**",
                                                    color=constants.EMBED_COLOUR_OK)
