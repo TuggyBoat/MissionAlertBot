@@ -2245,7 +2245,7 @@ async def carrier_image(ctx, lookname):
     true_size = (506, 285)
     true_width, true_height = true_size
     true_aspect = true_width / true_height
-    noimage_message = False
+    legacy_message, noimage_message = False, False
 
     newimage_description = ("The mission image helps give your Fleet Carrier trade missions a distinct visual identity. "
                             " You only need to upload an image once. This will be inserted into the slot in the"
