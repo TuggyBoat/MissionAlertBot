@@ -735,6 +735,7 @@ async def _overlay_mission_image(carrier_data):
     template.paste(carrier_image, (47,13))
     return template
 
+
 # function to create image for loading
 async def create_carrier_mission_image(carrier_data, commodity, system, station, profit, pads, demand, mission_type):
     print("Called mission image generator")
