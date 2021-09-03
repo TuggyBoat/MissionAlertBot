@@ -2263,7 +2263,8 @@ async def carrier_image(ctx, lookname):
                             "Carrier if you have one.\n"
                             "• Images will be cropped to 16:9 and resized to 506x285 if not already.\n"
                             "• You can use `m.carrier_image <yourcarrier>` at any time to change your image.\n\n"
-                            "Input \"**x**\" to cancel, or \"**p**\" to use a random placeholder with PTN logo.\n\n"
+                            "**You can upload your image now to change it**.\n"
+                            "Alternatively, input \"**x**\" to cancel, or \"**p**\" to use a random placeholder with PTN logo.\n\n"
                             "**You must have a valid image to generate a mission**.")
 
     # see if there's an image for this carrier already
