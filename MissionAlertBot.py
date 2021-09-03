@@ -1662,9 +1662,9 @@ async def _missions(ctx: SlashContext):
 
 
 # CO command to quickly mark mission as complete, optionally send some RP text
-@bot.command(name='done', help='Marks a mission as complete for specified carrier.\n'
-                               'Deletes trade alert in Discord and sends messages to carrier channel and reddit if '
-                               'appropriate.\n\nAnything put in quotes after the carrier name will be treated as a '
+@bot.command(name='done', help='Marks a mission as complete for specified carrier.\n\n'
+                               'Deletes trade alert in Discord and sends messages to carrier channel, reddit and owner if '
+                               'appropriate.\n\nAnything after the carrier name will be treated as a '
                                'quote to be sent along with the completion notice. This can be used for RP if desired.')
 @commands.has_any_role('Certified Carrier', 'Trainee')
 async def done(ctx, carrier_name_search_term: str, *, rp: str = None):
@@ -2237,13 +2237,17 @@ async def carrier_del(ctx, db_id: int):
 
 # change FC background image
 @bot.command(name='carrier_image', help='Change the background image for the specified carrier:\n\n'
-                                        'Use on its own to receive a blank template image.\n'
                                         'Use with carrier\'s name as argument to check the '
                                         'carrier\'s image or begin upload of a new image.')
 @commands.has_any_role('Certified Carrier', 'Trainee')
 async def carrier_image(ctx, lookname):
     print(f"{ctx.author} called m.carrier_image for {lookname}")
     carrier_data = find_carrier_from_long_name(lookname)
+
+    # check carrier exists
+    if not carrier_data:
+        await ctx.send(f"Sorry, no carrier found matching \"{lookname}\". Try using `/find` or `/owner`.")
+        return print(f"No carrier found for {lookname}")
 
     # define image requiremenets
     true_size = (506, 285)
@@ -2252,47 +2256,54 @@ async def carrier_image(ctx, lookname):
     legacy_message, noimage_message = False, False
 
     newimage_description = ("The mission image helps give your Fleet Carrier trade missions a distinct visual identity. "
-                            " You only need to upload an image once. This will be inserted into the slot in the"
-                            "above template. It is recommended to use in-game screenshots showing **scenery** and/or "
+                            " You only need to upload an image once. This will be inserted into the slot in the "
+                            "mission image template.\n\n"
+                            "• It is recommended to use in-game screenshots showing **scenery** and/or "
                             "**your Fleet Carrier**. You may also wish to add a **logo** or **emblem** for your Fleet "
-                            "Carrier if you have one.\n\n"
-                            "Images will be cropped to 16:9 and resized to 506x285 if not already.\n"
-                            "You can use `m.carrier_image yourcarrier` at any time to change your image.\n\n"
-                            "Input \"**x**\" to cancel or \"**d**\" to use a boring placeholder with PTN logo.\n\n"
+                            "Carrier if you have one.\n"
+                            "• Images will be cropped to 16:9 and resized to 506x285 if not already.\n"
+                            "• You can use `m.carrier_image <yourcarrier>` at any time to change your image.\n\n"
+                            "Input \"**x**\" to cancel, or \"**p**\" to use a random placeholder with PTN logo.\n\n"
                             "**You must have a valid image to generate a mission**.")
 
+    # see if there's an image for this carrier already
+    # newly added carriers have no image (by intention - we want CCOs to engage with this aspect of the job!)
     try:
         print("Looking for existing image")
         file = discord.File(f"images/{carrier_data.carrier_short_name}.png", filename="image.png")
     except:
         file = None
-    
+
     if file:
+        # we found an existing image, so show it to the user
         print("Found image")
-        # file = discord.File(f"images/{carrier_data.carrier_short_name}.png", filename="image.png")
         embed = discord.Embed(title=f"{carrier_data.carrier_long_name} MISSION IMAGE",
                                 color=constants.EMBED_COLOUR_QU)
         embed.set_image(url="attachment://image.png")
         await ctx.send(file=file, embed=embed)
         image_exists = True
 
-        # check if it's a legacy image
+        # check if it's a legacy image - if it is, we want them to replace it
         image = Image.open(f"images/{carrier_data.carrier_short_name}.png")
-        valid_image = False if not image.size == true_size else True
+        valid_image = image.size == true_size
 
     else:
-        valid_image = False
+        # no image found
         print("No existing image found")
-    
+        image_exists, valid_image = False, False
+
     if valid_image:
+        # an image exists and is the right size, user is not nagged to change it
         embed = discord.Embed(title="Change carrier's mission image?",
-                                    description="If you want to replace this image you can upload the new image now.\n\n"
-                                                "Images will be cropped to 16:9 and resized to 506x285 if not already.\n\n"
-                                                "Input \"x\" or wait 60 seconds if you don't want to upload and just want to view.",
+                                    description="If you want to replace this image you can upload the new image now. "
+                                                "Images will be automatically cropped to 16:9 and resized to 506x285.\n\n"
+                                                "**To continue without changing**:         Input \"**x**\" or wait 60 seconds\n"
+                                                "**To switch to a random PTN logo image**: Input \"**p**\"",
                                     color=constants.EMBED_COLOUR_QU)
         message_upload_now = await ctx.send(embed=embed)
     
     elif not valid_image and not image_exists:
+        # there's no mission image, prompt the user to upload one or use a PTN placeholder
         file = discord.File("template.png", filename="image.png")
         embed = discord.Embed(title=f"NO MISSION IMAGE FOUND",
                                 color=constants.EMBED_COLOUR_QU)
@@ -2300,7 +2311,9 @@ async def carrier_image(ctx, lookname):
         noimage_message = await ctx.send(file=file, embed=embed)
         embed = discord.Embed(title="Upload a mission image",
                               description=newimage_description, color=constants.EMBED_COLOUR_QU)
+
     elif not valid_image and image_exists:
+        # there's an image but it's outdated, prompt them to change it
         embed = discord.Embed(title="WARNING: LEGACY MISSION IMAGE DETECTED",
                               description="The mission image format has changed. You must upload a new image to continue"
                                                 " to use the Mission Generator.",
@@ -2309,14 +2322,17 @@ async def carrier_image(ctx, lookname):
         embed = discord.Embed(title="Upload a mission image",
                               description=newimage_description, color=constants.EMBED_COLOUR_QU)
 
-        message_upload_now = await ctx.send(embed=embed)
+    # send the embed we created
+    message_upload_now = await ctx.send(embed=embed)
 
+    # function to check user's response
     def check(message_to_check):
         return message_to_check.author == ctx.author and message_to_check.channel == ctx.channel
 
     try:
+        # now we process the user's response
         message = await bot.wait_for("message", check=check, timeout=60)
-        if message.content.lower() == "x":
+        if message.content.lower() == "x": # user backed out without making changes
             embed = discord.Embed(description="No changes made.",
                                     color=constants.EMBED_COLOUR_OK)
             await ctx.send(embed=embed)
@@ -2326,8 +2342,8 @@ async def carrier_image(ctx, lookname):
                 await noimage_message.delete()
             return
 
-        elif message.content.lower() == "d":
-            print("User wants boring default image, le sigh")
+        elif message.content.lower() == "p": # user wants to use a placeholder image
+            print("User wants default image")
             try:
                 # first backup the existing image, if any
                 shutil.move(f'images/{carrier_data.carrier_short_name}.png',
@@ -2335,12 +2351,14 @@ async def carrier_image(ctx, lookname):
             except:
                 pass
             try:
-                shutil.copy(f'default.png',
+                # select a random image from our default image library so not every carrier is the same
+                default_img = random.choice(os.listdir("images/default"))
+                shutil.copy(f'images/default/{default_img}',
                             f'images/{carrier_data.carrier_short_name}.png')
             except Exception as e:
                 print(e)
 
-        elif message.attachments:
+        elif message.attachments: # user has uploaded something, let's hope it's an image :))
             # first backup the existing image, if any
             try:
                 shutil.move(f'images/{carrier_data.carrier_short_name}.png',
@@ -2361,7 +2379,14 @@ async def carrier_image(ctx, lookname):
                 """
 
                 print("Checking image size")
-                image = Image.open(attachment.filename)
+                try:
+                    image = Image.open(attachment.filename)
+                except Exception as e: # they uploaded something daft
+                    print(e)
+                    await ctx.send("Sorry, I don't recognise that as an image file. Upload aborted.")
+                    return await message_upload_now.delete()
+
+                # now we check the image dimensions and aspect ratio
                 upload_width, upload_height = image.size
                 print(f"{upload_width}, {upload_height}")
                 upload_size = (upload_width, upload_height)
