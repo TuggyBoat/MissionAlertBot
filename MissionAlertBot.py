@@ -997,7 +997,7 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
     if os.path.isfile(f"images/{carrier_data.carrier_short_name}.png"):
         print("Carrier mission image found, checking size...")
         image = Image.open(f"images/{carrier_data.carrier_short_name}.png")
-        image_is_good = True if image.size == (506, 285) else False
+        image_is_good = image.size == (506, 285)
     else:
         image_is_good = False
     if not image_is_good:
@@ -1010,7 +1010,7 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
         if os.path.isfile(f"images/{carrier_data.carrier_short_name}.png"):
             print("Found an image file, checking size")
             image = Image.open(f"images/{carrier_data.carrier_short_name}.png")
-            image_is_good = True if image.size == (506, 285) else False
+            image_is_good = image.size == (506, 285)
         else:
             image_is_good = False
         if not image_is_good:
@@ -2132,6 +2132,11 @@ async def carrier_add(ctx, short_name: str, long_name: str, carrier_id: str, own
         # problem, wrong channel, no progress
         return await ctx.send(f'Sorry, you can only run this command out of: {bot_command_channel}.')
 
+    # check the ID code is correct format (thanks boozebot code!)
+    if not re.match(r"\w{3}-\w{3}", carrier_id):
+        print(f'{ctx.author}, the carrier ID was invalid, XXX-XXX expected received, {carrier_id}.')
+        return await ctx.channel.send(f'ERROR: Invalid carrier ID. Expected: XXX-XXX, received {carrier_id}.')
+
     # Only add to the carrier DB if it does not exist, if it does exist then the user should not be adding it.
     carrier_data = find_carrier_from_long_name(long_name)
     if carrier_data:
@@ -2169,11 +2174,10 @@ async def carrier_add(ctx, short_name: str, long_name: str, carrier_id: str, own
     await add_carrier_to_database(short_name, long_name, carrier_id, stripped_name.lower(), 0, owner_id)
 
     carrier_data = find_carrier_from_long_name(long_name)
-    await ctx.send(
-        f"Added **{carrier_data.carrier_long_name.upper()}** **{carrier_data.carrier_identifier.upper()}** "
-        f"with shortname **{carrier_data.carrier_short_name.lower()}**, channel "
-        f"**#{carrier_data.discord_channel}** "
-        f"owned by <@{owner_id}> at ID **{carrier_data.pid}**")
+    embed = discord.Embed(title="Fleet Carrier successfully added to database",
+                          color=constants.EMBED_COLOUR_OK)
+    embed = _add_common_embed_fields(embed, carrier_data)
+    return await ctx.send(embed=embed)
 
 
 # remove FC from database
@@ -2252,9 +2256,10 @@ async def carrier_image(ctx, lookname):
                             "above template. It is recommended to use in-game screenshots showing **scenery** and/or "
                             "**your Fleet Carrier**. You may also wish to add a **logo** or **emblem** for your Fleet "
                             "Carrier if you have one.\n\n"
-                            "Images will be cropped to 16:9 and resized to 506x285 if not already.\n\n"
-                            "You can use `m.carrier_image yourcarrier` at any time to change your image. "
-                            "Input \"x\" to cancel. **You must have a valid image to generate a mission**.")
+                            "Images will be cropped to 16:9 and resized to 506x285 if not already.\n"
+                            "You can use `m.carrier_image yourcarrier` at any time to change your image.\n\n"
+                            "Input \"**x**\" to cancel or \"**d**\" to use a boring placeholder with PTN logo.\n\n"
+                            "**You must have a valid image to generate a mission**.")
 
     try:
         print("Looking for existing image")
@@ -2321,6 +2326,20 @@ async def carrier_image(ctx, lookname):
                 await noimage_message.delete()
             return
 
+        elif message.content.lower() == "d":
+            print("User wants boring default image, le sigh")
+            try:
+                # first backup the existing image, if any
+                shutil.move(f'images/{carrier_data.carrier_short_name}.png',
+                            f'images/old/{carrier_data.carrier_short_name}.{get_formatted_date_string()[1]}.png')
+            except:
+                pass
+            try:
+                shutil.copy(f'default.png',
+                            f'images/{carrier_data.carrier_short_name}.png')
+            except Exception as e:
+                print(e)
+
         elif message.attachments:
             # first backup the existing image, if any
             try:
@@ -2380,40 +2399,40 @@ async def carrier_image(ctx, lookname):
             # now we can save the image
             image.save(f"images/{carrier_data.carrier_short_name}.png")
 
-            # show the user the result in situ
-            in_image = await _overlay_mission_image(carrier_data)
-            result_name = tempfile.NamedTemporaryFile(suffix='.png', delete=False)
-            print(f'Saving temporary mission image preview file for carrier: {carrier_data.carrier_long_name} to: {result_name.name}')
-            in_image.save(result_name.name)
-
-            file = discord.File(result_name.name, filename="image.png")
-            embed = discord.Embed(title=f"{carrier_data.carrier_long_name}",
-                                    description="Mission image updated.", color=constants.EMBED_COLOUR_OK)
-            embed.set_image(url="attachment://image.png")
-            await ctx.send(file=file, embed=embed)
-            print("Sent result to user")
-            await message.delete()
-            await message_upload_now.delete()
-            if noimage_message:
-                await noimage_message.delete()
-            # only delete legacy warning if user uploaded valid new file
-            if legacy_message:
-                await legacy_message.delete()
-            print("Tidied up our prompt messages")
-
-            # cleanup the tempfile
-            result_name.close()
-            os.unlink(result_name.name)
-            print("Removed the tempfile")
-
-            print(f"{ctx.author} updated carrier image for {carrier_data.carrier_long_name}")
-
-            # remove the downloaded image
+            # remove the downloaded attachment
             try:
                 image.close()
                 os.remove(attachment.filename)
             except Exception as e:
                 print(f"Error deleting file {attachment.filename}: {e}")
+
+        # now we can show the user the result in situ
+        in_image = await _overlay_mission_image(carrier_data)
+        result_name = tempfile.NamedTemporaryFile(suffix='.png', delete=False)
+        print(f'Saving temporary mission image preview file for carrier: {carrier_data.carrier_long_name} to: {result_name.name}')
+        in_image.save(result_name.name)
+
+        file = discord.File(result_name.name, filename="image.png")
+        embed = discord.Embed(title=f"{carrier_data.carrier_long_name}",
+                                description="Mission image updated.", color=constants.EMBED_COLOUR_OK)
+        embed.set_image(url="attachment://image.png")
+        await ctx.send(file=file, embed=embed)
+        print("Sent result to user")
+        await message.delete()
+        await message_upload_now.delete()
+        if noimage_message:
+            await noimage_message.delete()
+        # only delete legacy warning if user uploaded valid new file
+        if legacy_message:
+            await legacy_message.delete()
+        print("Tidied up our prompt messages")
+
+        # cleanup the tempfile
+        result_name.close()
+        os.unlink(result_name.name)
+        print("Removed the tempfile")
+
+        print(f"{ctx.author} updated carrier image for {carrier_data.carrier_long_name}")
 
     except asyncio.TimeoutError:
         embed = discord.Embed(description="No changes made (no response from user).",
