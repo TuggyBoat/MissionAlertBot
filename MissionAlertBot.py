@@ -2301,7 +2301,6 @@ async def carrier_image(ctx, lookname):
                                                 "**To continue without changing**:         Input \"**x**\" or wait 60 seconds\n"
                                                 "**To switch to a random PTN logo image**: Input \"**p**\"",
                                     color=constants.EMBED_COLOUR_QU)
-        message_upload_now = await ctx.send(embed=embed)
     
     elif not valid_image and not image_exists:
         # there's no mission image, prompt the user to upload one or use a PTN placeholder
@@ -2396,14 +2395,14 @@ async def carrier_image(ctx, lookname):
                 if not upload_aspect == true_aspect:
                     print(f"Image aspect ratio of {upload_aspect} requires adjustment")
                     # check largest dimension
-                    if upload_aspect > 1:
-                        print("Largest dimension is width")
-                        # largest dimension is width, we'll crop to height
+                    if upload_aspect > true_aspect:
+                        print("Image is too wide")
+                        # image is too wide, we'll crop width to maintain height
                         new_width = upload_height * true_aspect
                         new_height = upload_height
                     else:
-                        print("Largest dimension is height")
-                        # largest dimension is height, we'll crop to width
+                        print("Image is too high")
+                        # image is too high, we'll crop height to maintain width
                         new_height = upload_width / true_aspect
                         new_width = upload_width
                     # now perform the incision. Nurse: scalpel!
@@ -2420,7 +2419,7 @@ async def carrier_image(ctx, lookname):
                 # now check its size
                 if not upload_size == true_size:
                     print("Image requires resizing")
-                    image = image.resize(true_size)
+                    image = image.resize((true_size))
 
             # now we can save the image
             image.save(f"images/{carrier_data.carrier_short_name}.png")
