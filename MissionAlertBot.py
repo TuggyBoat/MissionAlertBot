@@ -1495,31 +1495,19 @@ def _mission_summary_embed(mission_data, embed):
 # find what fleet carriers are owned by a user - private slash command
 @slash.slash(name="owner", guild_ids=[bot_guild_id],
              description="Private command: Use with @User to find out what fleet carriers that user owns.")
-async def _owner(ctx: SlashContext, at_owner_discord: discord.Member):
-
-    # strip off the guff and get us a pure owner ID
-    stripped_owner = at_owner_discord.replace('<', '').replace('>', '').replace('!', '').replace('@', '')
-
-    print(f"{ctx.author} used /owner in {ctx.channel} to find carriers owned by user with ID {stripped_owner}")
-
-    try:
-        owner = await bot.fetch_user(stripped_owner)
-        print(f"Found user as {owner.display_name}")
-    except HTTPException:
-        await ctx.send("Couldn't find any users by that name.", hidden=True)
-        raise EnvironmentError(f'Could not find Discord user matching ID {at_owner_discord} ({stripped_owner})')
+async def _owner(ctx: SlashContext, owner: discord.Member):
 
     try:
         # look for matches for the owner ID in the carrier DB
-        carrier_list = find_carrier_with_owner_id(stripped_owner)
+        carrier_list = find_carrier_with_owner_id(owner.id)
 
         if not carrier_list:
-            await ctx.send(f"No carriers found owned by <@{stripped_owner}>", hidden=True) 
+            await ctx.send(f"No carriers found owned by <@{owner.id}>", hidden=True) 
             return print(f"No carriers found for owner {owner.id}")
 
-        embed = discord.Embed(description=f"Showing registered Fleet Carriers owned by <@{stripped_owner}>:",
-                              color=constants.EMBED_COLOUR_OK)
-      
+        embed = discord.Embed(description=f"Showing registered Fleet Carriers owned by <@{owner.id}>:",
+                                color=constants.EMBED_COLOUR_OK)
+        
         for carrier_data in carrier_list:
             embed.add_field(name=f"{carrier_data.carrier_long_name} ({carrier_data.carrier_identifier})",
                             value=f"Channel Name: #{carrier_data.discord_channel}",
