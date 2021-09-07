@@ -1238,32 +1238,14 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
                     try:
 
                         # post to reddit
-                        subreddit = await reddit.subreddit(to_subreddit)
-                        submission = await subreddit.submit_image(reddit_title, image_path=file_name,
-                                                                flair_id=flair_mission_start)
-                        reddit_post_url = submission.permalink
-                        reddit_post_id = submission.id
-                        if rp:
-                            comment = await submission.reply(f"> {rp_text}\n\n&#x200B;\n\n{reddit_body}")
-                        else:
-                            comment = await submission.reply(reddit_body)
-                        reddit_comment_url = comment.permalink
-                        reddit_comment_id = comment.id
-                        embed = discord.Embed(title=f"Reddit trade alert sent for {carrier_data.carrier_long_name}",
-                                            description=f"https://www.reddit.com{reddit_post_url}",
-                                            color=constants.EMBED_COLOUR_REDDIT)
-                        await ctx.send(embed=embed)
-                        await message_send.delete()
-                        embed = discord.Embed(title=f"{carrier_data.carrier_long_name} REQUIRES YOUR UPDOOTS",
-                                            description=f"https://www.reddit.com{reddit_post_url}",
-                                            color=constants.EMBED_COLOUR_REDDIT)
-                        channel = bot.get_channel(conf['CHANNEL_UPVOTES'])
-                        upvote_message = await channel.send(embed=embed)
-                        emoji = bot.get_emoji(upvote_emoji)
-                        await upvote_message.add_reaction(emoji)
+                        reddit_values = await asyncio.wait_for(_send_mission_to_reddit(ctx, rp, rp_text, file_name, reddit_title, reddit_body, carrier_data, message_send), timeout=60)
+                        (reddit_post_url, reddit_post_id, reddit_comment_url, reddit_comment_id) = reddit_values
                     except Exception as e:
                         print(f"Error posting to Reddit: {e}")
                         await ctx.send(f"Error posting to Reddit: {e}\nAttempting to continue with rest of mission gen...")
+                    except asyncio.TimeoutError:
+                        print(f"Error posting to Reddit: Attempt timed out.")
+                        await ctx.send(f"Error posting to Reddit: Timed Out.\nAttempting to continue with rest of mission gen...")
 
             if "n" in msg.content.lower():
                 print("User used option n")
@@ -1312,6 +1294,31 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
         await remove_carrier_channel(mission_temp_channel_id, seconds_short)
 
 
+async def _send_mission_to_reddit(ctx, rp, rp_text, file_name, reddit_title, reddit_body, carrier_data, message_send):
+    subreddit = await reddit.subreddit(to_subreddit)
+    submission = await subreddit.submit_image(reddit_title, image_path=file_name,
+                                            flair_id=flair_mission_start)
+    reddit_post_url = submission.permalink
+    reddit_post_id = submission.id
+    if rp:
+        comment = await submission.reply(f"> {rp_text}\n\n&#x200B;\n\n{reddit_body}")
+    else:
+        comment = await submission.reply(reddit_body)
+    reddit_comment_url = comment.permalink
+    reddit_comment_id = comment.id
+    embed = discord.Embed(title=f"Reddit trade alert sent for {carrier_data.carrier_long_name}",
+                        description=f"https://www.reddit.com{reddit_post_url}",
+                        color=constants.EMBED_COLOUR_REDDIT)
+    await ctx.send(embed=embed)
+    await message_send.delete()
+    embed = discord.Embed(title=f"{carrier_data.carrier_long_name} REQUIRES YOUR UPDOOTS",
+                        description=f"https://www.reddit.com{reddit_post_url}",
+                        color=constants.EMBED_COLOUR_REDDIT)
+    channel = bot.get_channel(conf['CHANNEL_UPVOTES'])
+    upvote_message = await channel.send(embed=embed)
+    emoji = bot.get_emoji(upvote_emoji)
+    await upvote_message.add_reaction(emoji)
+    return reddit_post_url, reddit_post_id, reddit_comment_url, reddit_comment_id
 
 
 async def create_mission_temp_channel(ctx, discord_channel, owner_id):
