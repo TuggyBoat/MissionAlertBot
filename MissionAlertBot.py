@@ -840,58 +840,57 @@ async def on_ready():
 
 # monitor reddit comments
 async def _monitor_reddit_comments():
-    try:
-        # TODO: what happens if there's an error in this process, e.g. reddit is down?
+    while True:
+        try:
+            # TODO: what happens if there's an error in this process, e.g. reddit is down?
 
-        comment_channel = bot.get_channel(conf['REDDIT_CHANNEL'])
-        # establish a comment stream to the subreddit using async praw
-        subreddit = await reddit.subreddit(to_subreddit)
-        async for comment in subreddit.stream.comments(skip_existing=True):
-            print(f"New reddit comment: {comment}. Is_submitter is {comment.is_submitter}")
-            # ignore comments from the bot / post author
-            if not comment.is_submitter:
-                # log some data
-                print(f"{comment.author} wrote:\n {comment.body}\nAt: {comment.permalink}\nIn: {comment.submission}")
+            comment_channel = bot.get_channel(conf['REDDIT_CHANNEL'])
+            # establish a comment stream to the subreddit using async praw
+            subreddit = await reddit.subreddit(to_subreddit)
+            async for comment in subreddit.stream.comments(skip_existing=True):
+                print(f"New reddit comment: {comment}. Is_submitter is {comment.is_submitter}")
+                # ignore comments from the bot / post author
+                if not comment.is_submitter:
+                    # log some data
+                    print(f"{comment.author} wrote:\n {comment.body}\nAt: {comment.permalink}\nIn: {comment.submission}")
 
-                # get a submission object so we can interrogate it for the parent post title
-                submission = await reddit.submission(comment.submission)
+                    # get a submission object so we can interrogate it for the parent post title
+                    submission = await reddit.submission(comment.submission)
 
-                # lookup the parent post ID with the mission database
-                mission_db.execute(f"SELECT * FROM missions WHERE "
-                                f"reddit_post_id = '{comment.submission}' ")
-                
-                print('DB command ran, go fetch the result')
-                mission_data = MissionData(mission_db.fetchone())
-
-                if not mission_data:
-                    print("No match in mission DB, mission must be complete.")
-
-                    embed = discord.Embed(title=f"{submission.title}",
-                                        description=f"This mission is **COMPLETED**.\n\nComment by **{comment.author}**\n{comment.body}"
-                                                    f"\n\nTo view this comment click here:\nhttps://www.reddit.com{comment.permalink}",
-                                                    color=constants.EMBED_COLOUR_QU)
-                
-                elif mission_data:
-                    # mission is active, we'll get info from the db and ping the CCO
-                    print(f'Found mission data: {mission_data}')
-
-                    # now we need to lookup the carrier data in the db
-                    carrier_data = find_carrier_from_long_name(mission_data.carrier_name)
+                    # lookup the parent post ID with the mission database
+                    mission_db.execute(f"SELECT * FROM missions WHERE "
+                                    f"reddit_post_id = '{comment.submission}' ")
                     
-                    # We can't easily moderate Reddit comments so we'll post it to a CCO-only channel
-                    
-                    await comment_channel.send(f"<@{carrier_data.ownerid}>, your Reddit trade post has received a new comment:")
-                    embed = discord.Embed(title=f"{submission.title}",
-                                        description=f"This mission is **IN PROGRESS**.\n\nComment by **{comment.author}**\n{comment.body}"
-                                                    f"\n\nTo view this comment click here:\nhttps://www.reddit.com{comment.permalink}",
-                                                    color=constants.EMBED_COLOUR_REDDIT)
+                    print('DB command ran, go fetch the result')
+                    mission_data = MissionData(mission_db.fetchone())
 
-                await comment_channel.send(embed=embed)
-                print("Sent comment to channel")
-    except Exception as e:
-        print(f"Error while monitoring {to_subreddit} for comments: {e}")
-        # if there's an error we still want the bot to keep trying to monitor, so...
-        await _monitor_reddit_comments() # this is probably hideous and bad, how else can I do this?
+                    if not mission_data:
+                        print("No match in mission DB, mission must be complete.")
+
+                        embed = discord.Embed(title=f"{submission.title}",
+                                            description=f"This mission is **COMPLETED**.\n\nComment by **{comment.author}**\n{comment.body}"
+                                                        f"\n\nTo view this comment click here:\nhttps://www.reddit.com{comment.permalink}",
+                                                        color=constants.EMBED_COLOUR_QU)
+                    
+                    elif mission_data:
+                        # mission is active, we'll get info from the db and ping the CCO
+                        print(f'Found mission data: {mission_data}')
+
+                        # now we need to lookup the carrier data in the db
+                        carrier_data = find_carrier_from_long_name(mission_data.carrier_name)
+                        
+                        # We can't easily moderate Reddit comments so we'll post it to a CCO-only channel
+                        
+                        await comment_channel.send(f"<@{carrier_data.ownerid}>, your Reddit trade post has received a new comment:")
+                        embed = discord.Embed(title=f"{submission.title}",
+                                            description=f"This mission is **IN PROGRESS**.\n\nComment by **{comment.author}**\n{comment.body}"
+                                                        f"\n\nTo view this comment click here:\nhttps://www.reddit.com{comment.permalink}",
+                                                        color=constants.EMBED_COLOUR_REDDIT)
+
+                    await comment_channel.send(embed=embed)
+                    print("Sent comment to channel")
+        except Exception as e:
+            print(f"Error while monitoring {to_subreddit} for comments: {e}")
 
 
 
