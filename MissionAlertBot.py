@@ -983,7 +983,6 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
         print(f'Exiting mission generation requested by {ctx.author} as pad size is invalid, provided: {pads}')
         return await ctx.send(f'Sorry, your pad size is not L or M. Provided: {pads}. Mission generation cancelled.')
 
-
     # check if commodity can be found, exit gracefully if not
     gen_mission.returnflag = False
     commodity_data = await find_commodity(commodity_search_term, ctx)
@@ -997,8 +996,17 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
     if not carrier_data:
         return await ctx.send(f"No carrier found for {carrier_name_search_term}. You can use `/find` or `/owner` to search for carrier names.")
 
-    # check if the carrier has an associated image
+    # check carrier isn't already on a mission
+    mission_data = find_mission_by_carrier_name(carrier_data.carrier_long_name)
+    if mission_data:
+        embed = discord.Embed(title="Error",
+                            description=f"{mission_data.carrier_name} is already on a mission, please "
+                                        f"use **m.done** to mark it complete before starting a new mission.",
+                            color=constants.EMBED_COLOUR_ERROR)
+        await ctx.send(embed=embed)
+        return  # We want to stop here, so go exit out
 
+    # check if the carrier has an associated image
     if os.path.isfile(f"images/{carrier_data.carrier_short_name}.png"):
         print("Carrier mission image found, checking size...")
         image = Image.open(f"images/{carrier_data.carrier_short_name}.png")
@@ -1041,16 +1049,6 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
 
         embed = discord.Embed(title="Generating and fetching mission alerts...", color=constants.EMBED_COLOUR_QU)
         message_gen = await ctx.send(embed=embed)
-
-        mission_db.execute(f'''SELECT * FROM missions WHERE carrier LIKE (?)''', ('%' + carrier_name_search_term + '%',))
-        mission_data = MissionData(mission_db.fetchone())
-        if mission_data:
-            embed = discord.Embed(title="Error",
-                                description=f"{mission_data.carrier_name} is already on a mission, please "
-                                            f"use **m.done** to mark it complete before starting a new mission.",
-                                color=constants.EMBED_COLOUR_ERROR)
-            await ctx.send(embed=embed)
-            return  # We want to stop here, so go exit out
 
         def check_confirm(message):
             # use all to verify that all the characters in the message content are present in the allowed list (dtrx).
