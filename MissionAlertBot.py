@@ -1718,7 +1718,10 @@ async def _cleanup_completed_mission(ctx, mission_data, reddit_complete_text, di
 
                 # first check if it's Wine, in which case it went to the booze cruise channel
                 if mission_data.commodity.title() == "Wine":
-                    alert_channel = bot.get_channel(wine_alerts_loading_id)
+                    if mission_data.mission_type == 'load':
+                        alert_channel = bot.get_channel(wine_alerts_loading_id)
+                    else:
+                        alert_channel = bot.get_channel(wine_alerts_unloading_id)
                 else:
                     alert_channel = bot.get_channel(trade_alerts_id)
 
