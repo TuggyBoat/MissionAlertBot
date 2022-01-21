@@ -57,7 +57,9 @@ flair_mission_stop = conf['MISSION_STOP']
 
 # channel IDs
 trade_alerts_id = conf['TRADE_ALERTS_ID']
-wine_alerts_id = conf['WINE_ALERTS_ID']
+wine_alerts_loading_id = conf['WINE_ALERTS_LOADING_ID']
+wine_alerts_unloading_id = conf['WINE_ALERTS_UNLOADING_ID']
+
 bot_spam_id = conf['BOT_SPAM_CHANNEL']
 to_subreddit = conf['SUB_REDDIT']
 cc_cat_id = conf['CC_CAT']
@@ -1186,8 +1188,12 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
                 try:
                     # send trade alert to trade alerts channel, or to wine alerts channel if loading wine
                     if commodity_data.name.title() == "Wine":
-                        channel = bot.get_channel(wine_alerts_id)
-                        channelId = wine_alerts_id
+                        if mission_type == 'load':
+                            channel = bot.get_channel(wine_alerts_loading_id)
+                            channelId = wine_alerts_loading_id
+                        else:   # unloading block
+                            channel = bot.get_channel(wine_alerts_unloading_id)
+                            channelId = wine_alerts_unloading_id
                     else:
                         channel = bot.get_channel(trade_alerts_id)
                         channelId = trade_alerts_id
@@ -1712,7 +1718,10 @@ async def _cleanup_completed_mission(ctx, mission_data, reddit_complete_text, di
 
                 # first check if it's Wine, in which case it went to the booze cruise channel
                 if mission_data.commodity.title() == "Wine":
-                    alert_channel = bot.get_channel(wine_alerts_id)
+                    if mission_data.mission_type == 'load':
+                        alert_channel = bot.get_channel(wine_alerts_loading_id)
+                    else:
+                        alert_channel = bot.get_channel(wine_alerts_unloading_id)
                 else:
                     alert_channel = bot.get_channel(trade_alerts_id)
 
