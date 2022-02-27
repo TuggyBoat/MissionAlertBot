@@ -17,6 +17,8 @@ PROD_UPVOTE_EMOJI = 828287733227192403 # upvote emoji on live server
 PROD_HAULER_ROLE = 875313960834965544 # hauler role ID on live server
 PROD_CC_ROLE = 869340261057196072 # CC role on live server
 PROD_CC_CAT = 877107894452117544 # Community Carrier category on live server
+PROD_CERTCARRIER_ROLE = 947253075561824327 # Certified Carrier role on live server
+PROD_RESCARRIER_ROLE = 947253075561824327 # Fleet Reserve Carrier role on live server
 PROD_TRADE_CAT = 801558838414409738 # Trade Carrier category on live server
 PROD_ARCHIVE_CAT = 821542402836660284 # Archive category on live server
 PROD_SECONDS_SHORT = 120
@@ -43,6 +45,8 @@ TEST_UPVOTE_EMOJI = 849388681382068225 # upvote emoji on test server
 TEST_HAULER_ROLE = 875439909102575647 # hauler role ID on test server
 TEST_CC_ROLE = 877220476827619399 # CC role on test server
 TEST_CC_CAT = 877108931699310592 # Community Carrier category on test server
+TEST_CERTCARRIER_ROLE = 947519773925859370 # Certified Carrier role on test server
+TEST_RESCARRIER_ROLE = 947521000122249247 # Fleet Reserve Carrier role on test server
 TEST_TRADE_CAT = 876569219259580436 # Trade Carrier category on live server
 TEST_ARCHIVE_CAT = 877244591579992144 # Archive category on live server
 TEST_SECONDS_SHORT = 5
@@ -88,6 +92,8 @@ def get_constant(production: bool):
             'HAULER_ROLE' : PROD_HAULER_ROLE,
             'CC_ROLE' : PROD_CC_ROLE,
             'CC_CAT' : PROD_CC_CAT,
+            'CERTCARRIER_ROLE' : PROD_CERTCARRIER_ROLE,
+            'RESCARRIER_ROLE' : PROD_RESCARRIER_ROLE,
             'TRADE_CAT' : PROD_TRADE_CAT,
             'ARCHIVE_CAT' : PROD_ARCHIVE_CAT,
             'SECONDS_SHORT' : PROD_SECONDS_SHORT,
@@ -112,6 +118,8 @@ def get_constant(production: bool):
             'HAULER_ROLE' : TEST_HAULER_ROLE,
             'CC_ROLE' : TEST_CC_ROLE,
             'CC_CAT' : TEST_CC_CAT,
+            'CERTCARRIER_ROLE' : TEST_CERTCARRIER_ROLE,
+            'RESCARRIER_ROLE' : TEST_RESCARRIER_ROLE,
             'TRADE_CAT' : TEST_TRADE_CAT,
             'ARCHIVE_CAT' : TEST_ARCHIVE_CAT,
             'SECONDS_SHORT' : TEST_SECONDS_SHORT,

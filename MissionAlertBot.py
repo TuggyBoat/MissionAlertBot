@@ -70,6 +70,8 @@ archive_cat_id = conf['ARCHIVE_CAT']
 # role IDs
 hauler_role_id = conf['HAULER_ROLE']
 cc_role_id = conf['CC_ROLE']
+certcarrier_role_id = conf['CERTCARRIER_ROLE']
+rescarrier_role_id = conf['RESCARRIER_ROLE']
 
 # emoji IDs
 upvote_emoji = conf['UPVOTE_EMOJI']
@@ -3725,8 +3727,10 @@ async def lasttrade_cron():
     try:
         # get roles
         guild = bot.get_guild(bot_guild_id)
-        cc_role = discord.utils.get(guild.roles, name='Certified Carrier')
-        fr_role = discord.utils.get(guild.roles, name='Fleet Reserve')
+        cc_role = discord.utils.get(guild.roles, id=certcarrier_role_id)
+        fr_role = discord.utils.get(guild.roles, id=rescarrier_role_id)
+        # get spam channel
+        spamchannel = bot.get_channel(bot_spam_id)
         # calculate epoch for 28 days ago
         now = datetime.now(tz=timezone.utc)
         lasttrade_max = now - timedelta(days=28)
@@ -3742,9 +3746,15 @@ async def lasttrade_cron():
                 if cc_role in owner.roles:
                     print(f"{owner.name} has the Certified Carrier role, removing.")
                     await owner.remove_roles(cc_role)
+                    await spamchannel.send(f"{owner.name} has been removed from the Certified Carrier role due to inactivity.")
                 if fr_role not in owner.roles:
                     print(f"{owner.name} does not have the Fleet Reserve role, adding.")
                     await owner.add_roles(fr_role)
+                    await spamchannel.send(f"{owner.name} has been added to the Fleet Reserve role.")
+            else:
+                print(f"Carrier owner id {carrier_data.ownerid} is invalid, skipping.")
+                await spamchannel.send(f"Owner of {carrier_data.carrier_short_name} with ID {carrier_data.ownerid} is invalid. "
+                                        "Cannot process lasttrade_cron for this carrier.")
         print("All carriers have been processed.")
     except Exception as e:
         print(f"last trade cron failed: {e}")
