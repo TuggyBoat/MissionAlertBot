@@ -18,6 +18,7 @@ class CarrierData:
         self.discord_channel = info_dict.get('discordchannel', None)
         self.channel_id = info_dict.get('channelid', None)
         self.ownerid = info_dict.get('ownerid', None)
+        self.lasttrade = info_dict.get('lasttrade', None)
         self.pid = info_dict.get('p_ID', None)
 
     def to_dictionary(self):

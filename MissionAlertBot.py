@@ -19,10 +19,11 @@ import asyncpraw
 import asyncio
 import shutil
 from discord.errors import HTTPException, InvalidArgument, Forbidden, NotFound
-from discord.ext import commands
+from discord.ext import commands, tasks
 from discord_slash import SlashCommand, SlashContext
 from datetime import datetime
 from datetime import timezone
+from datetime import timedelta
 from dotenv import load_dotenv
 from dateutil.relativedelta import relativedelta
 import constants
@@ -156,6 +157,20 @@ def check_database_table_exists(table_name, database):
     return bool(database.fetchone()[0])
 
 
+def check_table_column_exists(column_name, table_name, database):
+    """
+    Checks whether a column exists in a table for a database.
+
+    :param str column_name: The column name to check for.
+    :param str table_name: The table to check for the column in.
+    :param sqlite.Connection.cursor database: The database to connect against.
+    :type: bool
+    """
+    database.execute('''SELECT COUNT(name) FROM pragma_table_info('{}') WHERE name='{}' '''.format(
+        table_name, column_name))
+    return bool(database.fetchone()[0])
+
+
 print('Starting up - checking carriers database if it exists or not')
 if not check_database_table_exists('carriers', carrier_db):
     print('Carriers database missing - creating it now')
@@ -182,11 +197,51 @@ if not check_database_table_exists('carriers', carrier_db):
                 cid TEXT NOT NULL, 
                 discordchannel TEXT NOT NULL,
                 channelid INT,
-                ownerid INT
+                ownerid INT,
+                lasttrade INT NOT NULL DEFAULT (cast(strftime('%s','now') as int))
             ) 
         ''')
 else:
     print('Carrier database exists, do nothing')
+
+print('Starting up - checking if carriers database has new "lasttrade" column or not')
+if not check_table_column_exists('lasttrade', 'carriers', carrier_db):
+    """
+    In order to create the new 'lasttrade' column, a new table has to be created because
+    SQLite does not allow adding a new column with a non-constant value.
+    We then copy data from table to table, and rename them into place.
+    We will leave the backup table in case something goes wrong.
+    There is not enough try/catch here to be perfect. sorry.
+    """ 
+    temp_ts = int(datetime.now(tz=timezone.utc).timestamp())
+    temp_carriers_table = 'carriers_lasttrade_%s' % temp_ts
+    backup_carriers_table = 'carriers_backup_%s' % temp_ts
+    print(f'"lasttrade" column missing from carriers database, creating new temp table: {temp_carriers_table}')
+    # create new temp table with new column for lasttrade.
+    carrier_db.execute('''
+        CREATE TABLE {}(
+            p_ID INTEGER PRIMARY KEY AUTOINCREMENT,
+            shortname TEXT NOT NULL UNIQUE,
+            longname TEXT NOT NULL,
+            cid TEXT NOT NULL,
+            discordchannel TEXT NOT NULL,
+            channelid INT,
+            ownerid INT,
+            lasttrade INT default (cast(strftime('%s','now') as int))
+        )
+    '''.format(temp_carriers_table))
+    # copy data from carriers table to new temp table.
+    print('Copying carrier data to new table.')
+    carrier_db.execute('''INSERT INTO {}(p_ID, shortname, longname, cid, discordchannel, channelid, ownerid) select * from carriers'''.format(temp_carriers_table))
+    # rename old table and keep as backup just in case.
+    print(f'Renaming current carriers table to "{backup_carriers_table}"')
+    carrier_db.execute('''ALTER TABLE carriers RENAME TO {}'''.format(backup_carriers_table))
+    # rename temp table as original.
+    print(f'Renaming "{temp_carriers_table}" temp table to "carriers"')
+    carrier_db.execute('''ALTER TABLE {} RENAME TO carriers'''.format(temp_carriers_table))
+    print('Operation complete.')
+    carriers_conn.commit()
+
 
 print('Starting up - checking community_carriers database if it exists or not')
 # create Community Carriers table if necessary
@@ -344,7 +399,7 @@ async def add_carrier_to_database(short_name, long_name, carrier_id, channel, ch
     """
     await carrier_db_lock.acquire()
     try:
-        carrier_db.execute(''' INSERT INTO carriers VALUES(NULL, ?, ?, ?, ?, ?, ?) ''',
+        carrier_db.execute(''' INSERT INTO carriers VALUES(NULL, ?, ?, ?, ?, ?, ?, strftime('%s','now')) ''',
                            (short_name.lower(), long_name.upper(), carrier_id.upper(), channel, channel_id, owner_id))
         carriers_conn.commit()
     finally:
@@ -835,6 +890,8 @@ slash = SlashCommand(bot, sync_commands=True)
 @bot.event
 async def on_ready():
     print(f'{bot.user.name} has connected to Discord!')
+    # start the lasttrade_cron loop.
+    await lasttrade_cron.start()
     # reddit monitor must be at the END of this function
     await _monitor_reddit_comments()
 
@@ -1435,6 +1492,10 @@ async def mission_add(ctx, carrier_data, commodity_data, mission_type, system, s
     ))
     missions_conn.commit()
     print("Mission added to db")
+
+    print("Updating last trade timestamp for carrier")
+    carrier_db.execute(''' UPDATE carriers SET lasttrade=strftime('%s','now') WHERE p_ID=? ''', ( carrier_data.pid ))
+    carriers_conn.commit()
 
     # now we can release the channel lock
     carrier_channel_lock.release()
@@ -3634,12 +3695,60 @@ async def unlock_override(ctx):
     print("Channel lock manually released.")
 
 
+@bot.command(name='cron_status', help='Check the status of the lasttrade cron task')
+@commands.has_any_role('Council', 'Admin', 'Developer')
+async def cron_status(ctx):
+    if not lasttrade_cron.is_running() or lasttrade_cron.failed():
+        print("lasttrade cron task has failed, restarting.")
+        await ctx.send('lasttrade cron task has failed, restarting...')
+        lasttrade_cron.restart()
+    else:
+        nextrun = lasttrade_cron.next_iteration - datetime.now(tz=timezone.utc)
+        await ctx.send(f'lasttrade cron task is running. Next run in {str(nextrun)}')
+
+
 # quit the bot
 @bot.command(name='stopquit', help="Stops the bots process on the VM, ending all functions.")
 @commands.has_role('Admin')
 async def stopquit(ctx):
     await ctx.send(f"k thx bye")
     await user_exit()
+
+
+# lasttrade task loop:
+# Every 24 hours, check the timestamp of the last trade for all carriers and remove
+# 'Certified Carrier' role from owner if there has been no trade for 28 days.
+# If not already present, add 'Fleet Reserve' role to the owner.
+@tasks.loop(hours=24)
+async def lasttrade_cron():
+    print(f"last trade cron running.")
+    try:
+        # get roles
+        guild = bot.get_guild(bot_guild_id)
+        cc_role = discord.utils.get(guild.roles, name='Certified Carrier')
+        fr_role = discord.utils.get(guild.roles, name='Fleet Reserve')
+        # calculate epoch for 28 days ago
+        now = datetime.now(tz=timezone.utc)
+        lasttrade_max = now - timedelta(days=28)
+        # get carriers who last traded >28 days ago
+        carrier_db.execute(f"SELECT * FROM carriers WHERE lasttrade < {int(lasttrade_max.timestamp())}")
+        carriers = [CarrierData(carrier) for carrier in carrier_db.fetchall()]
+        for carrier_data in carriers:
+            # check roles on owners, remove/add as needed.
+            last_traded = datetime.fromtimestamp(carrier_data.lasttrade).strftime('%Y-%m-%d %H:%M:%S')
+            print(f"Processing carrier '{carrier_data.carrier_short_name}'. Last traded: {last_traded}")
+            owner = guild.get_member(carrier_data.ownerid)
+            if owner:
+                if cc_role in owner.roles:
+                    print(f"{owner.name} has the Certified Carrier role, removing.")
+                    await owner.remove_roles(cc_role)
+                if fr_role not in owner.roles:
+                    print(f"{owner.name} does not have the Fleet Reserve role, adding.")
+                    await owner.add_roles(fr_role)
+        print("All carriers have been processed.")
+    except Exception as e:
+        print(f"last trade cron failed: {e}")
+        pass
 
 
 #
