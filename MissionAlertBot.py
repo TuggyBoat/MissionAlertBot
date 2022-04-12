@@ -1212,7 +1212,7 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
                                     color=constants.EMBED_COLOUR_DISCORD)
                 await ctx.send(embed=embed)
                 if rp:
-                    embed = discord.Embed(title="Roleplay Text (Discord)", description=f"`> {rp_text}`",
+                    embed = discord.Embed(title="Roleplay Text (Discord)", description=f"`>>> {rp_text}`",
                                         color=constants.EMBED_COLOUR_DISCORD)
                     await ctx.send(embed=embed)
 
@@ -1272,7 +1272,7 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
                     embed_colour = constants.EMBED_COLOUR_LOADING if mission_type == 'load' \
                         else constants.EMBED_COLOUR_UNLOADING
                     embed = discord.Embed(title="P.T.N TRADE MISSION STARTING",
-                                        description=f"> {rp_text}" if rp else "", color=embed_colour)
+                                        description=f">>> {rp_text}" if rp else "", color=embed_colour)
 
                     embed.add_field(name="Destination", value=f"Station: {station.upper()}\nSystem: {system.upper()}", inline=True)
                     if eta:
@@ -2606,6 +2606,7 @@ def _add_common_embed_fields(embed, carrier_data):
     embed.add_field(name="Discord Channel", value=f"#{carrier_data.discord_channel}", inline=True)
     embed.add_field(name="Owner", value=f"<@{carrier_data.ownerid}>", inline=True)
     embed.add_field(name="Shortname", value=f"{carrier_data.carrier_short_name}", inline=True)
+    embed.add_field(name="Last Trade", value=f"{carrier_data.lasttrade}", inline=True)
     # shortname is not relevant to users and will be auto-generated in future
     return embed
 
@@ -3747,6 +3748,10 @@ async def lasttrade_cron():
                     print(f"{owner.name} has the Certified Carrier role, removing.")
                     await owner.remove_roles(cc_role)
                     await spamchannel.send(f"{owner.name} has been removed from the Certified Carrier role due to inactivity.")
+                    # notify by DM
+                    owner_dm = await bot.fetch_user(carrier_data.ownerid)
+                    await owner_dm.send(f"Ahoy CMDR! Your last PTN Fleet Carrier trade was more than 28 days ago at {last_traded} so you have been automatically marked as inactive and placed in the PTN Fleet Reserve. **You can visit <#939919613209223270> at any time to mark yourself as active and return to trading**. o7 CMDR!")
+                    print(f"Notified {owner.name} by DM.")
                 if fr_role not in owner.roles:
                     print(f"{owner.name} does not have the Fleet Reserve role, adding.")
                     await owner.add_roles(fr_role)
