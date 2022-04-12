@@ -2107,7 +2107,7 @@ async def carrier_list(ctx):
     for carrier in pages[0]:
         count += 1
         embed.add_field(name=f"{count}: {carrier.carrier_long_name} ({carrier.carrier_identifier})",
-                        value=f"<@{carrier.ownerid}>", inline=False)
+                        value=f"<@{carrier.ownerid}>, {carrier.lasttrade}", inline=False)
     # Now go send it and wait on a reaction
     message = await ctx.send(embed=embed)
 
@@ -2127,7 +2127,7 @@ async def carrier_list(ctx):
                     # Page -1 as humans think page 1, 2, but python thinks 0, 1, 2
                     count += 1
                     new_embed.add_field(name=f"{count}: {carrier.carrier_long_name} ({carrier.carrier_identifier})",
-                                        value=f"<@{carrier.ownerid}>", inline=False)
+                                        value=f"<@{carrier.ownerid}>, {carrier.lasttrade}", inline=False)
 
                 await message.edit(embed=new_embed)
 
@@ -2152,7 +2152,7 @@ async def carrier_list(ctx):
                     # Page -1 as humans think page 1, 2, but python thinks 0, 1, 2
                     count += 1
                     new_embed.add_field(name=f"{count}: {carrier.carrier_long_name} ({carrier.carrier_identifier})",
-                                        value=f"<@{carrier.ownerid}>", inline=False)
+                                        value=f"<@{carrier.ownerid}>, {carrier.lasttrade}", inline=False)
 
                 await message.edit(embed=new_embed)
                 # Ok now we can go forwards, check if we can also go backwards still
