@@ -3573,15 +3573,20 @@ async def _send_notice(ctx: SlashContext, message: str):
         owner_id = community_carrier.owner_id
         role_id = community_carrier.role_id
 
+    """
     # check if in the CC channel, this simplifies things a little
     if not ctx.channel.id == channel_id:
         await ctx.send(f"Please use this command in your community carrier channel: <#{channel_id}>", hidden=True)
         return
+    """
 
     # send the message to the CC channel
-    # channel = bot.get_channel(channel_id) - only if we allow sending from other channels to this one
-    await ctx.send(f"<@&{role_id}>:\n\n{message}\n\n*Use* `/notify_me` *in this channel to sign up for future notifications."
-                   f"\nYou can opt out at any time by using* `/notify_me` *again.*")
+    channel = bot.get_channel(channel_id)
+    await ctx.send(f"Sending your message to <#{channel_id}>.", hidden=True)
+
+    await channel.send(f"<@&{role_id}> New message from <@{owner_id}> for <#{channel_id}>:\n\n{message}\n\n*Use* `/notify_me` *in "
+                       f"this channel to sign up for future notifications."
+                       f"\nYou can opt out at any time by using* `/notify_me` *again.*")
 
 #
 #                       COMMUNITY NOMINATION COMMANDS
