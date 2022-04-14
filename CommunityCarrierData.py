@@ -14,6 +14,7 @@ class CommunityCarrierData:
 
         self.owner_id = info_dict.get('ownerid', None)
         self.channel_id = info_dict.get('channelid', None)
+        self.role_id = info_dict.get('roleid', None)
 
     def to_dictionary(self):
         """
@@ -34,7 +35,7 @@ class CommunityCarrierData:
 
         :rtype: str
         """
-        return 'CommunityCarrierData: OwnerID:{0.owner_id} ChannelID:{0.channel_id}'.format(self)
+        return 'CommunityCarrierData: OwnerID:{0.owner_id} ChannelID:{0.channel_id} RoleID:{0.role_id}'.format(self)
 
     def __bool__(self):
         """

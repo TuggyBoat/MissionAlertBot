@@ -6,8 +6,11 @@
 # Git repo: https://github.com/PilotsTradeNetwork/MissionAlertBot
 import ast
 import copy
+from doctest import debug_script
+from pydoc import describe
 import re
 import tempfile
+from turtle import color
 from typing import Union
 
 from PIL import Image, ImageFont, ImageDraw
@@ -19,10 +22,11 @@ import asyncpraw
 import asyncio
 import shutil
 from discord.errors import HTTPException, InvalidArgument, Forbidden, NotFound
-from discord.ext import commands
+from discord.ext import commands, tasks
 from discord_slash import SlashCommand, SlashContext
 from datetime import datetime
 from datetime import timezone
+from datetime import timedelta
 from dotenv import load_dotenv
 from dateutil.relativedelta import relativedelta
 import constants
@@ -69,6 +73,9 @@ archive_cat_id = conf['ARCHIVE_CAT']
 # role IDs
 hauler_role_id = conf['HAULER_ROLE']
 cc_role_id = conf['CC_ROLE']
+cteam_role_id = conf['CTEAM_ROLE']
+certcarrier_role_id = conf['CERTCARRIER_ROLE']
+rescarrier_role_id = conf['RESCARRIER_ROLE']
 
 # emoji IDs
 upvote_emoji = conf['UPVOTE_EMOJI']
@@ -156,6 +163,20 @@ def check_database_table_exists(table_name, database):
     return bool(database.fetchone()[0])
 
 
+def check_table_column_exists(column_name, table_name, database):
+    """
+    Checks whether a column exists in a table for a database.
+
+    :param str column_name: The column name to check for.
+    :param str table_name: The table to check for the column in.
+    :param sqlite.Connection.cursor database: The database to connect against.
+    :type: bool
+    """
+    database.execute('''SELECT COUNT(name) FROM pragma_table_info('{}') WHERE name='{}' '''.format(
+        table_name, column_name))
+    return bool(database.fetchone()[0])
+
+
 print('Starting up - checking carriers database if it exists or not')
 if not check_database_table_exists('carriers', carrier_db):
     print('Carriers database missing - creating it now')
@@ -182,11 +203,51 @@ if not check_database_table_exists('carriers', carrier_db):
                 cid TEXT NOT NULL, 
                 discordchannel TEXT NOT NULL,
                 channelid INT,
-                ownerid INT
+                ownerid INT,
+                lasttrade INT NOT NULL DEFAULT (cast(strftime('%s','now') as int))
             ) 
         ''')
 else:
     print('Carrier database exists, do nothing')
+
+print('Starting up - checking if carriers database has new "lasttrade" column or not')
+if not check_table_column_exists('lasttrade', 'carriers', carrier_db):
+    """
+    In order to create the new 'lasttrade' column, a new table has to be created because
+    SQLite does not allow adding a new column with a non-constant value.
+    We then copy data from table to table, and rename them into place.
+    We will leave the backup table in case something goes wrong.
+    There is not enough try/catch here to be perfect. sorry.
+    """ 
+    temp_ts = int(datetime.now(tz=timezone.utc).timestamp())
+    temp_carriers_table = 'carriers_lasttrade_%s' % temp_ts
+    backup_carriers_table = 'carriers_backup_%s' % temp_ts
+    print(f'"lasttrade" column missing from carriers database, creating new temp table: {temp_carriers_table}')
+    # create new temp table with new column for lasttrade.
+    carrier_db.execute('''
+        CREATE TABLE {}(
+            p_ID INTEGER PRIMARY KEY AUTOINCREMENT,
+            shortname TEXT NOT NULL UNIQUE,
+            longname TEXT NOT NULL,
+            cid TEXT NOT NULL,
+            discordchannel TEXT NOT NULL,
+            channelid INT,
+            ownerid INT,
+            lasttrade INT default (cast(strftime('%s','now') as int))
+        )
+    '''.format(temp_carriers_table))
+    # copy data from carriers table to new temp table.
+    print('Copying carrier data to new table.')
+    carrier_db.execute('''INSERT INTO {}(p_ID, shortname, longname, cid, discordchannel, channelid, ownerid) select * from carriers'''.format(temp_carriers_table))
+    # rename old table and keep as backup just in case.
+    print(f'Renaming current carriers table to "{backup_carriers_table}"')
+    carrier_db.execute('''ALTER TABLE carriers RENAME TO {}'''.format(backup_carriers_table))
+    # rename temp table as original.
+    print(f'Renaming "{temp_carriers_table}" temp table to "carriers"')
+    carrier_db.execute('''ALTER TABLE {} RENAME TO carriers'''.format(temp_carriers_table))
+    print('Operation complete.')
+    carriers_conn.commit()
+
 
 print('Starting up - checking community_carriers database if it exists or not')
 # create Community Carriers table if necessary
@@ -210,11 +271,45 @@ if not check_database_table_exists('community_carriers', carrier_db):
         carrier_db.execute('''
             CREATE TABLE community_carriers( 
                 ownerid INT NOT NULL UNIQUE,
-                channelid INT NOT NULL UNIQUE
+                channelid INT NOT NULL UNIQUE,
+                roleid INT NOT NULL UNIQUE
             ) 
         ''')
 else:
     print('Community Carrier database exists, do nothing')
+
+print('Starting up - checking if community carriers database has new "roleid" column or not')
+if not check_table_column_exists('roleid', 'community_carriers', carrier_db):
+    """
+    In order to create the new column, a new table has to be created because
+    SQLite does not allow adding a new column with a non-constant value.
+    We then copy data from table to table, and rename them into place.
+    We will leave the backup table in case something goes wrong.
+    There is not enough try/catch here to be perfect. sorry. (that's OK Durzo, thanks for the code!)
+    """ 
+    temp_ts = int(datetime.now(tz=timezone.utc).timestamp())
+    temp_carriers_table = 'community_carriers_newcolumn_%s' % temp_ts
+    backup_carriers_table = 'community_carriers_backup_%s' % temp_ts
+    print(f'roleid column missing from carriers database, creating new temp table: {temp_carriers_table}')
+    # create new temp table with new column for lasttrade.
+    carrier_db.execute('''
+        CREATE TABLE {}(
+                ownerid INT NOT NULL UNIQUE,
+                channelid INT NOT NULL UNIQUE,
+                roleid INT UNIQUE
+        )
+    '''.format(temp_carriers_table))
+    # copy data from community_carriers table to new temp table.
+    print('Copying community_carriers data to new table.')
+    carrier_db.execute('''INSERT INTO {}(ownerid, channelid) select * from community_carriers'''.format(temp_carriers_table))
+    # rename old table and keep as backup just in case.
+    print(f'Renaming current community_carriers table to "{backup_carriers_table}"')
+    carrier_db.execute('''ALTER TABLE community_carriers RENAME TO {}'''.format(backup_carriers_table))
+    # rename temp table as original.
+    print(f'Renaming "{temp_carriers_table}" temp table to "community_carriers"')
+    carrier_db.execute('''ALTER TABLE {} RENAME TO community_carriers'''.format(temp_carriers_table))
+    print('Operation complete.')
+    carriers_conn.commit()
 
 
 print('Starting up - checking nominees database if it exists or not')
@@ -344,7 +439,7 @@ async def add_carrier_to_database(short_name, long_name, carrier_id, channel, ch
     """
     await carrier_db_lock.acquire()
     try:
-        carrier_db.execute(''' INSERT INTO carriers VALUES(NULL, ?, ?, ?, ?, ?, ?) ''',
+        carrier_db.execute(''' INSERT INTO carriers VALUES(NULL, ?, ?, ?, ?, ?, ?, strftime('%s','now')) ''',
                            (short_name.lower(), long_name.upper(), carrier_id.upper(), channel, channel_id, owner_id))
         carriers_conn.commit()
     finally:
@@ -483,7 +578,7 @@ def find_carrier_with_owner_id(ownerid):
 
 def find_community_carrier_with_owner_id(ownerid):
     """
-    Returns channel and owner matching the ownerid
+    Returns channel owner and role matching the ownerid
 
     :param int ownerid: The owner id to match
     :returns: A list of community carrier data objects
@@ -495,6 +590,23 @@ def find_community_carrier_with_owner_id(ownerid):
     for community_carrier in community_carrier_data:
         print(f"{community_carrier.owner_id} owns channel {community_carrier.channel_id}" 
               f" called from find_carrier_with_owner_id.")
+
+    return community_carrier_data
+
+def find_community_carrier_with_channel_id(channelid):
+    """
+    Returns channel owner and role matching the channelid
+
+    :param int channelid: The channel id to match
+    :returns: A list of community carrier data objects
+    :rtype: list[CommunityCarrierData]
+    """
+    carrier_db.execute(f"SELECT * FROM community_carriers WHERE "
+                       f"channelid = {channelid} ")
+    community_carrier_data = [CommunityCarrierData(community_carrier) for community_carrier in carrier_db.fetchall()]
+    for community_carrier in community_carrier_data:
+        print(f"{community_carrier.owner_id} owns channel {community_carrier.channel_id}" 
+              f" called from find_carrier_with_channel_id.")
 
     return community_carrier_data
 
@@ -835,6 +947,8 @@ slash = SlashCommand(bot, sync_commands=True)
 @bot.event
 async def on_ready():
     print(f'{bot.user.name} has connected to Discord!')
+    # start the lasttrade_cron loop.
+    await lasttrade_cron.start()
     # reddit monitor must be at the END of this function
     await _monitor_reddit_comments()
 
@@ -1153,7 +1267,7 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
                                     color=constants.EMBED_COLOUR_DISCORD)
                 await ctx.send(embed=embed)
                 if rp:
-                    embed = discord.Embed(title="Roleplay Text (Discord)", description=f"`> {rp_text}`",
+                    embed = discord.Embed(title="Roleplay Text (Discord)", description=f"`>>> {rp_text}`",
                                         color=constants.EMBED_COLOUR_DISCORD)
                     await ctx.send(embed=embed)
 
@@ -1213,7 +1327,7 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
                     embed_colour = constants.EMBED_COLOUR_LOADING if mission_type == 'load' \
                         else constants.EMBED_COLOUR_UNLOADING
                     embed = discord.Embed(title="P.T.N TRADE MISSION STARTING",
-                                        description=f"> {rp_text}" if rp else "", color=embed_colour)
+                                        description=f">>> {rp_text}" if rp else "", color=embed_colour)
 
                     embed.add_field(name="Destination", value=f"Station: {station.upper()}\nSystem: {system.upper()}", inline=True)
                     if eta:
@@ -1435,6 +1549,10 @@ async def mission_add(ctx, carrier_data, commodity_data, mission_type, system, s
     ))
     missions_conn.commit()
     print("Mission added to db")
+
+    print("Updating last trade timestamp for carrier")
+    carrier_db.execute(''' UPDATE carriers SET lasttrade=strftime('%s','now') WHERE p_ID=? ''', ( [ carrier_data.pid ] ))
+    carriers_conn.commit()
 
     # now we can release the channel lock
     carrier_channel_lock.release()
@@ -2044,7 +2162,7 @@ async def carrier_list(ctx):
     for carrier in pages[0]:
         count += 1
         embed.add_field(name=f"{count}: {carrier.carrier_long_name} ({carrier.carrier_identifier})",
-                        value=f"<@{carrier.ownerid}>", inline=False)
+                        value=f"<@{carrier.ownerid}>, <t:{carrier.lasttrade}:R>", inline=False)
     # Now go send it and wait on a reaction
     message = await ctx.send(embed=embed)
 
@@ -2064,7 +2182,7 @@ async def carrier_list(ctx):
                     # Page -1 as humans think page 1, 2, but python thinks 0, 1, 2
                     count += 1
                     new_embed.add_field(name=f"{count}: {carrier.carrier_long_name} ({carrier.carrier_identifier})",
-                                        value=f"<@{carrier.ownerid}>", inline=False)
+                                        value=f"<@{carrier.ownerid}>, <t:{carrier.lasttrade}:R>", inline=False)
 
                 await message.edit(embed=new_embed)
 
@@ -2089,7 +2207,7 @@ async def carrier_list(ctx):
                     # Page -1 as humans think page 1, 2, but python thinks 0, 1, 2
                     count += 1
                     new_embed.add_field(name=f"{count}: {carrier.carrier_long_name} ({carrier.carrier_identifier})",
-                                        value=f"<@{carrier.ownerid}>", inline=False)
+                                        value=f"<@{carrier.ownerid}>, <t:{carrier.lasttrade}:R>", inline=False)
 
                 await message.edit(embed=new_embed)
                 # Ok now we can go forwards, check if we can also go backwards still
@@ -2109,8 +2227,10 @@ async def carrier_list(ctx):
 
         except asyncio.TimeoutError:
             print(f'Timeout hit during carrier request by: {ctx.author}')
-            await ctx.send(f'Closed the active carrier list request from: {ctx.author} due to no input in 60 seconds.')
+            embed = discord.Embed(description=f'Closed the active carrier list request from {ctx.author} due to no input in 60 seconds.', color=constants.EMBED_COLOUR_QU)
+            await ctx.send(embed=embed)
             await message.delete()
+            await ctx.message.delete()
             break
 
 
@@ -2150,17 +2270,8 @@ async def carrier_add(ctx, short_name: str, long_name: str, carrier_id: str, own
 
     backup_database('carriers')  # backup the carriers database before going any further
 
-    # first generate a string to use for the carrier's channel name based on its long name
-    # we want to replace the spaces with hyphens
-    long_name_hyphenated = long_name.replace(' ', '-')
-    # now we want to take only the alphanumeric characters and hyphens, leave behind everything else
-    re_compile = re.compile('([\w-]+)')
-    compiled_name = re_compile.findall(long_name_hyphenated)
-    # finally we join together all the extracted bits into one string
-    # this will be used for the discord channel name
-    stripped_name = ''.join(compiled_name)
-
-    print(f"Processed {long_name} into {stripped_name}")
+    # now generate a string to use for the carrier's channel name based on its long name
+    stripped_name = _regex_alphanumeric_with_hyphens(long_name)
 
     # find carrier owner as a user object
 
@@ -2543,9 +2654,29 @@ def _add_common_embed_fields(embed, carrier_data):
     embed.add_field(name="Discord Channel", value=f"#{carrier_data.discord_channel}", inline=True)
     embed.add_field(name="Owner", value=f"<@{carrier_data.ownerid}>", inline=True)
     embed.add_field(name="Shortname", value=f"{carrier_data.carrier_short_name}", inline=True)
+    embed.add_field(name="Last Trade", value=f"<t:{carrier_data.lasttrade}> (<t:{carrier_data.lasttrade}:R>)", inline=True)
     # shortname is not relevant to users and will be auto-generated in future
     return embed
+    
 
+def _regex_alphanumeric_with_hyphens(regex_string):
+    # replace any spaces with hyphens
+    regex_string_hyphenated = regex_string.replace(' ', '-')
+    # take only the alphanumeric characters and hyphens, leave behind everything else
+    re_compile = re.compile('([\w-]+)')
+    compiled_name = re_compile.findall(regex_string_hyphenated)
+    # join together all the extracted bits into one string
+    processed_string = ''.join(compiled_name)
+    print(f"Processed {regex_string} into {processed_string}")
+    return processed_string
+
+
+def _get_id_from_mention(mention):
+    # use re to return the devmode Discord ID from a string that we're not sure whether it's a mention/channel link or an ID
+    # mentions are in a format like <@0982340982304>
+    re_compile = re.compile('([\d-]+)')
+    mention_id = re_compile.findall(mention)
+    return mention_id
 
 # find FC based on longname
 @bot.command(name='find', help='Find a carrier based on a partial match with any part of its full name\n'
@@ -2943,16 +3074,16 @@ def _configure_all_carrier_detail_embed(embed, carrier_data: CarrierData):
 @commands.has_any_role('Community Team', 'Mod', 'Admin', 'Council')
 async def cc(ctx, owner: discord.Member, *, channel_name: str):
 
-    # check the channel name isn't something utterly stupid
-    if len(channel_name) > 30:
-        return await ctx.send("Error: Channel name should be fewer than 30 characters. (Preferably a *lot* fewer.)")
-
     # TODO:
     # - embeds instead of normal messages for all cc interactions?
     # - tidy up messages after actions complete?
 
-    stripped_channel_name = channel_name.replace(' ', '-').replace('.', '').replace('#', '')
+    stripped_channel_name = _regex_alphanumeric_with_hyphens(channel_name)
     print(f"{ctx.author} used m.cc")
+    # check the channel name isn't something utterly stupid
+    if len(stripped_channel_name) > 30:
+        embed = discord.Embed(description="**Error**: Channel name should be fewer than 30 characters. (Preferably a *lot* fewer.)", color=constants.EMBED_COLOUR_ERROR)
+        return await ctx.send(embed=embed)
 
     # first check the user isn't already in the DB, if they are, then stop
     community_carrier_data = find_community_carrier_with_owner_id(owner.id)
@@ -2970,53 +3101,71 @@ async def cc(ctx, owner: discord.Member, *, channel_name: str):
         return message.author == ctx.author and message.channel == ctx.channel and \
                                  message.content.lower() in ["y", "n"]
 
-# first check whether a channel already exists with that name
+# check whether a role exists with the same name
+    new_role = discord.utils.get(ctx.guild.roles, name=stripped_channel_name)
+    if new_role:
+        # if a new role exists we won't use it because it could lead to security concerns :(
+        print(f"Role {new_role} already exists.")
+        # role exists, cancel the process and inform the user 
+        embed = discord.Embed(description=f"**Error**: The role <@&{new_role.id}> already exists. Please choose a different name for your Community Carrier or delete the existing role and try again.", color=constants.EMBED_COLOUR_ERROR)
+        await ctx.send(embed=embed)
+        return
+
+    else:
+        # role does not exist, create it
+        new_role = await ctx.guild.create_role(name=stripped_channel_name)
+        print(f"Created {new_role}")
+        print(f'Roles: {ctx.guild.roles}')
+        if not new_role:
+            raise EnvironmentError(f'Could not create role {stripped_channel_name}')
+        embed = discord.Embed(description=f"Created role <@&{new_role.id}>.", color=constants.EMBED_COLOUR_OK)
+        await ctx.send(embed=embed)
+
+# check whether a channel already exists with that name
 
     new_channel = discord.utils.get(ctx.guild.channels, name=stripped_channel_name)
 
     if new_channel:
         print(f"Channel {new_channel} already exists.")
         # channel exists, ask if they want to use it
-        await ctx.send(f"Channel already exists: <#{new_channel.id}>. Do you wish to use this existing channel? **y**/**n**")
+        embed = discord.Embed(description=f"Channel already exists: <#{new_channel.id}>. Do you wish to use this existing channel? **y**/**n**", color=constants.EMBED_COLOUR_QU)
+        qu_msg = await ctx.send(embed=embed)
         try:
             msg = await bot.wait_for("message", check=check, timeout=60)
             if msg.content.lower() == "n":
-                await ctx.send("OK, cancelling.")
+                embed = discord.Embed(description=f"**Cancelled**: Please choose a different name for your Community Carrier or use the existing named role.", color=constants.EMBED_COLOUR_ERROR)
+                await ctx.send(embed=embed)
+                await msg.delete()
+                await qu_msg.delete()
                 return
             elif msg.content.lower() == "y":
                 # they want to use the existing channel, so we have to move it to the right category
                 print(f"Using existing channel {new_channel} and making {owner.display_name} its owner.")
                 try:
                     await new_channel.edit(category=category)
-                    await ctx.send(f"Channel moved to {category.name}.")
+                    embed = discord.Embed(description=f"Existing channel <#{new_channel.id}> moved to {category.name}.", color=constants.EMBED_COLOUR_OK)
+                    await ctx.send(embed=embed)
                 except Exception as e:
                     await ctx.send(f"Error: {e}")
                     print(e)
                     return
         except asyncio.TimeoutError:
-            await ctx.send("Cancelled: no response.")
+            embed = discord.Embed(description="**Cancelled**: no response.", color=constants.EMBED_COLOUR_ERROR)
+            await ctx.send(embed=embed)
             return
+        await msg.delete()
+        await qu_msg.delete()
     else:
-        # channel does not exist, ask user if they want to create it
-        await ctx.send(f"Create the channel #{stripped_channel_name} owned by {owner.display_name}? **y**/**n**")
-        try:
-            msg = await bot.wait_for("message", check=check, timeout=30)
-            if msg.content.lower() == "n":
-                await ctx.send("OK, cancelling.")
-                print("User cancelled cc command.")
-                return
-            elif msg.content.lower() == "y":
-                # create the channel
-                    new_channel = await ctx.guild.create_text_channel(stripped_channel_name, category=category)
-                    print(f"Created {new_channel}")
+        # channel does not exist, create it
+        new_channel = await ctx.guild.create_text_channel(stripped_channel_name, category=category)
+        print(f"Created {new_channel}")
 
-                    print(f'Channels: {ctx.guild.channels}')
+        print(f'Channels: {ctx.guild.channels}')
 
-                    if not new_channel:
-                        raise EnvironmentError(f'Could not create carrier channel {stripped_channel_name}')
-        except asyncio.TimeoutError:
-            await ctx.send("Cancelled: no response.")
-            return
+        embed = discord.Embed(description=f"Created channel <#{new_channel.id}>.", color=constants.EMBED_COLOUR_OK)
+        await ctx.send(embed=embed)
+        if not new_channel:
+            raise EnvironmentError(f'Could not create carrier channel {stripped_channel_name}')
 
     # now we have the channel and it's in the correct category, we need to give the user CC role and add channel permissions
 
@@ -3068,8 +3217,8 @@ async def cc(ctx, owner: discord.Member, *, channel_name: str):
     await carrier_db_lock.acquire()
     print("Carrier DB locked.")
     try:
-        carrier_db.execute(''' INSERT INTO community_carriers VALUES(?, ?) ''',
-                           (owner.id, new_channel.id))
+        carrier_db.execute(''' INSERT INTO community_carriers VALUES(?, ?, ?) ''',
+                           (owner.id, new_channel.id, new_role.id))
         carriers_conn.commit()
         print("Added new community carrier to database")
     finally:
@@ -3078,7 +3227,7 @@ async def cc(ctx, owner: discord.Member, *, channel_name: str):
         print("Carrier DB unlocked.")
 
     # tell the user what's going on
-    embed = discord.Embed(description=f"<@{owner.id}> is now a <@&{cc_role_id}> and owns <#{new_channel.id}>.\n\nNote channels may be freely renamed without affecting registration.", color=constants.EMBED_COLOUR_OK)
+    embed = discord.Embed(description=f"<@{owner.id}> is now a <@&{cc_role_id}> and owns <#{new_channel.id}> with notification role <@&{new_role.id}>.\n\nNote channels and roles **CAN be freely renamed** without affecting registration.", color=constants.EMBED_COLOUR_OK)
     await ctx.send(embed=embed)
 
     # add a note in bot_spam
@@ -3122,7 +3271,7 @@ async def cc_list(ctx):
     for community_carriers in pages[0]:
         count += 1
         embed.add_field(name="\u200b",
-                        value=f"{count}: <@{community_carriers.owner_id}> owns <#{community_carriers.channel_id}>", inline=False)
+                        value=f"{count}: <@{community_carriers.owner_id}> owns <#{community_carriers.channel_id}>, <@&{community_carriers.role_id}>", inline=False)
     # Now go send it and wait on a reaction
     message = await ctx.send(embed=embed)
 
@@ -3142,7 +3291,7 @@ async def cc_list(ctx):
                     # Page -1 as humans think page 1, 2, but python thinks 0, 1, 2
                     count += 1
                     new_embed.add_field(name="\u200b",
-                                        value=f"{count}: <@{community_carriers.owner_id}> owns <#{community_carriers.channel_id}>", inline=False)
+                                        value=f"{count}: <@{community_carriers.owner_id}> owns <#{community_carriers.channel_id}>, <@&{community_carriers.role_id}>", inline=False)
 
                 await message.edit(embed=new_embed)
 
@@ -3167,7 +3316,7 @@ async def cc_list(ctx):
                     # Page -1 as humans think page 1, 2, but python thinks 0, 1, 2
                     count += 1
                     new_embed.add_field(name="\u200b",
-                                        value=f"{count}: <@{community_carriers.owner_id}> owns <#{community_carriers.channel_id}>", inline=False)
+                                        value=f"{count}: <@{community_carriers.owner_id}> owns <#{community_carriers.channel_id}>, <@&{community_carriers.role_id}>", inline=False)
 
                 await message.edit(embed=new_embed)
                 # Ok now we can go forwards, check if we can also go backwards still
@@ -3187,8 +3336,10 @@ async def cc_list(ctx):
 
         except asyncio.TimeoutError:
             print(f'Timeout hit during community carrier request by: {ctx.author}')
-            await ctx.send(f'Closed the active community carrier list request from: {ctx.author} due to no input in 60 seconds.')
+            embed = discord.Embed(description=f'Closed the active carrier list request from {ctx.author} due to no input in 60 seconds.', color=constants.EMBED_COLOUR_QU)
+            await ctx.send(embed=embed)
             await message.delete()
+            await ctx.message.delete()
             break    
 
 
@@ -3218,65 +3369,54 @@ async def cc_del(ctx, owner: discord.Member):
 
     def check(message):
         return message.author == ctx.author and message.channel == ctx.channel and \
-                                 message.content.lower() in ["y", "n"]
-    def check2(message):
-        return message.author == ctx.author and message.channel == ctx.channel and \
-                                 message.content.lower() in ["d", "a"]
+                                 message.content.lower() in ["d", "a", "c"]
 
     # search for the user's database entry
     community_carrier_data = find_community_carrier_with_owner_id(owner.id)
     if not community_carrier_data:
-        await ctx.send(f"No Community Carrier registered to {owner.display_name}")
+        embed = discord.Embed(description=f"Error: No Community Carrier registered to {owner.display_name}.", color=constants.EMBED_COLOUR_ERROR)
+        await ctx.send(embed=embed)
         return
     elif community_carrier_data:
         # TODO: this should be fetchone() not fetchall but I can't make it work otherwise
         for community_carrier in community_carrier_data:
             print(f"Found data: {community_carrier.owner_id} owner of {community_carrier.channel_id}")
             channel_id = community_carrier.channel_id
-            await ctx.send(f"User {owner.display_name} is registered as a Community Carrier with channel <#{channel_id}>")
+            role_id = community_carrier.role_id
 
-    await ctx.send("Remove Community Carrier role and de-register user? **y**/**n**")
+    embed = discord.Embed(title="Remove Community Carrier",
+                          description=f"This will:\n\n• Remove the <@&{cc_role_id}> role from <@{owner.id}>\n"
+                                      f"• Delete the associated role <@&{role_id}>\n"
+                                      f"• Delete or Archive the channel <#{channel_id}>\n\n"
+                                      f"**WARNING**:\n• **Deleted** channels are gone forever and can NOT be recovered.\n"
+                                      f"• **Archived** channels can be re-activated by `m.cc` at any time.\n\n"
+                                      f"You can choose to (**d**)elete the channel, (**a**)rchive the channel, or (**c**)ancel this operation.",
+                          color=constants.EMBED_COLOUR_QU)
+    qu_embed = await ctx.send(embed=embed)
     try:
         msg = await bot.wait_for("message", check=check, timeout=30)
-        if msg.content.lower() == "n":
-            await ctx.send("OK, cancelling.")
+        if msg.content.lower() == "c":
+            embed = discord.Embed(description="Cancelled.", color=constants.EMBED_COLOUR_OK)
+            await ctx.send(embed=embed)
             print("User cancelled cc_del command.")
+            await msg.delete()
             return
-        elif msg.content.lower() == "y":
-            print("User wants to proceed with removal.")
 
-    except asyncio.TimeoutError:
-        await ctx.send("Cancelled: no response.")
-        return
-    
-    await ctx.send(f"Would you like to (**d**)elete or (**a**)archive <#{channel_id}>?")
-    try:
-        msg = await bot.wait_for("message", check=check2, timeout=30)
-        if msg.content.lower() == "a":
-            delete = 0
+        elif msg.content.lower() == "a":
+            delete_channel = 0
             print("User chose to archive channel.")
-            
-        elif msg.content.lower() == "d":
-            delete = 1
-            print("User wants to delete channel.")
-            await ctx.send("Deleted channels are gone forever, like tears in rain. Are you sure you want to delete? **y**/**n**")
-            try:
-                msg = await bot.wait_for("message", check=check, timeout=30)
-                if msg.content.lower() == "n":
-                    await ctx.send("OK, cancelling.")
-                    print("User cancelled cc_del command.")
-                    return
-                elif msg.content.lower() == "y":
-                    print("User wants to proceed with removal.")
-                    await ctx.send("OK, have it your way hoss.")
+            await msg.delete()
 
-            except asyncio.TimeoutError:
-                await ctx.send("Cancelled: no response.")
-                return
+        elif msg.content.lower() == "d":
+            delete_channel = 1
+            print("User wants to delete channel.")
+            await msg.delete()
 
     except asyncio.TimeoutError:
-        await ctx.send("Cancelled: no response.")
+        embed = discord.Embed(description="**Cancelled**: no response.", color=constants.EMBED_COLOUR_ERROR)
+        await ctx.send(embed=embed)
         return
+
 
     # now we do the thing
     # remove the database entry
@@ -3293,17 +3433,20 @@ async def cc_del(ctx, owner: discord.Member):
 
     role = discord.utils.get(ctx.guild.roles, id=cc_role_id)
 
+    embed = discord.Embed(title="Community Carrier Removed", description=f"", color=constants.EMBED_COLOUR_OK)
+
     try:
         await owner.remove_roles(role)
         print(f"Removed Community Carrier role from {owner}")
+        embed.add_field(name="Owner", value=f"<@{owner.id}> is no longer registered as a <@&{cc_role_id}>.", inline=False)
     except Exception as e:
         print(e)
-        await ctx.send(f"Failed removing role from {owner}: {e}")
+        embed.add_field(name="Owner", value=f"**Failed removing role from <@{owner.id}>**: {e}", inline=False)
 
     channel = bot.get_channel(channel_id)
     category = discord.utils.get(ctx.guild.categories, id=archive_cat_id)
 
-    if not delete:
+    if not delete_channel:
         # archive the channel and reset its permissions
         try:
             await channel.edit(category=category)
@@ -3312,33 +3455,133 @@ async def cc_del(ctx, owner: discord.Member):
             await channel.edit(sync_permissions=True)
             print("Synced permissions")
 
-            await ctx.send(f"{owner.display_name} removed from database and <#{channel_id}> archived.")
+            embed.add_field(name="Channel", value=f"<#{channel_id}> moved to Archives.", inline=False)
 
-            # notify in bot_spam
-            spamchannel = bot.get_channel(bot_spam_id)
-            await spamchannel.send(f"{ctx.author} used m.cc_del in <#{ctx.channel.id}> to remove {owner.name} as a Community Carrier. Channel <#{channel_id}> was archived.")
-            return
         except Exception as e:
             print(e)
-            return await ctx.send(f"Error, channel not archived: {e}")
+            embed.add_field(name="Channel", value=f"**Failed archiving <#{channel_id}>**: {e}", inline=False)
 
-    elif delete:
+    elif delete_channel:
         # delete the channel
         try:
             await channel.delete()
             print(f'Deleted {channel}')
-            gif = random.choice(byebye_gifs)
-            await ctx.send(gif)
-            await ctx.send(f"{owner.name} removed from database and #{channel} deleted.")
 
-            # notify in bot_spam
-            spamchannel = bot.get_channel(bot_spam_id)
-            await spamchannel.send(f"{ctx.author} used m.cc_del in <#{ctx.channel.id}> to remove {owner.name} as a Community Carrier. Channel #{channel} was deleted.")
-            return
+            embed.add_field(name="Channel", value=f"#{channel} deleted. All those moments lost in time, like tears in rain.", inline=False)
+
         except Exception as e:
             print(e)
-            return await ctx.send(f"Error, channel not deleted: {e}")
+            embed.add_field(name="Channel", value=f"**Failed to delete <#{channel_id}>**: {e}", inline=False)
 
+    role = discord.utils.get(ctx.guild.roles, id=role_id)
+    # delete the role
+    try:
+        await role.delete()
+        print(f'Deleted {role}')
+
+        embed.add_field(name="Role", value=f"{role} deleted.", inline=False)
+
+
+    except Exception as e:
+        print(e)
+        embed.add_field(name="Role", value=f"**Failed to delete <@&{role_id}>**: {e}", inline=False)
+
+    await ctx.send(embed=embed)
+    await qu_embed.delete()
+    gif = random.choice(byebye_gifs)
+    await ctx.send(gif)
+
+    spamchannel = bot.get_channel(bot_spam_id)
+    await spamchannel.send(f"{ctx.author} used m.cc_del in <#{ctx.channel.id}> to remove {owner.name} as a Community Carrier.")
+
+
+# sign up for a Community Carrier's notification role
+@slash.slash(name="notify_me", guild_ids=[bot_guild_id],
+             description="Private command: Use in a COMMUNITY CARRIER channel to opt in/out to receive its notifications.")
+async def _notify_me(ctx: SlashContext):
+
+    # note channel ID
+    msg_ctx_id = ctx.channel.id
+
+    # define spamchannel
+    spamchannel = bot.get_channel(bot_spam_id)
+
+    # look for a match for the channel ID in the community carrier DB
+    community_carrier_data = find_community_carrier_with_channel_id(msg_ctx_id)
+
+    if not community_carrier_data:
+        # if there's no channel match, return an error
+        embed = discord.Embed(description="Please try again in a Community Carrier's channel.", color=constants.EMBED_COLOUR_ERROR)
+        await ctx.send(embed=embed, hidden=True)
+        return
+
+    elif community_carrier_data:
+        # TODO: this should be fetchone() not fetchall but I can't make it work otherwise
+        for community_carrier in community_carrier_data:
+            print(f"Found data: {community_carrier.owner_id} owner of {community_carrier.channel_id}")
+            channel_id = community_carrier.channel_id
+            role_id = community_carrier.role_id
+            owner_id = community_carrier.owner_id
+
+    # we're in a carrier's channel so try to match its role ID with a server role
+    print(f"/notify used in channel for {channel_id}")
+    notify_role = discord.utils.get(ctx.guild.roles, id=role_id)
+
+    # check if role actually exists
+    if not notify_role: 
+        await ctx.send("Sorry, I couldn't find a notification role for this channel. Please report this to an Admin.", hidden=True)
+        await spamchannel.send(f"**ERROR**: {ctx.author} tried to use `/notify_me` in <#{ctx.channel.id}> but received an error (role does not exist).")
+        print(f"No role found matching {ctx.channel}")
+        return
+
+    # check if user has this role
+    print(f'Check whether user has role: "{notify_role}"')
+    print(f'User has roles: {ctx.author.roles}')
+    if notify_role not in ctx.author.roles:
+        # they don't so give it to them
+        await ctx.author.add_roles(notify_role)
+        embed = discord.Embed(title=f"You've signed up for notifications for {ctx.channel.name}!",
+                                description=f"You'll receive notifications from <@{owner_id}> or "
+                                            f"the <@&{cteam_role_id}> about this event or carrier's activity. You can cancel at any"
+                                            f" time by using `/notify_me` again in this channel.", color=constants.EMBED_COLOUR_OK)
+        await ctx.send(embed=embed, hidden=True)
+    else:
+        # they do so take it from them
+        await ctx.author.remove_roles(notify_role)
+        embed = discord.Embed(title=f"You've cancelled notifications for {ctx.channel.name}.",
+                                description="You'll no longer receive notifications about this event or carrier's activity."
+                                            " You can sign up again at any time by using `/notify_me` in this channel.", 
+                                            color=constants.EMBED_COLOUR_QU)
+        await ctx.send(embed=embed, hidden=True)
+
+# send a notice from a Community Carrier owner to their 'crew'
+@slash.slash(name="send_notice", guild_ids=[bot_guild_id],
+             description="Private command: Used by Community Carrier owners to send notices to their participants.")
+async def _send_notice(ctx: SlashContext, message: str):
+    # look up user in community carrier database
+    community_carrier_data = find_community_carrier_with_owner_id(ctx.author.id)
+
+    # check if the author is a CC owner
+    if not community_carrier_data:
+        await ctx.send("Only the owner of a Community Carrier can use `/send_notice`.", hidden=True)
+        return
+
+    # now define terms
+    for community_carrier in community_carrier_data:
+        print(f"Found data: {community_carrier.owner_id} owner of {community_carrier.channel_id}")
+        channel_id = community_carrier.channel_id
+        owner_id = community_carrier.owner_id
+        role_id = community_carrier.role_id
+
+    # check if in the CC channel, this simplifies things a little
+    if not ctx.channel.id == channel_id:
+        await ctx.send(f"Please use this command in your community carrier channel: <#{channel_id}>", hidden=True)
+        return
+
+    # send the message to the CC channel
+    # channel = bot.get_channel(channel_id) - only if we allow sending from other channels to this one
+    await ctx.send(f"<@&{role_id}>:\n\n{message}\n\n*Use* `/notify_me` *in this channel to sign up for future notifications."
+                   f"\nYou can opt out at any time by using* `/notify_me` *again.*")
 
 #
 #                       COMMUNITY NOMINATION COMMANDS
@@ -3566,7 +3809,7 @@ async def nom_delete(ctx, userid: Union[str, int]):
             await ctx.send("You're the boss, boss.")
 
     except asyncio.TimeoutError:
-        await ctx.send("Cancelled: no response.")
+        await ctx.send("**Cancelled**: no response.")
         return
 
     # remove the database entry
@@ -3624,7 +3867,7 @@ async def unlock_override(ctx):
             print("User wants to manually release channel lock.")
 
     except asyncio.TimeoutError:
-        await ctx.send("Cancelled: no response.")
+        await ctx.send("**Cancelled**: no response.")
         return
 
     await ctx.send("OK. Releasing channel lock.")
@@ -3634,12 +3877,72 @@ async def unlock_override(ctx):
     print("Channel lock manually released.")
 
 
+@bot.command(name='cron_status', help='Check the status of the lasttrade cron task')
+@commands.has_any_role('Council', 'Admin', 'Developer')
+async def cron_status(ctx):
+    if not lasttrade_cron.is_running() or lasttrade_cron.failed():
+        print("lasttrade cron task has failed, restarting.")
+        await ctx.send('lasttrade cron task has failed, restarting...')
+        lasttrade_cron.restart()
+    else:
+        nextrun = lasttrade_cron.next_iteration - datetime.now(tz=timezone.utc)
+        await ctx.send(f'lasttrade cron task is running. Next run in {str(nextrun)}')
+
+
 # quit the bot
 @bot.command(name='stopquit', help="Stops the bots process on the VM, ending all functions.")
 @commands.has_role('Admin')
 async def stopquit(ctx):
     await ctx.send(f"k thx bye")
     await user_exit()
+
+
+# lasttrade task loop:
+# Every 24 hours, check the timestamp of the last trade for all carriers and remove
+# 'Certified Carrier' role from owner if there has been no trade for 28 days.
+# If not already present, add 'Fleet Reserve' role to the owner.
+@tasks.loop(hours=24)
+async def lasttrade_cron():
+    print(f"last trade cron running.")
+    try:
+        # get roles
+        guild = bot.get_guild(bot_guild_id)
+        cc_role = discord.utils.get(guild.roles, id=certcarrier_role_id)
+        fr_role = discord.utils.get(guild.roles, id=rescarrier_role_id)
+        # get spam channel
+        spamchannel = bot.get_channel(bot_spam_id)
+        # calculate epoch for 28 days ago
+        now = datetime.now(tz=timezone.utc)
+        lasttrade_max = now - timedelta(days=28)
+        # get carriers who last traded >28 days ago
+        carrier_db.execute(f"SELECT * FROM carriers WHERE lasttrade < {int(lasttrade_max.timestamp())}")
+        carriers = [CarrierData(carrier) for carrier in carrier_db.fetchall()]
+        for carrier_data in carriers:
+            # check roles on owners, remove/add as needed.
+            last_traded = datetime.fromtimestamp(carrier_data.lasttrade).strftime('%Y-%m-%d %H:%M:%S')
+            print(f"Processing carrier '{carrier_data.carrier_short_name}'. Last traded: {last_traded}")
+            owner = guild.get_member(carrier_data.ownerid)
+            if owner:
+                if cc_role in owner.roles:
+                    print(f"{owner.name} has the Certified Carrier role, removing.")
+                    await owner.remove_roles(cc_role)
+                    await spamchannel.send(f"{owner.name} has been removed from the Certified Carrier role due to inactivity.")
+                    # notify by DM
+                    owner_dm = await bot.fetch_user(carrier_data.ownerid)
+                    await owner_dm.send(f"Ahoy CMDR! Your last PTN Fleet Carrier trade was more than 28 days ago at {last_traded} so you have been automatically marked as inactive and placed in the PTN Fleet Reserve. **You can visit <#939919613209223270> at any time to mark yourself as active and return to trading**. o7 CMDR!")
+                    print(f"Notified {owner.name} by DM.")
+                if fr_role not in owner.roles:
+                    print(f"{owner.name} does not have the Fleet Reserve role, adding.")
+                    await owner.add_roles(fr_role)
+                    await spamchannel.send(f"{owner.name} has been added to the Fleet Reserve role.")
+            else:
+                print(f"Carrier owner id {carrier_data.ownerid} is invalid, skipping.")
+                await spamchannel.send(f"Owner of {carrier_data.carrier_short_name} with ID {carrier_data.ownerid} is invalid. "
+                                        "Cannot process lasttrade_cron for this carrier.")
+        print("All carriers have been processed.")
+    except Exception as e:
+        print(f"last trade cron failed: {e}")
+        pass
 
 
 #
