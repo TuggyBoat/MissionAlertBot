@@ -1550,7 +1550,7 @@ async def mission_add(ctx, carrier_data, commodity_data, mission_type, system, s
     print("Mission added to db")
 
     print("Updating last trade timestamp for carrier")
-    carrier_db.execute(''' UPDATE carriers SET lasttrade=strftime('%s','now') WHERE p_ID=? ''', ( carrier_data.pid ))
+    carrier_db.execute(''' UPDATE carriers SET lasttrade=strftime('%s','now') WHERE p_ID=? ''', ( [ carrier_data.pid ] ))
     carriers_conn.commit()
 
     # now we can release the channel lock
@@ -3544,7 +3544,7 @@ async def _notify_me(ctx: SlashContext):
         await ctx.author.remove_roles(notify_role)
         embed = discord.Embed(title=f"You've cancelled notifications for {ctx.channel.name}.",
                                 description="You'll no longer receive notifications about this event or carrier's activity."
-                                            " You can sign up again at any time by using `/notify_me` again in this channel.", 
+                                            " You can sign up again at any time by using `/notify_me` in this channel.", 
                                             color=constants.EMBED_COLOUR_QU)
         await ctx.send(embed=embed, hidden=True)
 
@@ -3557,19 +3557,24 @@ async def _send_notice(ctx: SlashContext, message: str):
 
     # check if the author is a CC owner
     if not community_carrier_data:
-        await ctx.send("Only the owner of a Community Carrier can use `/send_notice`.")
+        await ctx.send("Only the owner of a Community Carrier can use `/send_notice`.", hidden=True)
         return
 
     # now define terms
     for community_carrier in community_carrier_data:
         print(f"Found data: {community_carrier.owner_id} owner of {community_carrier.channel_id}")
-        channel_id = community_carrier_data.channel_id
-        owner_id = community_carrier_data.owner_id
-        role_id = community_carrier_data.role_id
+        channel_id = community_carrier.channel_id
+        owner_id = community_carrier.owner_id
+        role_id = community_carrier.role_id
+
+    # check if in the CC channel, this simplifies things a little
+    if not ctx.channel.id == channel_id:
+        await ctx.send(f"Please use this command in your community carrier channel: <#{channel_id}>", hidden=True)
+        return
 
     # send the message to the CC channel
-    channel = bot.get_channel(channel_id)
-    channel.send(f"<@{role_id}:")
+    # channel = bot.get_channel(channel_id) - only if we allow sending from other channels to this one
+    await ctx.send(f"<@&{role_id}>: {message}")
 
 #
 #                       COMMUNITY NOMINATION COMMANDS
