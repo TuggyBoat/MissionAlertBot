@@ -1496,7 +1496,7 @@ async def mission_add(ctx, carrier_data, commodity_data, mission_type, system, s
     print("Mission added to db")
 
     print("Updating last trade timestamp for carrier")
-    carrier_db.execute(''' UPDATE carriers SET lasttrade=strftime('%s','now') WHERE p_ID=? ''', ( carrier_data.pid, ))
+    carrier_db.execute(''' UPDATE carriers SET lasttrade=strftime('%s','now') WHERE p_ID=? ''', ( [ carrier_data.pid ] ))
     carriers_conn.commit()
 
     # now we can release the channel lock
@@ -2107,7 +2107,7 @@ async def carrier_list(ctx):
     for carrier in pages[0]:
         count += 1
         embed.add_field(name=f"{count}: {carrier.carrier_long_name} ({carrier.carrier_identifier})",
-                        value=f"<@{carrier.ownerid}>, {carrier.lasttrade}", inline=False)
+                        value=f"<@{carrier.ownerid}>, <t:{carrier.lasttrade}:R>", inline=False)
     # Now go send it and wait on a reaction
     message = await ctx.send(embed=embed)
 
@@ -2127,7 +2127,7 @@ async def carrier_list(ctx):
                     # Page -1 as humans think page 1, 2, but python thinks 0, 1, 2
                     count += 1
                     new_embed.add_field(name=f"{count}: {carrier.carrier_long_name} ({carrier.carrier_identifier})",
-                                        value=f"<@{carrier.ownerid}>, {carrier.lasttrade}", inline=False)
+                                        value=f"<@{carrier.ownerid}>, <t:{carrier.lasttrade}:R>", inline=False)
 
                 await message.edit(embed=new_embed)
 
@@ -2152,7 +2152,7 @@ async def carrier_list(ctx):
                     # Page -1 as humans think page 1, 2, but python thinks 0, 1, 2
                     count += 1
                     new_embed.add_field(name=f"{count}: {carrier.carrier_long_name} ({carrier.carrier_identifier})",
-                                        value=f"<@{carrier.ownerid}>, {carrier.lasttrade}", inline=False)
+                                        value=f"<@{carrier.ownerid}>, <t:{carrier.lasttrade}:R>", inline=False)
 
                 await message.edit(embed=new_embed)
                 # Ok now we can go forwards, check if we can also go backwards still
@@ -2172,8 +2172,10 @@ async def carrier_list(ctx):
 
         except asyncio.TimeoutError:
             print(f'Timeout hit during carrier request by: {ctx.author}')
-            await ctx.send(f'Closed the active carrier list request from: {ctx.author} due to no input in 60 seconds.')
+            embed = discord.Embed(description=f'Closed the active carrier list request from {ctx.author} due to no input in 60 seconds.', color=constants.EMBED_COLOUR_QU)
+            await ctx.send(embed=embed)
             await message.delete()
+            await ctx.message.delete()
             break
 
 
@@ -2606,7 +2608,7 @@ def _add_common_embed_fields(embed, carrier_data):
     embed.add_field(name="Discord Channel", value=f"#{carrier_data.discord_channel}", inline=True)
     embed.add_field(name="Owner", value=f"<@{carrier_data.ownerid}>", inline=True)
     embed.add_field(name="Shortname", value=f"{carrier_data.carrier_short_name}", inline=True)
-    embed.add_field(name="Last Trade", value=f"{carrier_data.lasttrade}", inline=True)
+    embed.add_field(name="Last Trade", value=f"<t:{carrier_data.lasttrade}> (<t:{carrier_data.lasttrade}:R>)", inline=True)
     # shortname is not relevant to users and will be auto-generated in future
     return embed
 
@@ -3251,8 +3253,10 @@ async def cc_list(ctx):
 
         except asyncio.TimeoutError:
             print(f'Timeout hit during community carrier request by: {ctx.author}')
-            await ctx.send(f'Closed the active community carrier list request from: {ctx.author} due to no input in 60 seconds.')
+            embed = discord.Embed(description=f'Closed the active carrier list request from {ctx.author} due to no input in 60 seconds.', color=constants.EMBED_COLOUR_QU)
+            await ctx.send(embed=embed)
             await message.delete()
+            await ctx.message.delete()
             break    
 
 
