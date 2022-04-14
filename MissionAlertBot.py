@@ -72,6 +72,7 @@ archive_cat_id = conf['ARCHIVE_CAT']
 # role IDs
 hauler_role_id = conf['HAULER_ROLE']
 cc_role_id = conf['CC_ROLE']
+cteam_role_id = conf['CTEAM_ROLE']
 certcarrier_role_id = conf['CERTCARRIER_ROLE']
 rescarrier_role_id = conf['RESCARRIER_ROLE']
 
@@ -576,7 +577,7 @@ def find_carrier_with_owner_id(ownerid):
 
 def find_community_carrier_with_owner_id(ownerid):
     """
-    Returns channel and owner matching the ownerid
+    Returns channel owner and role matching the ownerid
 
     :param int ownerid: The owner id to match
     :returns: A list of community carrier data objects
@@ -588,6 +589,23 @@ def find_community_carrier_with_owner_id(ownerid):
     for community_carrier in community_carrier_data:
         print(f"{community_carrier.owner_id} owns channel {community_carrier.channel_id}" 
               f" called from find_carrier_with_owner_id.")
+
+    return community_carrier_data
+
+def find_community_carrier_with_channel_id(channelid):
+    """
+    Returns channel owner and role matching the channelid
+
+    :param int channelid: The channel id to match
+    :returns: A list of community carrier data objects
+    :rtype: list[CommunityCarrierData]
+    """
+    carrier_db.execute(f"SELECT * FROM community_carriers WHERE "
+                       f"channelid = {channelid} ")
+    community_carrier_data = [CommunityCarrierData(community_carrier) for community_carrier in carrier_db.fetchall()]
+    for community_carrier in community_carrier_data:
+        print(f"{community_carrier.owner_id} owns channel {community_carrier.channel_id}" 
+              f" called from find_carrier_with_channel_id.")
 
     return community_carrier_data
 
@@ -3060,7 +3078,8 @@ async def cc(ctx, owner: discord.Member, *, channel_name: str):
     print(f"{ctx.author} used m.cc")
     # check the channel name isn't something utterly stupid
     if len(stripped_channel_name) > 30:
-        return await ctx.send("Error: Channel name should be fewer than 30 characters. (Preferably a *lot* fewer.)")
+        embed = discord.Embed(description="**Error**: Channel name should be fewer than 30 characters. (Preferably a *lot* fewer.)", color=constants.EMBED_COLOUR_ERROR)
+        return await ctx.send(embed=embed)
 
     # first check the user isn't already in the DB, if they are, then stop
     community_carrier_data = find_community_carrier_with_owner_id(owner.id)
@@ -3081,27 +3100,12 @@ async def cc(ctx, owner: discord.Member, *, channel_name: str):
 # check whether a role exists with the same name
     new_role = discord.utils.get(ctx.guild.roles, name=stripped_channel_name)
     if new_role:
+        # if a new role exists we won't use it because it could lead to security concerns :(
         print(f"Role {new_role} already exists.")
-        # role exists, ask if they want to use it 
-        embed = discord.Embed(description=f"Role already exists: <@&{new_role.id}>. Do you wish to use this existing role? **y**/**n**", color=constants.EMBED_COLOUR_QU)
-        qu_msg = await ctx.send(embed=embed)
-        try:
-            msg = await bot.wait_for("message", check=check, timeout=60)
-            if msg.content.lower() == "n":
-                embed = discord.Embed(description=f"**Cancelled**: Please choose a different name for your Community Carrier or use the existing named role.", color=constants.EMBED_COLOUR_ERROR)
-                await ctx.send(embed=embed)
-                await msg.delete()
-                await qu_msg.delete()
-                return
-            elif msg.content.lower() == "y":
-                # they want to use the existing role
-                print(f"Using existing role {new_role}")
-        except asyncio.TimeoutError:
-            embed = discord.Embed(description=f"**Cancelled**: No response.", color=constants.EMBED_COLOUR_ERROR)
-            await ctx.send(embed=embed)
-            return
-        await msg.delete()
-        await qu_msg.delete()
+        # role exists, cancel the process and inform the user 
+        embed = discord.Embed(description=f"**Error**: The role <@&{new_role.id}> already exists. Please choose a different name for your Community Carrier or delete the existing role and try again.", color=constants.EMBED_COLOUR_ERROR)
+        await ctx.send(embed=embed)
+        return
 
     else:
         # role does not exist, create it
@@ -3142,7 +3146,8 @@ async def cc(ctx, owner: discord.Member, *, channel_name: str):
                     print(e)
                     return
         except asyncio.TimeoutError:
-            await ctx.send("**Cancelled**: no response.")
+            embed = discord.Embed(description="**Cancelled**: no response.", color=constants.EMBED_COLOUR_ERROR)
+            await ctx.send(embed=embed)
             return
         await msg.delete()
         await qu_msg.delete()
@@ -3358,15 +3363,13 @@ async def cc_del(ctx, owner: discord.Member):
 
     def check(message):
         return message.author == ctx.author and message.channel == ctx.channel and \
-                                 message.content.lower() in ["y", "n"]
-    def check2(message):
-        return message.author == ctx.author and message.channel == ctx.channel and \
-                                 message.content.lower() in ["d", "a"]
+                                 message.content.lower() in ["d", "a", "c"]
 
     # search for the user's database entry
     community_carrier_data = find_community_carrier_with_owner_id(owner.id)
     if not community_carrier_data:
-        await ctx.send(f"No Community Carrier registered to {owner.display_name}")
+        embed = discord.Embed(description=f"Error: No Community Carrier registered to {owner.display_name}.", color=constants.EMBED_COLOUR_ERROR)
+        await ctx.send(embed=embed)
         return
     elif community_carrier_data:
         # TODO: this should be fetchone() not fetchall but I can't make it work otherwise
@@ -3374,65 +3377,40 @@ async def cc_del(ctx, owner: discord.Member):
             print(f"Found data: {community_carrier.owner_id} owner of {community_carrier.channel_id}")
             channel_id = community_carrier.channel_id
             role_id = community_carrier.role_id
-            await ctx.send(f"User {owner.display_name} is registered as a Community Carrier with channel <#{channel_id}>")
 
-    await ctx.send("Remove Community Carrier role and de-register user? **y**/**n**")
+    embed = discord.Embed(title="Remove Community Carrier",
+                          description=f"This will:\n\n• Remove the <@&{cc_role_id}> role from <@{owner.id}>\n"
+                                      f"• Delete the associated role <@&{role_id}>\n"
+                                      f"• Delete or Archive the channel <#{channel_id}>\n\n"
+                                      f"**WARNING**:\n• **Deleted** channels are gone forever and can NOT be recovered.\n"
+                                      f"• **Archived** channels can be re-activated by `m.cc` at any time.\n\n"
+                                      f"You can choose to (**d**)elete the channel, (**a**)rchive the channel, or (**c**)ancel this operation.",
+                          color=constants.EMBED_COLOUR_QU)
+    qu_embed = await ctx.send(embed=embed)
     try:
         msg = await bot.wait_for("message", check=check, timeout=30)
-        if msg.content.lower() == "n":
-            await ctx.send("OK, cancelling.")
+        if msg.content.lower() == "c":
+            embed = discord.Embed(description="Cancelled.", color=constants.EMBED_COLOUR_OK)
+            await ctx.send(embed=embed)
             print("User cancelled cc_del command.")
+            await msg.delete()
             return
-        elif msg.content.lower() == "y":
-            print("User wants to proceed with removal.")
 
-    except asyncio.TimeoutError:
-        await ctx.send("**Cancelled**: no response.")
-        return
-    
-    await ctx.send(f"Would you like to (**d**)elete or (**a**)rchive <#{channel_id}>?")
-    try:
-        msg = await bot.wait_for("message", check=check2, timeout=30)
-        if msg.content.lower() == "a":
+        elif msg.content.lower() == "a":
             delete_channel = 0
             print("User chose to archive channel.")
-            
+            await msg.delete()
+
         elif msg.content.lower() == "d":
             delete_channel = 1
             print("User wants to delete channel.")
-            await ctx.send("Deleted channels are gone forever, like tears in rain. Are you sure you want to delete? **y**/**n**")
-            try:
-                msg = await bot.wait_for("message", check=check, timeout=30)
-                if msg.content.lower() == "n":
-                    await ctx.send("OK, cancelling.")
-                    print("User cancelled cc_del command.")
-                    return
-                elif msg.content.lower() == "y":
-                    print("User wants to proceed with removal.")
-                    await ctx.send("OK, have it your way hoss.")
-
-            except asyncio.TimeoutError:
-                await ctx.send("**Cancelled**: no response.")
-                return
+            await msg.delete()
 
     except asyncio.TimeoutError:
-        await ctx.send("**Cancelled**: no response.")
+        embed = discord.Embed(description="**Cancelled**: no response.", color=constants.EMBED_COLOUR_ERROR)
+        await ctx.send(embed=embed)
         return
 
-    await ctx.send(f"Would you like to (**d**)elete or (**k**)eep the associated role <@&{role_id}>?")
-    try:
-        msg = await bot.wait_for("message", check=check2, timeout=30)
-        if msg.content.lower() == "k":
-            delete_role = 0
-            print("User chose to keep role.")
-            
-        elif msg.content.lower() == "d":
-            delete_role = 1
-            print("User wants to delete role.")
-
-    except asyncio.TimeoutError:
-        await ctx.send("**Cancelled**: no response.")
-        return
 
     # now we do the thing
     # remove the database entry
@@ -3449,13 +3427,15 @@ async def cc_del(ctx, owner: discord.Member):
 
     role = discord.utils.get(ctx.guild.roles, id=cc_role_id)
 
+    embed = discord.Embed(title="Community Carrier Removed", description=f"", color=constants.EMBED_COLOUR_OK)
+
     try:
         await owner.remove_roles(role)
         print(f"Removed Community Carrier role from {owner}")
-        await ctx.send(f"<@{owner.id}> is no longer registered as a Community Carrier.")
+        embed.add_field(name="Owner", value=f"<@{owner.id}> is no longer registered as a <@&{cc_role_id}>.", inline=False)
     except Exception as e:
         print(e)
-        await ctx.send(f"Failed removing role from {owner}: {e}")
+        embed.add_field(name="Owner", value=f"**Failed removing role from <@{owner.id}>**: {e}", inline=False)
 
     channel = bot.get_channel(channel_id)
     category = discord.utils.get(ctx.guild.categories, id=archive_cat_id)
@@ -3469,41 +3449,127 @@ async def cc_del(ctx, owner: discord.Member):
             await channel.edit(sync_permissions=True)
             print("Synced permissions")
 
-            await ctx.send(f"<#{channel_id}> archived.")
+            embed.add_field(name="Channel", value=f"<#{channel_id}> moved to Archives.", inline=False)
 
         except Exception as e:
             print(e)
-            return await ctx.send(f"Error, channel not archived: {e}")
+            embed.add_field(name="Channel", value=f"**Failed archiving <#{channel_id}>**: {e}", inline=False)
 
     elif delete_channel:
         # delete the channel
         try:
             await channel.delete()
             print(f'Deleted {channel}')
-            gif1 = random.choice(byebye_gifs)
-            await ctx.send(gif1)
-            await ctx.send(f"#{channel} deleted.")
+
+            embed.add_field(name="Channel", value=f"#{channel} deleted. All those moments lost in time, like tears in rain.", inline=False)
 
         except Exception as e:
             print(e)
-            return await ctx.send(f"Error, channel not deleted: {e}")
+            embed.add_field(name="Channel", value=f"**Failed to delete <#{channel_id}>**: {e}", inline=False)
 
-    if delete_role:
-        role = discord.utils.get(ctx.guild.roles, id=role_id)
-        # delete the role
-        try:
-            await role.delete()
-            print(f'Deleted {role}')
-            gif2 = random.choice(byebye_gifs)
-            await ctx.send(gif2)
-            await ctx.send(f"Role removed.")
+    role = discord.utils.get(ctx.guild.roles, id=role_id)
+    # delete the role
+    try:
+        await role.delete()
+        print(f'Deleted {role}')
 
-        except Exception as e:
-            print(e)
-            return await ctx.send(f"Error, role not deleted: {e}")
+        embed.add_field(name="Role", value=f"{role} deleted.", inline=False)
+
+
+    except Exception as e:
+        print(e)
+        embed.add_field(name="Role", value=f"**Failed to delete <@&{role_id}>**: {e}", inline=False)
+
+    await ctx.send(embed=embed)
+    await qu_embed.delete()
+    gif = random.choice(byebye_gifs)
+    await ctx.send(gif)
 
     spamchannel = bot.get_channel(bot_spam_id)
     await spamchannel.send(f"{ctx.author} used m.cc_del in <#{ctx.channel.id}> to remove {owner.name} as a Community Carrier.")
+
+
+# sign up for a Community Carrier's notification role
+@slash.slash(name="notify_me", guild_ids=[bot_guild_id],
+             description="Private command: Use in a COMMUNITY CARRIER channel to opt in/out to receive its notifications.")
+async def _notify_me(ctx: SlashContext):
+
+    # note channel ID
+    msg_ctx_id = ctx.channel.id
+
+    # define spamchannel
+    spamchannel = bot.get_channel(bot_spam_id)
+
+    # look for a match for the channel ID in the community carrier DB
+    community_carrier_data = find_community_carrier_with_channel_id(msg_ctx_id)
+
+    if not community_carrier_data:
+        # if there's no channel match, return an error
+        embed = discord.Embed(description="Please try again in a Community Carrier's channel.", color=constants.EMBED_COLOUR_ERROR)
+        await ctx.send(embed=embed, hidden=True)
+        return
+
+    elif community_carrier_data:
+        # TODO: this should be fetchone() not fetchall but I can't make it work otherwise
+        for community_carrier in community_carrier_data:
+            print(f"Found data: {community_carrier.owner_id} owner of {community_carrier.channel_id}")
+            channel_id = community_carrier.channel_id
+            role_id = community_carrier.role_id
+            owner_id = community_carrier.owner_id
+
+    # we're in a carrier's channel so try to match its role ID with a server role
+    print(f"/notify used in channel for {channel_id}")
+    notify_role = discord.utils.get(ctx.guild.roles, id=role_id)
+
+    # check if role actually exists
+    if not notify_role: 
+        await ctx.send("Sorry, I couldn't find a notification role for this channel. Please report this to an Admin.", hidden=True)
+        await spamchannel.send(f"**ERROR**: {ctx.author} tried to use `/notify_me` in <#{ctx.channel.id}> but received an error (role does not exist).")
+        print(f"No role found matching {ctx.channel}")
+        return
+
+    # check if user has this role
+    print(f'Check whether user has role: "{notify_role}"')
+    print(f'User has roles: {ctx.author.roles}')
+    if notify_role not in ctx.author.roles:
+        # they don't so give it to them
+        await ctx.author.add_roles(notify_role)
+        embed = discord.Embed(title=f"You've signed up for notifications for {ctx.channel.name}!",
+                                description=f"You'll receive notifications from <@{owner_id}> or "
+                                            f"the <@&{cteam_role_id}> about this event or carrier's activity. You can cancel at any"
+                                            f" time by using `/notify_me` again in this channel.", color=constants.EMBED_COLOUR_OK)
+        await ctx.send(embed=embed, hidden=True)
+    else:
+        # they do so take it from them
+        await ctx.author.remove_roles(notify_role)
+        embed = discord.Embed(title=f"You've cancelled notifications for {ctx.channel.name}.",
+                                description="You'll no longer receive notifications about this event or carrier's activity."
+                                            " You can sign up again at any time by using `/notify_me` again in this channel.", 
+                                            color=constants.EMBED_COLOUR_QU)
+        await ctx.send(embed=embed, hidden=True)
+
+# send a notice from a Community Carrier owner to their 'crew'
+@slash.slash(name="send_notice", guild_ids=[bot_guild_id],
+             description="Private command: Used by Community Carrier owners to send notices to their participants.")
+async def _send_notice(ctx: SlashContext, message: str):
+    # look up user in community carrier database
+    community_carrier_data = find_community_carrier_with_owner_id(ctx.author.id)
+
+    # check if the author is a CC owner
+    if not community_carrier_data:
+        await ctx.send("Only the owner of a Community Carrier can use `/send_notice`.")
+        return
+
+    # now define terms
+    for community_carrier in community_carrier_data:
+        print(f"Found data: {community_carrier.owner_id} owner of {community_carrier.channel_id}")
+        channel_id = community_carrier_data.channel_id
+        owner_id = community_carrier_data.owner_id
+        role_id = community_carrier_data.role_id
+
+    # send the message to the CC channel
+    channel = bot.get_channel(channel_id)
+    channel.send(f"<@{role_id}:")
 
 #
 #                       COMMUNITY NOMINATION COMMANDS
