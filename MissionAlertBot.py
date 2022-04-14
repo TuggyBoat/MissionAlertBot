@@ -10,6 +10,7 @@ from doctest import debug_script
 from pydoc import describe
 import re
 import tempfile
+from turtle import color
 from typing import Union
 
 from PIL import Image, ImageFont, ImageDraw
@@ -3574,7 +3575,8 @@ async def _send_notice(ctx: SlashContext, message: str):
 
     # send the message to the CC channel
     # channel = bot.get_channel(channel_id) - only if we allow sending from other channels to this one
-    await ctx.send(f"<@&{role_id}>: {message}")
+    await ctx.send(f"<@&{role_id}>:\n\n{message}\n\n*Use* `/notify_me` *in this channel to sign up for future notifications."
+                   f"\nYou can opt out at any time by using* `/notify_me` *again.*")
 
 #
 #                       COMMUNITY NOMINATION COMMANDS
