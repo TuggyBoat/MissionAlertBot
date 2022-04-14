@@ -10,7 +10,7 @@ from doctest import debug_script
 from pydoc import describe
 import re
 import tempfile
-from turtle import color
+# from turtle import color
 from typing import Union
 
 from PIL import Image, ImageFont, ImageDraw
