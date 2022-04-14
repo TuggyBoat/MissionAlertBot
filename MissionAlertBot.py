@@ -1496,7 +1496,7 @@ async def mission_add(ctx, carrier_data, commodity_data, mission_type, system, s
     print("Mission added to db")
 
     print("Updating last trade timestamp for carrier")
-    carrier_db.execute(''' UPDATE carriers SET lasttrade=strftime('%s','now') WHERE p_ID=? ''', ( carrier_data.pid ))
+    carrier_db.execute(''' UPDATE carriers SET lasttrade=strftime('%s','now') WHERE p_ID=? ''', ( carrier_data.pid, ))
     carriers_conn.commit()
 
     # now we can release the channel lock
