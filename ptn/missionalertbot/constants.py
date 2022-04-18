@@ -1,7 +1,16 @@
-# Production variables
-PROD_FLAIR_MISSION_START = "d01e6808-9235-11eb-9cc0-0eb650439ee7"
-PROD_FLAIR_MISSION_STOP = "eea2d818-9235-11eb-b86f-0e50eec082f5"
+import ast
+import os
+import interactions
+from dotenv import load_dotenv
 
+# Get the discord token from the local .env file. Deliberately not hosted in the repo or Discord takes the bot down
+# because the keys are exposed. DO NOT HOST IN THE REPO. Seriously do not do it ...
+load_dotenv(os.path.join(os.getcwd(), '.env'))
+
+
+# Production variables
+PROD_FLAIR_MISSION_START = "d01e6808-9235-11eb-9cc0-0eb650439ee7" # reddit flair for in progress
+PROD_FLAIR_MISSION_STOP = "eea2d818-9235-11eb-b86f-0e50eec082f5" #  reddit flair for complete
 PROD_DISCORD_GUILD = 800080948716503040 # PTN Discord server
 PROD_TRADE_ALERTS_ID = 801798469189763073  # trade alerts channel ID for PTN main server
 PROD_WINE_ALERTS_LOADING_ID = 849249916676603944 # booze alerts channel ID for PTN main server [loading]
@@ -26,11 +35,8 @@ PROD_SECONDS_SHORT = 120
 PROD_SECONDS_LONG = 900
 
 # Testing variables
-
-# reddit flair IDs - testing sub
-TEST_FLAIR_MISSION_START = "3cbb1ab6-8e8e-11eb-93a1-0e0f446bc1b7"
-TEST_FLAIR_MISSION_STOP = "4242a2e2-8e8e-11eb-b443-0e664851dbff"
-
+TEST_FLAIR_MISSION_START = "3cbb1ab6-8e8e-11eb-93a1-0e0f446bc1b7" # reddit flair for in progress
+TEST_FLAIR_MISSION_STOP = "4242a2e2-8e8e-11eb-b443-0e664851dbff" #  reddit flair for complete
 TEST_DISCORD_GUILD = 818174236480897055 # test Discord server
 TEST_TRADE_ALERTS_ID = 843252609057423361  # trade alerts channel ID for PTN test server
 TEST_WINE_ALERTS_LOADING_ID = 870425638127943700 # booze alerts channel ID for PTN main server [loading]
@@ -54,6 +60,7 @@ TEST_ARCHIVE_CAT = 877244591579992144 # Archive category on live server
 TEST_SECONDS_SHORT = 5
 TEST_SECONDS_LONG = 10
 
+# embed colours
 EMBED_COLOUR_LOADING = 0x80ffff         # blue
 EMBED_COLOUR_UNLOADING = 0x80ff80       # green
 EMBED_COLOUR_REDDIT = 0xff0000          # red
@@ -63,10 +70,25 @@ EMBED_COLOUR_ERROR = 0x800000           # dark red
 EMBED_COLOUR_QU = 0x80ffff              # same as loading
 EMBED_COLOUR_OK = 0x80ff80              # same as unloading
 
+# link to our Discord by way of Josh's original post on Reddit
 REDDIT_DISCORD_LINK_URL = \
     'https://www.reddit.com/r/PilotsTradeNetwork/comments/l0y7dk/pilots_trade_network_intergalactic_discord_server/'
 
 
+
+# define production variable
+_production = ast.literal_eval(os.environ.get('PTN_MAB_BOT_PRODUCTION', 'False'))
+
+
+# define bot token
+TOKEN = os.getenv('MAB_BOT_DISCORD_TOKEN_PROD') if _production else os.getenv('MAB_BOT_DISCORD_TOKEN_TESTING')
+
+
+# define bot object
+bot = interactions.Client(token=TOKEN)
+
+
+# define constants based on prod or test environment
 def get_constant(production: bool):
     """
     Function takes a boolean and returns a dict containing the various parameters for that object.

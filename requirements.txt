@@ -18,4 +18,4 @@ aiofiles==0.6.0
 asyncpraw==7.2.0
 asyncprawcore==2.0.1
 python-dateutil>=2.8.1
-discord-py-slash-command>=1.1.2
+discord-py-interactions>=4.1.0

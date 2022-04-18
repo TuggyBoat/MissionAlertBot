@@ -10,9 +10,7 @@ from doctest import debug_script
 from pydoc import describe
 import re
 import tempfile
-# from turtle import color
 from typing import Union
-
 from PIL import Image, ImageFont, ImageDraw
 import os
 import sys
@@ -21,9 +19,9 @@ import sqlite3
 import asyncpraw
 import asyncio
 import shutil
+import interactions
 from discord.errors import HTTPException, InvalidArgument, Forbidden, NotFound
 from discord.ext import commands, tasks
-from discord_slash import SlashCommand, SlashContext
 from datetime import datetime
 from datetime import timezone
 from datetime import timedelta
@@ -941,8 +939,8 @@ async def lock_mission_channel():
 #                       BOT STUFF STARTS HERE
 #
 
-bot = commands.Bot(command_prefix='m.', intents=discord.Intents.all())
-slash = SlashCommand(bot, sync_commands=True)
+bot = interactions.Client(token=TOKEN)
+
 
 @bot.event
 async def on_ready():
@@ -1015,6 +1013,7 @@ async def _monitor_reddit_comments():
 #
 
 # load commands
+"""
 @bot.command(name='load', help='Generate details for a loading mission and optionally broadcast to Discord.\n'
                                '\n'
                                'carrier_name_search_term should be a unique part of your carrier\'s name. (Use quotes if spaces are required)\n'
@@ -1025,6 +1024,7 @@ async def _monitor_reddit_comments():
                                'Demand should be expressed as an absolute number e.g. 20k, 20,000, etc.\n'
                                'ETA is optional and should be expressed as a number of minutes e.g. 15.\n'
                                'Case is automatically corrected for all inputs.')
+"""
 @commands.has_any_role('Certified Carrier', 'Trainee')
 async def load(ctx, carrier_name_search_term: str, commodity_search_term: str, system: str, station: str,
                profit: Union[int, float], pads: str, demand: str, eta: str = None):
@@ -1620,9 +1620,12 @@ def _mission_summary_embed(mission_data, embed):
 
 
 # find what fleet carriers are owned by a user - private slash command
-@slash.slash(name="owner", guild_ids=[bot_guild_id],
-             description="Private command: Use with @User to find out what fleet carriers that user owns.")
-async def _owner(ctx: SlashContext, owner: discord.Member):
+@bot.command(
+    name="owner",
+    description="Private command: Use with @User to find out what fleet carriers that user owns.",
+    scope=[bot_guild_id],
+)
+async def owner(ctx: interactions.CommandContext, owner: discord.Member):
 
     try:
         # look for matches for the owner ID in the carrier DB
@@ -1647,9 +1650,12 @@ async def _owner(ctx: SlashContext, owner: discord.Member):
 
 
 # mission slash command - private, non spammy
-@slash.slash(name="mission", guild_ids=[bot_guild_id],
-             description="Private command: Use in a Fleet Carrier's channel to display its current mission.")
-async def _mission(ctx: SlashContext):
+@bot.command(
+    name="mission",
+    description="Private command: Use in a Fleet Carrier's channel to display its current mission.",
+    scope=[bot_guild_id],
+)
+async def mission(ctx: interactions.CommandContext):
 
     print(f"{ctx.author} asked for active mission in <#{ctx.channel.id}> (used /mission)")
 
@@ -1732,9 +1738,12 @@ def _format_missions_embedd(mission_data_list, embed):
     return embed
 
 # missions slash command - private, non-spammy
-@slash.slash(name="missions", guild_ids=[bot_guild_id],
-             description="Private command: Display all missions in progress.")
-async def _missions(ctx: SlashContext):
+@bot.command(
+    name="missions",
+    description="Private command: Display all missions in progress.",
+    scope=[bot_guild_id],
+)
+async def missions(ctx: interactions.CommandContext):
 
     print(f'User {ctx.author} asked for all active missions via /missions in {ctx.channel}.')
 
@@ -2064,9 +2073,12 @@ async def backup(ctx):
     await ctx.send("Database backup complete.")
 
 
-@slash.slash(name="info", guild_ids=[bot_guild_id],
-             description="Private command: Use in a Fleet Carrier's channel to show information about it.")
-async def _info(ctx: SlashContext):
+@bot.command(
+    name="info",
+    description="Private command: Use in a Fleet Carrier's channel to show information about it.",
+    scope=[bot_guild_id],
+)
+async def info(ctx: interactions.CommandContext):
 
     print(f'/info command carrier_data called by {ctx.author} in {ctx.channel}')
 
@@ -2107,9 +2119,12 @@ async def _info(ctx: SlashContext):
         return await ctx.send(embed=embed, hidden=True)
 
 
-@slash.slash(name="find", guild_ids=[bot_guild_id],
-             description="Private command: Search for a fleet carrier by partial match for its name.")
-async def _find(ctx: SlashContext, carrier_name_search_term: str):
+@bot.command(
+    name="find_carrier",
+    description="Private command: Search for a fleet carrier by partial match for its name.",
+    scope=[bot_guild_id],
+)
+async def find_carrier(ctx: interactions.CommandContext, carrier_name_search_term: str):
 
     print(f"{ctx.author} used /find for '{carrier_name_search_term}' in {ctx.channel}")
 
@@ -3496,9 +3511,12 @@ async def cc_del(ctx, owner: discord.Member):
 
 
 # sign up for a Community Carrier's notification role
-@slash.slash(name="notify_me", guild_ids=[bot_guild_id],
-             description="Private command: Use in a COMMUNITY CARRIER channel to opt in/out to receive its notifications.")
-async def _notify_me(ctx: SlashContext):
+@bot.command(
+    name="notify_me",
+    description="Private command: Use in a COMMUNITY CARRIER channel to opt in/out to receive its notifications.",
+    scope=[bot_guild_id],
+)
+async def notify_me(ctx: interactions.CommandContext):
 
     # note channel ID
     msg_ctx_id = ctx.channel.id
@@ -3555,9 +3573,12 @@ async def _notify_me(ctx: SlashContext):
         await ctx.send(embed=embed, hidden=True)
 
 # send a notice from a Community Carrier owner to their 'crew'
-@slash.slash(name="send_notice", guild_ids=[bot_guild_id],
-             description="Private command: Used by Community Carrier owners to send notices to their participants.")
-async def _send_notice(ctx: SlashContext, message: str):
+@bot.command(
+    name="send_notice",
+    description="Private command: Used by Community Carrier owners to send notices to their participants.",
+    scope=[bot_guild_id],
+)
+async def send_notice(ctx: interactions.CommandContext, message: str):
     # look up user in community carrier database
     community_carrier_data = find_community_carrier_with_owner_id(ctx.author.id)
 
@@ -3592,9 +3613,12 @@ async def _send_notice(ctx: SlashContext, message: str):
 #                       COMMUNITY NOMINATION COMMANDS
 #
 
-@slash.slash(name="nominate", guild_ids=[bot_guild_id],
-             description="Private command: Nominate an @member to become a Community Pillar.")
-async def _nominate(ctx: SlashContext, user: discord.Member, *, reason: str):
+@bot.command(
+    name="nominate",
+    description="Private command: Nominate an @member to become a Community Pillar.",
+    scope=[bot_guild_id],
+)
+async def nominate(ctx: interactions.CommandContext, user: discord.Member, *, reason: str):
 
     # TODO: command to list nominations for a nominator
 
@@ -3650,9 +3674,12 @@ async def _nominate(ctx: SlashContext, user: discord.Member, *, reason: str):
     return print("Nomination successful")
 
 
-@slash.slash(name="nominate_remove", guild_ids=[bot_guild_id],
-             description="Private command: Remove your Pillar nomination for a user.")
-async def _nominate_remove(ctx: SlashContext, user: discord.Member):
+@bot.command(
+    name="nominate_remove",
+    description="Private command: Remove your Pillar nomination for a user.",
+    scope=[bot_guild_id],
+)
+async def nominate_remove(ctx: interactions.CommandContext, user: discord.Member):
 
     print(f"{ctx.author} wants to un-nominate {user}")
 
@@ -3971,4 +3998,4 @@ async def on_command_error(ctx, error):
         await ctx.send(f"Sorry, that didn't work. Check your syntax and permissions, error: {error}")
 
 
-bot.run(TOKEN)
+bot.start()
