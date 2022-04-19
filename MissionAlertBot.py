@@ -947,15 +947,19 @@ slash = SlashCommand(bot, sync_commands=True)
 @bot.event
 async def on_ready():
     print(f'{bot.user.name} has connected to Discord!')
+    # define our two background tasks
+    lasttrade_task = asyncio.create_task(lasttrade_cron.start())
+    reddit_task = asyncio.create_task(_monitor_reddit_comments())
     # start the lasttrade_cron loop.
-    await lasttrade_cron.start()
-    # reddit monitor must be at the END of this function
-    await _monitor_reddit_comments()
+    await lasttrade_task
+    # start monitoring reddit comments
+    await reddit_task
 
 
 
 # monitor reddit comments
 async def _monitor_reddit_comments():
+    print("Reddit monitor started")
     while True:
         try:
             # TODO: what happens if there's an error in this process, e.g. reddit is down?
