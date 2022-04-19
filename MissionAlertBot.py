@@ -948,10 +948,9 @@ slash = SlashCommand(bot, sync_commands=True)
 async def on_ready():
     print(f'{bot.user.name} has connected to Discord!')
     # define our two background tasks
-    lasttrade_task = asyncio.create_task(lasttrade_cron.start())
     reddit_task = asyncio.create_task(_monitor_reddit_comments())
     # start the lasttrade_cron loop.
-    await lasttrade_task
+    await lasttrade_cron.start()
     # start monitoring reddit comments
     await reddit_task
 
