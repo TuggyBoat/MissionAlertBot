@@ -7,6 +7,7 @@
 import ast
 import copy
 from doctest import debug_script
+from msilib import knownbits
 from pydoc import describe
 import re
 import tempfile
@@ -3031,10 +3032,6 @@ def _configure_all_carrier_detail_embed(embed, carrier_data: CarrierData):
 @commands.has_any_role('Community Team', 'Mod', 'Admin', 'Council')
 async def cc(ctx, owner: discord.Member, *, channel_name: str):
 
-    # TODO:
-    # - embeds instead of normal messages for all cc interactions?
-    # - tidy up messages after actions complete?
-
     stripped_channel_name = _regex_alphanumeric_with_hyphens(channel_name)
     print(f"{ctx.author} used m.cc")
     # check the channel name isn't something utterly stupid
@@ -3058,9 +3055,12 @@ async def cc(ctx, owner: discord.Member, *, channel_name: str):
         return message.author == ctx.author and message.channel == ctx.channel and \
                                  message.content.lower() in ["y", "n"]
 
+
 # check whether a role exists with the same name
     new_role = discord.utils.get(ctx.guild.roles, name=stripped_channel_name)
-    if new_role:
+    role_create = False if new_role else True
+
+    if not role_create:
         # if a new role exists we won't use it because it could lead to security concerns :(
         print(f"Role {new_role} already exists.")
         # role exists, cancel the process and inform the user 
@@ -3068,23 +3068,36 @@ async def cc(ctx, owner: discord.Member, *, channel_name: str):
         await ctx.send(embed=embed)
         return
 
-    else:
-        # role does not exist, create it
-        new_role = await ctx.guild.create_role(name=stripped_channel_name)
-        print(f"Created {new_role}")
-        print(f'Roles: {ctx.guild.roles}')
-        if not new_role:
-            raise EnvironmentError(f'Could not create role {stripped_channel_name}')
-        embed = discord.Embed(description=f"Created role <@&{new_role.id}>.", color=constants.EMBED_COLOUR_OK)
-        await ctx.send(embed=embed)
-
-# check whether a channel already exists with that name
-
+    # check whether a channel already exists with that name
+    #
+    # we use a '_cc' suffix to identify whether channels are eligible for re-use as Community Carriers
+    # otherwise users could be mischievous and use e.g. #raxxla
+    #
+    # first see if there's a channel matching the given string as-is
     new_channel = discord.utils.get(ctx.guild.channels, name=stripped_channel_name)
-
+    
     if new_channel:
+        if new_channel.name.endswith('_cc'):
+            print(f"Channel detected matching user string, ends with _cc: {new_channel.name}")
+            # if the user used _cc in their channel name this will be true and we can proceed
+            reuse_channel = True if new_channel else False
+        else:
+            # channel match that doesn't end in cc, they can't use it
+            embed = discord.Embed(description=f"**Error**: The channel <#{new_channel.id}> is not a valid Community Carrier channel."
+                                f" Please choose a different name for your Community Carrier, or ask an admin to rename"
+                                f" the existing one to add \"**_cc**\" to the end then try again.", color=constants.EMBED_COLOUR_ERROR)
+            await ctx.send(embed=embed)
+            return
+
+    else:
+        # now see if there's a channel matching the user string + "_cc"    
+        new_channel = discord.utils.get(ctx.guild.channels, name=f'{stripped_channel_name}_cc')
+        # if it exists, prompt to re-use it, else create it
+        reuse_channel = True if new_channel else False
+
+    if reuse_channel:
         print(f"Channel {new_channel} already exists.")
-        # channel exists, ask if they want to use it
+        # channel exists and is safe to use, ask if they want to use it
         embed = discord.Embed(description=f"Channel already exists: <#{new_channel.id}>. Do you wish to use this existing channel? **y**/**n**", color=constants.EMBED_COLOUR_QU)
         qu_msg = await ctx.send(embed=embed)
         try:
@@ -3114,7 +3127,9 @@ async def cc(ctx, owner: discord.Member, *, channel_name: str):
         await qu_msg.delete()
     else:
         # channel does not exist, create it
-        new_channel = await ctx.guild.create_text_channel(stripped_channel_name, category=category)
+        stripped_channel_name = stripped_channel_name if stripped_channel_name.endswith('_cc') else f'{stripped_channel_name}_cc'
+
+        new_channel = await ctx.guild.create_text_channel(f"{stripped_channel_name}", category=category)
         print(f"Created {new_channel}")
 
         print(f'Channels: {ctx.guild.channels}')
@@ -3123,6 +3138,16 @@ async def cc(ctx, owner: discord.Member, *, channel_name: str):
         await ctx.send(embed=embed)
         if not new_channel:
             raise EnvironmentError(f'Could not create carrier channel {stripped_channel_name}')
+
+    if role_create:
+        # create pingable role to go with channel
+        new_role = await ctx.guild.create_role(name=stripped_channel_name)
+        print(f"Created {new_role}")
+        print(f'Roles: {ctx.guild.roles}')
+        if not new_role:
+            raise EnvironmentError(f'Could not create role {stripped_channel_name}')
+        embed = discord.Embed(description=f"Created role <@&{new_role.id}>.", color=constants.EMBED_COLOUR_OK)
+        await ctx.send(embed=embed)
 
     # now we have the channel and it's in the correct category, we need to give the user CC role and add channel permissions
 
@@ -3169,7 +3194,8 @@ async def cc(ctx, owner: discord.Member, *, channel_name: str):
     except:
         raise EnvironmentError(f'Could not set channel permissions for {owner.display_name} in {new_channel}')
 
-    # now we enter it into the community carriers table
+
+    # now we enter everything into the community carriers table
     print("Locking carrier db...")
     await carrier_db_lock.acquire()
     print("Carrier DB locked.")
@@ -3184,7 +3210,7 @@ async def cc(ctx, owner: discord.Member, *, channel_name: str):
         print("Carrier DB unlocked.")
 
     # tell the user what's going on
-    embed = discord.Embed(description=f"<@{owner.id}> is now a <@&{cc_role_id}> and owns <#{new_channel.id}> with notification role <@&{new_role.id}>.\n\nNote channels and roles **CAN be freely renamed** without affecting registration.", color=constants.EMBED_COLOUR_OK)
+    embed = discord.Embed(description=f"<@{owner.id}> is now a <@&{cc_role_id}> and owns <#{new_channel.id}> with notification role <@&{new_role.id}>.\n\nNote channels and roles **CAN BE FREELY RENAMED** without affecting registration.", color=constants.EMBED_COLOUR_OK)
     await ctx.send(embed=embed)
 
     # add a note in bot_spam
@@ -3411,6 +3437,10 @@ async def cc_del(ctx, owner: discord.Member):
             # now make sure it has the default permissions for the archive category
             await channel.edit(sync_permissions=True)
             print("Synced permissions")
+            # now make sure it ends with _cc so it can be re-used if desired
+            if not channel.name.endswith('_cc'):
+                print("Appending \'_cc\' to channel name")
+                await channel.edit(name=f'{channel.name}_cc')
 
             embed.add_field(name="Channel", value=f"<#{channel_id}> moved to Archives.", inline=False)
 
