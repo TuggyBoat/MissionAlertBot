@@ -7,12 +7,12 @@
 import ast
 import copy
 from doctest import debug_script
-from msilib import knownbits
 from pydoc import describe
 import re
 import tempfile
 # from turtle import color
 from typing import Union
+import enum
 
 from PIL import Image, ImageFont, ImageDraw
 import os
@@ -456,11 +456,26 @@ async def add_carrier_to_database(short_name, long_name, carrier_id, channel, ch
 DATABASE SEARCH FUNCTIONS
 """
 
+# class for CCO Carrier database
+class CarrierDbFields(enum.Enum):
+    longname = 'longname'
+    shortname = 'shortname'
+    cid = 'cid'
+    channelname = 'discordchannel'
+    channelid = 'channelid'
+    ownerid = 'ownerid'
+    lasttrade = 'lasttrade'
+    p_id = 'p_ID'
 
+# class for CC database
+class CCDbFields(enum.Enum):
+    ownerid = 'ownerid'
+    channelid = 'channelid'
+    roleid = 'roleid'
 
 # function to remove a carrier
 async def delete_carrier_from_db(p_id):
-    carrier = find_carrier(p_id, "p_ID")
+    carrier = find_carrier(p_id, CarrierDbFields.p_id.name)
     try:
         await carrier_db_lock.acquire()
         carrier_db.execute(f"DELETE FROM carriers WHERE p_ID = {p_id}")
@@ -527,17 +542,17 @@ def _delete_all_from_database(database):
 # function to search for a carrier
 def find_carrier(searchterm, searchfield):
     """
-    Finds any carriers matching a searchterm
+    Finds any carriers from the specified column matching the given searchterm.
 
-    :param str searchterm: Search term to match
-    :param str searchfield: DB column to match against
-    :returns: CarrierData object for the exact match
+    :param searchterm: Search term to match
+    :param searchfield: DB column to match against
+    :returns: A single CarrierData object
     :rtype: CarrierData
     """
     # TODO: This needs to check an exact not a `LIKE`
     carrier_db.execute(
-        f"SELECT * FROM carriers WHERE {searchfield} LIKE (?)",
-        (f'%{searchterm}%',))
+        f"SELECT * FROM carriers WHERE {searchfield} LIKE (?)", (f'%{searchterm}%',)
+        )
     carrier_data = CarrierData(carrier_db.fetchone())
     print(f"FC {carrier_data.pid} is {carrier_data.carrier_long_name} {carrier_data.carrier_identifier} called by "
           f"shortname {carrier_data.carrier_short_name} with channel #{carrier_data.discord_channel} called "
@@ -549,7 +564,7 @@ def find_carrier(searchterm, searchfield):
 # TODO: make every carrier longname search prompt with multiple results and use this function
 def find_carriers_mult(searchterm, searchfield):
     """
-    Returns all carriers matching the searchterm
+    Returns all carriers matching the searchterm from the searchfield
 
     :param searchterm: The searchterm to match
     :param searchfield: The db field to match against
@@ -951,7 +966,7 @@ async def _monitor_reddit_comments():
                         print(f'Found mission data: {mission_data}')
 
                         # now we need to lookup the carrier data in the db
-                        carrier_data = find_carrier(mission_data.carrier_name, "longname")
+                        carrier_data = find_carrier(mission_data.carrier_name, CarrierDbFields.longname.name)
                         
                         # We can't easily moderate Reddit comments so we'll post it to a CCO-only channel
                         
@@ -1066,7 +1081,7 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
         raise ValueError('Missing commodity data')
 
     # check if the carrier can be found, exit gracefully if not
-    carrier_data = find_carrier(carrier_name_search_term, "longname")
+    carrier_data = find_carrier(carrier_name_search_term, CarrierDbFields.longname.name)
     if not carrier_data:
         return await ctx.send(f"No carrier found for {carrier_name_search_term}. You can use `/find` or `/owner` to search for carrier names.")
 
@@ -1584,7 +1599,7 @@ async def _owner(ctx: SlashContext, owner: discord.Member):
 
     try:
         # look for matches for the owner ID in the carrier DB
-        carrier_list = find_carriers_mult(owner.id, "ownerid")
+        carrier_list = find_carriers_mult(owner.id, CarrierDbFields.ownerid.name)
 
         if not carrier_list:
             await ctx.send(f"No carriers found owned by <@{owner.id}>", hidden=True) 
@@ -1847,7 +1862,7 @@ async def _cleanup_completed_mission(ctx, mission_data, reddit_complete_text, di
             await ctx.send(embed=embed)
         
         # notify owner if not command author
-        carrier_data = find_carrier(mission_data.carrier_name, "longname")
+        carrier_data = find_carrier(mission_data.carrier_name, CarrierDbFields.longname.name)
         if not ctx.author.id == carrier_data.ownerid:
             print("Notify carrier owner")
             # notify in channel - not sure this is needed anymore, leaving out for now
@@ -2072,7 +2087,7 @@ async def _find(ctx: SlashContext, carrier_name_search_term: str):
     print(f"{ctx.author} used /find for '{carrier_name_search_term}' in {ctx.channel}")
 
     try:
-        carrier_data = find_carrier(carrier_name_search_term, "longname")
+        carrier_data = find_carrier(carrier_name_search_term, CarrierDbFields.longname.name)
         if carrier_data:
             print(f"Found {carrier_data}")
             embed = discord.Embed(title="Fleet Carrier Search Result",
@@ -2216,7 +2231,7 @@ async def carrier_add(ctx, short_name: str, long_name: str, carrier_id: str, own
         return await ctx.channel.send(f'ERROR: Invalid carrier ID. Expected: XXX-XXX, received {carrier_id}.')
 
     # Only add to the carrier DB if it does not exist, if it does exist then the user should not be adding it.
-    carrier_data = find_carrier(long_name, "longname")
+    carrier_data = find_carrier(long_name, CarrierDbFields.longname.name)
     if carrier_data:
         # Carrier exists already, go skip it.
         print(f'Request recieved from {ctx.author} to add a carrier that already exists in the database ({long_name}).')
@@ -2242,7 +2257,7 @@ async def carrier_add(ctx, short_name: str, long_name: str, carrier_id: str, own
     # finally, send all the info to the db
     await add_carrier_to_database(short_name, long_name, carrier_id, stripped_name.lower(), 0, owner_id)
 
-    carrier_data = find_carrier(long_name, "longname")
+    carrier_data = find_carrier(long_name, CarrierDbFields.longname.name)
     embed = discord.Embed(title="Fleet Carrier successfully added to database",
                           color=constants.EMBED_COLOUR_OK)
     embed = _add_common_embed_fields(embed, carrier_data)
@@ -2262,7 +2277,7 @@ async def carrier_del(ctx, db_id: int):
         return await ctx.send(f'Sorry, you can only run this command out of: {bot_command_channel}.')
 
     try:
-        carrier_data = find_carrier(db_id, "p_ID")
+        carrier_data = find_carrier(db_id, CarrierDbFields.p_id.name)
         if carrier_data:
             embed = discord.Embed(title="Delete Fleet Carrier", description=f"Result for {db_id}",
                                   color=constants.EMBED_COLOUR_OK)
@@ -2311,7 +2326,7 @@ async def carrier_del(ctx, db_id: int):
 @commands.has_any_role('Certified Carrier', 'Trainee')
 async def carrier_image(ctx, lookname):
     print(f"{ctx.author} called m.carrier_image for {lookname}")
-    carrier_data = find_carrier(lookname, "longname")
+    carrier_data = find_carrier(lookname, CarrierDbFields.longname.name)
 
     # check carrier exists
     if not carrier_data:
@@ -2546,7 +2561,7 @@ async def carrier_image(ctx, lookname):
                                     'command.')
 async def findshort(ctx, shortname_search_term: str):
     try:
-        carriers = find_carriers_mult(shortname_search_term, "shortname")
+        carriers = find_carriers_mult(shortname_search_term, CarrierDbFields.shortname.name)
         if carriers:
             carrier_data = None
 
@@ -2642,7 +2657,7 @@ def _get_id_from_mention(mention):
                                'Syntax: m.find <search_term>')
 async def find(ctx, carrier_name_search_term: str):
     try:
-        carriers = find_carriers_mult(carrier_name_search_term, "longname")
+        carriers = find_carriers_mult(carrier_name_search_term, CarrierDbFields.longname.name)
         if carriers:
             carrier_data = None
 
@@ -2715,7 +2730,7 @@ async def findid(ctx, db_id: int):
                 return await ctx.send(
                     f'Computer says "The input must be a valid integer, you gave us a {type(db_id)} with value: '
                     f'{db_id}"')
-        carrier_data = find_carrier(db_id, "p_ID")
+        carrier_data = find_carrier(db_id, CarrierDbFields.p_id.name)
         if carrier_data:
             embed = discord.Embed(title="Fleet Carrier DB# Search Result",
                                   description=f"Displaying carrier with DB# {carrier_data.pid}",
@@ -2766,7 +2781,7 @@ async def edit_carrier(ctx, carrier_name_search_term: str):
 
     # Go fetch the carrier details by searching for the name
 
-    carrier_data = copy.copy(find_carrier(carrier_name_search_term, "longname"))
+    carrier_data = copy.copy(find_carrier(carrier_name_search_term, CarrierDbFields.longname.name))
     print(carrier_data)
     if carrier_data:
         embed = discord.Embed(title=f"Edit DB request received.",
@@ -2839,7 +2854,7 @@ async def edit_carrier(ctx, carrier_name_search_term: str):
                   f'images/{edit_carrier_data.carrier_short_name}.png')
 
         # Go grab the details again, make sure it is correct and display to the user
-        updated_carrier_data = find_carrier(edit_carrier_data.carrier_long_name, "longname")
+        updated_carrier_data = find_carrier(edit_carrier_data.carrier_long_name, CarrierDbFields.longname.name)
         if updated_carrier_data:
             embed = discord.Embed(title=f"Reading the settings from DB:",
                                   description=f"Double check and re-run if incorrect the settings for old name: "
@@ -3040,7 +3055,7 @@ async def cc(ctx, owner: discord.Member, *, channel_name: str):
         return await ctx.send(embed=embed)
 
     # first check the user isn't already in the DB, if they are, then stop
-    community_carrier_data = find_community_carrier(owner.id, "ownerid")
+    community_carrier_data = find_community_carrier(owner.id, CCDbFields.ownerid.name)
     if community_carrier_data:
         # TODO: this should be fetchone() not fetchall but I can't make it work otherwise
         for community_carrier in community_carrier_data:
@@ -3079,8 +3094,8 @@ async def cc(ctx, owner: discord.Member, *, channel_name: str):
     if new_channel:
         if new_channel.name.endswith('_cc'):
             print(f"Channel detected matching user string, ends with _cc: {new_channel.name}")
-            # if the user used _cc in their channel name this will be true and we can proceed
-            reuse_channel = True if new_channel else False
+            # we can re-use this channel safely
+            reuse_channel = True
         else:
             # channel match that doesn't end in cc, they can't use it
             embed = discord.Embed(description=f"**Error**: The channel <#{new_channel.id}> is not a valid Community Carrier channel."
@@ -3332,7 +3347,7 @@ async def cc_list(ctx):
 @commands.has_any_role('Community Team', 'Mod', 'Admin', 'Council')
 async def cc_owner(ctx, owner: discord.Member):
 
-    community_carrier_data = find_community_carrier(owner.id, "ownerid")
+    community_carrier_data = find_community_carrier(owner.id, CCDbFields.ownerid.name)
     if community_carrier_data:
         # TODO: this should be fetchone() not fetchall but I can't make it work otherwise
         for community_carrier in community_carrier_data:
@@ -3355,7 +3370,7 @@ async def cc_del(ctx, owner: discord.Member):
                                  message.content.lower() in ["d", "a", "c"]
 
     # search for the user's database entry
-    community_carrier_data = find_community_carrier(owner.id, "ownerid")
+    community_carrier_data = find_community_carrier(owner.id, CCDbFields.ownerid.name)
     if not community_carrier_data:
         embed = discord.Embed(description=f"Error: No Community Carrier registered to {owner.display_name}.", color=constants.EMBED_COLOUR_ERROR)
         await ctx.send(embed=embed)
@@ -3494,7 +3509,7 @@ async def _notify_me(ctx: SlashContext):
     spamchannel = bot.get_channel(bot_spam_id)
 
     # look for a match for the channel ID in the community carrier DB
-    community_carrier_data = find_community_carrier(msg_ctx_id, "channelid")
+    community_carrier_data = find_community_carrier(msg_ctx_id, CCDbFields.channelid.name)
 
     if not community_carrier_data:
         # if there's no channel match, return an error
@@ -3546,7 +3561,7 @@ async def _notify_me(ctx: SlashContext):
              description="Private command: Used by Community Carrier owners to send notices to their participants.")
 async def _send_notice(ctx: SlashContext, message: str):
     # look up user in community carrier database
-    community_carrier_data = find_community_carrier(ctx.author.id, "ownerid")
+    community_carrier_data = find_community_carrier(ctx.author.id, CCDbFields.ownerid.name)
 
     # check if the author is a CC owner
     if not community_carrier_data:
