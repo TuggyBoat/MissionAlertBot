@@ -3934,7 +3934,12 @@ async def lasttrade_cron():
         now = datetime.now(tz=timezone.utc)
         lasttrade_max = now - timedelta(days=28)
         # get carriers who last traded >28 days ago
-        carrier_db.execute(f"SELECT * FROM carriers WHERE lasttrade < {int(lasttrade_max.timestamp())}")
+        # for owners with multiple carriers look at only the most recently used
+        carrier_db.execute(f'''
+                            SELECT p_ID,shortname,ownerid,max(lasttrade)
+                            FROM carriers WHERE lasttrade < {int(lasttrade_max.timestamp())}
+                            GROUP BY ownerid
+                            ''')
         carriers = [CarrierData(carrier) for carrier in carrier_db.fetchall()]
         for carrier_data in carriers:
             # check roles on owners, remove/add as needed.
