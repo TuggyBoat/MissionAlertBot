@@ -3093,6 +3093,7 @@ async def cc(ctx, owner: discord.Member, *, channel_name: str):
     
     if new_channel:
         if new_channel.name.endswith('_cc'):
+            # maybe the user added the _cc themselves, we'll allow them to use it
             print(f"Channel detected matching user string, ends with _cc: {new_channel.name}")
             # we can re-use this channel safely
             reuse_channel = True
@@ -3127,6 +3128,18 @@ async def cc(ctx, owner: discord.Member, *, channel_name: str):
                 # they want to use the existing channel, so we have to move it to the right category
                 print(f"Using existing channel {new_channel} and making {owner.display_name} its owner.")
                 try:
+                    if not stripped_channel_name.endswith('_cc'):
+                        # allow user to use _cc themselves if they wish, doesn't cause us any issues
+                        print("Removing \'_cc\' from archived channel name")
+                        new_channel_name = new_channel.name
+                        print(f'Current name: {new_channel.name}')
+                        new_channel_name = re.sub('\_cc$', '', new_channel_name)
+                        print(f'Target name: {new_channel_name}')
+
+                        # now rename the channel if needed
+                        await new_channel.edit(name=f'{new_channel_name}')
+                        print(f"channel renamed: {new_channel.name}")
+
                     await new_channel.edit(category=category)
                     embed = discord.Embed(description=f"Existing channel <#{new_channel.id}> moved to {category.name}.", color=constants.EMBED_COLOUR_OK)
                     await ctx.send(embed=embed)
@@ -3142,7 +3155,6 @@ async def cc(ctx, owner: discord.Member, *, channel_name: str):
         await qu_msg.delete()
     else:
         # channel does not exist, create it
-        stripped_channel_name = stripped_channel_name if stripped_channel_name.endswith('_cc') else f'{stripped_channel_name}_cc'
 
         new_channel = await ctx.guild.create_text_channel(f"{stripped_channel_name}", category=category)
         print(f"Created {new_channel}")
@@ -3387,7 +3399,7 @@ async def cc_del(ctx, owner: discord.Member):
                                       f"• Delete the associated role <@&{role_id}>\n"
                                       f"• Delete or Archive the channel <#{channel_id}>\n\n"
                                       f"**WARNING**:\n• **Deleted** channels are gone forever and can NOT be recovered.\n"
-                                      f"• **Archived** channels can be re-activated by `m.cc` at any time.\n\n"
+                                      f"• **Archived** channels are appended with `_cc` and can be re-activated by `m.cc` at any time.\n\n"
                                       f"You can choose to (**d**)elete the channel, (**a**)rchive the channel, or (**c**)ancel this operation.",
                           color=constants.EMBED_COLOUR_QU)
     qu_embed = await ctx.send(embed=embed)
