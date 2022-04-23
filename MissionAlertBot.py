@@ -649,7 +649,7 @@ def find_mission(searchterm, searchfield):
     :returns: list[mission data]
     """
     mission_db.execute(f'''SELECT * FROM missions WHERE {searchfield} LIKE (?)''',
-                        ('%' + searchterm + '%',))
+                        (f'%{searchterm}%',))
     mission_data = MissionData(mission_db.fetchone())
     print(f'Found mission data: {mission_data}')
     return mission_data
