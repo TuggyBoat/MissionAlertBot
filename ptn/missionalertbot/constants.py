@@ -1,6 +1,7 @@
 import ast
 import os
-import interactions
+import discord
+from discord.ext import commands
 from dotenv import load_dotenv
 
 # Get the discord token from the local .env file. Deliberately not hosted in the repo or Discord takes the bot down
@@ -85,7 +86,7 @@ TOKEN = os.getenv('MAB_BOT_DISCORD_TOKEN_PROD') if _production else os.getenv('M
 
 
 # define bot object
-bot = interactions.Client(token=TOKEN)
+bot = commands.Bot(command_prefix='m.', intents=discord.Intents.all())
 
 
 # define constants based on prod or test environment

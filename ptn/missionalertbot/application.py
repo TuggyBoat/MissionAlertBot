@@ -11,7 +11,7 @@ def run():
     :returns: None
     """
     bot.add_cog(DiscordBotCommands())
-    bot.start()
+    bot.run(TOKEN)
 
 
 if __name__ == '__main__':
