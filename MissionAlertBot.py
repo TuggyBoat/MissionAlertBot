@@ -3936,8 +3936,9 @@ async def lasttrade_cron():
         # get carriers who last traded >28 days ago
         # for owners with multiple carriers look at only the most recently used
         carrier_db.execute(f'''
-                            SELECT * FROM carriers WHERE lasttrade < {int(lasttrade_max.timestamp())}
-                            GROUP BY ownerid ORDER BY lasttrade DESC
+                            SELECT p_ID,shortname,ownerid,max(lasttrade)
+                            FROM carriers WHERE lasttrade < {int(lasttrade_max.timestamp())}
+                            GROUP BY ownerid
                             ''')
         carriers = [CarrierData(carrier) for carrier in carrier_db.fetchall()]
         for carrier_data in carriers:
