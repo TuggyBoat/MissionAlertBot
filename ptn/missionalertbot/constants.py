@@ -3,6 +3,7 @@ import os
 import discord
 from discord.ext import commands
 from dotenv import load_dotenv
+from PIL import ImageFont
 
 # Get the discord token from the local .env file. Deliberately not hosted in the repo or Discord takes the bot down
 # because the keys are exposed. DO NOT HOST IN THE REPO. Seriously do not do it ...
@@ -70,6 +71,48 @@ EMBED_COLOUR_RP = 0xff00ff              # pink
 EMBED_COLOUR_ERROR = 0x800000           # dark red
 EMBED_COLOUR_QU = 0x80ffff              # same as loading
 EMBED_COLOUR_OK = 0x80ff80              # same as unloading
+
+# defining fonts for pillow use
+REG_FONT = ImageFont.truetype('font/Exo/static/Exo-Light.ttf', 16)
+NAME_FONT = ImageFont.truetype('font/Exo/static/Exo-ExtraBold.ttf', 29)
+TITLE_FONT = ImageFont.truetype('font/Exo/static/Exo-ExtraBold.ttf', 22)
+NORMAL_FONT = ImageFont.truetype('font/Exo/static/Exo-Medium.ttf', 18)
+FIELD_FONT = ImageFont.truetype('font/Exo/static/Exo-Light.ttf', 18)
+
+# random gifs and images
+
+byebye_gifs = [
+    'https://tenor.com/view/explosion-gi-joe-a-real-american-hero-amusement-park-of-terror-the-revenge-of-cobra-boom-gif-17284145',
+    'https://tenor.com/view/ice-cube-bye-felicia-bye-gif-8310816',
+    'https://tenor.com/view/madagscar-penguins-kaboom-gif-9833865',
+    'https://tenor.com/view/boom-explosion-moonbeam-city-gif-20743300',
+]
+
+boom_gifs = [
+    'https://tenor.com/view/explosion-gi-joe-a-real-american-hero-amusement-park-of-terror-the-revenge-of-cobra-boom-gif-17284145',
+    'https://tenor.com/view/ice-cube-bye-felicia-bye-gif-8310816',
+    'https://c.tenor.com/v_d_Flu6pY0AAAAM/countdown-lastseconds.gif',
+    'https://tenor.com/view/final-countdown-countdown-europe-counting-music-video-gif-4789617',
+    'https://tenor.com/view/self-destruct-mission-impossible-conversation-tape-match-gif-20113224',
+    'https://tenor.com/view/boom-explosion-moonbeam-city-gif-20743300',
+]
+
+hello_gifs = [
+    'https://tenor.com/view/hello-there-hi-there-greetings-gif-9442662',
+    'https://tenor.com/view/hey-tom-hanks-forrest-gump-gif-5114770',
+    'https://tenor.com/view/hello-there-baby-yoda-mandolorian-hello-gif-20136589',
+    'https://tenor.com/view/oh-hello-there-sassy-fab-gif-14129058',
+    'https://tenor.com/view/world-star-hey-girl-hey-there-when-you-see-your-crush-feeling-yourself-gif-10605207',
+    'https://tenor.com/view/bye-jim-carrey-ciao-gif-5139786',
+    'https://tenor.com/view/hi-friends-baby-goat-saying-hello-saying-hi-hi-neighbor-gif-14737423',
+]
+
+error_gifs = [
+    'https://tenor.com/view/beaker-fire-shit-omg-disaster-gif-4767835',
+    'https://tenor.com/view/nothingtosee-disperse-casual-explosion-gif-4545906',
+    'https://tenor.com/view/spongebob-patrick-panic-run-scream-gif-4656335',
+    'https://tenor.com/view/angry-panda-rage-mad-gif-11780191',
+]
 
 # link to our Discord by way of Josh's original post on Reddit
 REDDIT_DISCORD_LINK_URL = \

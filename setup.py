@@ -6,7 +6,7 @@ from importlib import util
 from setuptools import setup
 
 NAMESPACE = 'ptn'
-COMPONENT = 'adroomba'
+COMPONENT = 'missionalertbot'
 
 here = Path().absolute()
 
@@ -25,23 +25,24 @@ with io.open(os.path.join(here, 'README.md'), encoding='utf-8') as f:
 setup(
     name=f'{NAMESPACE}.{COMPONENT}',
     version=metadata.__version__,
-    packages=['ptn.adroomba', 'ptn.adroomba.botcommands'],
-    description='Pilots Trade Network Ad Roomba Bot',
+    packages=['ptn.missionalertbot', 'ptn.missionalertbot.botcommands', 'ptn.missionalertbot.database'],
+    description='Pilots Trade Network Mission Alert Bot',
     long_description=long_description,
-    author='Graeme Cruickshank',
+    author='Charles Tosh',
     url='',
     install_requires=[
-        'discord',
+        'discord.py',
+        'python-dotenv',
     ],
     entry_points={
         'console_scripts': [
-            'roomba=ptn.adroomba.application:run',
+            'missionalertbot=ptn.missionalertbot.application:run',
         ],
     },
     license='None',
     keyworkd='PTN',
     project_urls={
-        "Source": "https://github.com/PilotsTradeNetwork/AdRoomba",
+        "Source": "https://github.com/PilotsTradeNetwork/MissionAlertBot",
     },
-    python_required='>=3.9',
+    python_required='>=3.8',
 )

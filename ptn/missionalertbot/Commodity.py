@@ -1,6 +1,3 @@
-import sqlite3
-
-
 class Commodity:
 
     def __init__(self, info_dict=None):

@@ -1,6 +1,3 @@
 # ignore cache and backup folders
 __pycache__/
 backup/
-
-# ignore carrier and mission databases
-database/

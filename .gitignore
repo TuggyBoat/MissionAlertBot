@@ -1,3 +1,5 @@
 .idea
 .env
 praw.ini
+*.db
+*.pyc

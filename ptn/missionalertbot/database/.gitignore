@@ -1,0 +1,5 @@
+# ignore SQL dump
+db_sql/
+
+# ignore .db files
+*.db
