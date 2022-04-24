@@ -665,6 +665,10 @@ async def _is_carrier_channel(carrier_data):
     else:
         return
 
+"""
+Embeds - gather standard embeds here TODO
+"""
+
 # return an embed featuring either the active mission or the not found message
 async def _is_mission_active_embed(carrier_data):
     print("Called _is_mission_active_embed")
@@ -763,15 +767,15 @@ async def find_commodity(commodity_search_term, ctx):
               f"maxsell {commodity.max_sell} minbuy {commodity.min_buy} maxprofit {commodity.max_profit}")
     return commodity
 
-
+# refactored database search commands above 24/04/2022 Sihmm
 
 """
-IMAGE GEN STUFF
+IMAGE GEN STUFF - refactored into ImageHandling.py
 """
 
 
 
-# defining fonts for pillow use
+# defining fonts for pillow use - refactored into constants.py
 REG_FONT = ImageFont.truetype('font/Exo/static/Exo-Light.ttf', 16)
 NAME_FONT = ImageFont.truetype('font/Exo/static/Exo-ExtraBold.ttf', 29)
 TITLE_FONT = ImageFont.truetype('font/Exo/static/Exo-ExtraBold.ttf', 22)
@@ -779,7 +783,7 @@ NORMAL_FONT = ImageFont.truetype('font/Exo/static/Exo-Medium.ttf', 18)
 FIELD_FONT = ImageFont.truetype('font/Exo/static/Exo-Light.ttf', 18)
 
 
-# get date and time
+# get date and time - refactored into GetFormattedDateString.py
 def get_formatted_date_string():
     """
     Returns a tuple of the Elite Dangerous Time and the current real world time.
@@ -842,7 +846,7 @@ async def create_carrier_mission_image(carrier_data, commodity, system, station,
 
 
 """
-TEXT GEN FUNCTIONS
+TEXT GEN FUNCTIONS - moved to MissionGenerator.py refactor Sihmm
 """
 
 
@@ -897,7 +901,7 @@ OTHER
 def user_exit():
     sys.exit("User requested exit.")
 
-
+# lock channel - now in MissionGenerator.py
 async def lock_mission_channel():
     print("Attempting channel lock...")
     await carrier_channel_lock.acquire()
@@ -915,6 +919,8 @@ BOT COMMANDS
 bot = commands.Bot(command_prefix='m.', intents=discord.Intents.all())
 slash = SlashCommand(bot, sync_commands=True)
 
+# this needs to be refactored into DiscordBotCommands.py as a listener for on_ready(self)
+# two tasks referenced here moved to BackgroundTasks.py refactor in progress Sihmm 24/04/2022
 @bot.event
 async def on_ready():
     print(f'{bot.user.name} has connected to Discord!')
@@ -927,7 +933,6 @@ async def on_ready():
 
 
 
-# monitor reddit comments
 async def _monitor_reddit_comments():
     print("Reddit monitor started")
     while True:

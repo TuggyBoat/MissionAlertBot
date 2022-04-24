@@ -10,7 +10,7 @@ from datetime import datetime, timezone, timedelta
 
 class DiscordBotCommands(commands.Cog):
     """
-    This class is a collection of generic blocks used throughout the booze bot.
+    This class is a collection of generic blocks used throughout the bot.
     """
 
     @commands.Cog.listener()

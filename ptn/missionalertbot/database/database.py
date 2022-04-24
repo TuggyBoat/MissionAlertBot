@@ -28,7 +28,6 @@ mission_db = missions_conn.cursor()
 # We need some locks to we wait on the DB queries
 carrier_db_lock = asyncio.Lock()
 mission_db_lock = asyncio.Lock()
-carrier_channel_lock = asyncio.Lock()
 
 
 # dump db to .sql file

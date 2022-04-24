@@ -35,3 +35,24 @@ async def _is_mission_active_embed(carrier_data):
     return embed
 
 
+# return an embed summarising a mission database entry
+def _mission_summary_embed(mission_data, embed):
+    embed.add_field(name="System", value=f"{mission_data.system.upper()}", inline=True)
+    embed.add_field(name="Station", value=f"{mission_data.station.upper()} ({mission_data.pad_size}-pads)",
+                    inline=True)
+    embed.add_field(name="Commodity", value=f"{mission_data.commodity.upper()}", inline=True)
+    embed.add_field(name="Quantity and profit",
+                    value=f"{mission_data.demand} units at {mission_data.profit}k profit per unit", inline=True)
+    return embed
+
+# return an embed summarising a carrier database entry
+def _add_common_embed_fields(embed, carrier_data):
+    embed.add_field(name="Carrier Name", value=f"{carrier_data.carrier_long_name}", inline=True)
+    embed.add_field(name="Carrier ID", value=f"{carrier_data.carrier_identifier}", inline=True)
+    embed.add_field(name="Database Entry", value=f"{carrier_data.pid}", inline=True)
+    embed.add_field(name="Discord Channel", value=f"#{carrier_data.discord_channel}", inline=True)
+    embed.add_field(name="Owner", value=f"<@{carrier_data.ownerid}>", inline=True)
+    embed.add_field(name="Shortname", value=f"{carrier_data.carrier_short_name}", inline=True)
+    embed.add_field(name="Last Trade", value=f"<t:{carrier_data.lasttrade}> (<t:{carrier_data.lasttrade}:R>)", inline=True)
+    # shortname is not relevant to users and will be auto-generated in future
+    return embed
