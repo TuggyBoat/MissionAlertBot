@@ -66,7 +66,7 @@ EMBED_COLOUR_OK = 0x80ff80              # same as unloading
 REDDIT_DISCORD_LINK_URL = \
     'https://www.reddit.com/r/PilotsTradeNetwork/comments/l0y7dk/pilots_trade_network_intergalactic_discord_server/'
 
-WORDPRESS_DISCORD_LINK = "https://discord.gg/AfdM4mhh"
+WORDPRESS_DISCORD_LINK_URL = "https://discord.gg/AfdM4mhh"
 
 
 def get_constant(production: bool):
