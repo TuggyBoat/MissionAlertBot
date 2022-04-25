@@ -32,6 +32,13 @@ from dotenv import load_dotenv
 from dateutil.relativedelta import relativedelta
 import constants
 import random
+import json
+
+#Wordpress imports
+from wordpress_xmlrpc import Client, WordPressPost
+from wordpress_xmlrpc.methods.posts import NewPost, DeletePost
+from wordpress_xmlrpc.methods import media
+from wordpress_xmlrpc.compat import xmlrpc_client
 #
 #                       INIT STUFF
 #
@@ -89,6 +96,12 @@ seconds_long = conf['SECONDS_LONG']
 # because the keys are exposed. DO NOT HOST IN THE REPO. Seriously do not do it ...
 load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN_PROD') if _production else os.getenv('DISCORD_TOKEN_TESTING')
+
+#Wordpress stuff
+wordpress_url = conf['WORDPRESS_URL']
+wordpress_user = os.getenv('WORDPRESS_USER')
+wordpress_password = os.getenv('WORDPRESS_PASSWORD')
+wp = Client(wordpress_url, wordpress_user, wordpress_password)
 
 # create reddit instance
 reddit = asyncpraw.Reddit('bot1')
@@ -1237,7 +1250,7 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
         print("Output check displayed")
 
         embed = discord.Embed(title="Where would you like to send the alert?",
-                            description="(**d**)iscord, (**r**)eddit, (**t**)ext for copy/pasting or (**x**) to cancel\n"
+                            description="(**d**)iscord, (**r**)eddit, (**W**)ebsite, (**t**)ext for copy/pasting or (**x**) to cancel\n"
                             "Use (**n**) to also notify PTN Haulers.",
                             color=constants.EMBED_COLOUR_QU)
         embed.set_footer(text="Enter all that apply, e.g. **drn** will send alerts to Discord and Reddit and notify PTN Haulers.")
@@ -1387,7 +1400,7 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
                     except Exception as e:
                         print(f"Error posting to Reddit: {e}")
                         await ctx.send(f"Error posting to Reddit: {e}\nAttempting to continue with rest of mission gen...")
-
+                        
             if "n" in msg.content.lower():
                 print("User used option n")
 
@@ -1401,6 +1414,45 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
                             description=f"Pinged <@&{hauler_role_id}> in <#{mission_temp_channel_id}>",
                             color=constants.EMBED_COLOUR_DISCORD)
                 await ctx.send(embed=embed)
+                
+           if "w" in msg.content.lower():
+                #post to website
+                #try in case site is down
+                try:
+                    wordpress_image_data = {
+                        'name': f'{carrier_data.carrier_identifier}.png',
+                        'type': 'image/png',
+                    }
+
+                    with open(file_name, 'rb') as img:
+                        data['bits'] = xmlrpc_client.Binary(img.read())
+
+                    wordpress_image_id = wp.call(media.UploadFile(data))['id']
+                except:
+                    pass
+                #try in case site is down
+                try:
+                    post = WordPressPost()
+                    post.title = wordpress_title
+                    post.content = wordpress_body
+                    post.post_status = "publish"
+                    post.thumbnail = wordpress_image_id
+                    post.slug = f"{carrier_data.carrier_identifier}"
+                    post.terms_names = {
+                      'post_tag': ['Mission-In-Progress'],
+                      'category': ['Trades']
+                    }
+
+                    wordpress_post_id = wp.call(NewPost(post))
+                except:
+                    pass
+                
+                
+
+with open(file_name, 'rb') as img:
+        data['bits'] = xmlrpc_client.Binary(img.read())
+                
+                
         except asyncio.TimeoutError:
             await ctx.send("**Mission not generated or broadcast (no valid response from user).**")
             try:
@@ -1870,6 +1922,10 @@ async def _cleanup_completed_mission(ctx, mission_data, reddit_complete_text, di
                 await submission.mod.spoiler()
             except:
                 await ctx.send("Failed updating Reddit :(")
+                
+        #Delete website post
+        if mission_data.wordpress_post_id != None:
+            wp.call(DeletePost(mission_data.wordpress_post_id))
 
         # delete mission entry from db
         print("Remove from mission database...")
