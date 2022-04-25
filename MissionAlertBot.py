@@ -99,7 +99,7 @@ TOKEN = os.getenv('DISCORD_TOKEN_PROD') if _production else os.getenv('DISCORD_T
 
 #Wordpress stuff
 wordpress_url = conf['WORDPRESS_API_URL']
-wordpress_user = os.getenv('WORDPRESS_USER')
+wordpress_user = os.getenv('WORDPRESS_USER') #Create New .env entrys for the wordpress bot user
 wordpress_password = os.getenv('WORDPRESS_PASSWORD')
 wp = Client(wordpress_url, wordpress_user, wordpress_password)
 
