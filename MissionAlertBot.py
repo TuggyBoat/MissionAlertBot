@@ -1448,11 +1448,6 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
                     pass
                 
                 
-
-with open(file_name, 'rb') as img:
-        data['bits'] = xmlrpc_client.Binary(img.read())
-                
-                
         except asyncio.TimeoutError:
             await ctx.send("**Mission not generated or broadcast (no valid response from user).**")
             try:
