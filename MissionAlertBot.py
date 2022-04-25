@@ -1173,6 +1173,7 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
         reddit_comment_id = None
         reddit_comment_url = None
         discord_alert_id = None
+        wordpress_post_id = None
 
         eta_text = f" (ETA {eta} minutes)" if eta else ""
 
@@ -1920,7 +1921,10 @@ async def _cleanup_completed_mission(ctx, mission_data, reddit_complete_text, di
                 
         #Delete website post
         if mission_data.wordpress_post_id != None:
-            wp.call(DeletePost(mission_data.wordpress_post_id))
+            try: #incase site is down
+                wp.call(DeletePost(mission_data.wordpress_post_id))
+            except:
+                pass
 
         # delete mission entry from db
         print("Remove from mission database...")
