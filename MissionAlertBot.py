@@ -883,6 +883,33 @@ def txt_create_reddit_body(carrier_data, mission_type, commodity, station, syste
             f" and discussion, channel **#{carrier_data.discord_channel}**.")
     return reddit_body
 
+def txt_create_wordpress_title(carrier_data):
+    wordpress_title = f"Trade mission - {carrier_data.carrier_long_name} ({carrier_data.carrier_identifier})"
+    return wordpress_title
+
+
+def txt_create_wordpress_body(carrier_data, mission_type, commodity, station, system, profit, pads, demand, eta_text):
+
+    if mission_type == 'load':
+        wordpress_body = (
+            f"<p>INCOMING WIDEBAND TRANSMISSION: P.T.N. CARRIER LOADING MISSION IN PROGRESS<br><br>"
+            f"BUY FROM: station {station.upper()} ({pads.upper()}-pads) in system **{system.upper()}<br>"
+            f"COMMODITY: {commodity.name}<br>"
+            f"SELL TO: Fleet Carrier {carrier_data.carrier_long_name} ({carrier_data.carrier_identifier})<br>"
+            f"{eta_text}<br>"
+            f"PROFIT: {profit}k/unit : {demand} demand<br>"
+            f"<a href="{constants.WORDPRESS_DISCORD_LINK_URL}">Join us on Discord</a> for mission updates and discussion, channel {carrier_data.discord_channel}.</p>")
+    else:
+        wordpress_body = (
+            f"<p>INCOMING WIDEBAND TRANSMISSION: P.T.N. CARRIER UNLOADING MISSION IN PROGRESS<br><br>"
+            f"BUY FROM: Fleet Carrier {carrier_data.carrier_long_name} ({carrier_data.carrier_identifier})<br>"
+            f"COMMODITY: {commodity.name}<br>"
+            f"SELL TO: station {station.upper()} ({pads.upper()}-pads) in system **{system.upper()}<br>"
+            f"{eta_text}<br>"
+            f"PROFIT: {profit}k/unit : {demand} demand<br>"
+            f"<a href="{constants.WORDPRESS_DISCORD_LINK_URL}">Join us on Discord</a> for mission updates and discussion, channel {carrier_data.discord_channel}.</p>")
+    return wordpress_body
+
 
 
 
