@@ -1587,14 +1587,15 @@ def cleanup_temp_image_file(file_name):
 #
 # add mission to DB, called from mission generator
 async def mission_add(ctx, carrier_data, commodity_data, mission_type, system, station, profit, pads, demand,
-                      rp_text, reddit_post_id, reddit_post_url, reddit_comment_id, reddit_comment_url, discord_alert_id, mission_temp_channel_id):
+                      rp_text, reddit_post_id, reddit_post_url, reddit_comment_id, reddit_comment_url, discord_alert_id, mission_temp_channel_id,
+                     wordpress_post_id):
     backup_database('missions')  # backup the missions database before going any further
 
     print("Called mission_add to write to database")
-    mission_db.execute(''' INSERT INTO missions VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ''', (
+    mission_db.execute(''' INSERT INTO missions VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ''', (
         carrier_data.carrier_long_name, carrier_data.carrier_identifier, mission_temp_channel_id,
         commodity_data.name.title(), mission_type.lower(), system.title(), station.title(), profit, pads.upper(),
-        demand, rp_text, reddit_post_id, reddit_post_url, reddit_comment_id, reddit_comment_url, discord_alert_id
+        demand, rp_text, reddit_post_id, reddit_post_url, reddit_comment_id, reddit_comment_url, discord_alert_id, wordpress_post_id
     ))
     missions_conn.commit()
     print("Mission added to db")
