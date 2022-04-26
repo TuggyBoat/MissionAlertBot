@@ -31,6 +31,7 @@ class MissionData:
         self.reddit_comment_id = info_dict.get('reddit_comment_id', None)
         self.reddit_comment_url = info_dict.get('reddit_comment_url', None)
         self.discord_alert_id = info_dict.get('discord_alert_id', None)
+        self.wordpress_post_id = info_dict.get('wordpress_post_id', None)
 
     def to_dictionary(self):
         """
