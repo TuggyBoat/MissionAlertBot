@@ -24,7 +24,6 @@ PROD_TRADE_CAT = 801558838414409738 # Trade Carrier category on live server
 PROD_ARCHIVE_CAT = 821542402836660284 # Archive category on live server
 PROD_SECONDS_SHORT = 120
 PROD_SECONDS_LONG = 900
-PROD_WORDPRESS_API_URL = "http://ptnwebdev.ddns.net:8181/xmlrpc.php" #Url of the ptn website api
 
 # Testing variables
 
@@ -54,7 +53,6 @@ TEST_TRADE_CAT = 876569219259580436 # Trade Carrier category on live server
 TEST_ARCHIVE_CAT = 877244591579992144 # Archive category on live server
 TEST_SECONDS_SHORT = 5
 TEST_SECONDS_LONG = 10
-TEST_WORDPRESS_API_URL = "http://ptnwebdev.ddns.net:8181/xmlrpc.php" #If there is a diffrent dev site to production
 
 EMBED_COLOUR_LOADING = 0x80ffff         # blue
 EMBED_COLOUR_UNLOADING = 0x80ff80       # green
@@ -105,7 +103,6 @@ def get_constant(production: bool):
             'ARCHIVE_CAT' : PROD_ARCHIVE_CAT,
             'SECONDS_SHORT' : PROD_SECONDS_SHORT,
             'SECONDS_LONG' : PROD_SECONDS_LONG,
-            'WORDPRESS_API_URL' : PROD_WORDPRESS_API_URL
         }
     else:
         result = {
@@ -133,7 +130,6 @@ def get_constant(production: bool):
             'ARCHIVE_CAT' : TEST_ARCHIVE_CAT,
             'SECONDS_SHORT' : TEST_SECONDS_SHORT,
             'SECONDS_LONG' : TEST_SECONDS_LONG,
-            'WORDPRESS_API_URL' : TEST_WORDPRESS_API_URL
         }
 
     return result
