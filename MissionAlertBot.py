@@ -98,10 +98,7 @@ load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN_PROD') if _production else os.getenv('DISCORD_TOKEN_TESTING')
 
 #Wordpress stuff
-wordpress_url = conf['WORDPRESS_API_URL']
-wordpress_user = os.getenv('WORDPRESS_USER') #Create New .env entrys for the wordpress bot user
-wordpress_password = os.getenv('WORDPRESS_PASSWORD')
-wp = Client(wordpress_url, wordpress_user, wordpress_password)
+wp = Client("http://ptnwebdev.ddns.net:8181/xmlrpc.php", "MissionAlertBot", "TBD")
 
 # create reddit instance
 reddit = asyncpraw.Reddit('bot1')
@@ -1431,7 +1428,8 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
 
                     wordpress_image_id = wp.call(media.UploadFile(data))['id']
                 except:
-                    pass
+                    print(f"Error posting Image to Website: {e}")
+                    await ctx.send(f"Error posting Image to Website: {e}\nAttempting to continue with rest of mission gen...")
                 #try in case site is down
                 try:
                     post = WordPressPost()
@@ -1447,7 +1445,8 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
 
                     wordpress_post_id = wp.call(NewPost(post))
                 except:
-                    pass
+                    print(f"Error posting to Website: {e}")
+                    await ctx.send(f"Error posting to Website: {e}\nAttempting to continue with rest of mission gen...")
                 
                 
         except asyncio.TimeoutError:
@@ -1592,7 +1591,7 @@ async def mission_add(ctx, carrier_data, commodity_data, mission_type, system, s
                      wordpress_post_id):
     backup_database('missions')  # backup the missions database before going any further
 
-    print("Called mission_add to write to database")
+    print("Called to write to database")
     mission_db.execute(''' INSERT INTO missions VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ''', (
         carrier_data.carrier_long_name, carrier_data.carrier_identifier, mission_temp_channel_id,
         commodity_data.name.title(), mission_type.lower(), system.title(), station.title(), profit, pads.upper(),
