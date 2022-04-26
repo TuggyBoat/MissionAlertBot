@@ -1468,10 +1468,7 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
                 
             if "w" in msg.content.lower():
                 #post to website
-                #try in case site is down
-
-                print(options.GetOptions([]))
-                
+                #try in case site is down                
                 try:
                     wordpress_image_data = {
                         'name': f'{carrier_data.carrier_identifier}.png',
