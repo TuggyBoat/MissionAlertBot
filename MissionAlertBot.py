@@ -1249,7 +1249,7 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
         print("Output check displayed")
 
         embed = discord.Embed(title="Where would you like to send the alert?",
-                            description="(**d**)iscord, (**r**)eddit, (**W**)ebsite, (**t**)ext for copy/pasting or (**x**) to cancel\n"
+                            description="(**d**)iscord, (**r**)eddit, (**w**)ebsite, (**t**)ext for copy/pasting or (**x**) to cancel\n"
                             "Use (**n**) to also notify PTN Haulers.",
                             color=constants.EMBED_COLOUR_QU)
         embed.set_footer(text="Enter all that apply, e.g. **drn** will send alerts to Discord and Reddit and notify PTN Haulers.")
@@ -1926,7 +1926,8 @@ async def _cleanup_completed_mission(ctx, mission_data, reddit_complete_text, di
             try: #incase site is down
                 wp.call(DeletePost(mission_data.wordpress_post_id))
             except:
-                pass
+                print("Failed To remove Website Post")
+                await ctx.send("Failed updating Website :(")
 
         # delete mission entry from db
         print("Remove from mission database...")
