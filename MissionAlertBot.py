@@ -37,7 +37,7 @@ import json
 #Wordpress imports
 from wordpress_xmlrpc import Client, WordPressPost
 from wordpress_xmlrpc.methods.posts import NewPost, DeletePost
-from wordpress_xmlrpc.methods import media
+from wordpress_xmlrpc.methods import media, options
 from wordpress_xmlrpc.compat import xmlrpc_client
 #
 #                       INIT STUFF
@@ -51,7 +51,7 @@ from MissionData import MissionData
 from CommunityCarrierData import CommunityCarrierData
 from NomineesData import NomineesData
 
-_production = ast.literal_eval(os.environ.get('PTN_MISSION_ALERT_SERVICE', 'False'))
+_production = False #ast.literal_eval(os.environ.get('PTN_MISSION_ALERT_SERVICE', 'False'))
 
 # We need some locks to we wait on the DB queries
 carrier_db_lock = asyncio.Lock()
@@ -101,7 +101,11 @@ TOKEN = os.getenv('DISCORD_TOKEN_PROD') if _production else os.getenv('DISCORD_T
 wp = Client("http://ptnwebdev.ddns.net:8181/xmlrpc.php", "MissionAlertBot", "7d&$lppYYYxMAD)DOPuI59v7")
 
 # create reddit instance
-reddit = asyncpraw.Reddit('bot1')
+reddit = asyncpraw.Reddit(username = "Conshmea23",
+                password = "C0N$hmea23",
+                client_id = "Dbh8wcu5ejvpU5RYQesdNw",
+                client_secret = "LWFqBNB9zpSuOdgwWV8av_ZdP4c7nw",
+                user_agent = "PTN Trade Watcher by /u/Conshmea23")
 
 # connect to sqlite carrier database
 carriers_conn = sqlite3.connect('carriers.db')
@@ -220,6 +224,97 @@ if not check_database_table_exists('carriers', carrier_db):
         ''')
 else:
     print('Carrier database exists, do nothing')
+
+print('Starting up - checking missions database if it exists or not')
+# create missions db if necessary
+if not check_database_table_exists('missions', mission_db):
+    print('Mission database missing - creating it now')
+
+    if os.path.exists(os.path.join(os.getcwd(), 'db_sql', 'missions_dump.sql')):
+        # recreate from backup file
+        print('Recreating mission db database from backup ...')
+        with open(os.path.join(os.getcwd(), 'db_sql', 'missions_dump.sql')) as f:
+            sql_script = f.read()
+            mission_db.executescript(sql_script)
+
+        # print('Loaded the following data: ')
+        # mission_db.execute('''SELECT * from missions ''')
+        # for e in mission_db.fetchall():
+        #     print(f'\t {MissionData(e)}')
+
+    else:
+        # Create a new version
+        print('No backup found - Creating empty database')
+        mission_db.execute('''
+            CREATE TABLE missions(
+                "carrier"	TEXT NOT NULL UNIQUE,
+                "cid"	TEXT,
+                "channelid"	INT,
+                "commodity"	TEXT,
+                "missiontype"	TEXT,
+                "system"	TEXT NOT NULL,
+                "station"	TEXT,
+                "profit"	INTEGER,
+                "pad"	TEXT,
+                "demand"    TEXT,
+                "rp_text"	TEXT,
+                "reddit_post_id"	TEXT,
+                "reddit_post_url"	TEXT,
+                "reddit_comment_id"	TEXT,
+                "reddit_comment_url"	TEXT,
+                "discord_alert_id"	INT,
+                "wordpress_post_id" INT
+            )
+        ''')
+else:
+    print('Mission database exists, do nothing')
+
+print('Starting up - checking if missions database has new "wordpress_post_id" column or not')
+if not check_table_column_exists('wordpress_post_id', 'missions', mission_db):
+    """
+    In order to create the new 'wordpress_post_id' column, a new table has to be created because
+    SQLite does not allow adding a new column with a non-constant value.
+    We then copy data from table to table, and rename them into place.
+    We will leave the backup table in case something goes wrong.
+    There is not enough try/catch here to be perfect. sorry.
+    """ 
+    temp_ts = int(datetime.now(tz=timezone.utc).timestamp())
+    temp_missions_table = 'missions_wordpress_post_id_%s' % temp_ts
+    backup_missions_table = 'missions_backup_%s' % temp_ts
+    print(f'"wordpress_post_id" column missing from missions database, creating new temp table: {temp_missions_table}')
+    # create new temp table with new column for wordpress_post_id.
+    mission_db.execute('''
+        CREATE TABLE {}(
+            "carrier"	TEXT NOT NULL UNIQUE,
+            "cid"	TEXT,
+            "channelid"	INT,
+            "commodity"	TEXT,
+            "missiontype"	TEXT,
+            "system"	TEXT NOT NULL,
+            "station"	TEXT,
+            "profit"	INTEGER,
+            "pad"	TEXT,
+            "demand"    TEXT,
+            "rp_text"	TEXT,
+            "reddit_post_id"	TEXT,
+            "reddit_post_url"	TEXT,
+            "reddit_comment_id"	TEXT,
+            "reddit_comment_url"	TEXT,
+            "discord_alert_id"	INT,
+            "wordpress_post_id" INT
+        )
+    '''.format(temp_missions_table))
+    # copy data from missions table to new temp table.
+    print('Copying mission data to new table.')
+    mission_db.execute('''INSERT INTO {}(carrier, cid, channelid, commodity, missiontype, system, station, profit, pad, demand, rp_text, reddit_post_id, reddit_post_url, reddit_comment_id, reddit_comment_url, discord_alert_id) select * from missions'''.format(temp_missions_table))
+    # rename old table and keep as backup just in case.
+    print(f'Renaming current carriers table to "{backup_missions_table}"')
+    mission_db.execute('''ALTER TABLE missions RENAME TO {}'''.format(backup_missions_table))
+    # rename temp table as original.
+    print(f'Renaming "{temp_missions_table}" temp table to "missions"')
+    mission_db.execute('''ALTER TABLE {} RENAME TO missions'''.format(temp_missions_table))
+    print('Operation complete.')
+    missions_conn.commit()
 
 print('Starting up - checking if carriers database has new "lasttrade" column or not')
 if not check_table_column_exists('lasttrade', 'carriers', carrier_db):
@@ -347,52 +442,6 @@ if not check_database_table_exists('nominees', carrier_db):
         ''')
 else:
     print('Nominees database exists, do nothing')
-
-
-print('Starting up - checking missions database if it exists or not')
-# create missions db if necessary
-if not check_database_table_exists('missions', mission_db):
-    print('Mission database missing - creating it now')
-
-    if os.path.exists(os.path.join(os.getcwd(), 'db_sql', 'missions_dump.sql')):
-        # recreate from backup file
-        print('Recreating mission db database from backup ...')
-        with open(os.path.join(os.getcwd(), 'db_sql', 'missions_dump.sql')) as f:
-            sql_script = f.read()
-            mission_db.executescript(sql_script)
-
-        # print('Loaded the following data: ')
-        # mission_db.execute('''SELECT * from missions ''')
-        # for e in mission_db.fetchall():
-        #     print(f'\t {MissionData(e)}')
-
-    else:
-        # Create a new version
-        print('No backup found - Creating empty database')
-        mission_db.execute('''
-            CREATE TABLE missions(
-                "carrier"	TEXT NOT NULL UNIQUE,
-                "cid"	TEXT,
-                "channelid"	INT,
-                "commodity"	TEXT,
-                "missiontype"	TEXT,
-                "system"	TEXT NOT NULL,
-                "station"	TEXT,
-                "profit"	INTEGER,
-                "pad"	TEXT,
-                "demand"    TEXT,
-                "rp_text"	TEXT,
-                "reddit_post_id"	TEXT,
-                "reddit_post_url"	TEXT,
-                "reddit_comment_id"	TEXT,
-                "reddit_comment_url"	TEXT,
-                "discord_alert_id"	INT,
-                "wordprress_post_id" INT
-            )
-        ''')
-else:
-    print('Mission database exists, do nothing')
-
 
 def dump_database_test(database_name):
     """
@@ -904,21 +953,21 @@ def txt_create_wordpress_body(carrier_data, mission_type, commodity, station, sy
     if mission_type == 'load':
         wordpress_body = (
             f"<p>INCOMING WIDEBAND TRANSMISSION: P.T.N. CARRIER LOADING MISSION IN PROGRESS<br><br>"
-            f"BUY FROM: station {station.upper()} ({pads.upper()}-pads) in system **{system.upper()}<br>"
-            f"COMMODITY: {commodity.name}<br>"
+            f"BUY FROM: station <b>{station.upper()}</b> ({pads.upper()}-pads) in system <b>{system.upper()}</b><br>"
+            f"COMMODITY: <b>{commodity.name}</b><br>"
             f"SELL TO: Fleet Carrier {carrier_data.carrier_long_name} ({carrier_data.carrier_identifier})<br>"
             f"{eta_text}<br>"
             f"PROFIT: {profit}k/unit : {demand} demand<br>"
-            f"<a href="{constants.WORDPRESS_DISCORD_LINK_URL}">Join us on Discord</a> for mission updates and discussion, channel {carrier_data.discord_channel}.</p>")
+            f"<a href='{constants.WORDPRESS_DISCORD_LINK_URL}'>Join us on Discord</a> for mission updates and discussion, channel {carrier_data.discord_channel}.</p>")
     else:
         wordpress_body = (
             f"<p>INCOMING WIDEBAND TRANSMISSION: P.T.N. CARRIER UNLOADING MISSION IN PROGRESS<br><br>"
             f"BUY FROM: Fleet Carrier {carrier_data.carrier_long_name} ({carrier_data.carrier_identifier})<br>"
-            f"COMMODITY: {commodity.name}<br>"
-            f"SELL TO: station {station.upper()} ({pads.upper()}-pads) in system **{system.upper()}<br>"
+            f"COMMODITY: <b>{commodity.name}</b><br>"
+            f"SELL TO: station <b>{station.upper()}</b> ({pads.upper()}-pads) in system <b>{system.upper()}</b><br>"
             f"{eta_text}<br>"
             f"PROFIT: {profit}k/unit : {demand} demand<br>"
-            f"<a href="{constants.WORDPRESS_DISCORD_LINK_URL}">Join us on Discord</a> for mission updates and discussion, channel {carrier_data.discord_channel}.</p>")
+            f"<a href='{constants.WORDPRESS_DISCORD_LINK_URL}'>Join us on Discord</a> for mission updates and discussion, channel {carrier_data.discord_channel}.</p>")
     return wordpress_body
 
 
@@ -967,57 +1016,57 @@ async def on_ready():
 # monitor reddit comments
 async def _monitor_reddit_comments():
     print("Reddit monitor started")
-    while True:
-        try:
-            # TODO: what happens if there's an error in this process, e.g. reddit is down?
+    #while True:
+    #    try:
+    #        # TODO: what happens if there's an error in this process, e.g. reddit is down?
 
-            comment_channel = bot.get_channel(conf['REDDIT_CHANNEL'])
-            # establish a comment stream to the subreddit using async praw
-            subreddit = await reddit.subreddit(to_subreddit)
-            async for comment in subreddit.stream.comments(skip_existing=True):
-                print(f"New reddit comment: {comment}. Is_submitter is {comment.is_submitter}")
-                # ignore comments from the bot / post author
-                if not comment.is_submitter:
-                    # log some data
-                    print(f"{comment.author} wrote:\n {comment.body}\nAt: {comment.permalink}\nIn: {comment.submission}")
+    #        comment_channel = bot.get_channel(conf['REDDIT_CHANNEL'])
+    #        # establish a comment stream to the subreddit using async praw
+    #        subreddit = await reddit.subreddit(to_subreddit)
+    #        async for comment in subreddit.stream.comments(skip_existing=True):
+    #            print(f"New reddit comment: {comment}. Is_submitter is {comment.is_submitter}")
+    #            # ignore comments from the bot / post author
+    #            if not comment.is_submitter:
+    #                # log some data
+    #                print(f"{comment.author} wrote:\n {comment.body}\nAt: {comment.permalink}\nIn: {comment.submission}")
 
-                    # get a submission object so we can interrogate it for the parent post title
-                    submission = await reddit.submission(comment.submission)
+    #                # get a submission object so we can interrogate it for the parent post title
+    #                submission = await reddit.submission(comment.submission)
 
-                    # lookup the parent post ID with the mission database
-                    mission_db.execute(f"SELECT * FROM missions WHERE "
-                                    f"reddit_post_id = '{comment.submission}' ")
+    #                # lookup the parent post ID with the mission database
+    #                mission_db.execute(f"SELECT * FROM missions WHERE "
+    #                               f"reddit_post_id = '{comment.submission}' ")
                     
-                    print('DB command ran, go fetch the result')
-                    mission_data = MissionData(mission_db.fetchone())
+    #                print('DB command ran, go fetch the result')
+    #                mission_data = MissionData(mission_db.fetchone())
 
-                    if not mission_data:
-                        print("No match in mission DB, mission must be complete.")
+    #                if not mission_data:
+    #                    print("No match in mission DB, mission must be complete.")
 
-                        embed = discord.Embed(title=f"{submission.title}",
-                                            description=f"This mission is **COMPLETED**.\n\nComment by **{comment.author}**\n{comment.body}"
-                                                        f"\n\nTo view this comment click here:\nhttps://www.reddit.com{comment.permalink}",
-                                                        color=constants.EMBED_COLOUR_QU)
+    #                    embed = discord.Embed(title=f"{submission.title}",
+    #                                        description=f"This mission is **COMPLETED**.\n\nComment by **{comment.author}**\n{comment.body}"
+    #                                                    f"\n\nTo view this comment click here:\nhttps://www.reddit.com{comment.permalink}",
+    #                                                    color=constants.EMBED_COLOUR_QU)
                     
-                    elif mission_data:
-                        # mission is active, we'll get info from the db and ping the CCO
-                        print(f'Found mission data: {mission_data}')
+    #                elif mission_data:
+    #                    # mission is active, we'll get info from the db and ping the CCO
+    #                    print(f'Found mission data: {mission_data}')
 
-                        # now we need to lookup the carrier data in the db
-                        carrier_data = find_carrier(mission_data.carrier_name, CarrierDbFields.longname.name)
+    #                    # now we need to lookup the carrier data in the db
+    #                    carrier_data = find_carrier(mission_data.carrier_name, CarrierDbFields.longname.name)
                         
-                        # We can't easily moderate Reddit comments so we'll post it to a CCO-only channel
+    #                    # We can't easily moderate Reddit comments so we'll post it to a CCO-only channel
                         
-                        await comment_channel.send(f"<@{carrier_data.ownerid}>, your Reddit trade post has received a new comment:")
-                        embed = discord.Embed(title=f"{submission.title}",
-                                            description=f"This mission is **IN PROGRESS**.\n\nComment by **{comment.author}**\n{comment.body}"
-                                                        f"\n\nTo view this comment click here:\nhttps://www.reddit.com{comment.permalink}",
-                                                        color=constants.EMBED_COLOUR_REDDIT)
+    #                    await comment_channel.send(f"<@{carrier_data.ownerid}>, your Reddit trade post has received a new comment:")
+    #                    embed = discord.Embed(title=f"{submission.title}",
+    #                                        description=f"This mission is **IN PROGRESS**.\n\nComment by **{comment.author}**\n{comment.body}"
+    #                                                    f"\n\nTo view this comment click here:\nhttps://www.reddit.com{comment.permalink}",
+    #                                                    color=constants.EMBED_COLOUR_REDDIT)
 
-                    await comment_channel.send(embed=embed)
-                    print("Sent comment to channel")
-        except Exception as e:
-            print(f"Error while monitoring {to_subreddit} for comments: {e}")
+    #                await comment_channel.send(embed=embed)
+    #                print("Sent comment to channel")
+    #    except Exception as e:
+    #        print(f"Error while monitoring {to_subreddit} for comments: {e}")
 
 
 
@@ -1172,6 +1221,8 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
         reddit_comment_url = None
         discord_alert_id = None
         wordpress_post_id = None
+        wordpress_image_id = None
+        wordpress_image_data = None
 
         eta_text = f" (ETA {eta} minutes)" if eta else ""
 
@@ -1183,7 +1234,7 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
             # Anything outwith this grouping will cause all to fail. Use set to throw away any duplicate objects.
             # not sure if the msg.content can ever be None, but lets gate it anyway
             return message.content and message.author == ctx.author and message.channel == ctx.channel and \
-                all(character in 'drtnx' for character in set(message.content.lower()))
+                all(character in 'drtnxw' for character in set(message.content.lower()))
 
         def check_rp(message):
             return message.author == ctx.author and message.channel == ctx.channel
@@ -1232,6 +1283,11 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
         reddit_body = txt_create_reddit_body(carrier_data, mission_type, commodity_data, station, system, profit, pads,
                                             demand, eta_text)
         print("Generated Reddit elements")
+
+        wordpress_title = txt_create_wordpress_title(carrier_data)
+        wordpress_body = txt_create_wordpress_body(carrier_data, mission_type, commodity_data, station, system, profit, pads,
+                                            demand, eta_text)
+        print("Generated Wordpress elements")
 
         # check they're happy with output and offer to send
         embed = discord.Embed(title=f"Mission pending for {carrier_data.carrier_long_name}{eta_text}",
@@ -1414,20 +1470,26 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
                             color=constants.EMBED_COLOUR_DISCORD)
                 await ctx.send(embed=embed)
                 
-           if "w" in msg.content.lower():
+            if "w" in msg.content.lower():
                 #post to website
                 #try in case site is down
+
+                print(options.GetOptions([]))
+                
                 try:
                     wordpress_image_data = {
                         'name': f'{carrier_data.carrier_identifier}.png',
                         'type': 'image/png',
+                        'overwrite': 1,
                     }
 
                     with open(file_name, 'rb') as img:
-                        data['bits'] = xmlrpc_client.Binary(img.read())
+                        wordpress_image_data['bits'] = xmlrpc_client.Binary(img.read())
 
-                    wordpress_image_id = wp.call(media.UploadFile(data))['id']
-                except:
+
+                    wordpress_image_id = wp.call(media.UploadFile(wordpress_image_data))['id']
+                
+                except Exception as e:
                     print(f"Error posting Image to Website: {e}")
                     await ctx.send(f"Error posting Image to Website: {e}\nAttempting to continue with rest of mission gen...")
                 #try in case site is down
@@ -1436,7 +1498,8 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
                     post.title = wordpress_title
                     post.content = wordpress_body
                     post.post_status = "publish"
-                    post.thumbnail = wordpress_image_id
+                    if wordpress_image_id != None:
+                        post.thumbnail = wordpress_image_id
                     post.slug = f"{carrier_data.carrier_identifier}"
                     post.terms_names = {
                       'post_tag': ['Mission-In-Progress'],
@@ -1444,7 +1507,12 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
                     }
 
                     wordpress_post_id = wp.call(NewPost(post))
-                except:
+
+                    embed = discord.Embed(title=f"Website trade alert sent for {carrier_data.carrier_long_name}",
+                                            description=f"http://ptnwebdev.ddns.net:8181/{carrier_data.carrier_identifier}",
+                                            color=constants.EMBED_COLOUR_WORDPRESS)
+                    await ctx.send(embed=embed)
+                except Exception as e:
                     print(f"Error posting to Website: {e}")
                     await ctx.send(f"Error posting to Website: {e}\nAttempting to continue with rest of mission gen...")
                 
@@ -1925,7 +1993,7 @@ async def _cleanup_completed_mission(ctx, mission_data, reddit_complete_text, di
         if mission_data.wordpress_post_id != None:
             try: #incase site is down
                 wp.call(DeletePost(mission_data.wordpress_post_id))
-            except:
+            except Exception as e:
                 print("Failed To remove Website Post")
                 await ctx.send("Failed updating Website :(")
 

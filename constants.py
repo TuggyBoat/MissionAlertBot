@@ -62,6 +62,7 @@ EMBED_COLOUR_RP = 0xff00ff              # pink
 EMBED_COLOUR_ERROR = 0x800000           # dark red
 EMBED_COLOUR_QU = 0x80ffff              # same as loading
 EMBED_COLOUR_OK = 0x80ff80              # same as unloading
+EMBED_COLOUR_WORDPRESS = 0xff80ff       #pinkish
 
 REDDIT_DISCORD_LINK_URL = \
     'https://www.reddit.com/r/PilotsTradeNetwork/comments/l0y7dk/pilots_trade_network_intergalactic_discord_server/'
