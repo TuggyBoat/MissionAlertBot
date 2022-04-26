@@ -58,7 +58,8 @@ class MissionData:
                'MissingType:{0.mission_type} System:{0.system} Station:{0.station} Profit:{0.profit}' \
                'Pad:{0.pad_size} Demand:{0.demand} RpText:{0.rp_text} RedditPostId:{0.reddit_post_id}' \
                'RedditPostUrl:{0.reddit_post_url} RedditCommentId:{0.reddit_comment_id}' \
-               'RedditCommentUrl:{0.reddit_comment_url} DiscordAlertId:{0.discord_alert_id}'.format(self)
+               'RedditCommentUrl:{0.reddit_comment_url} DiscordAlertId:{0.discord_alert_id}' \
+               'WordpressPostId:{0.wordpress_post_id}' .format(self)
 
     def __bool__(self):
         """
