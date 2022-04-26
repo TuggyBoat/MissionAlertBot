@@ -1469,7 +1469,8 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
             await ctx.send(f"Oops, error detected: {e}\nAttempting to continue with mission gen.")
 
         await mission_add(ctx, carrier_data, commodity_data, mission_type, system, station, profit, pads, demand,
-                        rp_text, reddit_post_id, reddit_post_url, reddit_comment_id, reddit_comment_url, discord_alert_id, mission_temp_channel_id)
+                        rp_text, reddit_post_id, reddit_post_url, reddit_comment_id, reddit_comment_url, discord_alert_id, mission_temp_channel_id,
+                        wordpress_post_id)
         await mission_generation_complete(ctx, carrier_data, message_pending, eta_text)
         cleanup_temp_image_file(file_name)
         print("Reached end of mission generator")
