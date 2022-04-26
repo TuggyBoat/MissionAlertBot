@@ -389,7 +389,8 @@ if not check_database_table_exists('missions', mission_db):
                 "reddit_post_url"	TEXT,
                 "reddit_comment_id"	TEXT,
                 "reddit_comment_url"	TEXT,
-                "discord_alert_id"	INT
+                "discord_alert_id"	INT,
+                "wordprress_post_id" INT
             )
         ''')
 else:
