@@ -98,7 +98,7 @@ load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN_PROD') if _production else os.getenv('DISCORD_TOKEN_TESTING')
 
 #Wordpress stuff
-wp = Client("http://ptnwebdev.ddns.net:8181/xmlrpc.php", "MissionAlertBot", "7d&$lppYYYxMAD)DOPuI59v7")
+wp = Client("http://ptnwebdev.ddns.net:8181/xmlrpc.php", "MissionAlertBot", "7d&$lppYYYxMAD)DOPuI59v7") #If anyone see's this they can get full admin access to the website
 
 # create reddit instance
 reddit = asyncpraw.Reddit('bot1')
