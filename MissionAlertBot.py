@@ -1949,7 +1949,7 @@ async def remove_carrier_channel(mission_channel_id, seconds):
 
 # a command for users to mark a carrier mission complete from within the carrier channel
 @bot.command(name='complete', help="Use in a carrier's channel to mark the current trade mission complete.")
-async def complete(ctx, rp: str = None):
+async def complete(ctx, Comment: str = None):
 
     print(f"m.complete called in {ctx.channel} by {ctx.author}")
 
@@ -2008,7 +2008,7 @@ async def complete(ctx, rp: str = None):
                                                    description=f"<@{ctx.author.id}> reports mission complete! **This mission channel will be removed in {seconds_long//60} minutes.**",
                                                    color=constants.EMBED_COLOUR_OK)
             print("Sending to _cleanup_completed_mission")
-            desc_msg = f"> {rp}\n" if rp else ""
+            desc_msg = f"> {Comment}\n" if Comment else ""
             await _cleanup_completed_mission(ctx, mission_data, reddit_complete_text, discord_complete_embed, desc_msg)
 
     except asyncio.TimeoutError:
