@@ -1870,7 +1870,8 @@ async def _cleanup_completed_mission(ctx, mission_data, reddit_complete_text, di
 
             # notify by DM
             owner = await bot.fetch_user(carrier_data.ownerid)
-            if m_done:
+            #chnaged to if there is rp text not if it was m.done
+            if not desc_msg == "":
                 """
                 desc_msg converts rp text received by m.done into a format that can be inserted directly into messages
                 without having to change the message's format depending on whether it exists or not. This was primarily
@@ -1948,7 +1949,7 @@ async def remove_carrier_channel(mission_channel_id, seconds):
 
 # a command for users to mark a carrier mission complete from within the carrier channel
 @bot.command(name='complete', help="Use in a carrier's channel to mark the current trade mission complete.")
-async def complete(ctx):
+async def complete(ctx, rp: str = None):
 
     print(f"m.complete called in {ctx.channel} by {ctx.author}")
 
@@ -1999,7 +2000,7 @@ async def complete(ctx):
         elif msg.content.lower() == "y":
             # they said yes!
             print("User responded yes")
-            desc_msg = ""
+            #desc_msg = ""
             reddit_complete_text = f"    INCOMING WIDEBAND TRANSMISSION: P.T.N. CARRIER MISSION UPDATE\n\n**" \
                                    f"{mission_data.carrier_name}** mission complete. o7 CMDRs!\n\n\n\n*Reported on " \
                                    f"PTN Discord by {ctx.author.display_name}*"
@@ -2007,6 +2008,7 @@ async def complete(ctx):
                                                    description=f"<@{ctx.author.id}> reports mission complete! **This mission channel will be removed in {seconds_long//60} minutes.**",
                                                    color=constants.EMBED_COLOUR_OK)
             print("Sending to _cleanup_completed_mission")
+            desc_msg = f"> {rp}\n" if rp else ""
             await _cleanup_completed_mission(ctx, mission_data, reddit_complete_text, discord_complete_embed, desc_msg)
 
     except asyncio.TimeoutError:
