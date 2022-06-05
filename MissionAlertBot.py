@@ -1289,6 +1289,7 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
                         embed = discord.Embed(description=discord_text, color=constants.EMBED_COLOUR_LOADING)
                     else:
                         embed = discord.Embed(description=discord_text, color=constants.EMBED_COLOUR_UNLOADING)
+                    embed.set_author(name=ctx.author.name, icon_url=ctx.author.avatar_url)
 
                     trade_alert_msg = await channel.send(embed=embed)
                     discord_alert_id = trade_alert_msg.id
@@ -1308,8 +1309,7 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
                 
                     embed.set_image(url="attachment://image.png")
                     embed.set_footer(
-                        text="m.complete will mark this mission complete\n/mission will show this mission info\n/missions "
-                            "will show all current trade missions")
+                        text=f"m.complete will mark this mission complete\n;stock {carrier_data.carrier_short_name} will show carrier market data\n/info will show this carrier's details")
                     await channel.send(file=discord_file, embed=embed)
                     embed = discord.Embed(title=f"Discord trade alerts sent for {carrier_data.carrier_long_name}",
                                         description=f"Check <#{channelId}> for trade alert and "
@@ -1870,7 +1870,8 @@ async def _cleanup_completed_mission(ctx, mission_data, reddit_complete_text, di
 
             # notify by DM
             owner = await bot.fetch_user(carrier_data.ownerid)
-            if m_done:
+            #chnaged to if there is rp text not if it was m.done
+            if desc_msg != "":
                 """
                 desc_msg converts rp text received by m.done into a format that can be inserted directly into messages
                 without having to change the message's format depending on whether it exists or not. This was primarily
@@ -1948,7 +1949,7 @@ async def remove_carrier_channel(mission_channel_id, seconds):
 
 # a command for users to mark a carrier mission complete from within the carrier channel
 @bot.command(name='complete', help="Use in a carrier's channel to mark the current trade mission complete.")
-async def complete(ctx):
+async def complete(ctx, comment: str = None):
 
     print(f"m.complete called in {ctx.channel} by {ctx.author}")
 
@@ -1999,7 +2000,6 @@ async def complete(ctx):
         elif msg.content.lower() == "y":
             # they said yes!
             print("User responded yes")
-            desc_msg = ""
             reddit_complete_text = f"    INCOMING WIDEBAND TRANSMISSION: P.T.N. CARRIER MISSION UPDATE\n\n**" \
                                    f"{mission_data.carrier_name}** mission complete. o7 CMDRs!\n\n\n\n*Reported on " \
                                    f"PTN Discord by {ctx.author.display_name}*"
@@ -2007,6 +2007,7 @@ async def complete(ctx):
                                                    description=f"<@{ctx.author.id}> reports mission complete! **This mission channel will be removed in {seconds_long//60} minutes.**",
                                                    color=constants.EMBED_COLOUR_OK)
             print("Sending to _cleanup_completed_mission")
+            desc_msg = f"> {comment}\n" if comment else ""
             await _cleanup_completed_mission(ctx, mission_data, reddit_complete_text, discord_complete_embed, desc_msg)
 
     except asyncio.TimeoutError:
@@ -2076,7 +2077,7 @@ async def _info(ctx: SlashContext):
     else:
         print(f'Found data: {carrier_data}')
         embed = discord.Embed(title=f"Welcome to {carrier_data.carrier_long_name} ({carrier_data.carrier_identifier})", color=constants.EMBED_COLOUR_OK)
-        embed = _add_common_embed_fields(embed, carrier_data)
+        embed = _add_common_embed_fields(embed, carrier_data, ctx)
         return await ctx.send(embed=embed, hidden=True)
 
 
@@ -2092,7 +2093,7 @@ async def _find(ctx: SlashContext, carrier_name_search_term: str):
             print(f"Found {carrier_data}")
             embed = discord.Embed(title="Fleet Carrier Search Result",
                                   description=f"Displaying first match for {carrier_name_search_term}", color=constants.EMBED_COLOUR_OK)
-            embed = _add_common_embed_fields(embed, carrier_data)
+            embed = _add_common_embed_fields(embed, carrier_data, ctx)
             return await ctx.send(embed=embed, hidden=True)
           
     except TypeError as e:
@@ -2238,7 +2239,7 @@ async def carrier_add(ctx, short_name: str, long_name: str, carrier_id: str, own
 
         embed = discord.Embed(title="Fleet carrier already exists, use m.carrier_edit to change its details.",
                               description=f"Carrier data matched for {long_name}", color=constants.EMBED_COLOUR_OK)
-        embed = _add_common_embed_fields(embed, carrier_data)
+        embed = _add_common_embed_fields(embed, carrier_data, ctx)
         return await ctx.send(embed=embed)
 
     backup_database('carriers')  # backup the carriers database before going any further
@@ -2260,7 +2261,7 @@ async def carrier_add(ctx, short_name: str, long_name: str, carrier_id: str, own
     carrier_data = find_carrier(long_name, CarrierDbFields.longname.name)
     embed = discord.Embed(title="Fleet Carrier successfully added to database",
                           color=constants.EMBED_COLOUR_OK)
-    embed = _add_common_embed_fields(embed, carrier_data)
+    embed = _add_common_embed_fields(embed, carrier_data, ctx)
     return await ctx.send(embed=embed)
 
 
@@ -2281,7 +2282,7 @@ async def carrier_del(ctx, db_id: int):
         if carrier_data:
             embed = discord.Embed(title="Delete Fleet Carrier", description=f"Result for {db_id}",
                                   color=constants.EMBED_COLOUR_OK)
-            embed = _add_common_embed_fields(embed, carrier_data)
+            embed = _add_common_embed_fields(embed, carrier_data, ctx)
             await ctx.send(embed=embed)
 
             embed = discord.Embed(title="Proceed with deletion?", description="y/n", color=constants.EMBED_COLOUR_OK)
@@ -2613,20 +2614,25 @@ async def findshort(ctx, shortname_search_term: str):
                 embed = discord.Embed(title="Fleet Carrier Shortname Search Result",
                                       description=f"Displaying first match for {shortname_search_term}",
                                       color=constants.EMBED_COLOUR_OK)
-                embed = _add_common_embed_fields(embed, carrier_data)
+                embed = _add_common_embed_fields(embed, carrier_data, ctx)
                 return await ctx.send(embed=embed)
     except TypeError as e:
         print('Error in carrier search: {}'.format(e))
     await ctx.send(f'No result for {shortname_search_term}.')
 
 
-def _add_common_embed_fields(embed, carrier_data):
+def _add_common_embed_fields(embed, carrier_data, ctx):
     embed.add_field(name="Carrier Name", value=f"{carrier_data.carrier_long_name}", inline=True)
     embed.add_field(name="Carrier ID", value=f"{carrier_data.carrier_identifier}", inline=True)
     embed.add_field(name="Database Entry", value=f"{carrier_data.pid}", inline=True)
-    embed.add_field(name="Discord Channel", value=f"#{carrier_data.discord_channel}", inline=True)
+
+    # make the channel field a clickable link if there's an active channel by that name
+    channel = discord.utils.get(ctx.guild.channels, name=carrier_data.discord_channel)
+    discord_channel = f"<#{channel.id}>" if channel else carrier_data.discord_channel
+    embed.add_field(name="Discord Channel", value=f"#{discord_channel}", inline=True)
+
     embed.add_field(name="Owner", value=f"<@{carrier_data.ownerid}>", inline=True)
-    embed.add_field(name="Shortname", value=f"{carrier_data.carrier_short_name}", inline=True)
+    embed.add_field(name="Market Data", value=f"`;stock {carrier_data.carrier_short_name}`", inline=True)
     embed.add_field(name="Last Trade", value=f"<t:{carrier_data.lasttrade}> (<t:{carrier_data.lasttrade}:R>)", inline=True)
     # shortname is not relevant to users and will be auto-generated in future
     return embed
@@ -2709,7 +2715,7 @@ async def find(ctx, carrier_name_search_term: str):
                 embed = discord.Embed(title="Fleet Carrier Search Result",
                                       description=f"Displaying match for {carrier_name_search_term}",
                                       color=constants.EMBED_COLOUR_OK)
-                embed = _add_common_embed_fields(embed, carrier_data)
+                embed = _add_common_embed_fields(embed, carrier_data, ctx)
                 return await ctx.send(embed=embed)
     except TypeError as e:
         print('Error in carrier search: {}'.format(e))
@@ -2735,7 +2741,7 @@ async def findid(ctx, db_id: int):
             embed = discord.Embed(title="Fleet Carrier DB# Search Result",
                                   description=f"Displaying carrier with DB# {carrier_data.pid}",
                                   color=constants.EMBED_COLOUR_OK)
-            embed = _add_common_embed_fields(embed, carrier_data)
+            embed = _add_common_embed_fields(embed, carrier_data, ctx)
             await ctx.send(embed=embed)
             return  # We exit here
 
