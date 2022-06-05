@@ -2628,7 +2628,7 @@ def _add_common_embed_fields(embed, carrier_data, ctx):
 
     # make the channel field a clickable link if there's an active channel by that name
     channel = discord.utils.get(ctx.guild.channels, name=carrier_data.discord_channel)
-    discord_channel = f"<#{channel.id}>" if channel else carrier_data.discord_channel
+    discord_channel = f"<#{channel.id}>" if channel else f"#{carrier_data.discord_channel}"
     embed.add_field(name="Discord Channel", value=f"{discord_channel}", inline=True)
 
     embed.add_field(name="Owner", value=f"<@{carrier_data.ownerid}>", inline=True)
