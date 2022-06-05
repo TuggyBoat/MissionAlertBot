@@ -1308,7 +1308,7 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
                 
                     embed.set_image(url="attachment://image.png")
                     embed.set_footer(
-                        text="m.complete will mark this mission complete\n/mission will show this mission info\n/missions "
+                        text=f"m.complete will mark this mission complete\n;stock {carrier_data.carrier_short_name} will show carrier market data\n/mission will show this mission info\n/missions "
                             "will show all current trade missions")
                     await channel.send(file=discord_file, embed=embed)
                     embed = discord.Embed(title=f"Discord trade alerts sent for {carrier_data.carrier_long_name}",
