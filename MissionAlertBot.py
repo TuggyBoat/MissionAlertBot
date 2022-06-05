@@ -1289,6 +1289,7 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
                         embed = discord.Embed(description=discord_text, color=constants.EMBED_COLOUR_LOADING)
                     else:
                         embed = discord.Embed(description=discord_text, color=constants.EMBED_COLOUR_UNLOADING)
+                    embed.set_author(name=ctx.author.name, icon_url=ctx.author.avatar_url)
 
                     trade_alert_msg = await channel.send(embed=embed)
                     discord_alert_id = trade_alert_msg.id
@@ -1308,8 +1309,7 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
                 
                     embed.set_image(url="attachment://image.png")
                     embed.set_footer(
-                        text=f"m.complete will mark this mission complete\n;stock {carrier_data.carrier_short_name} will show carrier market data\n/mission will show this mission info\n/missions "
-                            "will show all current trade missions")
+                        text=f"m.complete will mark this mission complete\n;stock {carrier_data.carrier_short_name} will show carrier market data\n/info will show this carrier's details")
                     await channel.send(file=discord_file, embed=embed)
                     embed = discord.Embed(title=f"Discord trade alerts sent for {carrier_data.carrier_long_name}",
                                         description=f"Check <#{channelId}> for trade alert and "
