@@ -1289,7 +1289,7 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
                         embed = discord.Embed(description=discord_text, color=constants.EMBED_COLOUR_LOADING)
                     else:
                         embed = discord.Embed(description=discord_text, color=constants.EMBED_COLOUR_UNLOADING)
-                    embed.set_author(name=ctx.author.name, icon_url=ctx.author.avatar_url)
+                    embed.set_author(name=ctx.author.display_name, icon_url=ctx.author.avatar_url)
 
                     trade_alert_msg = await channel.send(embed=embed)
                     discord_alert_id = trade_alert_msg.id
