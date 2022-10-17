@@ -3782,7 +3782,7 @@ async def nom_details(ctx, userid: Union[discord.Member, int]):
             embed.add_field(name=f'Nominator: {nominator.display_name}',
                             value=f"{nominees.note}", inline=False)
     else:
-        embed.description = f'No Nominations found for <@{member.id}>'
+        embed.description = f'No nominations found for <@{member.id}>'
         embed.color = constants.EMBED_COLOUR_REDDIT
 
     await ctx.send(embed=embed)
