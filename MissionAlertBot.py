@@ -3774,11 +3774,16 @@ async def nom_details(ctx, userid: Union[discord.Member, int]):
     embed=discord.Embed(title=f"Nomination details", description=f"Discord user <@{member.id}>", color=constants.EMBED_COLOUR_OK)
 
     # look up specified user and return every entry for them as embed fields. TODO: This will break after too many nominations, would need to be paged.
+    # if an empty list is returned, update the embed description and color
     nominees_data = find_nominee_with_id(userid)
-    for nominees in nominees_data:
-        nominator = await bot.fetch_user(nominees.nom_id)
-        embed.add_field(name=f'Nominator: {nominator.display_name}',
-                        value=f"{nominees.note}", inline=False)
+    if nominees_data:
+        for nominees in nominees_data:
+            nominator = await bot.fetch_user(nominees.nom_id)
+            embed.add_field(name=f'Nominator: {nominator.display_name}',
+                            value=f"{nominees.note}", inline=False)
+    else:
+        embed.description = f'No Nominations found for <@{member.id}>'
+        embed.color = constants.EMBED_COLOUR_REDDIT
 
     await ctx.send(embed=embed)
 
