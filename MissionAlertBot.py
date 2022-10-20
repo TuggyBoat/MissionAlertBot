@@ -2993,11 +2993,21 @@ async def _determine_db_fields_to_edit(ctx, carrier_data):
                 message_confirm = await ctx.send(embed=embed)
 
                 msg = await bot.wait_for("message", check=check_user, timeout=30)
-                print(f'Setting the value for {new_carrier_data.carrier_long_name} filed {field} to '
+                print(f'Setting the value for {new_carrier_data.carrier_long_name} field {field} to '
                       f'"{msg.content.strip()}"')
 
+                if field in ['carrier_long_name', 'carrier_identifier']:
+                    # always uppercase
+                    msg_content = msg.content.strip().upper()
+                elif field in ['carrier_short_name', 'discord_channel']:
+                    # always lowercase
+                    msg_content = msg.content.strip().lower()
+                else:
+                    # keep user case
+                    msg_content = msg.content.strip()
+
                 # Use setattr to change the value of the variable field object to the user input
-                setattr(new_carrier_data, field, msg.content.strip())
+                setattr(new_carrier_data, field, msg_content)
             else:
                 print(f'{ctx.author} provided the invalid input: {msg.content} from object: {ctx}.')
                 # Should never be hitting this as we gate the message
@@ -3020,8 +3030,8 @@ async def _determine_db_fields_to_edit(ctx, carrier_data):
         return None
 
     print(f'Carrier data now looks like:')
-    print(f'\t Initial: {carrier_data}')
-    print(f'\t Initial: {new_carrier_data}')
+    print(f'\t Original: {carrier_data}')
+    print(f'\t Updated: {new_carrier_data}')
 
     return new_carrier_data
 
