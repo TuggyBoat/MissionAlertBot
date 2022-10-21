@@ -1393,6 +1393,8 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
                         rp_text, reddit_post_id, reddit_post_url, reddit_comment_id, reddit_comment_url, discord_alert_id, mission_temp_channel_id)
         await mission_generation_complete(ctx, carrier_data, message_pending, eta_text)
         cleanup_temp_image_file(file_name)
+        await mark_cleanup_channel(mission_data.channel_id, 0)
+
         print("Reached end of mission generator")
         return
     except Exception as e:
@@ -1886,22 +1888,22 @@ async def _cleanup_completed_mission(ctx, mission_data, reddit_complete_text, di
                 await owner.send(f"Ahoy CMDR! The trade mission for your Fleet Carrier **{carrier_data.carrier_long_name}** has been marked as complete by {ctx.author.display_name}. Its mission channel will be removed in {seconds_long//60} minutes unless a new mission is started.")
 
         # remove channel
-        await mark_carrier_channel_complete(mission_data.channel_id)
+        await mark_cleanup_channel(mission_data.channel_id, 1)
         await remove_carrier_channel(mission_data.channel_id, seconds_long)
 
         return
 
 
-async def mark_carrier_channel_complete(mission_channel_id):
+async def mark_cleanup_channel(mission_channel_id, status):
     """
-    When a trade mission is complete update/insert into the channel_cleanup table
+    Create or update entry in the channel_cleanup table
     """
     insert_stmt = f"""
         INSERT INTO channel_cleanup
         (channelid, is_complete)
-        VALUES({mission_channel_id}, 1)
+        VALUES({mission_channel_id}, {status})
         ON CONFLICT(channelid)
-        DO UPDATE SET is_complete = 1;
+        DO UPDATE SET is_complete = {status};
         """
     mission_db.execute(insert_stmt)
     missions_conn.commit()
