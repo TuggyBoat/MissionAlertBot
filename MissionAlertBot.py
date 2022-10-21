@@ -330,7 +330,7 @@ database_table_map = {
     'nominees': {'obj': carrier_db, 'create': nominees_table_create},
     'missions': {'obj': mission_db, 'create': missions_table_create},
     'channel_cleanup': {'obj': mission_db, 'create': channel_cleanup_table_create}
-}q
+}
 
 for table_name in database_table_map:
     t = database_table_map[table_name]
@@ -1393,7 +1393,7 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
                         rp_text, reddit_post_id, reddit_post_url, reddit_comment_id, reddit_comment_url, discord_alert_id, mission_temp_channel_id)
         await mission_generation_complete(ctx, carrier_data, message_pending, eta_text)
         cleanup_temp_image_file(file_name)
-        await mark_cleanup_channel(mission_data.channel_id, 0)
+        await mark_cleanup_channel(mission_temp_channel_id, 0)
 
         print("Reached end of mission generator")
         return
