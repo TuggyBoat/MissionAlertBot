@@ -1144,13 +1144,14 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
             # Anything outwith this grouping will cause all to fail. Use set to throw away any duplicate objects.
             # not sure if the msg.content can ever be None, but lets gate it anyway
             return message.content and message.author == ctx.author and message.channel == ctx.channel and \
-                all(character in 'drtnx' for character in set(message.content.lower()))
+                all(character in 'drtnxy' for character in set(message.content.lower()))
 
         def check_rp(message):
             return message.author == ctx.author and message.channel == ctx.channel
 
         gen_mission.returnflag = False
         mission_temp_channel_id = await create_mission_temp_channel(ctx, carrier_data.discord_channel, carrier_data.ownerid)
+        mission_temp_channel = bot.get_channel(mission_temp_channel_id)
         # flag is set to True if mission channel creation is successful
         if not gen_mission.returnflag:
             return # we've already notified the user
@@ -1209,6 +1210,24 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
         await message_gen.delete()
         print("Output check displayed")
 
+        embed = discord.Embed(title="Is this an EDMC OFF mission?",
+                            description="Should haulers be instructured to turn EDMC off?\ny/n",
+                            color=constants.EMBED_COLOUR_QU)
+        edmc_confirm = await ctx.send(embed=embed)
+        try:
+            edmc_msg = await bot.wait_for("message", check=check_confirm, timeout=30)
+            edmc_off = False
+            if 'y' == edmc_msg.content.lower().strip():
+                edmc_off = True
+        except asyncio.TimeoutError:
+            await ctx.send("**Mission not generated or broadcast (no valid response from user).**")
+            try:
+                carrier_channel_lock.release()
+                print("Channel lock released")
+            finally:
+                await remove_carrier_channel(mission_temp_channel_id, seconds_short)
+            return
+
         embed = discord.Embed(title="Where would you like to send the alert?",
                             description="(**d**)iscord, (**r**)eddit, (**t**)ext for copy/pasting or (**x**) to cancel\n"
                             "Use (**n**) to also notify PTN Haulers.",
@@ -1231,6 +1250,8 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
                     await remove_carrier_channel(mission_temp_channel_id, seconds_short)
                 await msg.delete()
                 await message_confirm.delete()
+                await edmc_confirm.delete()
+                await edmc_msg.delete()
                 print("User cancelled mission generation")
                 return
 
@@ -1294,8 +1315,6 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
                     trade_alert_msg = await channel.send(embed=embed)
                     discord_alert_id = trade_alert_msg.id
 
-                    channel = bot.get_channel(mission_temp_channel_id)
-
                     discord_file = discord.File(file_name, filename="image.png")
 
                     embed_colour = constants.EMBED_COLOUR_LOADING if mission_type == 'load' \
@@ -1311,7 +1330,7 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
                     embed.set_footer(
                         text=f"m.complete will mark this mission complete\n;stock {carrier_data.carrier_short_name} will show carrier market data\n/info will show this carrier's details")
                     # pin the carrier trade msg sent by the bot
-                    pin_msg = await channel.send(file=discord_file, embed=embed)
+                    pin_msg = await mission_temp_channel.send(file=discord_file, embed=embed)
                     await pin_msg.pin()
                     embed = discord.Embed(title=f"Discord trade alerts sent for {carrier_data.carrier_long_name}",
                                         description=f"Check <#{channelId}> for trade alert and "
@@ -1366,16 +1385,24 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
             if "n" in msg.content.lower():
                 print("User used option n")
 
-                # get carrier's channel object
-
-                channel = bot.get_channel(mission_temp_channel_id)
-
-                await channel.send(f"<@&{hauler_role_id}>: {discord_text}")
+                await mission_temp_channel.send(f"<@&{hauler_role_id}>: {discord_text}")
 
                 embed = discord.Embed(title=f"Mission notification sent for {carrier_data.carrier_long_name}",
                             description=f"Pinged <@&{hauler_role_id}> in <#{mission_temp_channel_id}>",
                             color=constants.EMBED_COLOUR_DISCORD)
                 await ctx.send(embed=embed)
+
+            if edmc_off:
+                print('Sending EDMC OFF messages to haulers')
+                await mission_temp_channel.send(f"**PLEASE STOP ALL 3RD PARTY SOFTWARE:** EDMC, EDDISCOVERY, ETC")
+
+                edmc_files = [discord.File(f"images/system/edmc_off_{n}.png") for n in [1,2]]
+                await mission_temp_channel.send(files=edmc_files)
+
+                embed = discord.Embed(title=f"EDMC OFF messages sent",
+                            color=constants.EMBED_COLOUR_DISCORD)
+                await ctx.send(embed=embed)
+
         except asyncio.TimeoutError:
             await ctx.send("**Mission not generated or broadcast (no valid response from user).**")
             try:
@@ -1391,6 +1418,8 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
         try:
             await msg.delete()
             await message_confirm.delete()
+            await edmc_confirm.delete()
+            await edmc_msg.delete()
         except Exception as e:
             print(f"Error during clearup: {e}")
             await ctx.send(f"Oops, error detected: {e}\nAttempting to continue with mission gen.")
