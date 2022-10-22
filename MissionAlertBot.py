@@ -1135,6 +1135,8 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
         reddit_comment_url = None
         discord_alert_id = None
         mission_temp_channel_id = None
+        check_characters = None
+
 
         eta_text = f" (ETA {eta} minutes)" if eta else ""
 
@@ -1146,10 +1148,14 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
             # Anything outwith this grouping will cause all to fail. Use set to throw away any duplicate objects.
             # not sure if the msg.content can ever be None, but lets gate it anyway
             return message.content and message.author == ctx.author and message.channel == ctx.channel and \
-                all(character in 'drtnxy' for character in set(message.content.lower()))
+                all(character in check_characters for character in set(message.content.lower()))
 
         def check_rp(message):
             return message.author == ctx.author and message.channel == ctx.channel
+
+        async def default_timeout_message(location):
+            await ctx.send(f"**Mission generation cancelled (waiting too long for user input)** ({location})")
+
 
         # gen_mission.returnflag = False
         # mission_temp_channel_id = await create_mission_temp_channel(ctx, carrier_data.discord_channel, carrier_data.ownerid)
@@ -1176,7 +1182,8 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
                 rp_text = message_rp_text.content
 
             except asyncio.TimeoutError:
-                await ctx.send("**Mission generation cancelled (waiting too long for user input)**")
+                await default_timeout_message('rp')
+                return
 
         # Options that should create a mission db entry will change this to True
         submit_mission = False
@@ -1213,12 +1220,13 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
                             color=constants.EMBED_COLOUR_QU)
         edmc_confirm = await ctx.send(embed=embed)
         try:
+            check_characters = 'ny'
             edmc_msg = await bot.wait_for("message", check=check_confirm, timeout=30)
             edmc_off = False
             if 'y' == edmc_msg.content.lower().strip():
                 edmc_off = True
         except asyncio.TimeoutError:
-            await ctx.send("**Mission not generated or broadcast (no valid response from user).**")
+            await default_timeout_message('edmc_prompt')
             return
 
         embed = discord.Embed(title="Where would you like to send the alert?",
@@ -1230,6 +1238,7 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
         print("Prompted user for alert destination")
 
         try:
+            check_characters = 'drtnx'
             msg = await bot.wait_for("message", check=check_confirm, timeout=30)
 
             if "x" in msg.content.lower():
@@ -1390,8 +1399,15 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
 
             if edmc_off and "d" in msg.content.lower():
                 print('Sending EDMC OFF messages to haulers')
-                edmc_files = [discord.File(f"images/system/edmc_off_{n}.png") for n in [1,2]]
-                pin_edmc = await mission_temp_channel.send(f"**PLEASE STOP ALL 3RD PARTY SOFTWARE:** EDMC, EDDISCOVERY, ETC", files=edmc_files)
+                embed = discord.Embed(title='PLEASE STOP ALL 3RD PARTY SOFTWARE: EDMC, EDDISCOVERY, ETC',
+                        description=("Maximising our haulers' profits for this mission means keeping market data at this station"
+                                 " **a secret**! For this reason **please disabled/exit all journal reporting plugins/programs**"
+                                 " and leave them off until all missions at this location are complete. Thanks CMDRs!"),
+                        color=constants.EMBED_COLOUR_REDDIT)
+                edmc_file = discord.File(f"images/system/edmc_off_{random.randint(1,2)}.png", filename="image.png")
+
+                embed.set_image(url="attachment://image.png")
+                pin_edmc = await mission_temp_channel.send(file=edmc_file, embed=embed)
                 await pin_edmc.pin()
 
                 embed = discord.Embed(title=f"EDMC OFF messages sent", description='Reddit posts will be skipped',
@@ -1399,10 +1415,11 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
                 await ctx.send(embed=embed)
 
         except asyncio.TimeoutError:
-            await ctx.send("**Mission not generated or broadcast (no valid response from user).**")
+            await default_timeout_message('notification_type_decision')
             try:
-                carrier_channel_lock.release()
-                print("Channel lock released")
+                if mission_temp_channel_id:
+                    carrier_channel_lock.release()
+                    print("Channel lock released")
             finally:
                 if mission_temp_channel_id:
                     await remove_carrier_channel(mission_temp_channel_id, seconds_short)
