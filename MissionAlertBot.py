@@ -197,16 +197,16 @@ if not check_database_table_exists('carriers', carrier_db):
         # Create a new version
         print('No backup found - Creating empty database')
         carrier_db.execute('''
-            CREATE TABLE carriers( 
+            CREATE TABLE carriers(
                 p_ID INTEGER PRIMARY KEY AUTOINCREMENT,
-                shortname TEXT NOT NULL UNIQUE, 
-                longname TEXT NOT NULL, 
-                cid TEXT NOT NULL, 
+                shortname TEXT NOT NULL UNIQUE,
+                longname TEXT NOT NULL,
+                cid TEXT NOT NULL,
                 discordchannel TEXT NOT NULL,
                 channelid INT,
                 ownerid INT,
                 lasttrade INT NOT NULL DEFAULT (cast(strftime('%s','now') as int))
-            ) 
+            )
         ''')
 else:
     print('Carrier database exists, do nothing')
@@ -219,7 +219,7 @@ if not check_table_column_exists('lasttrade', 'carriers', carrier_db):
     We then copy data from table to table, and rename them into place.
     We will leave the backup table in case something goes wrong.
     There is not enough try/catch here to be perfect. sorry.
-    """ 
+    """
     temp_ts = int(datetime.now(tz=timezone.utc).timestamp())
     temp_carriers_table = 'carriers_lasttrade_%s' % temp_ts
     backup_carriers_table = 'carriers_backup_%s' % temp_ts
@@ -270,11 +270,11 @@ if not check_database_table_exists('community_carriers', carrier_db):
         # Create a new version
         print('No backup found - Creating empty database')
         carrier_db.execute('''
-            CREATE TABLE community_carriers( 
+            CREATE TABLE community_carriers(
                 ownerid INT NOT NULL UNIQUE,
                 channelid INT NOT NULL UNIQUE,
                 roleid INT NOT NULL UNIQUE
-            ) 
+            )
         ''')
 else:
     print('Community Carrier database exists, do nothing')
@@ -287,7 +287,7 @@ if not check_table_column_exists('roleid', 'community_carriers', carrier_db):
     We then copy data from table to table, and rename them into place.
     We will leave the backup table in case something goes wrong.
     There is not enough try/catch here to be perfect. sorry. (that's OK Durzo, thanks for the code!)
-    """ 
+    """
     temp_ts = int(datetime.now(tz=timezone.utc).timestamp())
     temp_carriers_table = 'community_carriers_newcolumn_%s' % temp_ts
     backup_carriers_table = 'community_carriers_backup_%s' % temp_ts
@@ -329,11 +329,11 @@ if not check_database_table_exists('nominees', carrier_db):
         # Create a new version
         print('No backup found - Creating empty database')
         carrier_db.execute('''
-            CREATE TABLE nominees( 
+            CREATE TABLE nominees(
                 nominatorid INT NOT NULL,
                 pillarid INT NOT NULL,
                 note TEXT
-            ) 
+            )
         ''')
 else:
     print('Nominees database exists, do nothing')
@@ -596,7 +596,7 @@ def find_community_carrier(searchterm, searchfield):
                        f"{searchfield} = {searchterm} ")
     community_carrier_data = [CommunityCarrierData(community_carrier) for community_carrier in carrier_db.fetchall()]
     for community_carrier in community_carrier_data:
-        print(f"{community_carrier.owner_id} owns channel {community_carrier.channel_id}" 
+        print(f"{community_carrier.owner_id} owns channel {community_carrier.channel_id}"
               f" called from find_community_carrier.")
 
     return community_carrier_data
@@ -614,7 +614,7 @@ def find_nominee_with_id(pillarid):
                        f"pillarid = {pillarid} ")
     nominees_data = [NomineesData(nominees) for nominees in carrier_db.fetchall()]
     for nominees in nominees_data:
-        print(f"{nominees.pillar_id} nominated by {nominees.nom_id} for reason {nominees.note}" 
+        print(f"{nominees.pillar_id} nominated by {nominees.nom_id} for reason {nominees.note}"
               f" called from find_nominee_with_id.")
 
     return nominees_data
@@ -632,7 +632,7 @@ def find_nominator_with_id(nomid):
                        f"nominatorid = {nomid} ")
     nominees_data = [NomineesData(nominees) for nominees in carrier_db.fetchall()]
     for nominees in nominees_data:
-        print(f"{nominees.nom_id} nominated {nominees.pillar_id} for reason {nominees.note}" 
+        print(f"{nominees.nom_id} nominated {nominees.pillar_id} for reason {nominees.note}"
               f" called from find_nominee_with_id.")
 
     return nominees_data
@@ -800,7 +800,7 @@ async def _overlay_mission_image(carrier_data):
     carrier_image:  the inset image optionally created by the Carrier Owner
     """
     template = Image.open("template.png")
-    carrier_image = Image.open(f"images/{carrier_data.carrier_short_name}.png")   
+    carrier_image = Image.open(f"images/{carrier_data.carrier_short_name}.png")
     template.paste(carrier_image, (47,13))
     return template
 
@@ -815,7 +815,7 @@ async def create_carrier_mission_image(carrier_data, commodity, system, station,
     template = await _overlay_mission_image(carrier_data)
 
     image_editable = ImageDraw.Draw(template)
-    
+
     mission_action = 'LOADING' if mission_type == 'load' else 'UNLOADING'
     image_editable.text((46, 304), "PILOTS TRADE NETWORK", (255, 255, 255), font=title_font)
     image_editable.text((46, 327), f"CARRIER {mission_action} MISSION", (191, 53, 57), font=title_font)
@@ -829,7 +829,7 @@ async def create_carrier_mission_image(carrier_data, commodity, system, station,
     image_editable.text((170, 514), f"{station.upper()} ({pads.upper()} pads)", (255, 255, 255), font=normal_font)
     image_editable.text((46, 552), "PROFIT:", (255, 255, 255), font=field_font)
     image_editable.text((170, 552), f"{profit}k per unit, {demand} units", (255, 255, 255), font=normal_font)
-    
+
     # Check if this will work fine, we might need to delete=False and clean it ourselves
     result_name = tempfile.NamedTemporaryFile(suffix='.png', delete=False)
     print(f'Saving temporary mission file for carrier: {carrier_data.carrier_long_name} to: {result_name.name}')
@@ -848,7 +848,8 @@ TEXT GEN FUNCTIONS
 
 
 def txt_create_discord(carrier_data, mission_type, commodity, station, system, profit, pads, demand, eta_text, mission_temp_channel_id):
-    discord_text = f"<#{mission_temp_channel_id}> {'load' if mission_type == 'load' else 'unload'}ing " \
+    discord_channel = f"<#{mission_temp_channel_id}>" if mission_temp_channel_id else f"#{carrier_data.discord_channel}"
+    discord_text = f"{discord_channel} {'load' if mission_type == 'load' else 'unload'}ing " \
                    f"{commodity.name} " \
                    f"{'from' if mission_type == 'load' else 'to'} **{station.upper()}** station in system " \
                    f"**{system.upper()}** : {profit}k per unit profit : "\
@@ -949,7 +950,7 @@ async def _monitor_reddit_comments():
                     # lookup the parent post ID with the mission database
                     mission_db.execute(f"SELECT * FROM missions WHERE "
                                     f"reddit_post_id = '{comment.submission}' ")
-                    
+
                     print('DB command ran, go fetch the result')
                     mission_data = MissionData(mission_db.fetchone())
 
@@ -960,16 +961,16 @@ async def _monitor_reddit_comments():
                                             description=f"This mission is **COMPLETED**.\n\nComment by **{comment.author}**\n{comment.body}"
                                                         f"\n\nTo view this comment click here:\nhttps://www.reddit.com{comment.permalink}",
                                                         color=constants.EMBED_COLOUR_QU)
-                    
+
                     elif mission_data:
                         # mission is active, we'll get info from the db and ping the CCO
                         print(f'Found mission data: {mission_data}')
 
                         # now we need to lookup the carrier data in the db
                         carrier_data = find_carrier(mission_data.carrier_name, CarrierDbFields.longname.name)
-                        
+
                         # We can't easily moderate Reddit comments so we'll post it to a CCO-only channel
-                        
+
                         await comment_channel.send(f"<@{carrier_data.ownerid}>, your Reddit trade post has received a new comment:")
                         embed = discord.Embed(title=f"{submission.title}",
                                             description=f"This mission is **IN PROGRESS**.\n\nComment by **{comment.author}**\n{comment.body}"
@@ -1125,7 +1126,7 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
 
     try: # this try/except pair is to try and ensure the channel lock is released if something breaks during mission gen
          # otherwise the bot freezes next time the lock is attempted
-        
+
         # None-strings, should hopefully not break the database. If it does revert these to 'NULL'
         rp_text = None
         reddit_post_id = None
@@ -1133,6 +1134,9 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
         reddit_comment_id = None
         reddit_comment_url = None
         discord_alert_id = None
+        mission_temp_channel_id = None
+        check_characters = None
+
 
         eta_text = f" (ETA {eta} minutes)" if eta else ""
 
@@ -1144,16 +1148,21 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
             # Anything outwith this grouping will cause all to fail. Use set to throw away any duplicate objects.
             # not sure if the msg.content can ever be None, but lets gate it anyway
             return message.content and message.author == ctx.author and message.channel == ctx.channel and \
-                all(character in 'drtnx' for character in set(message.content.lower()))
+                all(character in check_characters for character in set(message.content.lower()))
 
         def check_rp(message):
             return message.author == ctx.author and message.channel == ctx.channel
 
-        gen_mission.returnflag = False
-        mission_temp_channel_id = await create_mission_temp_channel(ctx, carrier_data.discord_channel, carrier_data.ownerid)
-        # flag is set to True if mission channel creation is successful
-        if not gen_mission.returnflag:
-            return # we've already notified the user
+        async def default_timeout_message(location):
+            await ctx.send(f"**Mission generation cancelled (waiting too long for user input)** ({location})")
+
+
+        # gen_mission.returnflag = False
+        # mission_temp_channel_id = await create_mission_temp_channel(ctx, carrier_data.discord_channel, carrier_data.ownerid)
+        # mission_temp_channel = bot.get_channel(mission_temp_channel_id)
+        # # flag is set to True if mission channel creation is successful
+        # if not gen_mission.returnflag:
+        #     return # we've already notified the user
 
         # beyond this point any exits need to release the channel lock
 
@@ -1173,21 +1182,18 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
                 rp_text = message_rp_text.content
 
             except asyncio.TimeoutError:
-                await ctx.send("**Mission generation cancelled (waiting too long for user input)**")
-                try:
-                    carrier_channel_lock.release()
-                    print("Channel lock released")
-                finally:
-                    await remove_carrier_channel(mission_temp_channel_id, seconds_short)
-                await message_rp.delete()
+                await default_timeout_message('rp')
                 return
+
+        # Options that should create a mission db entry will change this to True
+        submit_mission = False
 
         # generate the mission elements
 
         file_name = await create_carrier_mission_image(carrier_data, commodity_data, system, station, profit, pads, demand,
                                                 mission_type)
         discord_text = txt_create_discord(carrier_data, mission_type, commodity_data, station, system, profit, pads,
-                                        demand, eta_text, mission_temp_channel_id)
+                        demand, eta_text, mission_temp_channel_id)
         print("Generated discord elements")
         reddit_title = txt_create_reddit_title(carrier_data)
         reddit_body = txt_create_reddit_body(carrier_data, mission_type, commodity_data, station, system, profit, pads,
@@ -1209,6 +1215,20 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
         await message_gen.delete()
         print("Output check displayed")
 
+        embed = discord.Embed(title="Is this an EDMC OFF mission?",
+                            description="Should haulers be instructured to turn EDMC off?\ny/n",
+                            color=constants.EMBED_COLOUR_QU)
+        edmc_confirm = await ctx.send(embed=embed)
+        try:
+            check_characters = 'ny'
+            edmc_msg = await bot.wait_for("message", check=check_confirm, timeout=30)
+            edmc_off = False
+            if 'y' == edmc_msg.content.lower().strip():
+                edmc_off = True
+        except asyncio.TimeoutError:
+            await default_timeout_message('edmc_prompt')
+            return
+
         embed = discord.Embed(title="Where would you like to send the alert?",
                             description="(**d**)iscord, (**r**)eddit, (**t**)ext for copy/pasting or (**x**) to cancel\n"
                             "Use (**n**) to also notify PTN Haulers.",
@@ -1218,19 +1238,16 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
         print("Prompted user for alert destination")
 
         try:
+            check_characters = 'drtnx'
             msg = await bot.wait_for("message", check=check_confirm, timeout=30)
 
             if "x" in msg.content.lower():
                 # immediately stop if there's an x anywhere in the message, even if there are other proper inputs
                 message_cancelled = await ctx.send("**Mission creation cancelled.**")
-                # remove the channel we just created
-                try:
-                    carrier_channel_lock.release()
-                    print("Channel lock released")
-                finally:
-                    await remove_carrier_channel(mission_temp_channel_id, seconds_short)
                 await msg.delete()
                 await message_confirm.delete()
+                await edmc_confirm.delete()
+                await edmc_msg.delete()
                 print("User cancelled mission generation")
                 return
 
@@ -1270,7 +1287,14 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
                 await ctx.send(embed=embed)
 
             if "d" in msg.content.lower():
-                print("User used option d")
+                print("User used option d, creating mission channel")
+
+                mission_temp_channel_id = await create_mission_temp_channel(ctx, carrier_data.discord_channel, carrier_data.ownerid)
+                mission_temp_channel = bot.get_channel(mission_temp_channel_id)
+
+                # Recreate this text since we know the channel id
+                discord_text = txt_create_discord(carrier_data, mission_type, commodity_data, station, system, profit, pads,
+                                demand, eta_text, mission_temp_channel_id)
                 message_send = await ctx.send("**Sending to Discord...**")
                 try:
                     # send trade alert to trade alerts channel, or to wine alerts channel if loading wine
@@ -1284,7 +1308,7 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
                     else:
                         channel = bot.get_channel(trade_alerts_id)
                         channelId = trade_alerts_id
-                        
+
                     if mission_type == 'load':
                         embed = discord.Embed(description=discord_text, color=constants.EMBED_COLOUR_LOADING)
                     else:
@@ -1293,8 +1317,6 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
 
                     trade_alert_msg = await channel.send(embed=embed)
                     discord_alert_id = trade_alert_msg.id
-
-                    channel = bot.get_channel(mission_temp_channel_id)
 
                     discord_file = discord.File(file_name, filename="image.png")
 
@@ -1306,12 +1328,12 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
                     embed.add_field(name="Destination", value=f"Station: {station.upper()}\nSystem: {system.upper()}", inline=True)
                     if eta:
                         embed.add_field(name="ETA", value=f"{eta} minutes", inline=True)
-                
+
                     embed.set_image(url="attachment://image.png")
                     embed.set_footer(
                         text=f"m.complete will mark this mission complete\n;stock {carrier_data.carrier_short_name} will show carrier market data\n/info will show this carrier's details")
                     # pin the carrier trade msg sent by the bot
-                    pin_msg = await channel.send(file=discord_file, embed=embed)
+                    pin_msg = await mission_temp_channel.send(file=discord_file, embed=embed)
                     await pin_msg.pin()
                     embed = discord.Embed(title=f"Discord trade alerts sent for {carrier_data.carrier_long_name}",
                                         description=f"Check <#{channelId}> for trade alert and "
@@ -1319,11 +1341,12 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
                                         color=constants.EMBED_COLOUR_DISCORD)
                     await ctx.send(embed=embed)
                     await message_send.delete()
+                    submit_mission = True
                 except Exception as e:
                     print(f"Error sending to Discord: {e}")
                     await ctx.send(f"Error sending to Discord: {e}\nAttempting to continue with mission gen...")
 
-            if "r" in msg.content.lower():
+            if "r" in msg.content.lower() and not edmc_off:
                 print("User used option r")
                 # profit is a float, not an int.
                 if float(profit) < 10:
@@ -1359,30 +1382,47 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
                         upvote_message = await channel.send(embed=embed)
                         emoji = bot.get_emoji(upvote_emoji)
                         await upvote_message.add_reaction(emoji)
+                        submit_mission = True
                     except Exception as e:
                         print(f"Error posting to Reddit: {e}")
                         await ctx.send(f"Error posting to Reddit: {e}\nAttempting to continue with rest of mission gen...")
 
-            if "n" in msg.content.lower():
+            if "n" in msg.content.lower() and "d" in msg.content.lower():
                 print("User used option n")
 
-                # get carrier's channel object
-
-                channel = bot.get_channel(mission_temp_channel_id)
-
-                await channel.send(f"<@&{hauler_role_id}>: {discord_text}")
+                await mission_temp_channel.send(f"<@&{hauler_role_id}>: {discord_text}")
 
                 embed = discord.Embed(title=f"Mission notification sent for {carrier_data.carrier_long_name}",
                             description=f"Pinged <@&{hauler_role_id}> in <#{mission_temp_channel_id}>",
                             color=constants.EMBED_COLOUR_DISCORD)
                 await ctx.send(embed=embed)
+
+            if edmc_off and "d" in msg.content.lower():
+                print('Sending EDMC OFF messages to haulers')
+                embed = discord.Embed(title='PLEASE STOP ALL 3RD PARTY SOFTWARE: EDMC, EDDISCOVERY, ETC',
+                        description=("Maximising our haulers' profits for this mission means keeping market data at this station"
+                                 " **a secret**! For this reason **please disabled/exit all journal reporting plugins/programs**"
+                                 " and leave them off until all missions at this location are complete. Thanks CMDRs!"),
+                        color=constants.EMBED_COLOUR_REDDIT)
+                edmc_file = discord.File(f"images/system/edmc_off_{random.randint(1,2)}.png", filename="image.png")
+
+                embed.set_image(url="attachment://image.png")
+                pin_edmc = await mission_temp_channel.send(file=edmc_file, embed=embed)
+                await pin_edmc.pin()
+
+                embed = discord.Embed(title=f"EDMC OFF messages sent", description='Reddit posts will be skipped',
+                            color=constants.EMBED_COLOUR_DISCORD)
+                await ctx.send(embed=embed)
+
         except asyncio.TimeoutError:
-            await ctx.send("**Mission not generated or broadcast (no valid response from user).**")
+            await default_timeout_message('notification_type_decision')
             try:
-                carrier_channel_lock.release()
-                print("Channel lock released")
+                if mission_temp_channel_id:
+                    carrier_channel_lock.release()
+                    print("Channel lock released")
             finally:
-                await remove_carrier_channel(mission_temp_channel_id, seconds_short)
+                if mission_temp_channel_id:
+                    await remove_carrier_channel(mission_temp_channel_id, seconds_short)
             return
 
         print("All options worked through, now clean up")
@@ -1391,13 +1431,16 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
         try:
             await msg.delete()
             await message_confirm.delete()
+            await edmc_confirm.delete()
+            await edmc_msg.delete()
         except Exception as e:
             print(f"Error during clearup: {e}")
             await ctx.send(f"Oops, error detected: {e}\nAttempting to continue with mission gen.")
 
-        await mission_add(ctx, carrier_data, commodity_data, mission_type, system, station, profit, pads, demand,
+        if submit_mission:
+            await mission_add(ctx, carrier_data, commodity_data, mission_type, system, station, profit, pads, demand,
                         rp_text, reddit_post_id, reddit_post_url, reddit_comment_id, reddit_comment_url, discord_alert_id, mission_temp_channel_id)
-        await mission_generation_complete(ctx, carrier_data, message_pending, eta_text)
+            await mission_generation_complete(ctx, carrier_data, message_pending, eta_text)
         cleanup_temp_image_file(file_name)
         print("Reached end of mission generator")
         return
@@ -1407,7 +1450,8 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
         print("Something went wrong with mission generation :(")
         print(e)
         carrier_channel_lock.release()
-        await remove_carrier_channel(mission_temp_channel_id, seconds_short)
+        if mission_temp_channel_id:
+            await remove_carrier_channel(mission_temp_channel_id, seconds_short)
 
 
 
@@ -1530,8 +1574,9 @@ async def mission_add(ctx, carrier_data, commodity_data, mission_type, system, s
     carriers_conn.commit()
 
     # now we can release the channel lock
-    carrier_channel_lock.release()
-    print("Channel lock released")
+    if mission_temp_channel_id:
+        carrier_channel_lock.release()
+        print("Channel lock released")
     return
 
 async def mission_generation_complete(ctx, carrier_data, message_pending, eta_text):
@@ -1604,12 +1649,12 @@ async def _owner(ctx: SlashContext, owner: discord.Member):
         carrier_list = find_carriers_mult(owner.id, CarrierDbFields.ownerid.name)
 
         if not carrier_list:
-            await ctx.send(f"No carriers found owned by <@{owner.id}>", hidden=True) 
+            await ctx.send(f"No carriers found owned by <@{owner.id}>", hidden=True)
             return print(f"No carriers found for owner {owner.id}")
 
         embed = discord.Embed(description=f"Showing registered Fleet Carriers owned by <@{owner.id}>:",
                                 color=constants.EMBED_COLOUR_OK)
-        
+
         for carrier_data in carrier_list:
             embed.add_field(name=f"{carrier_data.carrier_long_name} ({carrier_data.carrier_identifier})",
                             value=f"Channel Name: #{carrier_data.discord_channel}",
@@ -1862,7 +1907,7 @@ async def _cleanup_completed_mission(ctx, mission_data, reddit_complete_text, di
                                   color=constants.EMBED_COLOUR_OK)
             embed.set_footer(text="Updated any sent alerts and removed from mission list.")
             await ctx.send(embed=embed)
-        
+
         # notify owner if not command author
         carrier_data = find_carrier(mission_data.carrier_name, CarrierDbFields.longname.name)
         if not ctx.author.id == carrier_data.ownerid:
@@ -1964,7 +2009,7 @@ async def complete(ctx, comment: str = None):
                               color=constants.EMBED_COLOUR_ERROR)
         await ctx.send(embed=embed)
         return
-    
+
     # now look to see if the carrier is on an active mission
     print("Looking for mission by channel ID match")
     mission_data = find_mission(ctx.channel.id, "channelid")
@@ -2035,8 +2080,8 @@ async def backup(ctx):
         return await ctx.send(f'Sorry, you can only run this command out of: {bot_command_channel}.')
 
     print(f"{ctx.author} requested a manual DB backup")
-    backup_database('missions') 
-    backup_database('carriers') 
+    backup_database('missions')
+    backup_database('carriers')
     await ctx.send("Database backup complete.")
 
 
@@ -2097,7 +2142,7 @@ async def _find(ctx: SlashContext, carrier_name_search_term: str):
                                   description=f"Displaying first match for {carrier_name_search_term}", color=constants.EMBED_COLOUR_OK)
             embed = _add_common_embed_fields(embed, carrier_data, ctx)
             return await ctx.send(embed=embed, hidden=True)
-          
+
     except TypeError as e:
         print('Error in carrier long search: {}'.format(e))
     await ctx.send(f'No result for {carrier_name_search_term}.', hidden=True)
@@ -2388,7 +2433,7 @@ async def carrier_image(ctx, lookname):
                                                 "**To continue without changing**:         Input \"**x**\" or wait 60 seconds\n"
                                                 "**To switch to a random PTN logo image**: Input \"**p**\"",
                                     color=constants.EMBED_COLOUR_QU)
-    
+
     elif not valid_image and not image_exists:
         # there's no mission image, prompt the user to upload one or use a PTN placeholder
         file = discord.File("template.png", filename="image.png")
@@ -2458,7 +2503,7 @@ async def carrier_image(ctx, lookname):
                 await attachment.save(attachment.filename)
 
                 """
-                Now we need to check the image's size and aspect ratio so we can trim it down without the user 
+                Now we need to check the image's size and aspect ratio so we can trim it down without the user
                 requiring any image editing skills. This is a bit involved. We need to compare both aspect
                 ratio and size to our desired values and fix them in that order. Aspect correction requires
                 figuring out whether the image is too tall or too wide, then centering the crop correctly.
@@ -2478,7 +2523,7 @@ async def carrier_image(ctx, lookname):
                 print(f"{upload_width}, {upload_height}")
                 upload_size = (upload_width, upload_height)
                 upload_aspect = upload_width / upload_height
- 
+
                 if not upload_aspect == true_aspect:
                     print(f"Image aspect ratio of {upload_aspect} requires adjustment")
                     # check largest dimension
@@ -2638,7 +2683,7 @@ def _add_common_embed_fields(embed, carrier_data, ctx):
     embed.add_field(name="Last Trade", value=f"<t:{carrier_data.lasttrade}> (<t:{carrier_data.lasttrade}:R>)", inline=True)
     # shortname is not relevant to users and will be auto-generated in future
     return embed
-    
+
 
 def _regex_alphanumeric_with_hyphens(regex_string):
     # replace any spaces with hyphens
@@ -2905,7 +2950,7 @@ async def _update_carrier_details_in_database(ctx, carrier_data, original_name):
         # Handy number to print out what the database connection is actually doing
         carriers_conn.set_trace_callback(print)
         carrier_db.execute(
-            ''' UPDATE carriers 
+            ''' UPDATE carriers
             SET shortname=?, longname=?, cid=?, discordchannel=?, channelid=?, ownerid=?
             WHERE longname LIKE (?) ''', data
         )
@@ -3080,7 +3125,7 @@ async def cc(ctx, owner: discord.Member, *, channel_name: str):
             print(f"Found data: {community_carrier.owner_id} owner of {community_carrier.channel_id}")
             await ctx.send(f"User {owner.display_name} is already registered as a Community Carrier with channel <#{community_carrier.channel_id}>")
             return
-        
+
     # get the CC category as a discord channel category object
     category = discord.utils.get(ctx.guild.categories, id=cc_cat_id)
 
@@ -3096,7 +3141,7 @@ async def cc(ctx, owner: discord.Member, *, channel_name: str):
     if not role_create:
         # if a new role exists we won't use it because it could lead to security concerns :(
         print(f"Role {new_role} already exists.")
-        # role exists, cancel the process and inform the user 
+        # role exists, cancel the process and inform the user
         embed = discord.Embed(description=f"**Error**: The role <@&{new_role.id}> already exists. Please choose a different name for your Community Carrier or delete the existing role and try again.", color=constants.EMBED_COLOUR_ERROR)
         await ctx.send(embed=embed)
         return
@@ -3108,7 +3153,7 @@ async def cc(ctx, owner: discord.Member, *, channel_name: str):
     #
     # first see if there's a channel matching the given string as-is
     new_channel = discord.utils.get(ctx.guild.channels, name=stripped_channel_name)
-    
+
     if new_channel:
         if new_channel.name.endswith('_cc'):
             # maybe the user added the _cc themselves, we'll allow them to use it
@@ -3124,7 +3169,7 @@ async def cc(ctx, owner: discord.Member, *, channel_name: str):
             return
 
     else:
-        # now see if there's a channel matching the user string + "_cc"    
+        # now see if there's a channel matching the user string + "_cc"
         new_channel = discord.utils.get(ctx.guild.channels, name=f'{stripped_channel_name}_cc')
         # if it exists, prompt to re-use it, else create it
         reuse_channel = True if new_channel else False
@@ -3368,7 +3413,7 @@ async def cc_list(ctx):
             await ctx.send(embed=embed)
             await message.delete()
             await ctx.message.delete()
-            break    
+            break
 
 
 # find a community carrier channel by owner
@@ -3560,7 +3605,7 @@ async def _notify_me(ctx: SlashContext):
     notify_role = discord.utils.get(ctx.guild.roles, id=role_id)
 
     # check if role actually exists
-    if not notify_role: 
+    if not notify_role:
         await ctx.send("Sorry, I couldn't find a notification role for this channel. Please report this to an Admin.", hidden=True)
         await spamchannel.send(f"**ERROR**: {ctx.author} tried to use `/notify_me` in <#{ctx.channel.id}> but received an error (role does not exist).")
         print(f"No role found matching {ctx.channel}")
@@ -3582,7 +3627,7 @@ async def _notify_me(ctx: SlashContext):
         await ctx.author.remove_roles(notify_role)
         embed = discord.Embed(title=f"You've cancelled notifications for {ctx.channel.name}.",
                                 description="You'll no longer receive notifications about this event or carrier's activity."
-                                            " You can sign up again at any time by using `/notify_me` in this channel.", 
+                                            " You can sign up again at any time by using `/notify_me` in this channel.",
                                             color=constants.EMBED_COLOUR_QU)
         await ctx.send(embed=embed, hidden=True)
 
@@ -3752,7 +3797,7 @@ async def nom_count(ctx, number: int):
         # only show those with a count >= the number the user specified
         if count >= numberint:
             embed.add_field(name=f'{count} nominations', value=f"<@{nominees.pillar_id}>", inline=False)
-    
+
     await ctx.send(embed=embed)
     return print("nom_count complete")
 
@@ -3882,7 +3927,7 @@ async def unlock_override(ctx):
     print(f"{ctx.author} called manual channel_lock release in {ctx.channel}")
     if not carrier_channel_lock.locked():
         return await ctx.send("Channel lock is not set.")
-    
+
     await ctx.send("Make sure nobody is using the Mission Generator before proceeding.")
     global deletion_in_progress
 
