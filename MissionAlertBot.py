@@ -257,12 +257,14 @@ def create_missing_table(table, db_obj, create_stmt):
     else:
         # Create a new version
         print('No backup found - Creating empty database')
+
         db_obj.execute(create_stmt)
 
 
 def check_table_column_exists(column_name, table_name, database):
     """
     Checks whether a column exists in a table for a database.
+
 
     :param str column_name: The column name to check for.
     :param str table_name: The table to check for the column in.
@@ -276,13 +278,16 @@ def check_table_column_exists(column_name, table_name, database):
     return bool(database.fetchone()[0])
 
 
+
 def create_missing_column(table, column, existing, db_name, db_obj, db_conn, create_stmt):
+
     """
     In order to create the new column, a new table has to be created because
     SQLite does not allow adding a new column with a non-constant value.
     We then copy data from table to table, and rename them into place.
     We will leave the backup table in case something goes wrong.
     There is not enough try/catch here to be perfect. sorry. (that's OK Durzo, thanks for the code!)
+
 
     :param str table: name of the table the new column should be created in
     :param str column: name of the new column
@@ -293,6 +298,7 @@ def create_missing_column(table, column, existing, db_name, db_obj, db_conn, cre
     :param sqlite.Connection db_conn: database connection
     :param string create_stmt: table create command
     :returns: return
+
     """
     temp_ts = int(datetime.now(tz=timezone.utc).timestamp())
     temp_database_table = f'{table}_newcolumn_{temp_ts}'
@@ -311,9 +317,11 @@ def create_missing_column(table, column, existing, db_name, db_obj, db_conn, cre
     print(f'Renaming current {table} table to "{backup_database_table}"')
     db_obj.execute(f'ALTER TABLE {table} RENAME TO {backup_database_table}')
 
+
     # rename temp table as original.
     print(f'Renaming "{temp_database_table}" temp table to "{table}"')
     db_obj.execute(f'ALTER TABLE {temp_database_table} RENAME TO {table}')
+
 
     print('Operation complete.')
     db_conn.commit()
@@ -840,7 +848,8 @@ TEXT GEN FUNCTIONS
 
 
 def txt_create_discord(carrier_data, mission_type, commodity, station, system, profit, pads, demand, eta_text, mission_temp_channel_id):
-    discord_text = f"<#{mission_temp_channel_id}> {'load' if mission_type == 'load' else 'unload'}ing " \
+    discord_channel = f"<#{mission_temp_channel_id}>" if mission_temp_channel_id else f"#{carrier_data.discord_channel}"
+    discord_text = f"{discord_channel} {'load' if mission_type == 'load' else 'unload'}ing " \
                    f"{commodity.name} " \
                    f"{'from' if mission_type == 'load' else 'to'} **{station.upper()}** station in system " \
                    f"**{system.upper()}** : {profit}k per unit profit : "\
@@ -1127,6 +1136,9 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
         reddit_comment_id = None
         reddit_comment_url = None
         discord_alert_id = None
+        mission_temp_channel_id = None
+        check_characters = None
+
 
         eta_text = f" (ETA {eta} minutes)" if eta else ""
 
@@ -1138,16 +1150,21 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
             # Anything outwith this grouping will cause all to fail. Use set to throw away any duplicate objects.
             # not sure if the msg.content can ever be None, but lets gate it anyway
             return message.content and message.author == ctx.author and message.channel == ctx.channel and \
-                all(character in 'drtnx' for character in set(message.content.lower()))
+                all(character in check_characters for character in set(message.content.lower()))
 
         def check_rp(message):
             return message.author == ctx.author and message.channel == ctx.channel
 
-        gen_mission.returnflag = False
-        mission_temp_channel_id = await create_mission_temp_channel(ctx, carrier_data.discord_channel, carrier_data.ownerid)
-        # flag is set to True if mission channel creation is successful
-        if not gen_mission.returnflag:
-            return # we've already notified the user
+        async def default_timeout_message(location):
+            await ctx.send(f"**Mission generation cancelled (waiting too long for user input)** ({location})")
+
+
+        # gen_mission.returnflag = False
+        # mission_temp_channel_id = await create_mission_temp_channel(ctx, carrier_data.discord_channel, carrier_data.ownerid)
+        # mission_temp_channel = bot.get_channel(mission_temp_channel_id)
+        # # flag is set to True if mission channel creation is successful
+        # if not gen_mission.returnflag:
+        #     return # we've already notified the user
 
         # beyond this point any exits need to release the channel lock
 
@@ -1167,21 +1184,18 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
                 rp_text = message_rp_text.content
 
             except asyncio.TimeoutError:
-                await ctx.send("**Mission generation cancelled (waiting too long for user input)**")
-                try:
-                    carrier_channel_lock.release()
-                    print("Channel lock released")
-                finally:
-                    await remove_carrier_channel(mission_temp_channel_id, seconds_short)
-                await message_rp.delete()
+                await default_timeout_message('rp')
                 return
+
+        # Options that should create a mission db entry will change this to True
+        submit_mission = False
 
         # generate the mission elements
 
         file_name = await create_carrier_mission_image(carrier_data, commodity_data, system, station, profit, pads, demand,
                                                 mission_type)
         discord_text = txt_create_discord(carrier_data, mission_type, commodity_data, station, system, profit, pads,
-                                        demand, eta_text, mission_temp_channel_id)
+                        demand, eta_text, mission_temp_channel_id)
         print("Generated discord elements")
         reddit_title = txt_create_reddit_title(carrier_data)
         reddit_body = txt_create_reddit_body(carrier_data, mission_type, commodity_data, station, system, profit, pads,
@@ -1203,6 +1217,20 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
         await message_gen.delete()
         print("Output check displayed")
 
+        embed = discord.Embed(title="Is this an EDMC OFF mission?",
+                            description="Should haulers be instructured to turn EDMC off?\ny/n",
+                            color=constants.EMBED_COLOUR_QU)
+        edmc_confirm = await ctx.send(embed=embed)
+        try:
+            check_characters = 'ny'
+            edmc_msg = await bot.wait_for("message", check=check_confirm, timeout=30)
+            edmc_off = False
+            if 'y' == edmc_msg.content.lower().strip():
+                edmc_off = True
+        except asyncio.TimeoutError:
+            await default_timeout_message('edmc_prompt')
+            return
+
         embed = discord.Embed(title="Where would you like to send the alert?",
                             description="(**d**)iscord, (**r**)eddit, (**t**)ext for copy/pasting or (**x**) to cancel\n"
                             "Use (**n**) to also notify PTN Haulers.",
@@ -1212,19 +1240,16 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
         print("Prompted user for alert destination")
 
         try:
+            check_characters = 'drtnx'
             msg = await bot.wait_for("message", check=check_confirm, timeout=30)
 
             if "x" in msg.content.lower():
                 # immediately stop if there's an x anywhere in the message, even if there are other proper inputs
                 message_cancelled = await ctx.send("**Mission creation cancelled.**")
-                # remove the channel we just created
-                try:
-                    carrier_channel_lock.release()
-                    print("Channel lock released")
-                finally:
-                    await remove_carrier_channel(mission_temp_channel_id, seconds_short)
                 await msg.delete()
                 await message_confirm.delete()
+                await edmc_confirm.delete()
+                await edmc_msg.delete()
                 print("User cancelled mission generation")
                 return
 
@@ -1264,7 +1289,14 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
                 await ctx.send(embed=embed)
 
             if "d" in msg.content.lower():
-                print("User used option d")
+                print("User used option d, creating mission channel")
+
+                mission_temp_channel_id = await create_mission_temp_channel(ctx, carrier_data.discord_channel, carrier_data.ownerid)
+                mission_temp_channel = bot.get_channel(mission_temp_channel_id)
+
+                # Recreate this text since we know the channel id
+                discord_text = txt_create_discord(carrier_data, mission_type, commodity_data, station, system, profit, pads,
+                                demand, eta_text, mission_temp_channel_id)
                 message_send = await ctx.send("**Sending to Discord...**")
                 try:
                     # send trade alert to trade alerts channel, or to wine alerts channel if loading wine
@@ -1288,8 +1320,6 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
                     trade_alert_msg = await channel.send(embed=embed)
                     discord_alert_id = trade_alert_msg.id
 
-                    channel = bot.get_channel(mission_temp_channel_id)
-
                     discord_file = discord.File(file_name, filename="image.png")
 
                     embed_colour = constants.EMBED_COLOUR_LOADING if mission_type == 'load' \
@@ -1305,7 +1335,7 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
                     embed.set_footer(
                         text=f"m.complete will mark this mission complete\n;stock {carrier_data.carrier_short_name} will show carrier market data\n/info will show this carrier's details")
                     # pin the carrier trade msg sent by the bot
-                    pin_msg = await channel.send(file=discord_file, embed=embed)
+                    pin_msg = await mission_temp_channel.send(file=discord_file, embed=embed)
                     await pin_msg.pin()
                     embed = discord.Embed(title=f"Discord trade alerts sent for {carrier_data.carrier_long_name}",
                                         description=f"Check <#{channelId}> for trade alert and "
@@ -1313,11 +1343,12 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
                                         color=constants.EMBED_COLOUR_DISCORD)
                     await ctx.send(embed=embed)
                     await message_send.delete()
+                    submit_mission = True
                 except Exception as e:
                     print(f"Error sending to Discord: {e}")
                     await ctx.send(f"Error sending to Discord: {e}\nAttempting to continue with mission gen...")
 
-            if "r" in msg.content.lower():
+            if "r" in msg.content.lower() and not edmc_off:
                 print("User used option r")
                 # profit is a float, not an int.
                 if float(profit) < 10:
@@ -1353,30 +1384,47 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
                         upvote_message = await channel.send(embed=embed)
                         emoji = bot.get_emoji(upvote_emoji)
                         await upvote_message.add_reaction(emoji)
+                        submit_mission = True
                     except Exception as e:
                         print(f"Error posting to Reddit: {e}")
                         await ctx.send(f"Error posting to Reddit: {e}\nAttempting to continue with rest of mission gen...")
 
-            if "n" in msg.content.lower():
+            if "n" in msg.content.lower() and "d" in msg.content.lower():
                 print("User used option n")
 
-                # get carrier's channel object
-
-                channel = bot.get_channel(mission_temp_channel_id)
-
-                await channel.send(f"<@&{hauler_role_id}>: {discord_text}")
+                await mission_temp_channel.send(f"<@&{hauler_role_id}>: {discord_text}")
 
                 embed = discord.Embed(title=f"Mission notification sent for {carrier_data.carrier_long_name}",
                             description=f"Pinged <@&{hauler_role_id}> in <#{mission_temp_channel_id}>",
                             color=constants.EMBED_COLOUR_DISCORD)
                 await ctx.send(embed=embed)
+
+            if edmc_off and "d" in msg.content.lower():
+                print('Sending EDMC OFF messages to haulers')
+                embed = discord.Embed(title='PLEASE STOP ALL 3RD PARTY SOFTWARE: EDMC, EDDISCOVERY, ETC',
+                        description=("Maximising our haulers' profits for this mission means keeping market data at this station"
+                                 " **a secret**! For this reason **please disabled/exit all journal reporting plugins/programs**"
+                                 " and leave them off until all missions at this location are complete. Thanks CMDRs!"),
+                        color=constants.EMBED_COLOUR_REDDIT)
+                edmc_file = discord.File(f"images/system/edmc_off_{random.randint(1,2)}.png", filename="image.png")
+
+                embed.set_image(url="attachment://image.png")
+                pin_edmc = await mission_temp_channel.send(file=edmc_file, embed=embed)
+                await pin_edmc.pin()
+
+                embed = discord.Embed(title=f"EDMC OFF messages sent", description='Reddit posts will be skipped',
+                            color=constants.EMBED_COLOUR_DISCORD)
+                await ctx.send(embed=embed)
+
         except asyncio.TimeoutError:
-            await ctx.send("**Mission not generated or broadcast (no valid response from user).**")
+            await default_timeout_message('notification_type_decision')
             try:
-                carrier_channel_lock.release()
-                print("Channel lock released")
+                if mission_temp_channel_id:
+                    carrier_channel_lock.release()
+                    print("Channel lock released")
             finally:
-                await remove_carrier_channel(mission_temp_channel_id, seconds_short)
+                if mission_temp_channel_id:
+                    await remove_carrier_channel(mission_temp_channel_id, seconds_short)
             return
 
         print("All options worked through, now clean up")
@@ -1385,13 +1433,16 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
         try:
             await msg.delete()
             await message_confirm.delete()
+            await edmc_confirm.delete()
+            await edmc_msg.delete()
         except Exception as e:
             print(f"Error during clearup: {e}")
             await ctx.send(f"Oops, error detected: {e}\nAttempting to continue with mission gen.")
 
-        await mission_add(ctx, carrier_data, commodity_data, mission_type, system, station, profit, pads, demand,
+        if submit_mission:
+            await mission_add(ctx, carrier_data, commodity_data, mission_type, system, station, profit, pads, demand,
                         rp_text, reddit_post_id, reddit_post_url, reddit_comment_id, reddit_comment_url, discord_alert_id, mission_temp_channel_id)
-        await mission_generation_complete(ctx, carrier_data, message_pending, eta_text)
+            await mission_generation_complete(ctx, carrier_data, message_pending, eta_text)
         cleanup_temp_image_file(file_name)
         await mark_cleanup_channel(mission_temp_channel_id, 0)
 
@@ -1403,7 +1454,8 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
         print("Something went wrong with mission generation :(")
         print(e)
         carrier_channel_lock.release()
-        await remove_carrier_channel(mission_temp_channel_id, seconds_short)
+        if mission_temp_channel_id:
+            await remove_carrier_channel(mission_temp_channel_id, seconds_short)
 
 
 
@@ -1526,8 +1578,9 @@ async def mission_add(ctx, carrier_data, commodity_data, mission_type, system, s
     carriers_conn.commit()
 
     # now we can release the channel lock
-    carrier_channel_lock.release()
-    print("Channel lock released")
+    if mission_temp_channel_id:
+        carrier_channel_lock.release()
+        print("Channel lock released")
     return
 
 async def mission_generation_complete(ctx, carrier_data, message_pending, eta_text):
