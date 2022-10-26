@@ -920,13 +920,15 @@ async def on_ready():
     print(f'{bot.user.name} has connected to Discord!')
     # define our background tasks
     reddit_task = asyncio.create_task(_monitor_reddit_comments())
-    cleanup_task = asyncio.create_task(cleanup_trade_channels_on_startup())
+    # Check if any trade channels were not deleted before bot restart/stop
+    cleanup_channels = await get_trade_channels_on_startup()
+    for channel in cleanup_channels:
+        asyncio.create_task(cleanup_trade_channel(channel))
     # start the lasttrade_cron loop.
     await lasttrade_cron.start()
     # start monitoring reddit comments
     await reddit_task
-    # Check if any trade channels were not deleted before bot restart/stop
-    await cleanup_task
+
 
 
 # monitor reddit comments
@@ -1972,16 +1974,23 @@ async def remove_channel_cleanup_entry(mission_channel_id):
     return
 
 
-async def cleanup_trade_channels_on_startup():
+async def get_trade_channels_on_startup():
     """
     This function is called on bot.on_ready() to clean up any channels
     that had their timer lost during bot stop/restart
     """
     print('Checking for trade channels that were not cleaned up before bot restart')
     mission_db.execute('SELECT * FROM channel_cleanup WHERE is_complete = 1')
-    for cleanup_channel in mission_db.fetchall():
-        print(f"Sending channel {cleanup_channel['channelid']} for removal")
-        await remove_carrier_channel(cleanup_channel['channelid'], seconds_long)
+    return mission_db.fetchall()
+
+
+async def cleanup_trade_channel(channel):
+    """
+    This function is called on bot.on_ready() to clean up any channels
+    that had their timer lost during bot stop/restart
+    """
+    print(f"Sending channel {channel['channelid']} for removal")
+    await remove_carrier_channel(channel['channelid'], seconds_long)
     return
 
 
