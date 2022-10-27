@@ -93,15 +93,89 @@ TOKEN = os.getenv('DISCORD_TOKEN_PROD') if _production else os.getenv('DISCORD_T
 # create reddit instance
 reddit = asyncpraw.Reddit('bot1')
 
-# connect to sqlite carrier database
+########################
+# Database Configuration
+########################
+# Each database should have:
+#   1. connection
+#   2. row_factory definition
+#   3. database object pointing to the cursor
+#
+# Each Table should have:
+#   1. create statement string (update with new columns as added)
+#   2. columns list (update with new columns as added)
+
+#  carrier database/table config
 carriers_conn = sqlite3.connect('carriers.db')
 carriers_conn.row_factory = sqlite3.Row
 carrier_db = carriers_conn.cursor()
+carriers_table_create = '''
+    CREATE TABLE carriers(
+        p_ID INTEGER PRIMARY KEY AUTOINCREMENT,
+        shortname TEXT NOT NULL UNIQUE,
+        longname TEXT NOT NULL,
+        cid TEXT NOT NULL,
+        discordchannel TEXT NOT NULL,
+        channelid INT,
+        ownerid INT,
+        lasttrade INT NOT NULL DEFAULT (cast(strftime('%s','now') as int))
+    )
+    '''
+carriers_table_columns = ['p_ID', 'shortname', 'longname', 'cid', 'discordchannel', 'channelid', 'ownerid', 'lasttrade']
 
-# connect to sqlite missions database
+community_carriers_table_create = '''
+    CREATE TABLE community_carriers(
+        ownerid INT NOT NULL UNIQUE,
+        channelid INT NOT NULL UNIQUE,
+        roleid INT NOT NULL UNIQUE
+    )
+    '''
+community_carriers_table_columns = ['ownerid', 'channelid', 'roleid']
+
+nominees_table_create = '''
+    CREATE TABLE nominees(
+        nominatorid INT NOT NULL,
+        pillarid INT NOT NULL,
+        note TEXT
+    )
+    '''
+nominess_table_columns = ['nominatorid', 'pillarid', 'note']
+
+#  missions database/table config
 missions_conn = sqlite3.connect('missions.db')
 missions_conn.row_factory = sqlite3.Row
 mission_db = missions_conn.cursor()
+missions_table_create = '''
+    CREATE TABLE missions(
+        "carrier"	TEXT NOT NULL UNIQUE,
+        "cid"	TEXT,
+        "channelid"	INT,
+        "commodity"	TEXT,
+        "missiontype"	TEXT,
+        "system"	TEXT NOT NULL,
+        "station"	TEXT,
+        "profit"	INTEGER,
+        "pad"	TEXT,
+        "demand"    TEXT,
+        "rp_text"	TEXT,
+        "reddit_post_id"	TEXT,
+        "reddit_post_url"	TEXT,
+        "reddit_comment_id"	TEXT,
+        "reddit_comment_url"	TEXT,
+        "discord_alert_id"	INT
+    )
+    '''
+missions_tables_columns = ['carrier', 'cid', 'channelid', 'commodity', 'missiontype', 'system', 'station',\
+    'profit', 'pad', 'demand', 'rp_text', 'reddit_post_id', 'reddit_post_url', 'reddit_comment_id',\
+    'reddit_comment_url', 'discord_alert_id', 'is_complete']
+
+channel_cleanup_table_create = '''
+    CREATE TABLE channel_cleanup(
+        "channelid" INT NOT NULL UNIQUE,
+        "is_complete" BOOLEAN DEFAULT 0
+    )
+'''
+channel_cleanup_columns = ['channelid', 'is_complete']
 
 deletion_in_progress = False
 
@@ -141,7 +215,7 @@ error_gifs = [
 ]
 
 #
-#                       DATABASE STUFF
+#                       DATABASE ACTION STUFF
 #
 
 
@@ -149,238 +223,164 @@ print('MissionAlertBot starting')
 print(f'Configuring to run against: {"Production" if _production else "Testing"} env.')
 
 
-# create carrier record if necessary (only needed on first run)
 def check_database_table_exists(table_name, database):
     """
-    Checks whether a carrier exists in the database already.
+    Checks whether a table exists in the database already.
 
     :param str table_name:  The database string name to create.
     :param sqlite.Connection.cursor database: The database to connect againt.
     :returns: A boolean state, True if it exists, else False
     :rtype: bool
     """
-    database.execute('''SELECT count(name) FROM sqlite_master WHERE TYPE = 'table' AND name = '{}' '''.format(
-        table_name))
+    print(f'Starting up - checking if {table_name} table exists or not')
+
+    database.execute(f"SELECT count(name) FROM sqlite_master WHERE TYPE = 'table' AND name = '{table_name}'")
     return bool(database.fetchone()[0])
+
+def create_missing_table(table, db_obj, create_stmt):
+    print(f'{table} table missing - creating it now')
+
+    if os.path.exists(os.path.join(os.getcwd(), 'db_sql', f'{table}_dump.sql')):
+
+        # recreate from backup file
+        print('Recreating database from backup ...')
+        with open(os.path.join(os.getcwd(), 'db_sql', f'{table}_dump.sql')) as f:
+
+            sql_script = f.read()
+            db_obj.executescript(sql_script)
+
+
+        # print('Loaded the following data: ')
+        # carrier_db.execute('''SELECT * from carriers ''')
+        # for e in carrier_db.fetchall():
+        #     print(f'\t {CarrierData(e)}')
+    else:
+        # Create a new version
+        print('No backup found - Creating empty database')
+
+        db_obj.execute(create_stmt)
 
 
 def check_table_column_exists(column_name, table_name, database):
     """
     Checks whether a column exists in a table for a database.
 
+
     :param str column_name: The column name to check for.
     :param str table_name: The table to check for the column in.
     :param sqlite.Connection.cursor database: The database to connect against.
-    :type: bool
+    :returns: A boolean state, True if it exists, else False
+    :rtype: bool
     """
-    database.execute('''SELECT COUNT(name) FROM pragma_table_info('{}') WHERE name='{}' '''.format(
-        table_name, column_name))
+    print(f'Starting up - checking if {table_name} table has new "{column_name}" column or not')
+
+    database.execute(f"SELECT COUNT(name) FROM pragma_table_info('{table_name}') WHERE name='{column_name}'")
     return bool(database.fetchone()[0])
 
 
-print('Starting up - checking carriers database if it exists or not')
-if not check_database_table_exists('carriers', carrier_db):
-    print('Carriers database missing - creating it now')
 
-    if os.path.exists(os.path.join(os.getcwd(), 'db_sql', 'carriers_dump.sql')):
-        # recreate from backup file
-        print('Recreating database from backup ...')
-        with open(os.path.join(os.getcwd(), 'db_sql', 'carriers_dump.sql')) as f:
-            sql_script = f.read()
-            carrier_db.executescript(sql_script)
+def create_missing_column(table, column, existing, db_name, db_obj, db_conn, create_stmt):
 
-        # print('Loaded the following data: ')
-        # carrier_db.execute('''SELECT * from carriers ''')
-        # for e in carrier_db.fetchall():
-        #     print(f'\t {CarrierData(e)}')
-    else:
-        # Create a new version
-        print('No backup found - Creating empty database')
-        carrier_db.execute('''
-            CREATE TABLE carriers(
-                p_ID INTEGER PRIMARY KEY AUTOINCREMENT,
-                shortname TEXT NOT NULL UNIQUE,
-                longname TEXT NOT NULL,
-                cid TEXT NOT NULL,
-                discordchannel TEXT NOT NULL,
-                channelid INT,
-                ownerid INT,
-                lasttrade INT NOT NULL DEFAULT (cast(strftime('%s','now') as int))
-            )
-        ''')
-else:
-    print('Carrier database exists, do nothing')
-
-print('Starting up - checking if carriers database has new "lasttrade" column or not')
-if not check_table_column_exists('lasttrade', 'carriers', carrier_db):
-    """
-    In order to create the new 'lasttrade' column, a new table has to be created because
-    SQLite does not allow adding a new column with a non-constant value.
-    We then copy data from table to table, and rename them into place.
-    We will leave the backup table in case something goes wrong.
-    There is not enough try/catch here to be perfect. sorry.
-    """
-    temp_ts = int(datetime.now(tz=timezone.utc).timestamp())
-    temp_carriers_table = 'carriers_lasttrade_%s' % temp_ts
-    backup_carriers_table = 'carriers_backup_%s' % temp_ts
-    print(f'"lasttrade" column missing from carriers database, creating new temp table: {temp_carriers_table}')
-    # create new temp table with new column for lasttrade.
-    carrier_db.execute('''
-        CREATE TABLE {}(
-            p_ID INTEGER PRIMARY KEY AUTOINCREMENT,
-            shortname TEXT NOT NULL UNIQUE,
-            longname TEXT NOT NULL,
-            cid TEXT NOT NULL,
-            discordchannel TEXT NOT NULL,
-            channelid INT,
-            ownerid INT,
-            lasttrade INT default (cast(strftime('%s','now') as int))
-        )
-    '''.format(temp_carriers_table))
-    # copy data from carriers table to new temp table.
-    print('Copying carrier data to new table.')
-    carrier_db.execute('''INSERT INTO {}(p_ID, shortname, longname, cid, discordchannel, channelid, ownerid) select * from carriers'''.format(temp_carriers_table))
-    # rename old table and keep as backup just in case.
-    print(f'Renaming current carriers table to "{backup_carriers_table}"')
-    carrier_db.execute('''ALTER TABLE carriers RENAME TO {}'''.format(backup_carriers_table))
-    # rename temp table as original.
-    print(f'Renaming "{temp_carriers_table}" temp table to "carriers"')
-    carrier_db.execute('''ALTER TABLE {} RENAME TO carriers'''.format(temp_carriers_table))
-    print('Operation complete.')
-    carriers_conn.commit()
-
-
-print('Starting up - checking community_carriers database if it exists or not')
-# create Community Carriers table if necessary
-if not check_database_table_exists('community_carriers', carrier_db):
-    print('Community Carriers database missing - creating it now')
-
-    if os.path.exists(os.path.join(os.getcwd(), 'db_sql', 'community_carriers_dump.sql')):
-        # recreate from backup file
-        print('Recreating database from backup ...')
-        with open(os.path.join(os.getcwd(), 'db_sql', 'community_carriers_dump.sql')) as f:
-            sql_script = f.read()
-            carrier_db.executescript(sql_script)
-
-        # print('Loaded the following data: ')
-        # carrier_db.execute('''SELECT * from carriers ''')
-        # for e in carrier_db.fetchall():
-        #     print(f'\t {CarrierData(e)}')
-    else:
-        # Create a new version
-        print('No backup found - Creating empty database')
-        carrier_db.execute('''
-            CREATE TABLE community_carriers(
-                ownerid INT NOT NULL UNIQUE,
-                channelid INT NOT NULL UNIQUE,
-                roleid INT NOT NULL UNIQUE
-            )
-        ''')
-else:
-    print('Community Carrier database exists, do nothing')
-
-print('Starting up - checking if community carriers database has new "roleid" column or not')
-if not check_table_column_exists('roleid', 'community_carriers', carrier_db):
     """
     In order to create the new column, a new table has to be created because
     SQLite does not allow adding a new column with a non-constant value.
     We then copy data from table to table, and rename them into place.
     We will leave the backup table in case something goes wrong.
     There is not enough try/catch here to be perfect. sorry. (that's OK Durzo, thanks for the code!)
+
+
+    :param str table: name of the table the new column should be created in
+    :param str column: name of the new column
+    :param list existing: list of all columns in table
+    :param str db_name: name of database
+    :param db_obj
+    :param sqlite.Connection.cursor db_obj: database cursor
+    :param sqlite.Connection db_conn: database connection
+    :param string create_stmt: table create command
+    :returns: return
+
     """
     temp_ts = int(datetime.now(tz=timezone.utc).timestamp())
-    temp_carriers_table = 'community_carriers_newcolumn_%s' % temp_ts
-    backup_carriers_table = 'community_carriers_backup_%s' % temp_ts
-    print(f'roleid column missing from carriers database, creating new temp table: {temp_carriers_table}')
-    # create new temp table with new column for lasttrade.
-    carrier_db.execute('''
-        CREATE TABLE {}(
-                ownerid INT NOT NULL UNIQUE,
-                channelid INT NOT NULL UNIQUE,
-                roleid INT UNIQUE
-        )
-    '''.format(temp_carriers_table))
+    temp_database_table = f'{table}_newcolumn_{temp_ts}'
+    backup_database_table = f'{table}_backup_{temp_ts}'
+
+    print(f'{column} column missing from {db_name} database, creating new temp table: {temp_database_table}')
+    db_obj.execute(create_stmt.replace(table, temp_database_table))
+
     # copy data from community_carriers table to new temp table.
-    print('Copying community_carriers data to new table.')
-    carrier_db.execute('''INSERT INTO {}(ownerid, channelid) select * from community_carriers'''.format(temp_carriers_table))
+    print(f'Copying {table} data to new table.')
+    # new column won't exist, so remove it from the existing list
+    existing.remove(column)
+    db_obj.execute(f"INSERT INTO {temp_database_table} ({','.join(existing)}) select * from {table}")
+
     # rename old table and keep as backup just in case.
-    print(f'Renaming current community_carriers table to "{backup_carriers_table}"')
-    carrier_db.execute('''ALTER TABLE community_carriers RENAME TO {}'''.format(backup_carriers_table))
+    print(f'Renaming current {table} table to "{backup_database_table}"')
+    db_obj.execute(f'ALTER TABLE {table} RENAME TO {backup_database_table}')
+
+
     # rename temp table as original.
-    print(f'Renaming "{temp_carriers_table}" temp table to "community_carriers"')
-    carrier_db.execute('''ALTER TABLE {} RENAME TO community_carriers'''.format(temp_carriers_table))
+    print(f'Renaming "{temp_database_table}" temp table to "{table}"')
+    db_obj.execute(f'ALTER TABLE {temp_database_table} RENAME TO {table}')
+
+
     print('Operation complete.')
-    carriers_conn.commit()
+    db_conn.commit()
+    return
 
+# Add a mapping when a new table needs to be created
+# Requires:
+#   table_name (str):
+#       obj (sqlite db obj): sqlite connection to db
+#       create (str): sql create statement for table
+database_table_map = {
+    'carriers' : {'obj': carrier_db, 'create': carriers_table_create},
+    'community_carriers': {'obj': carrier_db, 'create': community_carriers_table_create},
+    'nominees': {'obj': carrier_db, 'create': nominees_table_create},
+    'missions': {'obj': mission_db, 'create': missions_table_create},
+    'channel_cleanup': {'obj': mission_db, 'create': channel_cleanup_table_create}
+}
 
-print('Starting up - checking nominees database if it exists or not')
-# create nominees table if necessary
-if not check_database_table_exists('nominees', carrier_db):
-    print('Nominees database missing - creating it now')
-
-    if os.path.exists(os.path.join(os.getcwd(), 'db_sql', 'nominees_dump.sql')):
-        # recreate from backup file
-        print('Recreating database from backup ...')
-        with open(os.path.join(os.getcwd(), 'db_sql', 'nominees_dump.sql')) as f:
-            sql_script = f.read()
-            carrier_db.executescript(sql_script)
-
+for table_name in database_table_map:
+    t = database_table_map[table_name]
+    if not check_database_table_exists(table_name, t['obj']):
+        create_missing_table(table_name, t['obj'], t['create'])
     else:
-        # Create a new version
-        print('No backup found - Creating empty database')
-        carrier_db.execute('''
-            CREATE TABLE nominees(
-                nominatorid INT NOT NULL,
-                pillarid INT NOT NULL,
-                note TEXT
-            )
-        ''')
-else:
-    print('Nominees database exists, do nothing')
+        print(f'{table_name} table exists, do nothing')
 
+# Add a mapping when a new column needs to be added to an existing table
+# Requires:
+#   column_name (str):
+#       db_name (str): name of database the table exist in
+#       table (str): table the column needs to be added to
+#       obj (sqlite db obj): sqlite connection to db
+#       columns (list): list of existing column names
+#       conn (sqlite connection): connection to sqlitedb
+#       create (str): sql create statement for table
+new_column_map = {
+    'lasttrade': {
+        'db_name': 'carriers',
+        'table': 'carriers',
+        'obj': carrier_db,
+        'columns': carriers_table_columns,
+        'conn': carriers_conn,
+        'create': carriers_table_create
+    },
+    'roleid': {
+        'db_name': 'carriers',
+        'table': 'community_carriers',
+        'obj': carrier_db,
+        'columns': community_carriers_table_columns,
+        'conn': carriers_conn,
+        'create': community_carriers_table_create
+    },
+}
 
-print('Starting up - checking missions database if it exists or not')
-# create missions db if necessary
-if not check_database_table_exists('missions', mission_db):
-    print('Mission database missing - creating it now')
-
-    if os.path.exists(os.path.join(os.getcwd(), 'db_sql', 'missions_dump.sql')):
-        # recreate from backup file
-        print('Recreating mission db database from backup ...')
-        with open(os.path.join(os.getcwd(), 'db_sql', 'missions_dump.sql')) as f:
-            sql_script = f.read()
-            mission_db.executescript(sql_script)
-
-        # print('Loaded the following data: ')
-        # mission_db.execute('''SELECT * from missions ''')
-        # for e in mission_db.fetchall():
-        #     print(f'\t {MissionData(e)}')
-
+for column_name in new_column_map:
+    c = new_column_map[column_name]
+    if not check_table_column_exists(column_name, c['table'], c['obj']):
+        create_missing_column(c['table'], column_name, c['columns'], c['db_name'], c['obj'], c['conn'], c['create'])
     else:
-        # Create a new version
-        print('No backup found - Creating empty database')
-        mission_db.execute('''
-            CREATE TABLE missions(
-                "carrier"	TEXT NOT NULL UNIQUE,
-                "cid"	TEXT,
-                "channelid"	INT,
-                "commodity"	TEXT,
-                "missiontype"	TEXT,
-                "system"	TEXT NOT NULL,
-                "station"	TEXT,
-                "profit"	INTEGER,
-                "pad"	TEXT,
-                "demand"    TEXT,
-                "rp_text"	TEXT,
-                "reddit_post_id"	TEXT,
-                "reddit_post_url"	TEXT,
-                "reddit_comment_id"	TEXT,
-                "reddit_comment_url"	TEXT,
-                "discord_alert_id"	INT
-            )
-        ''')
-else:
-    print('Mission database exists, do nothing')
+        print(f'{column_name} exists, do nothing')
 
 
 def dump_database_test(database_name):
@@ -918,8 +918,12 @@ slash = SlashCommand(bot, sync_commands=True)
 @bot.event
 async def on_ready():
     print(f'{bot.user.name} has connected to Discord!')
-    # define our two background tasks
+    # define our background tasks
     reddit_task = asyncio.create_task(_monitor_reddit_comments())
+    # Check if any trade channels were not deleted before bot restart/stop
+    cleanup_channels = await get_trade_channels_on_startup()
+    for channel in cleanup_channels:
+        asyncio.create_task(cleanup_trade_channel(channel))
     # start the lasttrade_cron loop.
     await lasttrade_cron.start()
     # start monitoring reddit comments
@@ -1442,6 +1446,8 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
                         rp_text, reddit_post_id, reddit_post_url, reddit_comment_id, reddit_comment_url, discord_alert_id, mission_temp_channel_id)
             await mission_generation_complete(ctx, carrier_data, message_pending, eta_text)
         cleanup_temp_image_file(file_name)
+        await mark_cleanup_channel(mission_temp_channel_id, 0)
+
         print("Reached end of mission generator")
         return
     except Exception as e:
@@ -1937,9 +1943,55 @@ async def _cleanup_completed_mission(ctx, mission_data, reddit_complete_text, di
                 await owner.send(f"Ahoy CMDR! The trade mission for your Fleet Carrier **{carrier_data.carrier_long_name}** has been marked as complete by {ctx.author.display_name}. Its mission channel will be removed in {seconds_long//60} minutes unless a new mission is started.")
 
         # remove channel
+        await mark_cleanup_channel(mission_data.channel_id, 1)
         await remove_carrier_channel(mission_data.channel_id, seconds_long)
 
         return
+
+
+async def mark_cleanup_channel(mission_channel_id, status):
+    """
+    Create or update entry in the channel_cleanup table
+    """
+    insert_stmt = f"""
+        INSERT INTO channel_cleanup
+        (channelid, is_complete)
+        VALUES({mission_channel_id}, {status})
+        ON CONFLICT(channelid)
+        DO UPDATE SET is_complete = {status};
+        """
+    mission_db.execute(insert_stmt)
+    missions_conn.commit()
+    return
+
+
+async def remove_channel_cleanup_entry(mission_channel_id):
+    """
+    Remove entry from channel_cleanup after successful channel deletion
+    """
+    mission_db.execute(f"DELETE FROM channel_cleanup WHERE channelid = {mission_channel_id}")
+    missions_conn.commit()
+    return
+
+
+async def get_trade_channels_on_startup():
+    """
+    This function is called on bot.on_ready() to clean up any channels
+    that had their timer lost during bot stop/restart
+    """
+    print('Checking for trade channels that were not cleaned up before bot restart')
+    mission_db.execute('SELECT * FROM channel_cleanup WHERE is_complete = 1')
+    return mission_db.fetchall()
+
+
+async def cleanup_trade_channel(channel):
+    """
+    This function is called on bot.on_ready() to clean up any channels
+    that had their timer lost during bot stop/restart
+    """
+    print(f"Sending channel {channel['channelid']} for removal")
+    await remove_carrier_channel(channel['channelid'], seconds_long)
+    return
 
 
 async def remove_carrier_channel(mission_channel_id, seconds):
@@ -1981,6 +2033,8 @@ async def remove_carrier_channel(mission_channel_id, seconds):
                 await asyncio.sleep(5)
                 await delchannel.delete()
                 print(f'Deleted {delchannel}')
+                await remove_channel_cleanup_entry(mission_channel_id)
+
             except Forbidden:
                 raise EnvironmentError(f"Could not delete {delchannel}, reason: Bot does not have permission.")
             except NotFound:
