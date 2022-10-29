@@ -10,7 +10,6 @@ from doctest import debug_script
 from pydoc import describe
 import re
 import tempfile
-from tkinter import W
 # from turtle import color
 from typing import Union
 import enum
@@ -848,7 +847,7 @@ TEXT GEN FUNCTIONS
 
 
 
-def txt_create_discord(carrier_data, mission_type, commodity, station, system, profit, pads, demand, eta_text, mission_temp_channel_id):
+def txt_create_discord(carrier_data, mission_type, commodity, station, system, profit, pads, demand, eta_text, mission_temp_channel_id, edmc_off):
     discord_channel = f"<#{mission_temp_channel_id}>" if mission_temp_channel_id else f"#{carrier_data.discord_channel}"
     discord_text = f"{discord_channel} {'load' if mission_type == 'load' else 'unload'}ing " \
                    f"{commodity.name} " \
@@ -856,6 +855,8 @@ def txt_create_discord(carrier_data, mission_type, commodity, station, system, p
                    f"**{system.upper()}** : {profit}k per unit profit : "\
                    f"{demand} {'demand' if mission_type == 'load' else 'supply'} : {pads.upper()}-pads" \
                    f".{eta_text}"
+    if edmc_off:
+        discord_text += " **EDMC OFF**"
     return discord_text
 
 
@@ -920,7 +921,7 @@ slash = SlashCommand(bot, sync_commands=True)
 async def on_ready():
     print(f'{bot.user.name} has connected to Discord!')
     # define our background tasks
-    #reddit_task = asyncio.create_task(_monitor_reddit_comments())
+    reddit_task = asyncio.create_task(_monitor_reddit_comments())
     # Check if any trade channels were not deleted before bot restart/stop
     cleanup_channels = await get_trade_channels_on_startup()
     for channel in cleanup_channels:
@@ -928,7 +929,7 @@ async def on_ready():
     # start the lasttrade_cron loop.
     await lasttrade_cron.start()
     # start monitoring reddit comments
-    #await reddit_task
+    await reddit_task
 
 
 @bot.event
@@ -1152,6 +1153,7 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
         discord_alert_id = None
         mission_temp_channel_id = None
         check_characters = None
+        edmc_off = False
 
 
         eta_text = f" (ETA {eta} minutes)" if eta else ""
@@ -1209,7 +1211,7 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
         file_name = await create_carrier_mission_image(carrier_data, commodity_data, system, station, profit, pads, demand,
                                                 mission_type)
         discord_text = txt_create_discord(carrier_data, mission_type, commodity_data, station, system, profit, pads,
-                        demand, eta_text, mission_temp_channel_id)
+                        demand, eta_text, mission_temp_channel_id, edmc_off)
         print("Generated discord elements")
         reddit_title = txt_create_reddit_title(carrier_data)
         reddit_body = txt_create_reddit_body(carrier_data, mission_type, commodity_data, station, system, profit, pads,
@@ -1238,7 +1240,6 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
         try:
             check_characters = 'ny'
             edmc_msg = await bot.wait_for("message", check=check_confirm, timeout=30)
-            edmc_off = False
             if 'y' == edmc_msg.content.lower().strip():
                 edmc_off = True
         except asyncio.TimeoutError:
@@ -1310,7 +1311,7 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
 
                 # Recreate this text since we know the channel id
                 discord_text = txt_create_discord(carrier_data, mission_type, commodity_data, station, system, profit, pads,
-                                demand, eta_text, mission_temp_channel_id)
+                                demand, eta_text, mission_temp_channel_id, edmc_off)
                 message_send = await ctx.send("**Sending to Discord...**")
                 try:
                     # send trade alert to trade alerts channel, or to wine alerts channel if loading wine
