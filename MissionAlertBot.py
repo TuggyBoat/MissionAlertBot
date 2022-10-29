@@ -10,6 +10,7 @@ from doctest import debug_script
 from pydoc import describe
 import re
 import tempfile
+from tkinter import W
 # from turtle import color
 from typing import Union
 import enum
@@ -919,7 +920,7 @@ slash = SlashCommand(bot, sync_commands=True)
 async def on_ready():
     print(f'{bot.user.name} has connected to Discord!')
     # define our background tasks
-    reddit_task = asyncio.create_task(_monitor_reddit_comments())
+    #reddit_task = asyncio.create_task(_monitor_reddit_comments())
     # Check if any trade channels were not deleted before bot restart/stop
     cleanup_channels = await get_trade_channels_on_startup()
     for channel in cleanup_channels:
@@ -927,8 +928,19 @@ async def on_ready():
     # start the lasttrade_cron loop.
     await lasttrade_cron.start()
     # start monitoring reddit comments
-    await reddit_task
+    #await reddit_task
 
+
+@bot.event
+async def on_guild_channel_pins_update(channel, last_pin):
+    """
+    Delete the system message informing you a message was pinned in this channel
+    Watches every public channel in the guild (discord)
+    """
+    messages = await channel.history(limit=200).flatten()
+    for msg in messages:
+        if msg.type is discord.MessageType.pins_add:
+            await msg.delete()
 
 
 # monitor reddit comments
@@ -1220,7 +1232,7 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
         print("Output check displayed")
 
         embed = discord.Embed(title="Is this an EDMC OFF mission?",
-                            description="Should haulers be instructured to turn EDMC off?\ny/n",
+                            description="Should haulers be instructed to turn EDMC and other 3rd party tools off?\ny/n",
                             color=constants.EMBED_COLOUR_QU)
         edmc_confirm = await ctx.send(embed=embed)
         try:
@@ -1405,7 +1417,7 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
                 print('Sending EDMC OFF messages to haulers')
                 embed = discord.Embed(title='PLEASE STOP ALL 3RD PARTY SOFTWARE: EDMC, EDDISCOVERY, ETC',
                         description=("Maximising our haulers' profits for this mission means keeping market data at this station"
-                                 " **a secret**! For this reason **please disabled/exit all journal reporting plugins/programs**"
+                                 " **a secret**! For this reason **please disable/exit all journal reporting plugins/programs**"
                                  " and leave them off until all missions at this location are complete. Thanks CMDRs!"),
                         color=constants.EMBED_COLOUR_REDDIT)
                 edmc_file = discord.File(f"images/system/edmc_off_{random.randint(1,2)}.png", filename="image.png")
@@ -1416,6 +1428,11 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
 
                 embed = discord.Embed(title=f"EDMC OFF messages sent", description='Reddit posts will be skipped',
                             color=constants.EMBED_COLOUR_DISCORD)
+
+                print('Reacting to #official-trade-alerts message with EDMC OFF')
+                for r in ["🇪","🇩","🇲","🇨","📴"]:
+                    await trade_alert_msg.add_reaction(r)
+
                 await ctx.send(embed=embed)
 
         except asyncio.TimeoutError:
@@ -1446,7 +1463,8 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
                         rp_text, reddit_post_id, reddit_post_url, reddit_comment_id, reddit_comment_url, discord_alert_id, mission_temp_channel_id)
             await mission_generation_complete(ctx, carrier_data, message_pending, eta_text)
         cleanup_temp_image_file(file_name)
-        await mark_cleanup_channel(mission_temp_channel_id, 0)
+        if mission_temp_channel_id:
+            await mark_cleanup_channel(mission_temp_channel_id, 0)
 
         print("Reached end of mission generator")
         return
@@ -1902,6 +1920,8 @@ async def _cleanup_completed_mission(ctx, mission_data, reddit_complete_text, di
         mission_db.execute(f'''DELETE FROM missions WHERE carrier LIKE (?)''', ('%' + mission_data.carrier_name + '%',))
         missions_conn.commit()
 
+        await clean_up_pins(mission_channel)
+
         # command feedback
         print("Send command feedback to user")
         spamchannel = bot.get_channel(bot_spam_id)
@@ -1992,6 +2012,19 @@ async def cleanup_trade_channel(channel):
     print(f"Sending channel {channel['channelid']} for removal")
     await remove_carrier_channel(channel['channelid'], seconds_long)
     return
+
+
+async def clean_up_pins(channel):
+    """
+    Currently used in _cleanup_completed_mission to clear pins
+    in case a new mission is started in an existing channel before cleanup
+    Only cleans up pinned messages that were sent by the bot
+    """
+    print(f'Cleaning up pins in #{channel}')
+    all_pins = await channel.pins()
+    for pin in all_pins:
+        if pin.author.bot:
+            await pin.unpin()
 
 
 async def remove_carrier_channel(mission_channel_id, seconds):
