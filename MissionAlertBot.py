@@ -847,14 +847,17 @@ TEXT GEN FUNCTIONS
 
 
 
-def txt_create_discord(carrier_data, mission_type, commodity, station, system, profit, pads, demand, eta_text, mission_temp_channel_id):
+def txt_create_discord(carrier_data, mission_type, commodity, station, system, profit, pads, demand, eta_text, mission_temp_channel_id, edmc_off):
     discord_channel = f"<#{mission_temp_channel_id}>" if mission_temp_channel_id else f"#{carrier_data.discord_channel}"
-    discord_text = f"{discord_channel} {'load' if mission_type == 'load' else 'unload'}ing " \
-                   f"{commodity.name} " \
-                   f"{'from' if mission_type == 'load' else 'to'} **{station.upper()}** station in system " \
-                   f"**{system.upper()}** : {profit}k per unit profit : "\
-                   f"{demand} {'demand' if mission_type == 'load' else 'supply'} : {pads.upper()}-pads" \
-                   f".{eta_text}"
+    discord_text = (
+        f"{'**★ EDMC-OFF MISSION! ★** : ' if edmc_off else ''}"
+        f"{discord_channel} {'load' if mission_type == 'load' else 'unload'}ing "
+        f"{commodity.name} "
+        f"{'from' if mission_type == 'load' else 'to'} **{station.upper()}** station in system "
+        f"**{system.upper()}** : {profit}k per unit profit : "
+        f"{demand} {'demand' if mission_type == 'load' else 'supply'} : {pads.upper()}-pads"
+        f".{eta_text}"
+    )
     return discord_text
 
 
@@ -929,6 +932,17 @@ async def on_ready():
     # start monitoring reddit comments
     await reddit_task
 
+
+@bot.event
+async def on_guild_channel_pins_update(channel, last_pin):
+    """
+    Delete the system message informing you a message was pinned in this channel
+    Watches every public channel in the guild (discord)
+    """
+    messages = await channel.history(limit=200).flatten()
+    for msg in messages:
+        if msg.type is discord.MessageType.pins_add and msg.author == bot.user:
+            await msg.delete()
 
 
 # monitor reddit comments
@@ -1140,6 +1154,7 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
         discord_alert_id = None
         mission_temp_channel_id = None
         check_characters = None
+        edmc_off = False
 
 
         eta_text = f" (ETA {eta} minutes)" if eta else ""
@@ -1197,7 +1212,7 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
         file_name = await create_carrier_mission_image(carrier_data, commodity_data, system, station, profit, pads, demand,
                                                 mission_type)
         discord_text = txt_create_discord(carrier_data, mission_type, commodity_data, station, system, profit, pads,
-                        demand, eta_text, mission_temp_channel_id)
+                        demand, eta_text, mission_temp_channel_id, edmc_off)
         print("Generated discord elements")
         reddit_title = txt_create_reddit_title(carrier_data)
         reddit_body = txt_create_reddit_body(carrier_data, mission_type, commodity_data, station, system, profit, pads,
@@ -1219,39 +1234,24 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
         await message_gen.delete()
         print("Output check displayed")
 
-        embed = discord.Embed(title="Is this an EDMC OFF mission?",
-                            description="Should haulers be instructured to turn EDMC off?\ny/n",
-                            color=constants.EMBED_COLOUR_QU)
-        edmc_confirm = await ctx.send(embed=embed)
-        try:
-            check_characters = 'ny'
-            edmc_msg = await bot.wait_for("message", check=check_confirm, timeout=30)
-            edmc_off = False
-            if 'y' == edmc_msg.content.lower().strip():
-                edmc_off = True
-        except asyncio.TimeoutError:
-            await default_timeout_message('edmc_prompt')
-            return
-
         embed = discord.Embed(title="Where would you like to send the alert?",
                             description="(**d**)iscord, (**r**)eddit, (**t**)ext for copy/pasting or (**x**) to cancel\n"
-                            "Use (**n**) to also notify PTN Haulers.",
+                            "You can also use (**n**) to also notify PTN Haulers, and (**e**) to flag your mission as EDMC-OFF.",
                             color=constants.EMBED_COLOUR_QU)
         embed.set_footer(text="Enter all that apply, e.g. **drn** will send alerts to Discord and Reddit and notify PTN Haulers.")
         message_confirm = await ctx.send(embed=embed)
         print("Prompted user for alert destination")
 
         try:
-            check_characters = 'drtnx'
+            check_characters = 'dertnx'
             msg = await bot.wait_for("message", check=check_confirm, timeout=30)
+            edmc_off = True if "e" in msg.content.lower() else False
 
             if "x" in msg.content.lower():
                 # immediately stop if there's an x anywhere in the message, even if there are other proper inputs
                 message_cancelled = await ctx.send("**Mission creation cancelled.**")
                 await msg.delete()
                 await message_confirm.delete()
-                await edmc_confirm.delete()
-                await edmc_msg.delete()
                 print("User cancelled mission generation")
                 return
 
@@ -1298,7 +1298,7 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
 
                 # Recreate this text since we know the channel id
                 discord_text = txt_create_discord(carrier_data, mission_type, commodity_data, station, system, profit, pads,
-                                demand, eta_text, mission_temp_channel_id)
+                                demand, eta_text, mission_temp_channel_id, edmc_off)
                 message_send = await ctx.send("**Sending to Discord...**")
                 try:
                     # send trade alert to trade alerts channel, or to wine alerts channel if loading wine
@@ -1401,11 +1401,11 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
                             color=constants.EMBED_COLOUR_DISCORD)
                 await ctx.send(embed=embed)
 
-            if edmc_off and "d" in msg.content.lower():
+            if "e" in msg.content.lower() and "d" in msg.content.lower():
                 print('Sending EDMC OFF messages to haulers')
                 embed = discord.Embed(title='PLEASE STOP ALL 3RD PARTY SOFTWARE: EDMC, EDDISCOVERY, ETC',
                         description=("Maximising our haulers' profits for this mission means keeping market data at this station"
-                                 " **a secret**! For this reason **please disabled/exit all journal reporting plugins/programs**"
+                                 " **a secret**! For this reason **please disable/exit all journal reporting plugins/programs**"
                                  " and leave them off until all missions at this location are complete. Thanks CMDRs!"),
                         color=constants.EMBED_COLOUR_REDDIT)
                 edmc_file = discord.File(f"images/system/edmc_off_{random.randint(1,2)}.png", filename="image.png")
@@ -1417,6 +1417,10 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
                 embed = discord.Embed(title=f"EDMC OFF messages sent", description='Reddit posts will be skipped',
                             color=constants.EMBED_COLOUR_DISCORD)
                 await ctx.send(embed=embed)
+
+                print('Reacting to #official-trade-alerts message with EDMC OFF')
+                for r in ["🇪","🇩","🇲","🇨","📴"]:
+                    await trade_alert_msg.add_reaction(r)
 
         except asyncio.TimeoutError:
             await default_timeout_message('notification_type_decision')
@@ -1435,8 +1439,6 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
         try:
             await msg.delete()
             await message_confirm.delete()
-            await edmc_confirm.delete()
-            await edmc_msg.delete()
         except Exception as e:
             print(f"Error during clearup: {e}")
             await ctx.send(f"Oops, error detected: {e}\nAttempting to continue with mission gen.")
@@ -1446,7 +1448,8 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
                         rp_text, reddit_post_id, reddit_post_url, reddit_comment_id, reddit_comment_url, discord_alert_id, mission_temp_channel_id)
             await mission_generation_complete(ctx, carrier_data, message_pending, eta_text)
         cleanup_temp_image_file(file_name)
-        await mark_cleanup_channel(mission_temp_channel_id, 0)
+        if mission_temp_channel_id:
+            await mark_cleanup_channel(mission_temp_channel_id, 0)
 
         print("Reached end of mission generator")
         return
@@ -1902,6 +1905,8 @@ async def _cleanup_completed_mission(ctx, mission_data, reddit_complete_text, di
         mission_db.execute(f'''DELETE FROM missions WHERE carrier LIKE (?)''', ('%' + mission_data.carrier_name + '%',))
         missions_conn.commit()
 
+        await clean_up_pins(mission_channel)
+
         # command feedback
         print("Send command feedback to user")
         spamchannel = bot.get_channel(bot_spam_id)
@@ -1992,6 +1997,19 @@ async def cleanup_trade_channel(channel):
     print(f"Sending channel {channel['channelid']} for removal")
     await remove_carrier_channel(channel['channelid'], seconds_long)
     return
+
+
+async def clean_up_pins(channel):
+    """
+    Currently used in _cleanup_completed_mission to clear pins
+    in case a new mission is started in an existing channel before cleanup
+    Only cleans up pinned messages that were sent by the bot
+    """
+    print(f'Cleaning up pins in #{channel}')
+    all_pins = await channel.pins()
+    for pin in all_pins:
+        if pin.author.bot:
+            await pin.unpin()
 
 
 async def remove_carrier_channel(mission_channel_id, seconds):
