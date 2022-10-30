@@ -1236,7 +1236,7 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
 
         embed = discord.Embed(title="Where would you like to send the alert?",
                             description="(**d**)iscord, (**r**)eddit, (**t**)ext for copy/pasting or (**x**) to cancel\n"
-                            "Use (**n**) to also notify PTN Haulers, and (**e**) to flag your mission as EDMC-OFF.",
+                            "You can also use (**n**) to also notify PTN Haulers, and (**e**) to flag your mission as EDMC-OFF.",
                             color=constants.EMBED_COLOUR_QU)
         embed.set_footer(text="Enter all that apply, e.g. **drn** will send alerts to Discord and Reddit and notify PTN Haulers.")
         message_confirm = await ctx.send(embed=embed)
