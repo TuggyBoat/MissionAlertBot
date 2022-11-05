@@ -1910,7 +1910,10 @@ async def _cleanup_completed_mission(ctx, mission_data, reddit_complete_text, di
         # command feedback
         print("Send command feedback to user")
         spamchannel = bot.get_channel(bot_spam_id)
-        await spamchannel.send(f"{ctx.author} marked the mission complete for #{mission_channel} in {ctx.channel.name}")
+        embed = discord.Embed(title=f"Mission complete for {mission_data.carrier_name}",
+                              description=f"{ctx.author} marked the mission complete in #{ctx.channel.name}",
+                              color=constants.EMBED_COLOUR_OK)
+        await spamchannel.send(embed=embed)
         if m_done:
             # notify user in mission gen channel
             embed = discord.Embed(title=f"Mission complete for {mission_data.carrier_name}",
