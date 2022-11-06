@@ -1330,8 +1330,9 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
                                         description=f">>> {rp_text}" if rp else "", color=embed_colour)
 
                     embed.add_field(name="Destination", value=f"Station: {station.upper()}\nSystem: {system.upper()}", inline=True)
+                    embed.add_field(name="Carrier Owner", value=f"<@{carrier_data.ownerid}>")
                     if eta:
-                        embed.add_field(name="ETA", value=f"{eta} minutes", inline=True)
+                        embed.add_field(name="ETA", value=f"{eta} minutes", inline=False)
 
                     embed.set_image(url="attachment://image.png")
                     embed.set_footer(
@@ -2200,7 +2201,12 @@ async def _info(ctx: SlashContext):
         print(f'Found data: {carrier_data}')
         embed = discord.Embed(title=f"Welcome to {carrier_data.carrier_long_name} ({carrier_data.carrier_identifier})", color=constants.EMBED_COLOUR_OK)
         embed = _add_common_embed_fields(embed, carrier_data, ctx)
-        return await ctx.send(embed=embed, hidden=True)
+        carrier_owner_obj = bot.get_user(carrier_data.ownerid)
+        thumbnail_file = discord.File(f"images/{carrier_data.carrier_short_name}.png", filename="image.png")
+        embed.set_thumbnail(url="attachment://image.png")
+        embed.set_author(name=carrier_owner_obj.name, icon_url=carrier_owner_obj.avatar_url)
+        ctx.author = carrier_owner_obj
+        return await ctx.send(file=thumbnail_file, embed=embed, hidden=True)
 
 
 @slash.slash(name="find", guild_ids=[bot_guild_id],
