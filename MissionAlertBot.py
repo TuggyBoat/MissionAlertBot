@@ -1330,8 +1330,9 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
                                         description=f">>> {rp_text}" if rp else "", color=embed_colour)
 
                     embed.add_field(name="Destination", value=f"Station: {station.upper()}\nSystem: {system.upper()}", inline=True)
+                    embed.add_field(name="Carrier Owner", value=f"<@{carrier_data.ownerid}>")
                     if eta:
-                        embed.add_field(name="ETA", value=f"{eta} minutes", inline=True)
+                        embed.add_field(name="ETA", value=f"{eta} minutes", inline=False)
 
                     embed.set_image(url="attachment://image.png")
                     embed.set_footer(
@@ -1345,12 +1346,6 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
                                         color=constants.EMBED_COLOUR_DISCORD)
                     await ctx.send(embed=embed)
                     await message_send.delete()
-
-                    #send and then edit the message to avoid actually pinging the owner
-                    owner_msg = "This Trade Mission is run by"
-                    user_message = await mission_temp_channel.send(owner_msg)
-                    await user_message.edit(content=f"{owner_msg} <@{carrier_data.ownerid}>")
-
                     submit_mission = True
                 except Exception as e:
                     print(f"Error sending to Discord: {e}")
