@@ -4,6 +4,7 @@ PROD_FLAIR_MISSION_STOP = "eea2d818-9235-11eb-b86f-0e50eec082f5"
 
 PROD_DISCORD_GUILD = 800080948716503040 # PTN Discord server
 PROD_TRADE_ALERTS_ID = 801798469189763073  # trade alerts channel ID for PTN main server
+PROD_LEGACY_ALERTS_ID = 1047113504332709938 # trade alerts channel ID for legacy trade alerts on the PTN main server
 PROD_WINE_ALERTS_LOADING_ID = 849249916676603944 # booze alerts channel ID for PTN main server [loading]
 PROD_WINE_ALERTS_UNLOADING_ID = 932918003639648306 # booze alerts channel ID for PTN main server [unloading]
 PROD_SUB_REDDIT = "PilotsTradeNetwork"  # subreddit for live
@@ -33,8 +34,9 @@ TEST_FLAIR_MISSION_STOP = "4242a2e2-8e8e-11eb-b443-0e664851dbff"
 
 TEST_DISCORD_GUILD = 818174236480897055 # test Discord server
 TEST_TRADE_ALERTS_ID = 843252609057423361  # trade alerts channel ID for PTN test server
-TEST_WINE_ALERTS_LOADING_ID = 870425638127943700 # booze alerts channel ID for PTN main server [loading]
-TEST_WINE_ALERTS_UNLOADING_ID = 870425638127943700 # booze alerts channel ID for PTN main server [unloading]
+TEST_LEGACY_ALERTS_ID = 1047113662743183410 # trade alerts channel ID for legacy trade alerts on the PTN test server
+TEST_WINE_ALERTS_LOADING_ID = 870425638127943700 # booze alerts channel ID for PTN test server [loading]
+TEST_WINE_ALERTS_UNLOADING_ID = 870425638127943700 # booze alerts channel ID for PTN test server [unloading]
 TEST_SUB_REDDIT = "PTNBotTesting"  # subreddit for testing
 TEST_CHANNEL_UPVOTES = 839918504676294666    # The ID for the updoots channel on test
 TEST_REDDIT_CHANNEL = 878029350933520484 # the ID for the Reddit Comments channel
@@ -82,6 +84,7 @@ def get_constant(production: bool):
             'BOT_GUILD': PROD_DISCORD_GUILD,
             'SUB_REDDIT': PROD_SUB_REDDIT,
             'TRADE_ALERTS_ID': PROD_TRADE_ALERTS_ID,
+            'LEGACY_ALERTS_ID': PROD_LEGACY_ALERTS_ID,
             'WINE_ALERTS_LOADING_ID': PROD_WINE_ALERTS_LOADING_ID,
             'WINE_ALERTS_UNLOADING_ID': PROD_WINE_ALERTS_UNLOADING_ID,
             'CHANNEL_UPVOTES': PROD_CHANNEL_UPVOTES,
@@ -109,6 +112,7 @@ def get_constant(production: bool):
             'BOT_GUILD': TEST_DISCORD_GUILD,
             'SUB_REDDIT': TEST_SUB_REDDIT,
             'TRADE_ALERTS_ID': TEST_TRADE_ALERTS_ID,
+            'LEGACY_ALERTS_ID': TEST_LEGACY_ALERTS_ID,
             'WINE_ALERTS_LOADING_ID': TEST_WINE_ALERTS_LOADING_ID,
             'WINE_ALERTS_UNLOADING_ID': TEST_WINE_ALERTS_UNLOADING_ID,
             'CHANNEL_UPVOTES': TEST_CHANNEL_UPVOTES,
