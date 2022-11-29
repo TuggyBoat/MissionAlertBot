@@ -863,7 +863,7 @@ def txt_create_discord(carrier_data, mission_type, commodity, station, system, p
 
 def txt_create_reddit_title(carrier_data, legacy):
     reddit_title = (
-        f"{'**◄ LEGACY UNIVERSE ►** : ' if legacy else ''}"
+        f"{'◄ LEGACY UNIVERSE ► : ' if legacy else ''}"
         f"P.T.N. News - Trade mission - {carrier_data.carrier_long_name} {carrier_data.carrier_identifier}" \
                    f" - {get_formatted_date_string()[0]}"
     )
@@ -875,7 +875,7 @@ def txt_create_reddit_body(carrier_data, mission_type, commodity, station, syste
     if mission_type == 'load':
         reddit_body = (
             f"    INCOMING WIDEBAND TRANSMISSION: P.T.N. CARRIER LOADING MISSION IN PROGRESS\n"
-            f"{'**◄ LEGACY UNIVERSE ►** : ' if legacy else ''}"
+            f"{'**◄ LEGACY UNIVERSE ►**' if legacy else ''}"
             f"\n\n"
             f"**BUY FROM**: station **{station.upper()}** ({pads.upper()}-pads) in system **{system.upper()}**\n\n**COMMODITY**: "
             f"{commodity.name}\n\n&#x200B;\n\n**SELL TO**: Fleet Carrier **{carrier_data.carrier_long_name} "
@@ -1425,11 +1425,11 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
                             channelId = wine_alerts_unloading_id
                     else:
                         if legacy:
-                            channel = bot.get_channel(trade_alerts_id)
-                            channelId = trade_alerts_id
-                        else:
                             channel = bot.get_channel(legacy_alerts_id)
                             channelId = legacy_alerts_id
+                        else:
+                            channel = bot.get_channel(trade_alerts_id)
+                            channelId = trade_alerts_id
 
                     if mission_type == 'load':
                         embed = discord.Embed(description=discord_text, color=constants.EMBED_COLOUR_LOADING)
