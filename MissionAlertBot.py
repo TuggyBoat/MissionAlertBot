@@ -22,9 +22,8 @@ import sqlite3
 import asyncpraw
 import asyncio
 import shutil
-from discord.errors import HTTPException, InvalidArgument, Forbidden, NotFound
+from discord.errors import HTTPException, Forbidden, NotFound
 from discord.ext import commands, tasks
-from discord_slash import SlashCommand, SlashContext
 from datetime import datetime
 from datetime import timezone
 from datetime import timedelta
@@ -56,6 +55,7 @@ carrier_channel_lock = asyncio.Lock()
 conf = constants.get_constant(_production)
 
 bot_guild_id = int(conf['BOT_GUILD'])
+guild_obj = discord.Object(bot_guild_id)
 
 flair_mission_start = conf['MISSION_START']
 flair_mission_stop = conf['MISSION_STOP']
@@ -89,9 +89,6 @@ seconds_long = conf['SECONDS_LONG']
 # because the keys are exposed. DO NOT HOST IN THE REPO. Seriously do not do it ...
 load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN_PROD') if _production else os.getenv('DISCORD_TOKEN_TESTING')
-
-# create reddit instance
-reddit = asyncpraw.Reddit('bot1')
 
 ########################
 # Database Configuration
@@ -518,7 +515,7 @@ async def delete_nominee_from_db(pillarid):
 
 # function to remove a nominee
 async def delete_nominee_by_nominator(nomid, pillarid):
-    print("Attempting to delete {nomid} {pillarid} match.")
+    print(f"Attempting to delete {nomid} {pillarid} match.")
     try:
         await carrier_db_lock.acquire()
         carrier_db.execute(f"DELETE FROM nominees WHERE nominatorid = {nomid} AND pillarid = {pillarid}")
@@ -906,7 +903,40 @@ async def lock_mission_channel():
     await carrier_channel_lock.acquire()
     print("Channel lock acquired.")
 
+async def get_reddit():
+    """
+    Return reddit instance
+    discord.py complains if an async resource is not initialized
+    inside async
+    """
+    return asyncpraw.Reddit('bot1')
 
+async def get_overwrite_perms():
+    """
+    Default permission set for set_permissions()
+    """
+    overwrite = discord.PermissionOverwrite()
+    overwrite.read_messages = True
+    overwrite.manage_channels = True
+    overwrite.manage_roles = True
+    overwrite.manage_webhooks = True
+    overwrite.create_instant_invite = True
+    overwrite.send_messages = True
+    overwrite.embed_links = True
+    overwrite.attach_files = True
+    overwrite.add_reactions = True
+    overwrite.external_emojis = True
+    overwrite.manage_messages = True
+    overwrite.read_message_history = True
+    overwrite.use_application_commands = True
+    return overwrite
+
+
+async def get_guild():
+    """
+    Return bot guild instance for use in get_member()
+    """
+    return bot.get_guild(bot_guild_id)
 
 
 """
@@ -916,11 +946,13 @@ BOT COMMANDS
 
 
 bot = commands.Bot(command_prefix='m.', intents=discord.Intents.all())
-slash = SlashCommand(bot, sync_commands=True)
+
 
 @bot.event
 async def on_ready():
     print(f'{bot.user.name} has connected to Discord!')
+    # sync slash commands
+    await bot.tree.sync()
     # define our background tasks
     reddit_task = asyncio.create_task(_monitor_reddit_comments())
     # Check if any trade channels were not deleted before bot restart/stop
@@ -939,8 +971,7 @@ async def on_guild_channel_pins_update(channel, last_pin):
     Delete the system message informing you a message was pinned in this channel
     Watches every public channel in the guild (discord)
     """
-    messages = await channel.history(limit=200).flatten()
-    for msg in messages:
+    async for msg in channel.history(limit=200):
         if msg.type is discord.MessageType.pins_add and msg.author == bot.user:
             await msg.delete()
 
@@ -954,6 +985,7 @@ async def _monitor_reddit_comments():
 
             comment_channel = bot.get_channel(conf['REDDIT_CHANNEL'])
             # establish a comment stream to the subreddit using async praw
+            reddit = await get_reddit()
             subreddit = await reddit.subreddit(to_subreddit)
             async for comment in subreddit.stream.comments(skip_existing=True):
                 print(f"New reddit comment: {comment}. Is_submitter is {comment.is_submitter}")
@@ -1317,7 +1349,7 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
                         embed = discord.Embed(description=discord_text, color=constants.EMBED_COLOUR_LOADING)
                     else:
                         embed = discord.Embed(description=discord_text, color=constants.EMBED_COLOUR_UNLOADING)
-                    embed.set_author(name=ctx.author.display_name, icon_url=ctx.author.avatar_url)
+                    embed.set_author(name=ctx.author.display_name, icon_url=ctx.author.display_avatar)
 
                     trade_alert_msg = await channel.send(embed=embed)
                     discord_alert_id = trade_alert_msg.id
@@ -1364,6 +1396,7 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
                     try:
 
                         # post to reddit
+                        reddit = await get_reddit()
                         subreddit = await reddit.subreddit(to_subreddit)
                         submission = await subreddit.submit_image(reddit_title, image_path=file_name,
                                                                 flair_id=flair_mission_start)
@@ -1506,40 +1539,28 @@ async def create_mission_temp_channel(ctx, discord_channel, owner_id):
     gen_mission.returnflag = True
 
     # find carrier owner as a user object
-
+    guild = await get_guild()
     try:
-        owner = await bot.fetch_user(owner_id)
-        print(f"Owner identified as {owner.display_name}")
+        member = await guild.fetch_member(owner_id)
+        print(f"Owner identified as {member.display_name}")
     except:
         raise EnvironmentError(f'Could not find Discord user matching ID {owner_id}')
 
     # add owner to channel permissions
-
+    overwrite = await get_overwrite_perms()
     try:
-        await mission_temp_channel.set_permissions(owner, read_messages=True,
-                                            manage_channels=True,
-                                            manage_roles=True,
-                                            manage_webhooks=True,
-                                            create_instant_invite=True,
-                                            send_messages=True,
-                                            embed_links=True,
-                                            attach_files=True,
-                                            add_reactions=True,
-                                            external_emojis=True,
-                                            manage_messages=True,
-                                            read_message_history=True,
-                                            use_slash_commands=True)
-        print(f"Set permissions for {owner} in {mission_temp_channel}")
+        await mission_temp_channel.set_permissions(member, overwrite=overwrite)
+        print(f"Set permissions for {member} in {mission_temp_channel}")
     except Forbidden:
-        raise EnvironmentError(f"Could not set channel permissions for {owner.display_name} in {mission_temp_channel}, reason: Bot does not have permissions to edit channel specific permissions.")
+        raise EnvironmentError(f"Could not set channel permissions for {member.display_name} in {mission_temp_channel}, reason: Bot does not have permissions to edit channel specific permissions.")
     except NotFound:
-        raise EnvironmentError(f"Could not set channel permissions for {owner.display_name} in {mission_temp_channel}, reason: The role or member being edited is not part of the guild.")
+        raise EnvironmentError(f"Could not set channel permissions for {member.display_name} in {mission_temp_channel}, reason: The role or member being edited is not part of the guild.")
     except HTTPException:
-        raise EnvironmentError(f"Could not set channel permissions for {owner.display_name} in {mission_temp_channel}, reason: Editing channel specific permissions failed.")
-    except InvalidArgument:
-        raise EnvironmentError(f"Could not set channel permissions for {owner.display_name} in {mission_temp_channel}, reason: The overwrite parameter invalid or the target type was not Role or Member.")
+        raise EnvironmentError(f"Could not set channel permissions for {member.display_name} in {mission_temp_channel}, reason: Editing channel specific permissions failed.")
+    except (TypeError, ValueError):
+        raise EnvironmentError(f"Could not set channel permissions for {member.display_name} in {mission_temp_channel}, reason: The overwrite parameter invalid or the target type was not Role or Member.")
     except:
-        raise EnvironmentError(f'Could not set channel permissions for {owner.display_name} in {mission_temp_channel}')
+        raise EnvironmentError(f'Could not set channel permissions for {member.display_name} in {mission_temp_channel}')
 
     # send the channel back to the mission generator as a channel id
 
@@ -1650,16 +1671,16 @@ def _mission_summary_embed(mission_data, embed):
 
 
 # find what fleet carriers are owned by a user - private slash command
-@slash.slash(name="owner", guild_ids=[bot_guild_id],
-             description="Private command: Use with @User to find out what fleet carriers that user owns.")
-async def _owner(ctx: SlashContext, owner: discord.Member):
+@bot.tree.command(name="owner",
+    description="Private command: Use with @User to find out what fleet carriers that user owns.", guild=guild_obj)
+async def _owner(interaction: discord.Interaction, owner: discord.Member):
 
     try:
         # look for matches for the owner ID in the carrier DB
         carrier_list = find_carriers_mult(owner.id, CarrierDbFields.ownerid.name)
 
         if not carrier_list:
-            await ctx.send(f"No carriers found owned by <@{owner.id}>", hidden=True)
+            await interaction.response.send_message(f"No carriers found owned by <@{owner.id}>", ephemeral=True)
             return print(f"No carriers found for owner {owner.id}")
 
         embed = discord.Embed(description=f"Showing registered Fleet Carriers owned by <@{owner.id}>:",
@@ -1670,29 +1691,29 @@ async def _owner(ctx: SlashContext, owner: discord.Member):
                             value=f"Channel Name: #{carrier_data.discord_channel}",
                             inline=False)
 
-        await ctx.send(embed=embed, hidden=True)
+        await interaction.response.send_message(embed=embed, ephemeral=True)
 
     except TypeError as e:
         print('Error: {}'.format(e))
 
 
 # mission slash command - private, non spammy
-@slash.slash(name="mission", guild_ids=[bot_guild_id],
-             description="Private command: Use in a Fleet Carrier's channel to display its current mission.")
-async def _mission(ctx: SlashContext):
+@bot.tree.command(name="mission",
+    description="Private command: Use in a Fleet Carrier's channel to display its current mission.", guild=guild_obj)
+async def _mission(interaction: discord.Interaction):
 
-    print(f"{ctx.author} asked for active mission in <#{ctx.channel.id}> (used /mission)")
+    print(f"{interaction.user} asked for active mission in <#{interaction.channel}> (used /mission)")
 
     # take a note of the channel name
-    msg_ctx_name = ctx.channel.name
+    msg_channel_name = interaction.channel.name
 
-    carrier_data = find_carrier(msg_ctx_name, "discordchannel")
+    carrier_data = find_carrier(msg_channel_name, "discordchannel")
     embed = await _is_carrier_channel(carrier_data)
 
     if not embed:
         embed = await _is_mission_active_embed(carrier_data)
 
-    await ctx.send(embed=embed, hidden=True)
+    await interaction.response.send_message(embed=embed, ephemeral=True)
     return
 
 
@@ -1762,18 +1783,18 @@ def _format_missions_embedd(mission_data_list, embed):
     return embed
 
 # missions slash command - private, non-spammy
-@slash.slash(name="missions", guild_ids=[bot_guild_id],
-             description="Private command: Display all missions in progress.")
-async def _missions(ctx: SlashContext):
+@bot.tree.command(name="missions",
+    description="Private command: Display all missions in progress.", guild=guild_obj)
+async def _missions(interaction: discord.Interaction):
 
-    print(f'User {ctx.author} asked for all active missions via /missions in {ctx.channel}.')
+    print(f'User {interaction.user} asked for all active missions via /missions in {interaction.channel}.')
 
-    print(f'Generating full unloading mission list requested by: {ctx.author}')
+    print(f'Generating full unloading mission list requested by: {interaction.user}')
     mission_db.execute('''SELECT * FROM missions WHERE missiontype="unload";''')
     unload_records = [MissionData(mission_data) for mission_data in mission_db.fetchall()]
 
     mission_db.execute('''SELECT * FROM missions WHERE missiontype="load";''')
-    print(f'Generating full loading mission list requested by: {ctx.author}')
+    print(f'Generating full loading mission list requested by: {interaction.user}')
     load_records = [MissionData(mission_data) for mission_data in mission_db.fetchall()]
 
     trade_channel = bot.get_channel(trade_alerts_id)
@@ -1789,7 +1810,7 @@ async def _missions(ctx: SlashContext):
         color=constants.EMBED_COLOUR_LOADING
     )
 
-    await ctx.send(embed=embed, hidden=True)
+    await interaction.response.send_message(embed=embed, ephemeral=True)
 
     if not number_of_missions:
         return
@@ -1798,12 +1819,12 @@ async def _missions(ctx: SlashContext):
         embed = discord.Embed(title=f"{len(load_records)} P.T.N Fleet Carrier LOADING missions in progress:",
                             color=constants.EMBED_COLOUR_LOADING)
         embed = _format_missions_embedd(load_records, embed)
-        await ctx.send(embed=embed, hidden=True)
+        await interaction.followup.send(embed=embed, ephemeral=True)
 
         embed = discord.Embed(title=f"{len(unload_records)} P.T.N Fleet Carrier UNLOADING missions in progress:",
                             color=constants.EMBED_COLOUR_UNLOADING)
         embed = _format_missions_embedd(unload_records, embed)
-        await ctx.send(embed=embed, hidden=True)
+        await interaction.followup.send(embed=embed, ephemeral=True)
 
 
 # CO command to quickly mark mission as complete, optionally send some RP text
@@ -1892,6 +1913,7 @@ async def _cleanup_completed_mission(ctx, mission_data, reddit_complete_text, di
         if mission_data.reddit_post_id and mission_data.reddit_post_id != 'NULL':
             try:  # try in case Reddit is down
                 reddit_post_id = mission_data.reddit_post_id
+                reddit = await get_reddit()
                 await reddit.subreddit(to_subreddit)
                 submission = await reddit.submission(reddit_post_id)
                 await submission.reply(reddit_complete_text)
@@ -2161,59 +2183,58 @@ async def backup(ctx):
     await ctx.send("Database backup complete.")
 
 
-@slash.slash(name="info", guild_ids=[bot_guild_id],
-             description="Private command: Use in a Fleet Carrier's channel to show information about it.")
-async def _info(ctx: SlashContext):
+@bot.tree.command(name="info",
+    description="Private command: Use in a Fleet Carrier's channel to show information about it.", guild=guild_obj)
+async def _info(interaction: discord.Interaction):
 
-    print(f'/info command carrier_data called by {ctx.author} in {ctx.channel}')
+    print(f'/info command carrier_data called by {interaction.user} in {interaction.channel}')
 
     # take a note of channel name and ID
-    msg_ctx_name = ctx.channel.name
-    msg_ctx_id = ctx.channel.id
+    msg_channel_name = interaction.channel.name
+    msg_channel_id = interaction.channel.id
 
     # look for a match for the ID in the community carrier database
     carrier_db.execute(f"SELECT * FROM community_carriers WHERE "
-                       f"channelid = {msg_ctx_id}")
+                       f"channelid = {msg_channel_id}")
     community_carrier_data = CommunityCarrierData(carrier_db.fetchone())
 
     if community_carrier_data:
         embed = discord.Embed(title="COMMUNITY CARRIER CHANNEL",
-                              description=f"<#{ctx.channel.id}> is a <@&{cc_role_id}> channel "
+                              description=f"<#{interaction.channel.id}> is a <@&{cc_role_id}> channel "
                                           f"registered to <@{community_carrier_data.owner_id}>.\n\n"
                                           f"Community Carrier channels are for community building and events and "
                                           f"may be used for multiple Fleet Carriers. See channel pins and description "
                                           f"more information.", color=constants.EMBED_COLOUR_OK)
-        await ctx.send(embed=embed, hidden=True)
+        await interaction.response.send_message(embed=embed, ephemeral=True)
         return # if it was a Community Carrier, we're done and gone. Otherwise we keep looking.
 
     # now look for a match for the channel name in the carrier DB
     carrier_db.execute(f"SELECT * FROM carriers WHERE "
-                       f"discordchannel = '{msg_ctx_name}' ;")
+                       f"discordchannel = '{msg_channel_name}' ;")
     carrier_data = CarrierData(carrier_db.fetchone())
 
     if not carrier_data.discord_channel:
-        print(f"/info failed, {ctx.channel} doesn't seem to be a carrier channel")
+        print(f"/info failed, {interaction.channel} doesn't seem to be a carrier channel")
         # if there's no channel match, return an error
         embed = discord.Embed(description="Try again in a **🚛Trade Carriers** channel.", color=constants.EMBED_COLOUR_QU)
-        await ctx.send(embed=embed, hidden=True)
+        await interaction.response.send_message(embed=embed, ephemeral=True)
         return
     else:
         print(f'Found data: {carrier_data}')
         embed = discord.Embed(title=f"Welcome to {carrier_data.carrier_long_name} ({carrier_data.carrier_identifier})", color=constants.EMBED_COLOUR_OK)
-        embed = _add_common_embed_fields(embed, carrier_data, ctx)
+        embed = _add_common_embed_fields(embed, carrier_data, interaction)
         carrier_owner_obj = bot.get_user(carrier_data.ownerid)
         thumbnail_file = discord.File(f"images/{carrier_data.carrier_short_name}.png", filename="image.png")
         embed.set_thumbnail(url="attachment://image.png")
-        embed.set_author(name=carrier_owner_obj.name, icon_url=carrier_owner_obj.avatar_url)
-        ctx.author = carrier_owner_obj
-        return await ctx.send(file=thumbnail_file, embed=embed, hidden=True)
+        embed.set_author(name=carrier_owner_obj.name, icon_url=carrier_owner_obj.display_avatar)
+        interaction.user = carrier_owner_obj
+        return await interaction.response.send_message(file=thumbnail_file, embed=embed, ephemeral=True)
 
 
-@slash.slash(name="find", guild_ids=[bot_guild_id],
-             description="Private command: Search for a fleet carrier by partial match for its name.")
-async def _find(ctx: SlashContext, carrier_name_search_term: str):
-
-    print(f"{ctx.author} used /find for '{carrier_name_search_term}' in {ctx.channel}")
+@bot.tree.command(name="find",
+    description="Private command: Search for a fleet carrier by partial match for its name.", guild=guild_obj)
+async def _find(interaction: discord.Interaction, carrier_name_search_term: str):
+    print(f"{interaction.user} used /find for '{carrier_name_search_term}' in {interaction.channel}")
 
     try:
         carrier_data = find_carrier(carrier_name_search_term, CarrierDbFields.longname.name)
@@ -2221,12 +2242,12 @@ async def _find(ctx: SlashContext, carrier_name_search_term: str):
             print(f"Found {carrier_data}")
             embed = discord.Embed(title="Fleet Carrier Search Result",
                                   description=f"Displaying first match for {carrier_name_search_term}", color=constants.EMBED_COLOUR_OK)
-            embed = _add_common_embed_fields(embed, carrier_data, ctx)
-            return await ctx.send(embed=embed, hidden=True)
+            embed = _add_common_embed_fields(embed, carrier_data, interaction)
+            return await interaction.response.send_message(embed=embed, ephemeral=True)
 
     except TypeError as e:
         print('Error in carrier long search: {}'.format(e))
-    await ctx.send(f'No result for {carrier_name_search_term}.', hidden=True)
+    await interaction.response.send_message(f'No result for {carrier_name_search_term}.', ephemeral=True)
 
 
 # list FCs
@@ -2749,13 +2770,13 @@ async def findshort(ctx, shortname_search_term: str):
     await ctx.send(f'No result for {shortname_search_term}.')
 
 
-def _add_common_embed_fields(embed, carrier_data, ctx):
+def _add_common_embed_fields(embed, carrier_data, ctx_interaction):
     embed.add_field(name="Carrier Name", value=f"{carrier_data.carrier_long_name}", inline=True)
     embed.add_field(name="Carrier ID", value=f"{carrier_data.carrier_identifier}", inline=True)
     embed.add_field(name="Database Entry", value=f"{carrier_data.pid}", inline=True)
 
     # make the channel field a clickable link if there's an active channel by that name
-    channel = discord.utils.get(ctx.guild.channels, name=carrier_data.discord_channel)
+    channel = discord.utils.get(ctx_interaction.guild.channels, name=carrier_data.discord_channel)
     discord_channel = f"<#{channel.id}>" if channel else f"#{carrier_data.discord_channel}"
     embed.add_field(name="Discord Channel", value=f"{discord_channel}", inline=True)
 
@@ -3334,36 +3355,30 @@ async def cc(ctx, owner: discord.Member, *, channel_name: str):
         await ctx.send(f"Failed adding role to {owner}: {e}")
 
     # add owner to channel permissions
-
+    guild = await get_guild()
+    overwrite = await get_overwrite_perms()
+    try:
+        member = await guild.fetch_member(owner.id)
+        print(f"Owner identified as {member.display_name}")
+    except:
+        raise EnvironmentError(f'Could not find Discord user matching ID {owner.id}')
     try:
         # first make sure it has the default permissions for the CC category
         await new_channel.edit(sync_permissions=True)
         print("Synced permissions with parent category")
         # now add the owner with superpermissions
-        await new_channel.set_permissions(owner, read_messages=True,
-                                            manage_channels=True,
-                                            manage_roles=True,
-                                            manage_webhooks=True,
-                                            create_instant_invite=True,
-                                            send_messages=True,
-                                            embed_links=True,
-                                            attach_files=True,
-                                            add_reactions=True,
-                                            external_emojis=True,
-                                            manage_messages=True,
-                                            read_message_history=True,
-                                            use_slash_commands=True)
-        print(f"Set permissions for {owner} in {new_channel}")
+        await new_channel.set_permissions(member, overwrite=overwrite)
+        print(f"Set permissions for {member} in {new_channel}")
     except Forbidden:
-        raise EnvironmentError(f"Could not set channel permissions for {owner.display_name} in {new_channel}, reason: Bot does not have permissions to edit channel specific permissions.")
+        raise EnvironmentError(f"Could not set channel permissions for {member.display_name} in {new_channel}, reason: Bot does not have permissions to edit channel specific permissions.")
     except NotFound:
-        raise EnvironmentError(f"Could not set channel permissions for {owner.display_name} in {new_channel}, reason: The role or member being edited is not part of the guild.")
+        raise EnvironmentError(f"Could not set channel permissions for {member.display_name} in {new_channel}, reason: The role or member being edited is not part of the guild.")
     except HTTPException:
-        raise EnvironmentError(f"Could not set channel permissions for {owner.display_name} in {new_channel}, reason: Editing channel specific permissions failed.")
-    except InvalidArgument:
-        raise EnvironmentError(f"Could not set channel permissions for {owner.display_name} in {new_channel}, reason: The overwrite parameter invalid or the target type was not Role or Member.")
+        raise EnvironmentError(f"Could not set channel permissions for {member.display_name} in {new_channel}, reason: Editing channel specific permissions failed.")
+    except (ValueError, TypeError):
+        raise EnvironmentError(f"Could not set channel permissions for {member.display_name} in {new_channel}, reason: The overwrite parameter invalid or the target type was not Role or Member.")
     except:
-        raise EnvironmentError(f'Could not set channel permissions for {owner.display_name} in {new_channel}')
+        raise EnvironmentError(f'Could not set channel permissions for {member.display_name} in {new_channel}')
 
 
     # now we enter everything into the community carriers table
@@ -3654,23 +3669,23 @@ async def cc_del(ctx, owner: discord.Member):
 
 
 # sign up for a Community Carrier's notification role
-@slash.slash(name="notify_me", guild_ids=[bot_guild_id],
-             description="Private command: Use in a COMMUNITY CARRIER channel to opt in/out to receive its notifications.")
-async def _notify_me(ctx: SlashContext):
+@bot.tree.command(name="notify_me",
+    description="Private command: Use in a COMMUNITY CARRIER channel to opt in/out to receive its notifications.", guild=guild_obj)
+async def _notify_me(interaction: discord.Interaction):
 
     # note channel ID
-    msg_ctx_id = ctx.channel.id
+    msg_channel_id = interaction.channel.id
 
     # define spamchannel
     spamchannel = bot.get_channel(bot_spam_id)
 
     # look for a match for the channel ID in the community carrier DB
-    community_carrier_data = find_community_carrier(msg_ctx_id, CCDbFields.channelid.name)
+    community_carrier_data = find_community_carrier(msg_channel_id, CCDbFields.channelid.name)
 
     if not community_carrier_data:
         # if there's no channel match, return an error
         embed = discord.Embed(description="Please try again in a Community Carrier's channel.", color=constants.EMBED_COLOUR_ERROR)
-        await ctx.send(embed=embed, hidden=True)
+        await interaction.response.send_message(embed=embed, ephemeral=True)
         return
 
     elif community_carrier_data:
@@ -3683,45 +3698,45 @@ async def _notify_me(ctx: SlashContext):
 
     # we're in a carrier's channel so try to match its role ID with a server role
     print(f"/notify used in channel for {channel_id}")
-    notify_role = discord.utils.get(ctx.guild.roles, id=role_id)
+    notify_role = discord.utils.get(interaction.guild.roles, id=role_id)
 
     # check if role actually exists
     if not notify_role:
-        await ctx.send("Sorry, I couldn't find a notification role for this channel. Please report this to an Admin.", hidden=True)
-        await spamchannel.send(f"**ERROR**: {ctx.author} tried to use `/notify_me` in <#{ctx.channel.id}> but received an error (role does not exist).")
-        print(f"No role found matching {ctx.channel}")
+        await interaction.response.send_message("Sorry, I couldn't find a notification role for this channel. Please report this to an Admin.", ephemeral=True)
+        await spamchannel.send(f"**ERROR**: {interaction.user} tried to use `/notify_me` in <#{interaction.channel.id}> but received an error (role does not exist).")
+        print(f"No role found matching {interaction.channel}")
         return
 
     # check if user has this role
     print(f'Check whether user has role: "{notify_role}"')
-    print(f'User has roles: {ctx.author.roles}')
-    if notify_role not in ctx.author.roles:
+    print(f'User has roles: {interaction.user.roles}')
+    if notify_role not in interaction.user.roles:
         # they don't so give it to them
-        await ctx.author.add_roles(notify_role)
-        embed = discord.Embed(title=f"You've signed up for notifications for {ctx.channel.name}!",
+        await interaction.user.add_roles(notify_role)
+        embed = discord.Embed(title=f"You've signed up for notifications for {interaction.channel.name}!",
                                 description=f"You'll receive notifications from <@{owner_id}> or "
                                             f"the <@&{cteam_role_id}> about this event or carrier's activity. You can cancel at any"
                                             f" time by using `/notify_me` again in this channel.", color=constants.EMBED_COLOUR_OK)
-        await ctx.send(embed=embed, hidden=True)
+        await interaction.response.send_message(embed=embed, ephemeral=True)
     else:
         # they do so take it from them
-        await ctx.author.remove_roles(notify_role)
-        embed = discord.Embed(title=f"You've cancelled notifications for {ctx.channel.name}.",
+        await interaction.user.remove_roles(notify_role)
+        embed = discord.Embed(title=f"You've cancelled notifications for {interaction.channel.name}.",
                                 description="You'll no longer receive notifications about this event or carrier's activity."
                                             " You can sign up again at any time by using `/notify_me` in this channel.",
                                             color=constants.EMBED_COLOUR_QU)
-        await ctx.send(embed=embed, hidden=True)
+        await interaction.response.send_message(embed=embed, ephemeral=True)
 
 # send a notice from a Community Carrier owner to their 'crew'
-@slash.slash(name="send_notice", guild_ids=[bot_guild_id],
-             description="Private command: Used by Community Carrier owners to send notices to their participants.")
-async def _send_notice(ctx: SlashContext, message: str):
+@bot.tree.command(name="send_notice",
+    description="Private command: Used by Community Carrier owners to send notices to their participants.", guild=guild_obj)
+async def _send_notice(interaction: discord.Interaction, message: str):
     # look up user in community carrier database
-    community_carrier_data = find_community_carrier(ctx.author.id, CCDbFields.ownerid.name)
+    community_carrier_data = find_community_carrier(interaction.user.id, CCDbFields.ownerid.name)
 
     # check if the author is a CC owner
     if not community_carrier_data:
-        await ctx.send("Only the owner of a Community Carrier can use `/send_notice`.", hidden=True)
+        await interaction.response.send_message("Only the owner of a Community Carrier can use `/send_notice`.", ephemeral=True)
         return
 
     # now define terms
@@ -3740,7 +3755,7 @@ async def _send_notice(ctx: SlashContext, message: str):
 
     # send the message to the CC channel
     channel = bot.get_channel(channel_id)
-    await ctx.send(f"Sending your message to <#{channel_id}>.", hidden=True)
+    await interaction.response.send_message(f"Sending your message to <#{channel_id}>.", ephemeral=True)
 
     await channel.send(f"<@&{role_id}> New message from <@{owner_id}> for <#{channel_id}>:\n\n{message}\n\n*Use* `/notify_me` *in "
                        f"this channel to sign up for future notifications."
@@ -3750,30 +3765,30 @@ async def _send_notice(ctx: SlashContext, message: str):
 #                       COMMUNITY NOMINATION COMMANDS
 #
 
-@slash.slash(name="nominate", guild_ids=[bot_guild_id],
-             description="Private command: Nominate an @member to become a Community Pillar.")
-async def _nominate(ctx: SlashContext, user: discord.Member, *, reason: str):
+@bot.tree.command(name="nominate",
+    description="Private command: Nominate an @member to become a Community Pillar.", guild=guild_obj)
+async def _nominate(interaction: discord.Interaction, user: discord.Member, *, reason: str):
 
     # TODO: command to list nominations for a nominator
 
     # first check the user is not nominating themselves because seriously dude
 
-    if ctx.author.id == user.id:
-        print(f"{ctx.author} tried to nominate themselves for Community Pillar :]")
-        return await ctx.send("You can't nominate yourself! But congrats on the positive self-esteem :)", hidden=True)
+    if interaction.user.id == user.id:
+        print(f"{interaction.user} tried to nominate themselves for Community Pillar :]")
+        return await interaction.response.send_message("You can't nominate yourself! But congrats on the positive self-esteem :)", ephemeral=True)
 
-    print(f"{ctx.author} wants to nominate {user}")
+    print(f"{interaction.user} wants to nominate {user}")
     spamchannel = bot.get_channel(bot_spam_id)
 
     # first check this user has not already nominated the same person
-    nominees_data = find_nominator_with_id(ctx.author.id)
+    nominees_data = find_nominator_with_id(interaction.user.id)
     if nominees_data:
         for nominees in nominees_data:
             if nominees.pillar_id == user.id:
                 print("This user already nommed this dude")
                 embed = discord.Embed(title="Nomination Failed", description=f"You've already nominated <@{user.id}> for reason **{nominees.note}**.\n\n"
                                                                              f"You can nominate any number of users, but only once for each user.", color=constants.EMBED_COLOUR_ERROR)
-                await ctx.send(embed=embed, hidden=True)
+                await interaction.response.send_message(embed=embed, ephemeral=True)
                 return
 
     print("No matching nomination, proceeding")
@@ -3785,7 +3800,7 @@ async def _nominate(ctx: SlashContext, user: discord.Member, *, reason: str):
         print("Carrier DB locked.")
         try:
             carrier_db.execute(''' INSERT INTO nominees VALUES(?, ?, ?) ''',
-                            (ctx.author.id, user.id, reason))
+                            (interaction.user.id, user.id, reason))
             carriers_conn.commit()
             print("Registered nomination to database")
         finally:
@@ -3793,37 +3808,37 @@ async def _nominate(ctx: SlashContext, user: discord.Member, *, reason: str):
             carrier_db_lock.release()
             print("Carrier DB unlocked.")
     except Exception as e:
-        await ctx.send("Sorry, something went wrong and developers have been notified.", hidden=True)
+        await interaction.response.send_message("Sorry, something went wrong and developers have been notified.", ephemeral=True)
         # notify in bot_spam
-        await spamchannel.send(f"Error on /nominate by {ctx.author}: {e}")
-        return print(f"Error on /nominate by {ctx.author}: {e}")
+        await spamchannel.send(f"Error on /nominate by {interaction.user}: {e}")
+        return print(f"Error on /nominate by {interaction.user}: {e}")
 
     # notify user of success
     embed = discord.Embed(title="Nomination Successful", description=f"Thank you! You've nominated <@{user.id}> "
                                 f"to become a Community Pillar.\n\nReason: **{reason}**", color=constants.EMBED_COLOUR_OK)
-    await ctx.send(embed=embed, hidden=True)
+    await interaction.response.send_message(embed=embed, ephemeral=True)
 
     # also tell bot-spam
     await spamchannel.send(f"<@{user.id}> was nominated for Community Pillar.")
     return print("Nomination successful")
 
 
-@slash.slash(name="nominate_remove", guild_ids=[bot_guild_id],
-             description="Private command: Remove your Pillar nomination for a user.")
-async def _nominate_remove(ctx: SlashContext, user: discord.Member):
+@bot.tree.command(name="nominate_remove",
+    description="Private command: Remove your Pillar nomination for a user.", guild=guild_obj)
+async def _nominate_remove(interaction: discord.Interaction, user: discord.Member):
 
-    print(f"{ctx.author} wants to un-nominate {user}")
+    print(f"{interaction.user} wants to un-nominate {user}")
 
     # find the nomination
-    nominees_data = find_nominator_with_id(ctx.author.id)
+    nominees_data = find_nominator_with_id(interaction.user.id)
     if nominees_data:
         for nominees in nominees_data:
             if nominees.pillar_id == user.id:
-                await delete_nominee_by_nominator(ctx.author.id, user.id)
+                await delete_nominee_by_nominator(interaction.user.id, user.id)
                 embed = discord.Embed(title="Nomination Removed", description=f"Your nomination for <@{user.id}> "
                                            f"has been removed. If they're being a jerk, consider reporting privately "
                                            f"to a Mod or Council member.", color=constants.EMBED_COLOUR_OK)
-                await ctx.send(embed=embed, hidden=True)
+                await interaction.response.send_message(embed=embed, ephemeral=True)
 
                 # notify bot-spam
                 spamchannel = bot.get_channel(bot_spam_id)
@@ -3832,7 +3847,7 @@ async def _nominate_remove(ctx: SlashContext, user: discord.Member):
 
     # otherwise return an error
     print("No such nomination")
-    return await ctx.send("No nomination found by you for that user.")
+    return await interaction.response.send_message("No nomination found by you for that user.", ephemeral=True)
 
 def nom_count_user(pillarid):
     """
@@ -4074,7 +4089,7 @@ async def lasttrade_cron():
     print(f"last trade cron running.")
     try:
         # get roles
-        guild = bot.get_guild(bot_guild_id)
+        guild = await get_guild()
         cc_role = discord.utils.get(guild.roles, id=certcarrier_role_id)
         fr_role = discord.utils.get(guild.roles, id=rescarrier_role_id)
         # get spam channel
