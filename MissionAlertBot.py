@@ -62,6 +62,7 @@ flair_mission_stop = conf['MISSION_STOP']
 
 # channel IDs
 trade_alerts_id = conf['TRADE_ALERTS_ID']
+legacy_alerts_id = conf['LEGACY_ALERTS_ID']
 wine_alerts_loading_id = conf['WINE_ALERTS_LOADING_ID']
 wine_alerts_unloading_id = conf['WINE_ALERTS_UNLOADING_ID']
 
@@ -73,6 +74,7 @@ archive_cat_id = conf['ARCHIVE_CAT']
 
 # role IDs
 hauler_role_id = conf['HAULER_ROLE']
+legacy_hauler_role_id = conf['LEGACY_HAULER_ROLE']
 cc_role_id = conf['CC_ROLE']
 cteam_role_id = conf['CTEAM_ROLE']
 certcarrier_role_id = conf['CERTCARRIER_ROLE']
@@ -844,9 +846,10 @@ TEXT GEN FUNCTIONS
 
 
 
-def txt_create_discord(carrier_data, mission_type, commodity, station, system, profit, pads, demand, eta_text, mission_temp_channel_id, edmc_off):
+def txt_create_discord(carrier_data, mission_type, commodity, station, system, profit, pads, demand, eta_text, mission_temp_channel_id, edmc_off, legacy):
     discord_channel = f"<#{mission_temp_channel_id}>" if mission_temp_channel_id else f"#{carrier_data.discord_channel}"
     discord_text = (
+        f"{'**◄ LEGACY UNIVERSE ►** : ' if legacy else ''}"
         f"{'**★ EDMC-OFF MISSION! ★** : ' if edmc_off else ''}"
         f"{discord_channel} {'load' if mission_type == 'load' else 'unload'}ing "
         f"{commodity.name} "
@@ -858,26 +861,33 @@ def txt_create_discord(carrier_data, mission_type, commodity, station, system, p
     return discord_text
 
 
-def txt_create_reddit_title(carrier_data):
-    reddit_title = f"P.T.N. News - Trade mission - {carrier_data.carrier_long_name} {carrier_data.carrier_identifier}" \
+def txt_create_reddit_title(carrier_data, legacy):
+    reddit_title = (
+        f"{'◄ LEGACY UNIVERSE ► : ' if legacy else ''}"
+        f"P.T.N. News - Trade mission - {carrier_data.carrier_long_name} {carrier_data.carrier_identifier}" \
                    f" - {get_formatted_date_string()[0]}"
+    )
     return reddit_title
 
 
-def txt_create_reddit_body(carrier_data, mission_type, commodity, station, system, profit, pads, demand, eta_text):
+def txt_create_reddit_body(carrier_data, mission_type, commodity, station, system, profit, pads, demand, eta_text, legacy):
 
     if mission_type == 'load':
         reddit_body = (
-            f"    INCOMING WIDEBAND TRANSMISSION: P.T.N. CARRIER LOADING MISSION IN PROGRESS\n\n**BUY FROM**: station "
-            f"**{station.upper()}** ({pads.upper()}-pads) in system **{system.upper()}**\n\n**COMMODITY**: "
+            f"    INCOMING WIDEBAND TRANSMISSION: P.T.N. CARRIER LOADING MISSION IN PROGRESS\n"
+            f"{'**◄ LEGACY UNIVERSE ►**' if legacy else ''}"
+            f"\n\n"
+            f"**BUY FROM**: station **{station.upper()}** ({pads.upper()}-pads) in system **{system.upper()}**\n\n**COMMODITY**: "
             f"{commodity.name}\n\n&#x200B;\n\n**SELL TO**: Fleet Carrier **{carrier_data.carrier_long_name} "
             f"{carrier_data.carrier_identifier}{eta_text}**\n\n**PROFIT**: {profit}k/unit : {demand} "
             f"demand\n\n\n\n[Join us on Discord]({constants.REDDIT_DISCORD_LINK_URL}) for "
             f"mission updates and discussion, channel **#{carrier_data.discord_channel}**.")
     else:
         reddit_body = (
-            f"    INCOMING WIDEBAND TRANSMISSION: P.T.N. CARRIER UNLOADING MISSION IN PROGRESS\n\n**BUY FROM**: Fleet "
-            f"Carrier **{carrier_data.carrier_long_name} {carrier_data.carrier_identifier}{eta_text}**"
+            f"    INCOMING WIDEBAND TRANSMISSION: P.T.N. CARRIER UNLOADING MISSION IN PROGRESS\n"
+            f"{'**◄ LEGACY UNIVERSE ►** : ' if legacy else ''}"
+            f"\n\n"
+            f"**BUY FROM**: Fleet Carrier **{carrier_data.carrier_long_name} {carrier_data.carrier_identifier}{eta_text}**"
             f"\n\n**COMMODITY**: {commodity.name}\n\n&#x200B;\n\n**SELL TO**: station "
             f"**{station.upper()}** ({pads.upper()}-pads) in system **{system.upper()}**\n\n**PROFIT**: {profit}k/unit "
             f": {demand} supply\n\n\n\n[Join us on Discord]({constants.REDDIT_DISCORD_LINK_URL}) for mission updates"
@@ -1039,7 +1049,7 @@ async def _monitor_reddit_comments():
 #
 
 # load commands
-@bot.command(name='load', help='Generate details for a loading mission and optionally broadcast to Discord.\n'
+@bot.command(name='load', help='Generate details for a loading mission and optionally broadcast.\n'
                                '\n'
                                'carrier_name_search_term should be a unique part of your carrier\'s name. (Use quotes if spaces are required)\n'
                                'commodity_name_partial should be a unique part of any commodity\'s name.\n'
@@ -1054,8 +1064,9 @@ async def load(ctx, carrier_name_search_term: str, commodity_search_term: str, s
                profit: Union[int, float], pads: str, demand: str, eta: str = None):
     rp = False
     mission_type = 'load'
+    legacy = False
     await gen_mission(ctx, carrier_name_search_term, commodity_search_term, system, station, profit, pads, demand,
-                      rp, mission_type, eta)
+                      rp, mission_type, eta, legacy)
 
 
 @bot.command(name="loadrp", help='Same as load command but prompts user to enter roleplay text\n'
@@ -1067,9 +1078,44 @@ async def loadrp(ctx, carrier_name_search_term: str, commodity_search_term: str,
                  profit: Union[int, float], pads: str, demand: str, eta: str = None):
     rp = True
     mission_type = 'load'
+    legacy = False
     await gen_mission(ctx, carrier_name_search_term, commodity_search_term, system, station, profit, pads, demand,
-                      rp, mission_type, eta)
+                      rp, mission_type, eta, legacy)
 
+
+# legacy load commands
+@bot.command(name='loadlegacy', help='Generate details for a LEGACY loading mission and optionally broadcast.\n'
+                               '\n'
+                               'carrier_name_search_term should be a unique part of your carrier\'s name. (Use quotes if spaces are required)\n'
+                               'commodity_name_partial should be a unique part of any commodity\'s name.\n'
+                               'System and Station names should be enclosed in quotes if they contain spaces.\n'
+                               'Profit should be expressed as a simple number e.g. enter 10 for 10k/unit profit.\n'
+                               'Pad size should be expressed as L or M.\n'
+                               'Demand should be expressed as an absolute number e.g. 20k, 20,000, etc.\n'
+                               'ETA is optional and should be expressed as a number of minutes e.g. 15.\n'
+                               'Case is automatically corrected for all inputs.')
+@commands.has_any_role('Certified Carrier', 'Trainee')
+async def loadlegacy(ctx, carrier_name_search_term: str, commodity_search_term: str, system: str, station: str,
+               profit: Union[int, float], pads: str, demand: str, eta: str = None):
+    rp = False
+    mission_type = 'load'
+    legacy = True
+    await gen_mission(ctx, carrier_name_search_term, commodity_search_term, system, station, profit, pads, demand,
+                      rp, mission_type, eta, legacy)
+
+
+@bot.command(name="loadrplegacy", help='Same as load command but prompts user to enter roleplay text\n'
+                                 'This is added to the Reddit comment as as a quote above the mission details\n'
+                                 'and sent to the carrier\'s Discord channel in quote format if those options are '
+                                 'chosen')
+@commands.has_any_role('Certified Carrier', 'Trainee')
+async def loadrplegacy(ctx, carrier_name_search_term: str, commodity_search_term: str, system: str, station: str,
+                 profit: Union[int, float], pads: str, demand: str, eta: str = None):
+    rp = True
+    mission_type = 'load'
+    legacy = True
+    await gen_mission(ctx, carrier_name_search_term, commodity_search_term, system, station, profit, pads, demand,
+                      rp, mission_type, eta, legacy)
 
 # unload commands
 @bot.command(name='unload', help='Generate details for an unloading mission.\n'
@@ -1087,8 +1133,9 @@ async def unload(ctx, carrier_name_search_term: str, commodity_search_term: str,
                  profit: Union[int, float], pads: str, supply: str, eta: str = None):
     rp = False
     mission_type = 'unload'
+    legacy = False
     await gen_mission(ctx, carrier_name_search_term, commodity_search_term, system, station, profit, pads, supply, rp,
-                      mission_type, eta)
+                      mission_type, eta, legacy)
 
 
 @bot.command(name="unloadrp", help='Same as unload command but prompts user to enter roleplay text\n'
@@ -1100,14 +1147,49 @@ async def unloadrp(ctx, carrier_name_search_term: str, commodity_search_term: st
                    profit: Union[int, float], pads: str, demand: str, eta: str = None):
     rp = True
     mission_type = 'unload'
+    legacy = False
     await gen_mission(ctx, carrier_name_search_term, commodity_search_term, system, station, profit, pads, demand,
-                      rp, mission_type, eta)
+                      rp, mission_type, eta, legacy)
+
+# legacy unload commands
+@bot.command(name='unloadlegacy', help='Generate details for a LEGACY unloading mission.\n'
+                                 '\n'
+                                 'carrier_name_search_term should be a unique part of your carrier\'s name. (Use quotes if spaces are required)\n'
+                                 'commodity_name_partial should be a unique part of any commodity\'s name.\n'
+                                 'System and Station names should be enclosed in quotes if they contain spaces.\n'
+                                 'Profit should be expressed as a simple number e.g. enter 10 for 10k/unit profit.\n'
+                                 'Pad size should be expressed as L or M.\n'
+                                 'Supply should be expressed as an absolute number e.g. 20k, 20,000, etc.\n'
+                                 'ETA is optional and should be expressed as a number of minutes e.g. 15.\n'
+                                 'Case is automatically corrected for all inputs.')
+@commands.has_any_role('Certified Carrier', 'Trainee')
+async def unload(ctx, carrier_name_search_term: str, commodity_search_term: str, system: str, station: str,
+                 profit: Union[int, float], pads: str, supply: str, eta: str = None):
+    rp = False
+    mission_type = 'unload'
+    legacy = True
+    await gen_mission(ctx, carrier_name_search_term, commodity_search_term, system, station, profit, pads, supply, rp,
+                      mission_type, eta, legacy)
+
+
+@bot.command(name="unloadrplegacy", help='Same as unload command but prompts user to enter roleplay text\n'
+                                   'This is added to the Reddit comment as as a quote above the mission details\n'
+                                   'and sent to the carrier\'s Discord channel in quote format if those options are '
+                                   'chosen')
+@commands.has_any_role('Certified Carrier', 'Trainee')
+async def unloadrp(ctx, carrier_name_search_term: str, commodity_search_term: str, system: str, station: str,
+                   profit: Union[int, float], pads: str, demand: str, eta: str = None):
+    rp = True
+    mission_type = 'unload'
+    legacy = True
+    await gen_mission(ctx, carrier_name_search_term, commodity_search_term, system, station, profit, pads, demand,
+                      rp, mission_type, eta, legacy)
 
 
 # mission generator called by loading/unloading commands
 async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term: str, system: str, station: str,
                       profit: Union[int, float], pads: str, demand: str, rp: str, mission_type: str,
-                      eta: str):
+                      eta: str, legacy):
     # Check we are in the designated mission channel, if not go no farther.
     mission_gen_channel = bot.get_channel(conf['MISSION_CHANNEL'])
     current_channel = ctx.channel
@@ -1244,11 +1326,11 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
         file_name = await create_carrier_mission_image(carrier_data, commodity_data, system, station, profit, pads, demand,
                                                 mission_type)
         discord_text = txt_create_discord(carrier_data, mission_type, commodity_data, station, system, profit, pads,
-                        demand, eta_text, mission_temp_channel_id, edmc_off)
+                        demand, eta_text, mission_temp_channel_id, edmc_off, legacy)
         print("Generated discord elements")
-        reddit_title = txt_create_reddit_title(carrier_data)
+        reddit_title = txt_create_reddit_title(carrier_data, legacy)
         reddit_body = txt_create_reddit_body(carrier_data, mission_type, commodity_data, station, system, profit, pads,
-                                            demand, eta_text)
+                                            demand, eta_text, legacy)
         print("Generated Reddit elements")
 
         # check they're happy with output and offer to send
@@ -1330,7 +1412,7 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
 
                 # Recreate this text since we know the channel id
                 discord_text = txt_create_discord(carrier_data, mission_type, commodity_data, station, system, profit, pads,
-                                demand, eta_text, mission_temp_channel_id, edmc_off)
+                                demand, eta_text, mission_temp_channel_id, edmc_off, legacy)
                 message_send = await ctx.send("**Sending to Discord...**")
                 try:
                     # send trade alert to trade alerts channel, or to wine alerts channel if loading wine
@@ -1342,8 +1424,12 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
                             channel = bot.get_channel(wine_alerts_unloading_id)
                             channelId = wine_alerts_unloading_id
                     else:
-                        channel = bot.get_channel(trade_alerts_id)
-                        channelId = trade_alerts_id
+                        if legacy:
+                            channel = bot.get_channel(legacy_alerts_id)
+                            channelId = legacy_alerts_id
+                        else:
+                            channel = bot.get_channel(trade_alerts_id)
+                            channelId = trade_alerts_id
 
                     if mission_type == 'load':
                         embed = discord.Embed(description=discord_text, color=constants.EMBED_COLOUR_LOADING)
@@ -1428,10 +1514,11 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
             if "n" in msg.content.lower() and "d" in msg.content.lower():
                 print("User used option n")
 
-                await mission_temp_channel.send(f"<@&{hauler_role_id}>: {discord_text}")
+                ping_role_id = legacy_hauler_role_id if legacy else hauler_role_id
+                await mission_temp_channel.send(f"<@&{ping_role_id}>: {discord_text}")
 
                 embed = discord.Embed(title=f"Mission notification sent for {carrier_data.carrier_long_name}",
-                            description=f"Pinged <@&{hauler_role_id}> in <#{mission_temp_channel_id}>",
+                            description=f"Pinged <@&{ping_role_id}> in <#{mission_temp_channel_id}>",
                             color=constants.EMBED_COLOUR_DISCORD)
                 await ctx.send(embed=embed)
 
@@ -1893,10 +1980,17 @@ async def _cleanup_completed_mission(ctx, mission_data, reddit_complete_text, di
                         alert_channel = bot.get_channel(wine_alerts_unloading_id)
                 else:
                     alert_channel = bot.get_channel(trade_alerts_id)
-
+                
                 discord_alert_id = mission_data.discord_alert_id
-                msg = await alert_channel.fetch_message(discord_alert_id)
-                await msg.delete()
+
+                try: # shitty hacky message of incorporating legacy trades without extra DB fields
+                    msg = await alert_channel.fetch_message(discord_alert_id)
+                    await msg.delete()
+                except: # if it can't find a message in the normal channel it'll look in legacy instead
+                    alert_channel = bot.get_channel(legacy_alerts_id)
+                    msg = await alert_channel.fetch_message(discord_alert_id)
+                    await msg.delete()
+
             except:
                 print(f"Looks like this mission alert for {mission_data.carrier_name} was already deleted"
                       f" by someone else. We'll keep going anyway.")
