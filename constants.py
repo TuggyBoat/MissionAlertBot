@@ -16,6 +16,7 @@ PROD_ADMIN_BOT_CHANNEL = 895083178761547806 # bot command channel for admins onl
 PROD_BOT_SPAM_CHANNEL = 801258393205604372 # Certain bot logging messages go here
 PROD_UPVOTE_EMOJI = 828287733227192403 # upvote emoji on live server
 PROD_HAULER_ROLE = 875313960834965544 # hauler role ID on live server
+PROD_LEGACY_HAULER__ROLE = 1047133548886364190 # legacy hauler role ID on live server
 PROD_CC_ROLE = 869340261057196072 # CC role on live server
 PROD_CC_CAT = 877107894452117544 # Community Carrier category on live server
 PROD_CTEAM_ROLE = 863521103434350613 # Commnunity Team role on live server
@@ -46,6 +47,7 @@ TEST_ADMIN_BOT_CHANNEL = 842152343441375283 # bot command channel for admins onl
 TEST_BOT_SPAM_CHANNEL = 842525081858867211 # Bot logging messages on the test server
 TEST_UPVOTE_EMOJI = 849388681382068225 # upvote emoji on test server
 TEST_HAULER_ROLE = 875439909102575647 # hauler role ID on test server
+TEST_LEGACY_HAULER__ROLE = 1047152762707787786 # legacy hauler role ID on test server
 TEST_CC_ROLE = 877220476827619399 # CC role on test server
 TEST_CC_CAT = 877108931699310592 # Community Carrier category on test server
 TEST_CTEAM_ROLE = 877586763672072193 # Community Team role on test server
@@ -95,6 +97,7 @@ def get_constant(production: bool):
             'BOT_SPAM_CHANNEL': PROD_BOT_SPAM_CHANNEL,
             'UPVOTE_EMOJI': PROD_UPVOTE_EMOJI,
             'HAULER_ROLE' : PROD_HAULER_ROLE,
+            'LEGACY_HAULER_ROLE' : PROD_LEGACY_HAULER__ROLE,
             'CC_ROLE' : PROD_CC_ROLE,
             'CC_CAT' : PROD_CC_CAT,
             'CTEAM_ROLE' : PROD_CTEAM_ROLE,
@@ -123,6 +126,7 @@ def get_constant(production: bool):
             'BOT_SPAM_CHANNEL': TEST_BOT_SPAM_CHANNEL,
             'UPVOTE_EMOJI': TEST_UPVOTE_EMOJI,
             'HAULER_ROLE' : TEST_HAULER_ROLE,
+            'LEGACY_HAULER_ROLE' : TEST_LEGACY_HAULER__ROLE,
             'CC_ROLE' : TEST_CC_ROLE,
             'CC_CAT' : TEST_CC_CAT,
             'CTEAM_ROLE' : TEST_CTEAM_ROLE,

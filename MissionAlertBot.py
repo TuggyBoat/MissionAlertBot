@@ -74,6 +74,7 @@ archive_cat_id = conf['ARCHIVE_CAT']
 
 # role IDs
 hauler_role_id = conf['HAULER_ROLE']
+legacy_hauler_role_id = conf['LEGACY_HAULER_ROLE']
 cc_role_id = conf['CC_ROLE']
 cteam_role_id = conf['CTEAM_ROLE']
 certcarrier_role_id = conf['CERTCARRIER_ROLE']
@@ -1325,7 +1326,7 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
         file_name = await create_carrier_mission_image(carrier_data, commodity_data, system, station, profit, pads, demand,
                                                 mission_type)
         discord_text = txt_create_discord(carrier_data, mission_type, commodity_data, station, system, profit, pads,
-                        demand, eta_text, mission_temp_channel_id, edmc_off)
+                        demand, eta_text, mission_temp_channel_id, edmc_off, legacy)
         print("Generated discord elements")
         reddit_title = txt_create_reddit_title(carrier_data, legacy)
         reddit_body = txt_create_reddit_body(carrier_data, mission_type, commodity_data, station, system, profit, pads,
@@ -1513,10 +1514,11 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
             if "n" in msg.content.lower() and "d" in msg.content.lower():
                 print("User used option n")
 
-                await mission_temp_channel.send(f"<@&{hauler_role_id}>: {discord_text}")
+                ping_role_id = legacy_hauler_role_id if legacy else hauler_role_id
+                await mission_temp_channel.send(f"<@&{ping_role_id}>: {discord_text}")
 
                 embed = discord.Embed(title=f"Mission notification sent for {carrier_data.carrier_long_name}",
-                            description=f"Pinged <@&{hauler_role_id}> in <#{mission_temp_channel_id}>",
+                            description=f"Pinged <@&{ping_role_id}> in <#{mission_temp_channel_id}>",
                             color=constants.EMBED_COLOUR_DISCORD)
                 await ctx.send(embed=embed)
 
@@ -1978,10 +1980,17 @@ async def _cleanup_completed_mission(ctx, mission_data, reddit_complete_text, di
                         alert_channel = bot.get_channel(wine_alerts_unloading_id)
                 else:
                     alert_channel = bot.get_channel(trade_alerts_id)
-
+                
                 discord_alert_id = mission_data.discord_alert_id
-                msg = await alert_channel.fetch_message(discord_alert_id)
-                await msg.delete()
+
+                try: # shitty hacky message of incorporating legacy trades without extra DB fields
+                    msg = await alert_channel.fetch_message(discord_alert_id)
+                    await msg.delete()
+                except: # if it can't find a message in the normal channel it'll look in legacy instead
+                    alert_channel = bot.get_channel(legacy_alerts_id)
+                    msg = await alert_channel.fetch_message(discord_alert_id)
+                    await msg.delete()
+
             except:
                 print(f"Looks like this mission alert for {mission_data.carrier_name} was already deleted"
                       f" by someone else. We'll keep going anyway.")
