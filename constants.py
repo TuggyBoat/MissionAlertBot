@@ -23,7 +23,7 @@ PROD_CTEAM_ROLE = 863521103434350613 # Commnunity Team role on live server
 PROD_CERTCARRIER_ROLE = 947253075561824327 # Certified Carrier role on live server
 PROD_RESCARRIER_ROLE = 947253075561824327 # Fleet Reserve Carrier role on live server
 PROD_TRADE_CAT = 801558838414409738 # Trade Carrier category on live server
-PROD_ARCHIVE_CAT = 821542402836660284 # Archive category on live server
+PROD_ARCHIVE_CAT = 1048957416781393970 # Archive category on live server
 PROD_SECONDS_SHORT = 120
 PROD_SECONDS_LONG = 900
 
