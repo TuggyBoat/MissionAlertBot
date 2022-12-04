@@ -81,6 +81,7 @@ certcarrier_role_id = conf['CERTCARRIER_ROLE']
 rescarrier_role_id = conf['RESCARRIER_ROLE']
 botadmin_role_id = conf['ADMIN_ROLE']
 trainee_role_id = conf['TRAINEE_ROLE']
+botdev_role_id = conf['DEV_ROLE']
 
 # emoji IDs
 upvote_emoji = conf['UPVOTE_EMOJI']
@@ -1061,9 +1062,10 @@ async def _monitor_reddit_comments():
                                'Demand should be expressed as an absolute number e.g. 20k, 20,000, etc.\n'
                                'ETA is optional and should be expressed as a number of minutes e.g. 15.\n'
                                'Case is automatically corrected for all inputs.')
-@commands.has_any_role(certcarrier_role_id, trainee_role_id)
 async def load(ctx, carrier_name_search_term: str, commodity_search_term: str, system: str, station: str,
                profit: Union[int, float], pads: str, demand: str, eta: str = None):
+    permitted_role_ids = [certcarrier_role_id, trainee_role_id]
+    if not await checkroles(ctx, permitted_role_ids): return
     rp = False
     mission_type = 'load'
     legacy = False
@@ -1075,9 +1077,10 @@ async def load(ctx, carrier_name_search_term: str, commodity_search_term: str, s
                                  'This is added to the Reddit comment as as a quote above the mission details\n'
                                  'and sent to the carrier\'s Discord channel in quote format if those options are '
                                  'chosen')
-@commands.has_any_role(certcarrier_role_id, trainee_role_id)
 async def loadrp(ctx, carrier_name_search_term: str, commodity_search_term: str, system: str, station: str,
                  profit: Union[int, float], pads: str, demand: str, eta: str = None):
+    permitted_role_ids = [certcarrier_role_id, trainee_role_id]
+    if not await checkroles(ctx, permitted_role_ids): return
     rp = True
     mission_type = 'load'
     legacy = False
@@ -1096,9 +1099,10 @@ async def loadrp(ctx, carrier_name_search_term: str, commodity_search_term: str,
                                'Demand should be expressed as an absolute number e.g. 20k, 20,000, etc.\n'
                                'ETA is optional and should be expressed as a number of minutes e.g. 15.\n'
                                'Case is automatically corrected for all inputs.')
-@commands.has_any_role(certcarrier_role_id, trainee_role_id)
 async def loadlegacy(ctx, carrier_name_search_term: str, commodity_search_term: str, system: str, station: str,
                profit: Union[int, float], pads: str, demand: str, eta: str = None):
+    permitted_role_ids = [certcarrier_role_id, trainee_role_id]
+    if not await checkroles(ctx, permitted_role_ids): return
     rp = False
     mission_type = 'load'
     legacy = True
@@ -1110,9 +1114,10 @@ async def loadlegacy(ctx, carrier_name_search_term: str, commodity_search_term: 
                                  'This is added to the Reddit comment as as a quote above the mission details\n'
                                  'and sent to the carrier\'s Discord channel in quote format if those options are '
                                  'chosen')
-@commands.has_any_role(certcarrier_role_id, trainee_role_id)
 async def loadrplegacy(ctx, carrier_name_search_term: str, commodity_search_term: str, system: str, station: str,
                  profit: Union[int, float], pads: str, demand: str, eta: str = None):
+    permitted_role_ids = [certcarrier_role_id, trainee_role_id]
+    if not await checkroles(ctx, permitted_role_ids): return
     rp = True
     mission_type = 'load'
     legacy = True
@@ -1130,9 +1135,10 @@ async def loadrplegacy(ctx, carrier_name_search_term: str, commodity_search_term
                                  'Supply should be expressed as an absolute number e.g. 20k, 20,000, etc.\n'
                                  'ETA is optional and should be expressed as a number of minutes e.g. 15.\n'
                                  'Case is automatically corrected for all inputs.')
-@commands.has_any_role(certcarrier_role_id, trainee_role_id)
 async def unload(ctx, carrier_name_search_term: str, commodity_search_term: str, system: str, station: str,
                  profit: Union[int, float], pads: str, supply: str, eta: str = None):
+    permitted_role_ids = [certcarrier_role_id, trainee_role_id]
+    if not await checkroles(ctx, permitted_role_ids): return
     rp = False
     mission_type = 'unload'
     legacy = False
@@ -1144,9 +1150,10 @@ async def unload(ctx, carrier_name_search_term: str, commodity_search_term: str,
                                    'This is added to the Reddit comment as as a quote above the mission details\n'
                                    'and sent to the carrier\'s Discord channel in quote format if those options are '
                                    'chosen')
-@commands.has_any_role(certcarrier_role_id, trainee_role_id)
 async def unloadrp(ctx, carrier_name_search_term: str, commodity_search_term: str, system: str, station: str,
                    profit: Union[int, float], pads: str, demand: str, eta: str = None):
+    permitted_role_ids = [certcarrier_role_id, trainee_role_id]
+    if not await checkroles(ctx, permitted_role_ids): return
     rp = True
     mission_type = 'unload'
     legacy = False
@@ -1164,9 +1171,10 @@ async def unloadrp(ctx, carrier_name_search_term: str, commodity_search_term: st
                                  'Supply should be expressed as an absolute number e.g. 20k, 20,000, etc.\n'
                                  'ETA is optional and should be expressed as a number of minutes e.g. 15.\n'
                                  'Case is automatically corrected for all inputs.')
-@commands.has_any_role(certcarrier_role_id, trainee_role_id)
 async def unload(ctx, carrier_name_search_term: str, commodity_search_term: str, system: str, station: str,
                  profit: Union[int, float], pads: str, supply: str, eta: str = None):
+    permitted_role_ids = [certcarrier_role_id, trainee_role_id]
+    if not await checkroles(ctx, permitted_role_ids): return
     rp = False
     mission_type = 'unload'
     legacy = True
@@ -1178,9 +1186,10 @@ async def unload(ctx, carrier_name_search_term: str, commodity_search_term: str,
                                    'This is added to the Reddit comment as as a quote above the mission details\n'
                                    'and sent to the carrier\'s Discord channel in quote format if those options are '
                                    'chosen')
-@commands.has_any_role(certcarrier_role_id, trainee_role_id)
 async def unloadrp(ctx, carrier_name_search_term: str, commodity_search_term: str, system: str, station: str,
                    profit: Union[int, float], pads: str, demand: str, eta: str = None):
+    permitted_role_ids = [certcarrier_role_id, trainee_role_id]
+    if not await checkroles(ctx, permitted_role_ids): return
     rp = True
     mission_type = 'unload'
     legacy = True
@@ -1921,8 +1930,9 @@ async def _missions(interaction: discord.Interaction):
                                'Deletes trade alert in Discord and sends messages to carrier channel, reddit and owner if '
                                'appropriate.\n\nAnything after the carrier name will be treated as a '
                                'quote to be sent along with the completion notice. This can be used for RP if desired.')
-@commands.has_any_role(certcarrier_role_id, trainee_role_id)
 async def done(ctx, carrier_name_search_term: str, *, rp: str = None):
+    permitted_role_ids = [certcarrier_role_id, trainee_role_id, rescarrier_role_id]
+    if not await checkroles(ctx, permitted_role_ids): return
 
     # Check we are in the designated mission channel, if not go no farther.
     mission_gen_channel = bot.get_channel(conf['MISSION_CHANNEL'])
@@ -2569,8 +2579,10 @@ async def carrier_del(ctx, db_id: int):
 @bot.command(name='carrier_image', help='Change the background image for the specified carrier:\n\n'
                                         'Use with carrier\'s name as argument to check the '
                                         'carrier\'s image or begin upload of a new image.')
-@commands.has_any_role(certcarrier_role_id, trainee_role_id)
 async def carrier_image(ctx, lookname):
+    permitted_role_ids = [certcarrier_role_id, trainee_role_id]
+    if not await checkroles(ctx, permitted_role_ids): return
+
     print(f"{ctx.author} called m.carrier_image for {lookname}")
     carrier_data = find_carrier(lookname, CarrierDbFields.longname.name)
 
@@ -3305,8 +3317,10 @@ def _configure_all_carrier_detail_embed(embed, carrier_data: CarrierData):
                              'Format: m.cc @owner channel-name\n'
                              'The owner will receive the @Community Carrier role\n'
                              'as well as full permissions in the channel.')
-@commands.has_any_role(cmentor_role_id, botadmin_role_id)
 async def cc(ctx, owner: discord.Member, *, channel_name: str):
+    permitted_role_ids = [cmentor_role_id, botadmin_role_id]
+    if not await checkroles(ctx, permitted_role_ids): return
+
 
     stripped_channel_name = _regex_alphanumeric_with_hyphens(channel_name)
     print(f"{ctx.author} used m.cc")
@@ -3505,8 +3519,10 @@ async def cc(ctx, owner: discord.Member, *, channel_name: str):
 
 # list all community carriers
 @bot.command(name='cc_list', help='List all Community Carriers.')
-@commands.has_any_role(cmentor_role_id, botadmin_role_id)
 async def cc_list(ctx):
+    permitted_role_ids = [cmentor_role_id, botadmin_role_id]
+    if not await checkroles(ctx, permitted_role_ids): return
+
     carrier_db.execute(f"SELECT * FROM community_carriers")
     community_carriers = [CommunityCarrierData(carrier) for carrier in carrier_db.fetchall()]
 
@@ -3611,8 +3627,9 @@ async def cc_list(ctx):
 # find a community carrier channel by owner
 @bot.command(name='cc_owner', help='Search for an owner by @ mention in the Community Carrier database.\n'
                              'Format: m.cc_owner @owner\n')
-@commands.has_any_role(cmentor_role_id, botadmin_role_id)
 async def cc_owner(ctx, owner: discord.Member):
+    permitted_role_ids = [cmentor_role_id, botadmin_role_id]
+    if not await checkroles(ctx, permitted_role_ids): return
 
     community_carrier_data = find_community_carrier(owner.id, CCDbFields.ownerid.name)
     if community_carrier_data:
@@ -3628,8 +3645,10 @@ async def cc_owner(ctx, owner: discord.Member):
 # delete a Community Carrier
 @bot.command(name='cc_del', help='Delete a Community Carrier.\n'
                              'Format: m.cc_del @owner\n')
-@commands.has_any_role(cmentor_role_id, botadmin_role_id)
 async def cc_del(ctx, owner: discord.Member):
+    permitted_role_ids = [cmentor_role_id, botadmin_role_id]
+    if not await checkroles(ctx, permitted_role_ids): return
+
     print(f"{ctx.author} called cc_del command for {owner}")
 
     def check(message):
@@ -3957,8 +3976,9 @@ def nom_count_user(pillarid):
     return count
 
 @bot.command(name='nom_count', help='Shows all users with more than X nominations')
-@commands.has_any_role(cmentor_role_id, botadmin_role_id)
 async def nom_count(ctx, number: int):
+    permitted_role_ids = [cmentor_role_id, botadmin_role_id]
+    if not await checkroles(ctx, permitted_role_ids): return
 
     # make sure we are in the right channel
     bot_command_channel = bot.get_channel(conf['ADMIN_BOT_CHANNEL'])
@@ -3995,10 +4015,12 @@ async def nom_count(ctx, number: int):
 
 
 @bot.command(name='nom_details', help='Shows nomination details for given user by ID or @ mention')
-@commands.has_any_role(cmentor_role_id, botadmin_role_id)
 async def nom_details(ctx, userid: Union[discord.Member, int]):
     # userID should really be a discord.Member object, but that lacks a sensible way to cast back to a userid,
     # so just use a string and ignore the problem.
+    permitted_role_ids = [cmentor_role_id, botadmin_role_id]
+    if not await checkroles(ctx, permitted_role_ids): return
+
 
     if not isinstance(userid, discord.Member):
         # sanitise userid in case they used an @ mention
@@ -4038,8 +4060,10 @@ async def nom_details(ctx, userid: Union[discord.Member, int]):
 
 
 @bot.command(name='nom_delete', help='Completely removes all nominations for a user by user ID or @ mention. NOT RECOVERABLE.')
-@commands.has_any_role(botadmin_role_id)
 async def nom_delete(ctx, userid: Union[str, int]):
+    permitted_role_ids = [cmentor_role_id, botadmin_role_id]
+    if not await checkroles(ctx, permitted_role_ids): return
+
     print(f"nom_delete called by {ctx.author}")
 
     # userID should really be a discord.Member object, but that lacks a sensible way to cast back to a userid,
@@ -4107,15 +4131,20 @@ async def nom_delete(ctx, userid: Union[str, int]):
 
 # ping the bot
 @bot.command(name='ping', help='Ping the bot')
-@commands.has_any_role(botadmin_role_id, certcarrier_role_id, trainee_role_id, 'Developer')
 async def ping(ctx):
+    permitted_role_ids = [botadmin_role_id, certcarrier_role_id, trainee_role_id, botdev_role_id]
+    if not await checkroles(ctx, permitted_role_ids): return
+
     gif = random.choice(hello_gifs)
     await ctx.send(gif)
     # await ctx.send("**PING? PONG!**")
 
+
 @bot.command(name='unlock_override', help='Unlock the channel lock manually after Sheriff Benguin breaks it.')
-@commands.has_any_role(botadmin_role_id, botadmin_role_id, 'Developer')
 async def unlock_override(ctx):
+    permitted_role_ids = [botadmin_role_id, botdev_role_id]
+    if not await checkroles(ctx, permitted_role_ids): return
+
     print(f"{ctx.author} called manual channel_lock release in {ctx.channel}")
     if not carrier_channel_lock.locked():
         return await ctx.send("Channel lock is not set.")
@@ -4157,8 +4186,10 @@ async def unlock_override(ctx):
 
 
 @bot.command(name='cron_status', help='Check the status of the lasttrade cron task')
-@commands.has_any_role(botadmin_role_id, botadmin_role_id, 'Developer')
 async def cron_status(ctx):
+    permitted_role_ids = [botadmin_role_id, botdev_role_id]
+    if not await checkroles(ctx, permitted_role_ids): return
+
     if not lasttrade_cron.is_running() or lasttrade_cron.failed():
         print("lasttrade cron task has failed, restarting.")
         await ctx.send('lasttrade cron task has failed, restarting...')
@@ -4174,6 +4205,29 @@ async def cron_status(ctx):
 async def stopquit(ctx):
     await ctx.send(f"k thx bye")
     await user_exit()
+
+
+# Pair of helper functions to check a user's permission to run a command based on their roles, and return a helpful error if they don't have the correct role(s)
+def getrole(ctx, id): # takes a Discord role ID and returns the role object
+    role = discord.utils.get(ctx.guild.roles, id=id)
+    return role
+
+async def checkroles(ctx, permitted_role_ids): # checks a list of roles against a user's roles
+    author_roles = ctx.author.roles
+    permitted_roles = [getrole(ctx, role) for role in permitted_role_ids]
+    print(author_roles)
+    print(permitted_roles)
+    permission = True if any(x in permitted_roles for x in author_roles) else False
+    print(permission)
+    if not permission:
+        if len(permitted_roles)>1:
+            embed=discord.Embed(title="Permission denied", description="You need one of the following roles to use this command:", color=constants.EMBED_COLOUR_ERROR)
+        else:
+            embed=discord.Embed(title="Permission denied", description="You need the following role to use this command:", color=constants.EMBED_COLOUR_ERROR)
+        for role in permitted_role_ids:
+            embed.add_field(name="\u200b", value=f'<@&{role}>', inline=True)
+        await ctx.send(embed=embed)
+    return permission
 
 
 # lasttrade task loop:
