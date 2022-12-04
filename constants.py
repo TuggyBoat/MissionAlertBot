@@ -19,9 +19,12 @@ PROD_HAULER_ROLE = 875313960834965544 # hauler role ID on live server
 PROD_LEGACY_HAULER__ROLE = 1047133548886364190 # legacy hauler role ID on live server
 PROD_CC_ROLE = 869340261057196072 # CC role on live server
 PROD_CC_CAT = 877107894452117544 # Community Carrier category on live server
-PROD_CTEAM_ROLE = 863521103434350613 # Commnunity Team role on live server
+PROD_ADMIN_ROLE = 800091021852803072 # MAB Bot Admin role on live server (currently @Council)
+PROD_CMENTOR_ROLE = 863521103434350613 # Community Mentor role on live server
 PROD_CERTCARRIER_ROLE = 947253075561824327 # Certified Carrier role on live server
 PROD_RESCARRIER_ROLE = 947253075561824327 # Fleet Reserve Carrier role on live server
+PROD_TRAINEE_ROLE = 800439864797167637 # CCO Trainee role on live server
+PROD_DEV_ROLE = 812988180210909214 # Developer role ID on live
 PROD_TRADE_CAT = 801558838414409738 # Trade Carrier category on live server
 PROD_ARCHIVE_CAT = 821542402836660284 # Archive category on live server
 PROD_SECONDS_SHORT = 120
@@ -50,9 +53,12 @@ TEST_HAULER_ROLE = 875439909102575647 # hauler role ID on test server
 TEST_LEGACY_HAULER__ROLE = 1047152762707787786 # legacy hauler role ID on test server
 TEST_CC_ROLE = 877220476827619399 # CC role on test server
 TEST_CC_CAT = 877108931699310592 # Community Carrier category on test server
-TEST_CTEAM_ROLE = 877586763672072193 # Community Team role on test server
-TEST_CERTCARRIER_ROLE = 947519773925859370 # Certified Carrier role on test server
+TEST_ADMIN_ROLE = 836367194979041351 # Bot Admin role on test server
+TEST_CMENTOR_ROLE = 877586763672072193 # Community Mentor role on test server
+TEST_CERTCARRIER_ROLE = 822999970012463154 # Certified Carrier role on test server
 TEST_RESCARRIER_ROLE = 947520552766152744 # Fleet Reserve Carrier role on test server
+TEST_TRAINEE_ROLE = 1048912218344923187 # CCO Trainee role on test server
+TEST_DEV_ROLE = 1048913812163678278 # Dev role ID on test
 TEST_TRADE_CAT = 876569219259580436 # Trade Carrier category on live server
 TEST_ARCHIVE_CAT = 877244591579992144 # Archive category on live server
 TEST_SECONDS_SHORT = 5
@@ -100,9 +106,11 @@ def get_constant(production: bool):
             'LEGACY_HAULER_ROLE' : PROD_LEGACY_HAULER__ROLE,
             'CC_ROLE' : PROD_CC_ROLE,
             'CC_CAT' : PROD_CC_CAT,
-            'CTEAM_ROLE' : PROD_CTEAM_ROLE,
+            'ADMIN_ROLE' : PROD_ADMIN_ROLE,
+            'CMENTOR_ROLE' : PROD_CMENTOR_ROLE,
             'CERTCARRIER_ROLE' : PROD_CERTCARRIER_ROLE,
             'RESCARRIER_ROLE' : PROD_RESCARRIER_ROLE,
+            'TRAINEE_ROLE' : PROD_TRAINEE_ROLE,
             'TRADE_CAT' : PROD_TRADE_CAT,
             'ARCHIVE_CAT' : PROD_ARCHIVE_CAT,
             'SECONDS_SHORT' : PROD_SECONDS_SHORT,
@@ -129,9 +137,11 @@ def get_constant(production: bool):
             'LEGACY_HAULER_ROLE' : TEST_LEGACY_HAULER__ROLE,
             'CC_ROLE' : TEST_CC_ROLE,
             'CC_CAT' : TEST_CC_CAT,
-            'CTEAM_ROLE' : TEST_CTEAM_ROLE,
+            'ADMIN_ROLE' : TEST_ADMIN_ROLE,
+            'CMENTOR_ROLE' : TEST_CMENTOR_ROLE,
             'CERTCARRIER_ROLE' : TEST_CERTCARRIER_ROLE,
             'RESCARRIER_ROLE' : TEST_RESCARRIER_ROLE,
+            'TRAINEE_ROLE' : TEST_TRAINEE_ROLE,
             'TRADE_CAT' : TEST_TRADE_CAT,
             'ARCHIVE_CAT' : TEST_ARCHIVE_CAT,
             'SECONDS_SHORT' : TEST_SECONDS_SHORT,
