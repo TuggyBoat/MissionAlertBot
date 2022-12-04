@@ -3305,7 +3305,7 @@ def _configure_all_carrier_detail_embed(embed, carrier_data: CarrierData):
                              'Format: m.cc @owner channel-name\n'
                              'The owner will receive the @Community Carrier role\n'
                              'as well as full permissions in the channel.')
-@commands.has_any_role(cmentor_role_id, botadmin_role_id,)
+@commands.has_any_role(cmentor_role_id, botadmin_role_id)
 async def cc(ctx, owner: discord.Member, *, channel_name: str):
 
     stripped_channel_name = _regex_alphanumeric_with_hyphens(channel_name)
@@ -3505,7 +3505,7 @@ async def cc(ctx, owner: discord.Member, *, channel_name: str):
 
 # list all community carriers
 @bot.command(name='cc_list', help='List all Community Carriers.')
-@commands.has_any_role(cmentor_role_id, botadmin_role_id,)
+@commands.has_any_role(cmentor_role_id, botadmin_role_id)
 async def cc_list(ctx):
     carrier_db.execute(f"SELECT * FROM community_carriers")
     community_carriers = [CommunityCarrierData(carrier) for carrier in carrier_db.fetchall()]
@@ -3611,7 +3611,7 @@ async def cc_list(ctx):
 # find a community carrier channel by owner
 @bot.command(name='cc_owner', help='Search for an owner by @ mention in the Community Carrier database.\n'
                              'Format: m.cc_owner @owner\n')
-@commands.has_any_role(cmentor_role_id, botadmin_role_id,)
+@commands.has_any_role(cmentor_role_id, botadmin_role_id)
 async def cc_owner(ctx, owner: discord.Member):
 
     community_carrier_data = find_community_carrier(owner.id, CCDbFields.ownerid.name)
@@ -3628,7 +3628,7 @@ async def cc_owner(ctx, owner: discord.Member):
 # delete a Community Carrier
 @bot.command(name='cc_del', help='Delete a Community Carrier.\n'
                              'Format: m.cc_del @owner\n')
-@commands.has_any_role(cmentor_role_id, botadmin_role_id,)
+@commands.has_any_role(cmentor_role_id, botadmin_role_id)
 async def cc_del(ctx, owner: discord.Member):
     print(f"{ctx.author} called cc_del command for {owner}")
 
@@ -3957,7 +3957,7 @@ def nom_count_user(pillarid):
     return count
 
 @bot.command(name='nom_count', help='Shows all users with more than X nominations')
-@commands.has_any_role(cmentor_role_id, botadmin_role_id,)
+@commands.has_any_role(cmentor_role_id, botadmin_role_id)
 async def nom_count(ctx, number: int):
 
     # make sure we are in the right channel
@@ -3995,7 +3995,7 @@ async def nom_count(ctx, number: int):
 
 
 @bot.command(name='nom_details', help='Shows nomination details for given user by ID or @ mention')
-@commands.has_any_role(cmentor_role_id, botadmin_role_id,)
+@commands.has_any_role(cmentor_role_id, botadmin_role_id)
 async def nom_details(ctx, userid: Union[discord.Member, int]):
     # userID should really be a discord.Member object, but that lacks a sensible way to cast back to a userid,
     # so just use a string and ignore the problem.
@@ -4038,7 +4038,7 @@ async def nom_details(ctx, userid: Union[discord.Member, int]):
 
 
 @bot.command(name='nom_delete', help='Completely removes all nominations for a user by user ID or @ mention. NOT RECOVERABLE.')
-@commands.has_any_role(botadmin_role_id,)
+@commands.has_any_role(botadmin_role_id)
 async def nom_delete(ctx, userid: Union[str, int]):
     print(f"nom_delete called by {ctx.author}")
 
