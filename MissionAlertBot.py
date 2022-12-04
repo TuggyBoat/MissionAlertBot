@@ -1453,8 +1453,12 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
                         embed.add_field(name="ETA", value=f"{eta} minutes", inline=False)
 
                     embed.set_image(url="attachment://image.png")
+                    stock_field = f'\n;stock {carrier_data.carrier_short_name} will show carrier market data'
                     embed.set_footer(
-                        text=f"m.complete will mark this mission complete\n;stock {carrier_data.carrier_short_name} will show carrier market data\n/info will show this carrier's details")
+                        text=
+                             f"m.complete will mark this mission complete"
+                             f"{stock_field if not legacy else ''}"
+                             f"\n/info will show this carrier's details")
                     # pin the carrier trade msg sent by the bot
                     pin_msg = await mission_temp_channel.send(file=discord_file, embed=embed)
                     await pin_msg.pin()
