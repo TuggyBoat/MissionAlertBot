@@ -23,7 +23,9 @@ import asyncpraw
 import asyncio
 import shutil
 from discord.errors import HTTPException, Forbidden, NotFound
+from discord import app_commands
 from discord.ext import commands, tasks
+from discord.ui import Select, View, Button
 from datetime import datetime
 from datetime import timezone
 from datetime import timedelta
@@ -31,6 +33,7 @@ from dotenv import load_dotenv
 from dateutil.relativedelta import relativedelta
 import constants
 import random
+import emoji
 #
 #                       INIT STUFF
 #
@@ -185,19 +188,20 @@ deletion_in_progress = False
 # random gifs and images
 
 byebye_gifs = [
-    'https://tenor.com/view/explosion-gi-joe-a-real-american-hero-amusement-park-of-terror-the-revenge-of-cobra-boom-gif-17284145',
-    'https://tenor.com/view/ice-cube-bye-felicia-bye-gif-8310816',
-    'https://tenor.com/view/madagscar-penguins-kaboom-gif-9833865',
-    'https://tenor.com/view/boom-explosion-moonbeam-city-gif-20743300',
+    'https://media.tenor.com/gRgywxwuxb0AAAAd/explosion-gi-joe-a-real-american-hero.gif',
+    'https://media.tenor.com/a7LMG-8ldlAAAAAC/ice-cube-bye-felicia.gif',
+    'https://media.tenor.com/SqrZAbYtcq0AAAAC/madagscar-penguins.gif',
+    'https://media.tenor.com/ctCdr1R4ga4AAAAC/boom-explosion.gif',
 ]
 
 boom_gifs = [
-    'https://tenor.com/view/explosion-gi-joe-a-real-american-hero-amusement-park-of-terror-the-revenge-of-cobra-boom-gif-17284145',
-    'https://tenor.com/view/ice-cube-bye-felicia-bye-gif-8310816',
-    'https://c.tenor.com/v_d_Flu6pY0AAAAM/countdown-lastseconds.gif',
-    'https://tenor.com/view/final-countdown-countdown-europe-counting-music-video-gif-4789617',
-    'https://tenor.com/view/self-destruct-mission-impossible-conversation-tape-match-gif-20113224',
-    'https://tenor.com/view/boom-explosion-moonbeam-city-gif-20743300',
+    'https://media.tenor.com/xGJ5PEQ9lLYAAAAC/self-destruction-imminent-please-evacuate.gif'
+    'https://media.tenor.com/gRgywxwuxb0AAAAd/explosion-gi-joe-a-real-american-hero.gif',
+    'https://media.tenor.com/a7LMG-8ldlAAAAAC/ice-cube-bye-felicia.gif',
+    'https://media.tenor.com/v_d_Flu6pY0AAAAC/countdown-lastseconds.gif',
+    'https://media.tenor.com/Ijf5y9BUgg8AAAAC/final-countdown-countdown.gif',
+    'https://media.tenor.com/apADIQqKnSEAAAAC/self-destruct-mission-impossible.gif',
+    'https://media.tenor.com/ctCdr1R4ga4AAAAC/boom-explosion.gif',
 ]
 
 hello_gifs = [
@@ -911,19 +915,24 @@ def getrole(ctx, id): # takes a Discord role ID and returns the role object
     return role
 
 async def checkroles(ctx, permitted_role_ids): # checks a list of roles against a user's roles
-    author_roles = ctx.author.roles
+    try: # hacky way to make this work with both slash and normal commands
+        author_roles = ctx.author.roles
+    except: # slash commands use interaction instead of ctx and user instead of author
+        author_roles = ctx.user.roles
     permitted_roles = [getrole(ctx, role) for role in permitted_role_ids]
     print(author_roles)
     print(permitted_roles)
     permission = True if any(x in permitted_roles for x in author_roles) else False
     print(permission)
     if not permission:
-        if len(permitted_roles)>1:
-            embed=discord.Embed(title="Permission denied", description="You need one of the following roles to use this command:", color=constants.EMBED_COLOUR_ERROR)
-        else:
-            embed=discord.Embed(title="Permission denied", description="You need the following role to use this command:", color=constants.EMBED_COLOUR_ERROR)
+        role_list = []
         for role in permitted_role_ids:
-            embed.add_field(name="\u200b", value=f'<@&{role}>', inline=True)
+            role_list.append(f'<@&{role}> ')
+            formatted_role_list = " • ".join(role_list)
+        if len(permitted_roles)>1:
+            embed=discord.Embed(description=f"**Permission denied**: You need one of the following roles to use this command:\n{formatted_role_list}", color=constants.EMBED_COLOUR_ERROR)
+        else:
+            embed=discord.Embed(description=f"**Permission denied**: You need the following role to use this command:\n{formatted_role_list}", color=constants.EMBED_COLOUR_ERROR)
         await ctx.send(embed=embed)
     return permission
 
@@ -999,7 +1008,13 @@ bot = commands.Bot(command_prefix='m.', intents=discord.Intents.all())
 async def on_ready():
     print(f'{bot.user.name} has connected to Discord!')
     # sync slash commands
-    await bot.tree.sync()
+    try:
+        await bot.tree.sync(guild=guild_obj)
+        print("Synchronised bot tree.")
+    except Exception as e:
+        print(f"Tree sync failed: {e}.")
+
+    
     # define our background tasks
     reddit_task = asyncio.create_task(_monitor_reddit_comments())
     # Check if any trade channels were not deleted before bot restart/stop
@@ -2335,12 +2350,12 @@ async def _info(interaction: discord.Interaction):
     community_carrier_data = CommunityCarrierData(carrier_db.fetchone())
 
     if community_carrier_data:
-        embed = discord.Embed(title="COMMUNITY CARRIER CHANNEL",
-                              description=f"<#{interaction.channel.id}> is a <@&{cc_role_id}> channel "
+        embed = discord.Embed(title="COMMUNITY CHANNEL",
+                              description=f"<#{interaction.channel.id}> is a P.T.N. Community channel "
                                           f"registered to <@{community_carrier_data.owner_id}>.\n\n"
-                                          f"Community Carrier channels are for community building and events and "
-                                          f"may be used for multiple Fleet Carriers. See channel pins and description "
-                                          f"more information.", color=constants.EMBED_COLOUR_OK)
+                                          f"Community channels are for events and community building and"
+                                          f"are administered by the <@&{cc_role_id}> and <@&{cmentor_role_id}>s. See channel pins and description "
+                                          f"more information about this channel's purpose and associated event(s).", color=constants.EMBED_COLOUR_OK)
         await interaction.response.send_message(embed=embed, ephemeral=True)
         return # if it was a Community Carrier, we're done and gone. Otherwise we keep looking.
 
@@ -3342,146 +3357,88 @@ def _configure_all_carrier_detail_embed(embed, carrier_data: CarrierData):
 #
 #                       COMMUNITY CARRIER COMMANDS
 #
+"""
+# menu example from git gist https://gist.github.com/lykn/a2b68cb790d6dad8ecff75b2aa450f23
+class Select(discord.ui.Select):
+    def __init__(self):
+        options=[
+            discord.SelectOption(label="Option 1",emoji="👌",description="This is option 1!"),
+            discord.SelectOption(label="Option 2",emoji="✨",description="This is option 2!"),
+            discord.SelectOption(label="Option 3",emoji="🎭",description="This is option 3!")
+            ]
+        super().__init__(placeholder="Select an option",max_values=1,min_values=1,options=options)
+    async def callback(self, interaction: discord.Interaction):
+        if self.values[0] == "Option 1":
+            await interaction.response.edit_message(content="This is the first option from the entire list!")
+        elif self.values[0] == "Option 2":
+            await interaction.response.send_message("This is the second option from the list entire wooo!",ephemeral=False)
+        elif self.values[0] == "Option 3":
+            await interaction.response.send_message("Third One!",ephemeral=True)
 
-@bot.command(name='cc', help='Create a new Community Carrier channel. Limit is one per user.\n'
-                             'Format: m.cc @owner channel-name\n'
-                             'The owner will receive the @Community Carrier role\n'
-                             'as well as full permissions in the channel.')
-@check_roles([cmentor_role_id, botadmin_role_id])
-async def cc(ctx, owner: discord.Member, *, channel_name: str):
+@bot.command()
+async def menu(ctx):
+    await ctx.send("Menus!",view=SelectView())
 
-    stripped_channel_name = _regex_alphanumeric_with_hyphens(channel_name)
-    print(f"{ctx.author} used m.cc")
-    # check the channel name isn't something utterly stupid
-    if len(stripped_channel_name) > 30:
-        embed = discord.Embed(description="**Error**: Channel name should be fewer than 30 characters. (Preferably a *lot* fewer.)", color=constants.EMBED_COLOUR_ERROR)
-        return await ctx.send(embed=embed)
+class SelectView(discord.ui.View):
+    def __init__(self, *, timeout = 180):
+        super().__init__(timeout=timeout)
+        self.add_item(Select())
+        """
 
-    # first check the user isn't already in the DB, if they are, then stop
+
+
+# helper function to validate CC owner, returns False if owner already in db or True if check passes
+async def _cc_owner_check(interaction, owner):
     community_carrier_data = find_community_carrier(owner.id, CCDbFields.ownerid.name)
     if community_carrier_data:
         # TODO: this should be fetchone() not fetchall but I can't make it work otherwise
         for community_carrier in community_carrier_data:
             print(f"Found data: {community_carrier.owner_id} owner of {community_carrier.channel_id}")
-            await ctx.send(f"User {owner.display_name} is already registered as a Community Carrier with channel <#{community_carrier.channel_id}>")
-            return
+            await interaction.response.send_message(f"User {owner.display_name} is already registered as a Community channel owner with channel <#{community_carrier.channel_id}>")
+            return False
+    return True
 
-    # get the CC category as a discord channel category object
-    category = discord.utils.get(ctx.guild.categories, id=cc_cat_id)
-
-    def check(message):
-        return message.author == ctx.author and message.channel == ctx.channel and \
-                                 message.content.lower() in ["y", "n"]
-
-
-# check whether a role exists with the same name
-    new_role = discord.utils.get(ctx.guild.roles, name=stripped_channel_name)
-    role_create = False if new_role else True
-
-    if not role_create:
-        # if a new role exists we won't use it because it could lead to security concerns :(
+# helper function to validate CC new role, returns False if role exists or True if check passes
+async def _cc_role_create_check(interaction, new_channel_name):
+    # CHECK: existing role
+    new_role = discord.utils.get(interaction.guild.roles, name=new_channel_name)
+    if new_role:
+        # if the role exists we won't use it because it could lead to security concerns :(
         print(f"Role {new_role} already exists.")
-        # role exists, cancel the process and inform the user
-        embed = discord.Embed(description=f"**Error**: The role <@&{new_role.id}> already exists. Please choose a different name for your Community Carrier or delete the existing role and try again.", color=constants.EMBED_COLOUR_ERROR)
-        await ctx.send(embed=embed)
-        return
+        embed = discord.Embed(description=f"**Error**: The role <@&{new_role.id}> already exists. Please choose a different name for your Community channel or delete the existing role and try again.", color=constants.EMBED_COLOUR_ERROR)
+        await interaction.response.send_message(embed=embed)
+        return False
+    return True
 
-    # check whether a channel already exists with that name
-    #
-    # we use a '_cc' suffix to identify whether channels are eligible for re-use as Community Carriers
-    # otherwise users could be mischievous and use e.g. #raxxla
-    #
-    # first see if there's a channel matching the given string as-is
-    new_channel = discord.utils.get(ctx.guild.channels, name=stripped_channel_name)
-
-    if new_channel:
-        if new_channel.name.endswith('_cc'):
-            # maybe the user added the _cc themselves, we'll allow them to use it
-            print(f"Channel detected matching user string, ends with _cc: {new_channel.name}")
-            # we can re-use this channel safely
-            reuse_channel = True
-        else:
-            # channel match that doesn't end in cc, they can't use it
-            embed = discord.Embed(description=f"**Error**: The channel <#{new_channel.id}> is not a valid Community Carrier channel."
-                                f" Please choose a different name for your Community Carrier, or ask an admin to rename"
-                                f" the existing one to add \"**_cc**\" to the end then try again.", color=constants.EMBED_COLOUR_ERROR)
-            await ctx.send(embed=embed)
-            return
-
-    else:
-        # now see if there's a channel matching the user string + "_cc"
-        new_channel = discord.utils.get(ctx.guild.channels, name=f'{stripped_channel_name}_cc')
-        # if it exists, prompt to re-use it, else create it
-        reuse_channel = True if new_channel else False
-
-    if reuse_channel:
-        print(f"Channel {new_channel} already exists.")
-        # channel exists and is safe to use, ask if they want to use it
-        embed = discord.Embed(description=f"Channel already exists: <#{new_channel.id}>. Do you wish to use this existing channel? **y**/**n**", color=constants.EMBED_COLOUR_QU)
-        qu_msg = await ctx.send(embed=embed)
-        try:
-            msg = await bot.wait_for("message", check=check, timeout=60)
-            if msg.content.lower() == "n":
-                embed = discord.Embed(description=f"**Cancelled**: Please choose a different name for your Community Carrier or use the existing named role.", color=constants.EMBED_COLOUR_ERROR)
-                await ctx.send(embed=embed)
-                await msg.delete()
-                await qu_msg.delete()
-                return
-            elif msg.content.lower() == "y":
-                # they want to use the existing channel, so we have to move it to the right category
-                print(f"Using existing channel {new_channel} and making {owner.display_name} its owner.")
-                try:
-                    if not stripped_channel_name.endswith('_cc'):
-                        # allow user to use _cc themselves if they wish, doesn't cause us any issues
-                        print("Removing \'_cc\' from archived channel name")
-                        new_channel_name = new_channel.name
-                        print(f'Current name: {new_channel.name}')
-                        new_channel_name = re.sub('\_cc$', '', new_channel_name)
-                        print(f'Target name: {new_channel_name}')
-
-                        # now rename the channel if needed
-                        await new_channel.edit(name=f'{new_channel_name}')
-                        print(f"channel renamed: {new_channel.name}")
-
-                    await new_channel.edit(category=category)
-                    embed = discord.Embed(description=f"Existing channel <#{new_channel.id}> moved to {category.name}.", color=constants.EMBED_COLOUR_OK)
-                    await ctx.send(embed=embed)
-                except Exception as e:
-                    await ctx.send(f"Error: {e}")
-                    print(e)
-                    return
-        except asyncio.TimeoutError:
-            embed = discord.Embed(description="**Cancelled**: no response.", color=constants.EMBED_COLOUR_ERROR)
-            await ctx.send(embed=embed)
-            return
-        await msg.delete()
-        await qu_msg.delete()
-    else:
-        # channel does not exist, create it
-
-        new_channel = await ctx.guild.create_text_channel(f"{stripped_channel_name}", category=category)
+# helper function to create a CC channel, returns a channel object
+async def _cc_create_channel(interaction, new_channel_name, cc_category):
+    try:
+        new_channel = await interaction.guild.create_text_channel(f"{new_channel_name}", category=cc_category)
         print(f"Created {new_channel}")
 
-        print(f'Channels: {ctx.guild.channels}')
+        print(f'Channels: {interaction.guild.channels}')
 
         embed = discord.Embed(description=f"Created channel <#{new_channel.id}>.", color=constants.EMBED_COLOUR_OK)
-        await ctx.send(embed=embed)
-        if not new_channel:
-            raise EnvironmentError(f'Could not create carrier channel {stripped_channel_name}')
+        await interaction.response.send_message(embed=embed)
+    except:
+        raise EnvironmentError(f'Could not create carrier channel {new_channel_name}')
+    return new_channel
 
-    if role_create:
-        # create pingable role to go with channel
-        new_role = await ctx.guild.create_role(name=stripped_channel_name)
-        print(f"Created {new_role}")
-        print(f'Roles: {ctx.guild.roles}')
-        if not new_role:
-            raise EnvironmentError(f'Could not create role {stripped_channel_name}')
-        embed = discord.Embed(description=f"Created role <@&{new_role.id}>.", color=constants.EMBED_COLOUR_OK)
-        await ctx.send(embed=embed)
+# helper function to create a CC role, returns a role object
+async def _cc_role_create(interaction, new_channel_name):
+    # create pingable role to go with channel
+    new_role = await interaction.guild.create_role(name=new_channel_name)
+    print(f"Created {new_role}")
+    print(f'Roles: {interaction.guild.roles}')
+    if not new_role:
+        raise EnvironmentError(f'Could not create role {new_channel_name}')
+    embed = discord.Embed(description=f"Created role <@&{new_role.id}>.", color=constants.EMBED_COLOUR_OK)
+    await interaction.followup.send(embed=embed)
+    return new_role
 
-    # now we have the channel and it's in the correct category, we need to give the user CC role and add channel permissions
-
-    role = discord.utils.get(ctx.guild.roles, id=cc_role_id)
+# helper function to assign CC channel permissions
+async def _cc_assign_permissions(interaction, owner, new_channel):
+    role = discord.utils.get(interaction.guild.roles, id=cc_role_id)
     print(cc_role_id)
     print(role)
 
@@ -3490,7 +3447,7 @@ async def cc(ctx, owner: discord.Member, *, channel_name: str):
         print(f"Added Community Carrier role to {owner}")
     except Exception as e:
         print(e)
-        await ctx.send(f"Failed adding role to {owner}: {e}")
+        raise EnvironmentError(f"Failed adding role to {owner}: {e}")
 
     # add owner to channel permissions
     guild = await get_guild()
@@ -3507,6 +3464,8 @@ async def cc(ctx, owner: discord.Member, *, channel_name: str):
         # now add the owner with superpermissions
         await new_channel.set_permissions(member, overwrite=overwrite)
         print(f"Set permissions for {member} in {new_channel}")
+        # now set the channel to private for other users
+        await new_channel.set_permissions(interaction.guild.default_role, read_messages=False)
     except Forbidden:
         raise EnvironmentError(f"Could not set channel permissions for {member.display_name} in {new_channel}, reason: Bot does not have permissions to edit channel specific permissions.")
     except NotFound:
@@ -3518,7 +3477,7 @@ async def cc(ctx, owner: discord.Member, *, channel_name: str):
     except:
         raise EnvironmentError(f'Could not set channel permissions for {member.display_name} in {new_channel}')
 
-
+async def _cc_db_enter(interaction, owner, new_channel, new_role):
     # now we enter everything into the community carriers table
     print("Locking carrier db...")
     await carrier_db_lock.acquire()
@@ -3528,21 +3487,153 @@ async def cc(ctx, owner: discord.Member, *, channel_name: str):
                            (owner.id, new_channel.id, new_role.id))
         carriers_conn.commit()
         print("Added new community carrier to database")
+    except:
+        raise EnvironmentError("Error: failed to update community channels database.")
     finally:
         print("Unlocking carrier db...")
         carrier_db_lock.release()
         print("Carrier DB unlocked.")
 
     # tell the user what's going on
-    embed = discord.Embed(description=f"<@{owner.id}> is now a <@&{cc_role_id}> and owns <#{new_channel.id}> with notification role <@&{new_role.id}>.\n\nNote channels and roles **CAN BE FREELY RENAMED** without affecting registration.", color=constants.EMBED_COLOUR_OK)
-    await ctx.send(embed=embed)
-
-    # add a note in bot_spam
-    spamchannel = bot.get_channel(bot_spam_id)
-    await spamchannel.send(f"{ctx.author} used m.cc in <#{ctx.channel.id}> to add {owner.display_name} as a Community Carrier with channel <#{new_channel.id}>")
+    embed = discord.Embed(description=f"<@{owner.id}> is now a <@&{cc_role_id}> and owns <#{new_channel.id}> with notification role <@&{new_role.id}>.\n\nNote channels and roles **can** be renamed freely.", color=constants.EMBED_COLOUR_OK)
+    await interaction.followup.send(embed=embed)
 
     return
 
+@bot.tree.command(name="test", description="test", guild=guild_obj)
+async def _test(interaction: discord.Interaction, test: str):
+    await interaction.response.send_message(test)
+
+@bot.tree.command(name="create_community_channel",
+                  description="Create a Community Channel linked to a specific user.",
+                  guild=guild_obj)
+@check_roles([cmentor_role_id, botadmin_role_id])
+async def _create_community_channel(interaction: discord.Interaction, owner: discord.Member, channel_name: str, channel_emoji: str = None):
+    print(f"{interaction.user} used /create_community_channel")
+    print(f"Params: {owner} {channel_name} {channel_emoji}")
+    # trim emojis to 1 character
+    emoji_string = channel_emoji[:1] if not channel_emoji == None else None
+
+    # PROCESS: check for valid emoji
+    print(emoji.is_emoji(emoji_string))
+    if not emoji.is_emoji(emoji_string) and not emoji_string == None: 
+        embed = discord.Embed(description="**Error**: Invalid emoji supplied. Use a valid Unicode emoji from your emoji keyboard,"
+                                        f"or leave the field blank. **Discord custom emojis will not work**.", color=constants.EMBED_COLOUR_ERROR)
+        bu_link = Button(label="Full Emoji List", url="https://unicode.org/emoji/charts/full-emoji-list.html")
+        view = View()
+        view.add_item(bu_link)
+        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+
+    # PROCESS: remove unusable characters and render to lowercase
+    stripped_channel_name = _regex_alphanumeric_with_hyphens(channel_name.lower())
+
+    # check the channel name isn't too long
+    if len(stripped_channel_name) > 30:
+        embed = discord.Embed(description="**Error**: Channel name should be fewer than 30 characters. (Preferably a *lot* fewer.)", color=constants.EMBED_COLOUR_ERROR)
+        return await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    # join with the emoji
+    new_channel_name = emoji_string + stripped_channel_name if not emoji_string == None else stripped_channel_name
+    print(f"Candidate channel name: {new_channel_name}")
+
+    # CHECK: user already owns a channel
+    if not await _cc_owner_check(interaction, owner): return
+ 
+    # get the CC category as a discord channel category object
+    cc_category = discord.utils.get(interaction.guild.categories, id=cc_cat_id)
+    archive_category = discord.utils.get(interaction.guild.categories, id=archive_cat_id)
+
+    # check the role validity here so we can stop if needed
+    if not await _cc_role_create_check(interaction, new_channel_name): return
+
+    # CHECK: existing channels
+    new_channel = discord.utils.get(interaction.guild.channels, name=new_channel_name)
+
+    if new_channel:
+        # check whether it's an existing CC channel
+        if new_channel.category == cc_category:
+            embed = discord.Embed(description=f"**Error**: A Community channel <#{new_channel.id}> already exists."
+                                f" Please choose a different name for your Community channel.", color=constants.EMBED_COLOUR_ERROR)
+            await interaction.response.send_message(embed=embed)
+
+        # check whether it's an archived CC channel
+        elif new_channel.category == archive_category:
+            embed = discord.Embed(description=f"**Error**: A Community channel <#{new_channel.id}> already exists in the archives."
+                                f" Use `/restore_community_channel` in the channel to restore it.", color=constants.EMBED_COLOUR_ERROR)
+            await interaction.response.send_message(embed=embed)
+
+        # the channel must exist with that name elsewhere on the server and so can't be used
+        else:
+            embed = discord.Embed(description=f"**Error**: A channel <#{new_channel.id}> already exists on the server"
+                                f" and does not appear to be a Community channel."
+                                f" Please choose a different name for your Community channel.", color=constants.EMBED_COLOUR_ERROR)
+            await interaction.response.send_message(embed=embed)
+            return
+
+    else:
+        # channel does not exist, create it
+        new_channel = await _cc_create_channel(interaction, new_channel_name, cc_category)
+    
+    # create the role
+    new_role = await _cc_role_create(interaction, new_channel_name)
+
+    # assign channel permissions
+    await _cc_assign_permissions(interaction, owner, new_channel)
+
+    # enter into the db
+    await _cc_db_enter(interaction, owner, new_channel, new_role)
+
+    # add a note in bot_spam
+    spamchannel = bot.get_channel(bot_spam_id)
+    await spamchannel.send(f"{interaction.user} used `/create_community_channel` in <#{interaction.channel.id}> to add {owner.display_name} as a Community channel owner with channel <#{new_channel.id}>")
+
+    return
+
+
+@bot.tree.command(name="restore_community_channel",
+    description="Restore an archived Community Channel.",
+                guild=guild_obj)
+@check_roles([cmentor_role_id, botadmin_role_id])
+async def _restore_community_channel(interaction: discord.Interaction, owner: discord.Member):
+
+    # get the CC categories as discord channel category objects
+    cc_category = discord.utils.get(interaction.guild.categories, id=cc_cat_id)
+    archive_category = discord.utils.get(interaction.guild.categories, id=archive_cat_id)
+
+    # check we're in an archived community channel
+    if not interaction.channel.category == archive_category:
+        embed = discord.Embed(description=f"**Error**: This command can only be used in an archived Community channel in the <#{archive_cat_id}> category.", color=constants.EMBED_COLOUR_QU)
+        return await interaction.response.send_message(embed=embed)
+
+    # now prep the channel
+    # CHECK: user already owns a channel
+    if not await _cc_owner_check(interaction, owner): return
+
+    # check the role validity here so we can stop if needed
+    if not await _cc_role_create_check(interaction, interaction.channel.name): return
+
+    # move the channel from the archive to the CC category
+    try:
+        await interaction.channel.edit(category=cc_category)
+        embed = discord.Embed(description=f"<#{interaction.channel.id}> moved to <#{cc_cat_id}>.", color=constants.EMBED_COLOUR_OK)
+        await interaction.response.send_message(embed=embed)
+    except Exception as e:
+        raise EnvironmentError(f"Error moving channel: {e}")
+
+    # create the role
+    new_role = await _cc_role_create(interaction, interaction.channel.name)
+
+    # assign channel permissions
+    await _cc_assign_permissions(interaction, owner, interaction.channel)
+
+    # enter into the db
+    await _cc_db_enter(interaction, owner, interaction.channel, new_role)
+
+    # add a note in bot_spam
+    spamchannel = bot.get_channel(bot_spam_id)
+    await spamchannel.send(f"{interaction.user} used `/restore_community_channel` in <#{interaction.channel.id}> and granted ownership to {owner.display_name}.")
+
+    return
 
 
 # list all community carriers
@@ -3668,125 +3759,201 @@ async def cc_owner(ctx, owner: discord.Member):
         await ctx.send(f"No Community Carrier registered to {owner.display_name}")
 
 
+# button interaction class for /remove_community_channel
+class RemoveCCView(View):
+
+    @discord.ui.button(label="Delete", style=discord.ButtonStyle.danger, emoji="💥", custom_id="delete")
+    async def delete_button_callback(self, interaction, button):
+        delete_channel = 1
+        print("User wants to delete channel.")
+        await _remove_cc_manager(interaction, delete_channel)
+        
+    @discord.ui.button(label="Archive", style=discord.ButtonStyle.primary, emoji="📂", custom_id="archive")
+    async def archive_button_callback(self, interaction, button):
+        delete_channel = 0
+        print("User chose to archive channel.")
+        await _remove_cc_manager(interaction, delete_channel)
+        
+        self.clear_items()
+        await interaction.response.edit_message(view=self)
+        await interaction.delete_original_response()
+
+    @discord.ui.button(label="Cancel", style=discord.ButtonStyle.gray, emoji="✖", custom_id="cancel")
+    async def cancel_button_callback(self, interaction, button):
+        embed = discord.Embed(title="Remove Community Carrier",
+                          description=f"Operation cancelled by user.",
+                          color=constants.EMBED_COLOUR_OK)
+        self.clear_items()
+        await interaction.response.edit_message(view=self, embed=embed)
+        print("User cancelled cc_del command.")
+
+
 # delete a Community Carrier
-@bot.command(name='cc_del', help='Delete a Community Carrier.\n'
-                             'Format: m.cc_del @owner\n')
+@bot.tree.command(name="remove_community_channel",
+                  description="Retires a community channel.",
+                  guild=guild_obj)
 @check_roles([cmentor_role_id, botadmin_role_id])
-async def cc_del(ctx, owner: discord.Member):
+async def _remove_community_channel(interaction: discord.Interaction):
 
-    print(f"{ctx.author} called cc_del command for {owner}")
+    print(f"{interaction.user} called `/remove_community_channel` command in <#{interaction.channel.id}>")
 
-    def check(message):
-        return message.author == ctx.author and message.channel == ctx.channel and \
-                                 message.content.lower() in ["d", "a", "c"]
-
-    # search for the user's database entry
-    community_carrier_data = find_community_carrier(owner.id, CCDbFields.ownerid.name)
-    if not community_carrier_data:
-        embed = discord.Embed(description=f"Error: No Community Carrier registered to {owner.display_name}.", color=constants.EMBED_COLOUR_ERROR)
-        await ctx.send(embed=embed)
+    # check if we're in a community channel
+    carrier_db.execute(f"SELECT * FROM community_carriers WHERE "
+                    f"channelid = {interaction.channel.id}")
+    community_carrier = CommunityCarrierData(carrier_db.fetchone())
+    # error if not
+    if not community_carrier:
+        embed = discord.Embed(description=f"Error: This does not appear to be a community channel.", color=constants.EMBED_COLOUR_ERROR, ephemeral=True)
+        await interaction.response.send_message(embed=embed)
         return
-    elif community_carrier_data:
-        # TODO: this should be fetchone() not fetchall but I can't make it work otherwise
-        for community_carrier in community_carrier_data:
-            print(f"Found data: {community_carrier.owner_id} owner of {community_carrier.channel_id}")
-            channel_id = community_carrier.channel_id
-            role_id = community_carrier.role_id
+
+    elif community_carrier:
+        print(f"Found data: {community_carrier.owner_id} owner of {community_carrier.channel_id}")
+        owner_id = community_carrier.owner_id
+        owner = await bot.fetch_user(owner_id)
+        channel_id = community_carrier.channel_id
+        role_id = community_carrier.role_id
 
     embed = discord.Embed(title="Remove Community Carrier",
-                          description=f"This will:\n\n• Remove the <@&{cc_role_id}> role from <@{owner.id}>\n"
+                          description=f"This will:\n\n• Remove the <@&{cc_role_id}> role from <@{owner_id}>\n"
                                       f"• Delete the associated role <@&{role_id}>\n"
                                       f"• Delete or Archive the channel <#{channel_id}>\n\n"
                                       f"**WARNING**:\n• **Deleted** channels are gone forever and can NOT be recovered.\n"
-                                      f"• **Archived** channels are appended with `_cc` and can be re-activated by `m.cc` at any time.\n\n"
-                                      f"You can choose to (**d**)elete the channel, (**a**)rchive the channel, or (**c**)ancel this operation.",
+                                      f"• **Archived** channels are moved to the archive and remain accessible to Community Team members. "
+                                      f"They can be re-activated at any time using `/restore_community_channel` in-channel.\n\n",
                           color=constants.EMBED_COLOUR_QU)
-    qu_embed = await ctx.send(embed=embed)
-    try:
-        msg = await bot.wait_for("message", check=check, timeout=30)
-        if msg.content.lower() == "c":
-            embed = discord.Embed(description="Cancelled.", color=constants.EMBED_COLOUR_OK)
-            await ctx.send(embed=embed)
-            print("User cancelled cc_del command.")
-            await msg.delete()
-            return
 
-        elif msg.content.lower() == "a":
-            delete_channel = 0
-            print("User chose to archive channel.")
-            await msg.delete()
+    view = RemoveCCView()
 
-        elif msg.content.lower() == "d":
-            delete_channel = 1
-            print("User wants to delete channel.")
-            await msg.delete()
+    await interaction.response.send_message(embed=embed, view=view)
+    
+    return
 
-    except asyncio.TimeoutError:
-        embed = discord.Embed(description="**Cancelled**: no response.", color=constants.EMBED_COLOUR_ERROR)
-        await ctx.send(embed=embed)
+# function called by button responses to process channel deletion
+async def _remove_cc_manager(interaction, delete_channel):
+    # get the carrier data again because I can't figure out how to penetrate callbacks with additional variables or vice versa
+    carrier_db.execute(f"SELECT * FROM community_carriers WHERE "
+                    f"channelid = {interaction.channel.id}")
+    community_carrier = CommunityCarrierData(carrier_db.fetchone())
+    # error if not
+    if not community_carrier:
+        embed = discord.Embed(description=f"Error: This somehow does not appear to be a community channel anymore(?).", color=constants.EMBED_COLOUR_ERROR, ephemeral=True)
+        await interaction.response.send_message(embed=embed)
         return
 
+    elif community_carrier:
+        print(f"Found data: {community_carrier.owner_id} owner of {community_carrier.channel_id}")
+        guild = await get_guild()
+        owner_id = community_carrier.owner_id
+        owner = guild.get_member(owner_id)
+        print(f"Owner is {owner}")
+        role_id = community_carrier.role_id
 
     # now we do the thing
+
+    # remove db entry
+    print("Removing db entry...")
+    if not await _remove_cc_owner_from_db(interaction, owner): return
+
+    # remove role from owner
+    print("Removing role from owner...")
+    embed = await _remove_cc_role_from_owner(interaction, owner)
+
+    # archive channel if relevant - we save deleting for later so user can read bot status messages in channel
+    print("Processing archive flag...")
+    if not delete_channel: embed = await _archive_cc_channel(interaction, embed)
+     
+    # delete role
+    print("Deleting role...")
+    embed = await _cc_role_delete(interaction, role_id, embed)
+
+    # inform user of everything that happened
+    print("Returning finished embed...")
+    if delete_channel: embed.add_field(name="Channel", value=f"<#{interaction.channel.id}> **will be deleted** in **10 seconds**.", inline=False)
+    embed.set_image(url=random.choice(byebye_gifs))
+    await interaction.channel.send(embed=embed)
+
+    # delete channel if relevant
+    print("Processing delete flag...")
+    if delete_channel: await _delete_cc_channel(interaction) 
+
+    # notify bot-spam
+    print("Notifying bot-spam...")
+    spamchannel = bot.get_channel(bot_spam_id)
+    await spamchannel.send(f"{interaction.user} used `/remove_community_channel` in <#{interaction.channel.id}>, removing {owner.name} as a Community channel owner.")
+
+    # all done
+    print("_remove_cc_manager done.")
+    return
+
+# helper function for /remove_community_channel
+async def _remove_cc_owner_from_db(interaction, owner):
     # remove the database entry
     try:
         error_msg = await delete_community_carrier_from_db(owner.id)
         if error_msg:
-            return await ctx.send(error_msg)
+            return await interaction.channel.send(error_msg)
 
         print("User DB entry removed.")
     except Exception as e:
-        return await ctx.send(f'Something went wrong, go tell the bot team "computer said: {e}"')
+        return await interaction.channel.send(f'Something went wrong, go tell the bot team "computer said: {e}"')
 
-    # now remove the Discord role from the user
+    return True
 
-    role = discord.utils.get(ctx.guild.roles, id=cc_role_id)
+# helper function for /remove_community_channel
+async def _remove_cc_role_from_owner(interaction, owner):
 
-    embed = discord.Embed(title="Community Carrier Removed", description=f"", color=constants.EMBED_COLOUR_OK)
+    role = discord.utils.get(interaction.guild.roles, id=cc_role_id)
 
+    embed = discord.Embed(title="Community Channel Removed", description=f"", color=constants.EMBED_COLOUR_OK)
     try:
         await owner.remove_roles(role)
         print(f"Removed Community Carrier role from {owner}")
-        embed.add_field(name="Owner", value=f"<@{owner.id}> is no longer registered as a <@&{cc_role_id}>.", inline=False)
+        embed.add_field(name="Owner", value=f"<@{owner.id}> is no longer registered as the <@&{cc_role_id}>.", inline=False)
     except Exception as e:
         print(e)
         embed.add_field(name="Owner", value=f"**Failed removing role from <@{owner.id}>**: {e}", inline=False)
 
-    channel = bot.get_channel(channel_id)
-    category = discord.utils.get(ctx.guild.categories, id=archive_cat_id)
+    return embed
 
-    if not delete_channel:
-        # archive the channel and reset its permissions
-        try:
-            await channel.edit(category=category)
-            print("moved channel to archive")
-            # now make sure it has the default permissions for the archive category
-            await channel.edit(sync_permissions=True)
-            print("Synced permissions")
-            # now make sure it ends with _cc so it can be re-used if desired
-            if not channel.name.endswith('_cc'):
-                print("Appending \'_cc\' to channel name")
-                await channel.edit(name=f'{channel.name}_cc')
+# helper function for /remove_community_channel
+async def _delete_cc_channel(interaction):
+    # start a timer so the user has time to read the status embed
+    channel_name = interaction.channel.name
+    print(f"Starting countdown for deletion of {channel_name}")
+    await asyncio.sleep(10)
+    try:
+        await interaction.channel.delete()
+        print(f'Deleted {channel_name}')
 
-            embed.add_field(name="Channel", value=f"<#{channel_id}> moved to Archives.", inline=False)
+    except Exception as e:
+        print(e)
+        await interaction.channel.send(f"**Failed to delete <#{interaction.channel.id}>**: {e}")
+    
+    return
 
-        except Exception as e:
-            print(e)
-            embed.add_field(name="Channel", value=f"**Failed archiving <#{channel_id}>**: {e}", inline=False)
+# helper function for /remove_community_channel
+async def _archive_cc_channel(interaction, embed):
+    archive_category = discord.utils.get(interaction.guild.categories, id=archive_cat_id)
+    try:
+        await interaction.channel.edit(category=archive_category)
+        print("moved channel to archive")
+        # now make sure it has the default permissions for the archive category
+        await interaction.channel.edit(sync_permissions=True)
+        print("Synced permissions")
 
-    elif delete_channel:
-        # delete the channel
-        try:
-            await channel.delete()
-            print(f'Deleted {channel}')
+        embed.add_field(name="Channel", value=f"<#{interaction.channel.id}> moved to Archives.", inline=False)
 
-            embed.add_field(name="Channel", value=f"#{channel} deleted. All those moments lost in time, like tears in rain.", inline=False)
+    except Exception as e:
+        print(e)
+        embed.add_field(name="Channel", value=f"**Failed archiving <#{interaction.channel.id}>**: {e}", inline=False)
 
-        except Exception as e:
-            print(e)
-            embed.add_field(name="Channel", value=f"**Failed to delete <#{channel_id}>**: {e}", inline=False)
+    return embed
 
-    role = discord.utils.get(ctx.guild.roles, id=role_id)
+# helper function for /remove_community_channel
+async def _cc_role_delete(interaction, role_id, embed):
+    # get the role
+    role = discord.utils.get(interaction.guild.roles, id=role_id)
     # delete the role
     try:
         await role.delete()
@@ -3794,23 +3961,59 @@ async def cc_del(ctx, owner: discord.Member):
 
         embed.add_field(name="Role", value=f"{role} deleted.", inline=False)
 
-
     except Exception as e:
         print(e)
         embed.add_field(name="Role", value=f"**Failed to delete <@&{role_id}>**: {e}", inline=False)
 
-    await ctx.send(embed=embed)
-    await qu_embed.delete()
-    gif = random.choice(byebye_gifs)
-    await ctx.send(gif)
+    return embed
 
-    spamchannel = bot.get_channel(bot_spam_id)
-    await spamchannel.send(f"{ctx.author} used m.cc_del in <#{ctx.channel.id}> to remove {owner.name} as a Community Carrier.")
+
+# open a community channel (i.e. set non private)
+@bot.tree.command(name="open_community_channel",
+    description="Use in a Community Channel to open it to visitors (set it non-private).", guild=guild_obj)
+async def _open_community_channel(interaction: discord.Interaction):
+    open = True
+    await _openclose_community_channel(interaction, open)
+
+# close a community channel (i.e. set private)
+@bot.tree.command(name="close_community_channel",
+    description="Use in a Community Channel to close it to visitors (set it private).", guild=guild_obj)
+async def _close_community_channel(interaction: discord.Interaction):
+    open = False
+    await _openclose_community_channel(interaction, open)
+
+# helper function for open and closing community channel commands
+async def _openclose_community_channel(interaction, open):
+
+    status_text_verb = "open" if open else "close"
+    status_text_adj = "open" if open else "closed"
+   
+    #check we're in the right category
+    cc_category = discord.utils.get(interaction.guild.categories, id=cc_cat_id)
+    if not interaction.channel.category == cc_category:
+        embed = discord.Embed(description=f"**Error**: This command can only be used in an active Community channel in the <#{cc_cat_id}> category.", color=constants.EMBED_COLOUR_ERROR)
+        return await interaction.response.send_message(embed=embed, ephemeral=True)
+    
+    # now set permissions
+    try:
+        await interaction.channel.set_permissions(interaction.guild.default_role, overwrite=None) if open else await interaction.channel.set_permissions(interaction.guild.default_role, read_messages=False)
+    except Exception as e:
+        embed = discord.Embed(description=f"**ERROR**: Could not {status_text_verb} channel: {e}")
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+        return
+    
+    # notify user
+    embed = discord.Embed(description=f"**<#{interaction.channel.id}> is {status_text_adj}!**"
+                                      f"{' This channel is now visble to the server community 😊' if open else f' This channel is now hidden from the server community 😳'}",
+                                       color=constants.EMBED_COLOUR_OK)
+    await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    return
 
 
 # sign up for a Community Carrier's notification role
 @bot.tree.command(name="notify_me",
-    description="Private command: Use in a COMMUNITY CARRIER channel to opt in/out to receive its notifications.", guild=guild_obj)
+    description="Private command: Use in a COMMUNITY CHANNEL to opt in/out to receive its notifications.", guild=guild_obj)
 async def _notify_me(interaction: discord.Interaction):
 
     # note channel ID
