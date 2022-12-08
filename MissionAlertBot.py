@@ -2022,7 +2022,7 @@ async def _cleanup_completed_mission(ctx, mission_data, reddit_complete_text, di
                         alert_channel = bot.get_channel(wine_alerts_unloading_id)
                 else:
                     alert_channel = bot.get_channel(trade_alerts_id)
-                
+
                 discord_alert_id = mission_data.discord_alert_id
 
                 try: # shitty hacky message of incorporating legacy trades without extra DB fields
@@ -4246,7 +4246,7 @@ async def lasttrade_cron():
         # get carriers who last traded >28 days ago
         # for owners with multiple carriers look at only the most recently used
         carrier_db.execute(f'''
-                            SELECT p_ID,shortname,ownerid,max(lasttrade)
+                            SELECT p_ID,shortname,ownerid,max(lasttrade) as lasttrade
                             FROM carriers WHERE lasttrade < {int(lasttrade_max.timestamp())}
                             GROUP BY ownerid
                             ''')
