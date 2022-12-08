@@ -3495,7 +3495,9 @@ async def _cc_db_enter(interaction, owner, new_channel, new_role):
         print("Carrier DB unlocked.")
 
     # tell the user what's going on
-    embed = discord.Embed(description=f"<@{owner.id}> is now a <@&{cc_role_id}> and owns <#{new_channel.id}> with notification role <@&{new_role.id}>.\n\nNote channels and roles **can** be renamed freely.", color=constants.EMBED_COLOUR_OK)
+    embed = discord.Embed(description=f"<@{owner.id}> is now a <@&{cc_role_id}> and owns <#{new_channel.id}> with notification role <@&{new_role.id}>."
+                                      f" **This channel will remained closed** (private) until `/open_community_channel` is used in it."
+                                      f"\n\nNote channels and roles can be freely renamed.", color=constants.EMBED_COLOUR_OK)
     await interaction.followup.send(embed=embed)
 
     return
