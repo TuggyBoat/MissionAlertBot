@@ -3780,7 +3780,7 @@ class RemoveCCView(View):
 
     @discord.ui.button(label="Cancel", style=discord.ButtonStyle.gray, emoji="✖", custom_id="cancel")
     async def cancel_button_callback(self, interaction, button):
-        embed = discord.Embed(title="Remove Community Carrier",
+        embed = discord.Embed(title="Remove Community Channel",
                           description=f"Operation cancelled by user.",
                           color=constants.EMBED_COLOUR_OK)
         self.clear_items()
@@ -3814,13 +3814,13 @@ async def _remove_community_channel(interaction: discord.Interaction):
         channel_id = community_carrier.channel_id
         role_id = community_carrier.role_id
 
-    embed = discord.Embed(title="Remove Community Carrier",
+    embed = discord.Embed(title="Remove Community Channel",
                           description=f"This will:\n\n• Remove the <@&{cc_role_id}> role from <@{owner_id}>\n"
                                       f"• Delete the associated role <@&{role_id}>\n"
                                       f"• Delete or Archive the channel <#{channel_id}>\n\n"
-                                      f"**WARNING**:\n• **Deleted** channels are gone forever and can NOT be recovered.\n"
                                       f"• **Archived** channels are moved to the archive and remain accessible to Community Team members. "
-                                      f"They can be re-activated at any time using `/restore_community_channel` in-channel.\n\n",
+                                      f"They can be re-activated at any time using `/restore_community_channel` in-channel.\n\n"
+                                      f"• **WARNING**: *Deleted* channels are gone forever and can NOT be recovered.",
                           color=constants.EMBED_COLOUR_QU)
 
     view = RemoveCCView()
