@@ -25,7 +25,7 @@ import shutil
 from discord.errors import HTTPException, Forbidden, NotFound
 from discord import app_commands
 from discord.ext import commands, tasks
-from discord.ui import Select, View, Button
+from discord.ui import Select, View, Button, Modal
 from datetime import datetime
 from datetime import timezone
 from datetime import timedelta
@@ -933,7 +933,7 @@ async def checkroles(ctx, permitted_role_ids): # checks a list of roles against 
             embed=discord.Embed(description=f"**Permission denied**: You need one of the following roles to use this command:\n{formatted_role_list}", color=constants.EMBED_COLOUR_ERROR)
         else:
             embed=discord.Embed(description=f"**Permission denied**: You need the following role to use this command:\n{formatted_role_list}", color=constants.EMBED_COLOUR_ERROR)
-        await ctx.send(embed=embed)
+        await ctx.channel.send(embed=embed)
     return permission
 
 def check_roles(permitted_role_ids):
@@ -1696,15 +1696,15 @@ async def create_mission_temp_channel(ctx, discord_channel, owner_id):
         await mission_temp_channel.set_permissions(member, overwrite=overwrite)
         print(f"Set permissions for {member} in {mission_temp_channel}")
     except Forbidden:
-        raise EnvironmentError(f"Could not set channel permissions for {member.display_name} in {mission_temp_channel}, reason: Bot does not have permissions to edit channel specific permissions.")
+        raise EnvironmentError(f"Could not set channel permissions in {mission_temp_channel}, reason: Bot does not have permissions to edit channel specific permissions.")
     except NotFound:
-        raise EnvironmentError(f"Could not set channel permissions for {member.display_name} in {mission_temp_channel}, reason: The role or member being edited is not part of the guild.")
+        raise EnvironmentError(f"Could not set channel permissions in {mission_temp_channel}, reason: The role or member being edited is not part of the guild.")
     except HTTPException:
-        raise EnvironmentError(f"Could not set channel permissions for {member.display_name} in {mission_temp_channel}, reason: Editing channel specific permissions failed.")
+        raise EnvironmentError(f"Could not set channel permissions in {mission_temp_channel}, reason: Editing channel specific permissions failed.")
     except (TypeError, ValueError):
-        raise EnvironmentError(f"Could not set channel permissions for {member.display_name} in {mission_temp_channel}, reason: The overwrite parameter invalid or the target type was not Role or Member.")
+        raise EnvironmentError(f"Could not set channel permissions in {mission_temp_channel}, reason: The overwrite parameter invalid or the target type was not Role or Member.")
     except:
-        raise EnvironmentError(f'Could not set channel permissions for {member.display_name} in {mission_temp_channel}')
+        raise EnvironmentError(f'Could not set channel permissions in {mission_temp_channel}')
 
     # send the channel back to the mission generator as a channel id
 
@@ -3357,34 +3357,6 @@ def _configure_all_carrier_detail_embed(embed, carrier_data: CarrierData):
 #
 #                       COMMUNITY CARRIER COMMANDS
 #
-"""
-# menu example from git gist https://gist.github.com/lykn/a2b68cb790d6dad8ecff75b2aa450f23
-class Select(discord.ui.Select):
-    def __init__(self):
-        options=[
-            discord.SelectOption(label="Option 1",emoji="👌",description="This is option 1!"),
-            discord.SelectOption(label="Option 2",emoji="✨",description="This is option 2!"),
-            discord.SelectOption(label="Option 3",emoji="🎭",description="This is option 3!")
-            ]
-        super().__init__(placeholder="Select an option",max_values=1,min_values=1,options=options)
-    async def callback(self, interaction: discord.Interaction):
-        if self.values[0] == "Option 1":
-            await interaction.response.edit_message(content="This is the first option from the entire list!")
-        elif self.values[0] == "Option 2":
-            await interaction.response.send_message("This is the second option from the list entire wooo!",ephemeral=False)
-        elif self.values[0] == "Option 3":
-            await interaction.response.send_message("Third One!",ephemeral=True)
-
-@bot.command()
-async def menu(ctx):
-    await ctx.send("Menus!",view=SelectView())
-
-class SelectView(discord.ui.View):
-    def __init__(self, *, timeout = 180):
-        super().__init__(timeout=timeout)
-        self.add_item(Select())
-        """
-
 
 
 # helper function to validate CC owner, returns False if owner already in db or True if check passes
@@ -3467,15 +3439,15 @@ async def _cc_assign_permissions(interaction, owner, new_channel):
         # now set the channel to private for other users
         await new_channel.set_permissions(interaction.guild.default_role, read_messages=False)
     except Forbidden:
-        raise EnvironmentError(f"Could not set channel permissions for {member.display_name} in {new_channel}, reason: Bot does not have permissions to edit channel specific permissions.")
+        raise EnvironmentError(f"Could not set channel permissions in {new_channel}, reason: Bot does not have permissions to edit channel specific permissions.")
     except NotFound:
-        raise EnvironmentError(f"Could not set channel permissions for {member.display_name} in {new_channel}, reason: The role or member being edited is not part of the guild.")
+        raise EnvironmentError(f"Could not set channel permissions in {new_channel}, reason: The role or member being edited is not part of the guild.")
     except HTTPException:
-        raise EnvironmentError(f"Could not set channel permissions for {member.display_name} in {new_channel}, reason: Editing channel specific permissions failed.")
+        raise EnvironmentError(f"Could not set channel permissions in {new_channel}, reason: Editing channel specific permissions failed.")
     except (ValueError, TypeError):
-        raise EnvironmentError(f"Could not set channel permissions for {member.display_name} in {new_channel}, reason: The overwrite parameter invalid or the target type was not Role or Member.")
+        raise EnvironmentError(f"Could not set channel permissions in {new_channel}, reason: The overwrite parameter invalid or the target type was not Role or Member.")
     except:
-        raise EnvironmentError(f'Could not set channel permissions for {member.display_name} in {new_channel}')
+        raise EnvironmentError(f'Could not set channel permissions in {new_channel}')
 
 async def _cc_db_enter(interaction, owner, new_channel, new_role):
     # now we enter everything into the community carriers table
@@ -3502,9 +3474,6 @@ async def _cc_db_enter(interaction, owner, new_channel, new_role):
 
     return
 
-@bot.tree.command(name="test", description="test", guild=guild_obj)
-async def _test(interaction: discord.Interaction, test: str):
-    await interaction.response.send_message(test)
 
 @bot.tree.command(name="create_community_channel",
                   description="Create a Community Channel linked to a specific user.",
@@ -3763,6 +3732,12 @@ async def cc_owner(ctx, owner: discord.Member):
 
 # button interaction class for /remove_community_channel
 class RemoveCCView(View):
+    def __init__(self, author): # call init to pass through the author variable
+        self.author = author
+        super().__init__()
+
+    async def interaction_check(self, interaction: discord.Interaction):
+        return interaction.user.id == self.author.id
 
     @discord.ui.button(label="Delete", style=discord.ButtonStyle.danger, emoji="💥", custom_id="delete")
     async def delete_button_callback(self, interaction, button):
@@ -3794,10 +3769,13 @@ class RemoveCCView(View):
 @bot.tree.command(name="remove_community_channel",
                   description="Retires a community channel.",
                   guild=guild_obj)
-@check_roles([cmentor_role_id, botadmin_role_id])
+@check_roles([cmentor_role_id, botadmin_role_id]) 
 async def _remove_community_channel(interaction: discord.Interaction):
 
     print(f"{interaction.user} called `/remove_community_channel` command in <#{interaction.channel.id}>")
+    author = interaction.user # define author here so we can use it to check the interaction later
+    print(f"{interaction.user} is {author.name} as {author.display_name}")
+
 
     # check if we're in a community channel
     carrier_db.execute(f"SELECT * FROM community_carriers WHERE "
@@ -3805,8 +3783,8 @@ async def _remove_community_channel(interaction: discord.Interaction):
     community_carrier = CommunityCarrierData(carrier_db.fetchone())
     # error if not
     if not community_carrier:
-        embed = discord.Embed(description=f"Error: This does not appear to be a community channel.", color=constants.EMBED_COLOUR_ERROR, ephemeral=True)
-        await interaction.response.send_message(embed=embed)
+        embed = discord.Embed(description=f"Error: This does not appear to be a community channel.", color=constants.EMBED_COLOUR_ERROR)
+        await interaction.response.send_message(embed=embed, ephemeral=True)
         return
 
     elif community_carrier:
@@ -3825,7 +3803,7 @@ async def _remove_community_channel(interaction: discord.Interaction):
                                       f"• **WARNING**: *Deleted* channels are gone forever and can NOT be recovered.",
                           color=constants.EMBED_COLOUR_QU)
 
-    view = RemoveCCView()
+    view = RemoveCCView(author)
 
     await interaction.response.send_message(embed=embed, view=view)
     
@@ -3873,7 +3851,7 @@ async def _remove_cc_manager(interaction, delete_channel):
     print("Returning finished embed...")
     if delete_channel: embed.add_field(name="Channel", value=f"<#{interaction.channel.id}> **will be deleted** in **10 seconds**.", inline=False)
     embed.set_image(url=random.choice(byebye_gifs))
-    await interaction.channel.send(embed=embed)
+    await interaction.response.send_message(embed=embed)
 
     # delete channel if relevant
     print("Processing delete flag...")
@@ -3930,7 +3908,7 @@ async def _delete_cc_channel(interaction):
 
     except Exception as e:
         print(e)
-        await interaction.channel.send(f"**Failed to delete <#{interaction.channel.id}>**: {e}")
+        await interaction.response.send_message(f"**Failed to delete <#{interaction.channel.id}>**: {e}")
     
     return
 
@@ -3973,6 +3951,7 @@ async def _cc_role_delete(interaction, role_id, embed):
 # open a community channel (i.e. set non private)
 @bot.tree.command(name="open_community_channel",
     description="Use in a Community Channel to open it to visitors (set it non-private).", guild=guild_obj)
+@check_roles([cmentor_role_id, botadmin_role_id, cc_role_id]) # allow owners to open/close their own channels
 async def _open_community_channel(interaction: discord.Interaction):
     open = True
     await _openclose_community_channel(interaction, open)
@@ -3980,6 +3959,7 @@ async def _open_community_channel(interaction: discord.Interaction):
 # close a community channel (i.e. set private)
 @bot.tree.command(name="close_community_channel",
     description="Use in a Community Channel to close it to visitors (set it private).", guild=guild_obj)
+@check_roles([cmentor_role_id, botadmin_role_id, cc_role_id]) # allow owners to open/close their own channels
 async def _close_community_channel(interaction: discord.Interaction):
     open = False
     await _openclose_community_channel(interaction, open)
@@ -3995,7 +3975,7 @@ async def _openclose_community_channel(interaction, open):
     if not interaction.channel.category == cc_category:
         embed = discord.Embed(description=f"**Error**: This command can only be used in an active Community channel in the <#{cc_cat_id}> category.", color=constants.EMBED_COLOUR_ERROR)
         return await interaction.response.send_message(embed=embed, ephemeral=True)
-    
+
     # now set permissions
     try:
         await interaction.channel.set_permissions(interaction.guild.default_role, overwrite=None) if open else await interaction.channel.set_permissions(interaction.guild.default_role, read_messages=False)
@@ -4075,36 +4055,68 @@ async def _notify_me(interaction: discord.Interaction):
 # send a notice from a Community Carrier owner to their 'crew'
 @bot.tree.command(name="send_notice",
     description="Private command: Used by Community Carrier owners to send notices to their participants.", guild=guild_obj)
-async def _send_notice(interaction: discord.Interaction, message: str):
-    # look up user in community carrier database
-    community_carrier_data = find_community_carrier(interaction.user.id, CCDbFields.ownerid.name)
+@check_roles([cmentor_role_id, botadmin_role_id, cc_role_id]) # allow all owners for now then restrict during command
+async def _send_notice(interaction: discord.Interaction):
 
-    # check if the author is a CC owner
-    if not community_carrier_data:
-        await interaction.response.send_message("Only the owner of a Community Carrier can use `/send_notice`.", ephemeral=True)
+    # check if we're in a community channel
+    carrier_db.execute(f"SELECT * FROM community_carriers WHERE "
+                    f"channelid = {interaction.channel.id}")
+    community_carrier = CommunityCarrierData(carrier_db.fetchone())
+    # error if not
+    if not community_carrier:
+        embed = discord.Embed(description=f"Error: This does not appear to be a community channel.", color=constants.EMBED_COLOUR_ERROR)
+        await interaction.response.send_message(embed=embed, ephemeral=True)
         return
 
-    # now define terms
-    for community_carrier in community_carrier_data:
+    elif community_carrier:
         print(f"Found data: {community_carrier.owner_id} owner of {community_carrier.channel_id}")
+        owner = await bot.fetch_user(community_carrier.owner_id)
         channel_id = community_carrier.channel_id
         owner_id = community_carrier.owner_id
         role_id = community_carrier.role_id
 
-    """
-    # check if in the CC channel, this simplifies things a little
-    if not ctx.channel.id == channel_id:
-        await ctx.send(f"Please use this command in your community carrier channel: <#{channel_id}>", hidden=True)
-        return
-    """
+    # check that the command user is the channel owner, or a Community Mentor/Admin
+    if not interaction.user.id == owner.id:
+        print("Channel user is not command user")
+        if not await checkroles(interaction, [cmentor_role_id, botadmin_role_id]):
+            interaction.response.defer()
+            return
 
-    # send the message to the CC channel
-    channel = bot.get_channel(channel_id)
-    await interaction.response.send_message(f"Sending your message to <#{channel_id}>.", ephemeral=True)
+    # create a modal to take the message
+    await interaction.response.send_modal(SendNoticeModal(role_id))
 
-    await channel.send(f"<@&{role_id}> New message from <@{owner_id}> for <#{channel_id}>:\n\n{message}\n\n*Use* `/notify_me` *in "
-                       f"this channel to sign up for future notifications."
-                       f"\nYou can opt out at any time by using* `/notify_me` *again.*")
+
+
+# view for modal for send_notice
+
+class SendNoticeModal(Modal):
+    def __init__(self, role_id, title = 'Send Notice to Community Channel', timeout = None) -> None:
+        self.role_id = role_id
+        super().__init__(title=title, timeout=timeout)
+
+    message = discord.ui.TextInput(
+        label='Enter your message below.',
+        style=discord.TextStyle.long,
+        placeholder='You might want to copy/paste from text prepared in-channel.',
+        required=True,
+        max_length=2000,
+    )
+
+    async def on_submit(self, interaction: discord.Interaction):
+        print(self.role_id)
+
+        embed = discord.Embed(description=self.message, color=constants.EMBED_COLOUR_QU)
+
+        # send the message to the CC channel
+        await interaction.channel.send(f"<@&{self.role_id}> New message from <@{interaction.user.id}> for <#{interaction.channel.id}>:")
+        await interaction.channel.send(embed=embed) # this is the actual message
+        await interaction.channel.send("*Use* `/notify_me` *in this channel to sign up for future notifications."
+                        f"\nYou can opt out at any time by using* `/notify_me` *again.*")
+        await interaction.response.defer()
+
+    async def on_error(self, interaction: discord.Interaction, error: Exception) -> None:
+        await interaction.response.send_message(f'Oops! Something went wrong: {error}', ephemeral=True)
+    
 
 #
 #                       COMMUNITY NOMINATION COMMANDS
@@ -4318,7 +4330,7 @@ async def nom_delete(ctx, userid: Union[str, int]):
     # check whether user has any nominations
     nominees_data = find_nominee_with_id(userid)
     if not nominees_data:
-        return await ctx.send(f'No results for {member.display_name} (user ID {userid})')
+        return await ctx.send(f'No results (user ID {userid})')
 
     # now check they're sure they want to delete
 
