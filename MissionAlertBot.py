@@ -4232,6 +4232,7 @@ async def stopquit(ctx):
 # If not already present, add 'Fleet Reserve' role to the owner.
 @tasks.loop(hours=24)
 async def lasttrade_cron():
+    return
     print(f"last trade cron running.")
     try:
         # get roles
