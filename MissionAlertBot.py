@@ -3786,8 +3786,9 @@ async def _remove_community_channel(interaction: discord.Interaction):
     community_carrier = CommunityCarrierData(carrier_db.fetchone())
     # error if not
     if not community_carrier:
-        embed = discord.Embed(description=f"Error: This does not appear to be a community channel.", color=constants.EMBED_COLOUR_ERROR)
+        embed = discord.Embed(description=f"This does not appear to be a community channel. Running purge task instead.", color=constants.EMBED_COLOUR_ERROR)
         await interaction.response.send_message(embed=embed, ephemeral=True)
+        # insert purge task here
         return
 
     elif community_carrier:
