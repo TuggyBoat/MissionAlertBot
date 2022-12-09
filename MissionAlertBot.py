@@ -3784,11 +3784,28 @@ async def _remove_community_channel(interaction: discord.Interaction):
     carrier_db.execute(f"SELECT * FROM community_carriers WHERE "
                     f"channelid = {interaction.channel.id}")
     community_carrier = CommunityCarrierData(carrier_db.fetchone())
-    # error if not
+    # if not, we return a notice and then try the db purge action
     if not community_carrier:
         embed = discord.Embed(description=f"This does not appear to be a community channel. Running purge task instead.", color=constants.EMBED_COLOUR_ERROR)
         await interaction.response.send_message(embed=embed, ephemeral=True)
-        # insert purge task here
+        # this purges database entries with invalid channel ids so users aren't stuck with ghost channels if e.g. it was manually deleted
+        carrier_db.execute(f"SELECT * FROM community_carriers")
+        community_carriers = [CommunityCarrierData(carrier) for carrier in carrier_db.fetchall()]
+        for carrier in community_carriers:
+            if not bot.get_channel(carrier.channel_id):
+                print(f"Could not find channel for owner {carrier.owner_id}, deleting from db")
+                embed = discord.Embed(description=f"Found invalid channel for <@{carrier.owner_id}>, removing from database."
+                                                   f"\nRemoving <@&{cc_role_id}> from <@{carrier.owner_id}>."
+                                                   f"\nDeleting associated channel role.", color=constants.EMBED_COLOUR_QU)
+                await interaction.followup.send(embed=embed, ephemeral=True)
+                try:
+                    carrier_db.execute(f"DELETE FROM community_carriers WHERE channelid = {carrier.channel_id}")
+                    owner = interaction.guild.get_member(carrier.owner_id)
+                    embed = await _remove_cc_role_from_owner(interaction, owner) # this returns an embed but we'll only use it to pass into the next function
+                    await _cc_role_delete(interaction, carrier.role_id, embed) # this returns an embed but we won't use it
+
+                except Exception as e:
+                    await interaction.followup.send(e, ephemeral=True)
         return
 
     elif community_carrier:
