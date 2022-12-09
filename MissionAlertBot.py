@@ -933,7 +933,9 @@ async def checkroles(ctx, permitted_role_ids): # checks a list of roles against 
             embed=discord.Embed(description=f"**Permission denied**: You need one of the following roles to use this command:\n{formatted_role_list}", color=constants.EMBED_COLOUR_ERROR)
         else:
             embed=discord.Embed(description=f"**Permission denied**: You need the following role to use this command:\n{formatted_role_list}", color=constants.EMBED_COLOUR_ERROR)
-        await ctx.channel.send(embed=embed)
+        # hacky way to check whether we were sent an interaction object or a ctx object is to check attributes.
+        # ctx has the author attribute, interaction does not, so we may as well use that since we already used it earlier
+        await ctx.channel.send(embed=embed) if hasattr(ctx, 'author') else await ctx.response.send_message(embed=embed, ephemeral=True)
     return permission
 
 def check_roles(permitted_role_ids):
@@ -1009,6 +1011,7 @@ async def on_ready():
     print(f'{bot.user.name} has connected to Discord!')
     # sync slash commands
     try:
+        bot.tree.copy_global_to(guild=guild_obj)
         await bot.tree.sync(guild=guild_obj)
         print("Synchronised bot tree.")
     except Exception as e:
@@ -4009,7 +4012,7 @@ async def _notify_me(interaction: discord.Interaction):
 
     if not community_carrier_data:
         # if there's no channel match, return an error
-        embed = discord.Embed(description="Please try again in a Community Carrier's channel.", color=constants.EMBED_COLOUR_ERROR)
+        embed = discord.Embed(description="Please try again in a Community Channel.", color=constants.EMBED_COLOUR_ERROR)
         await interaction.response.send_message(embed=embed, ephemeral=True)
         return
 
@@ -4052,12 +4055,89 @@ async def _notify_me(interaction: discord.Interaction):
                                             color=constants.EMBED_COLOUR_QU)
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
-# send a notice from a Community Carrier owner to their 'crew'
+
+# send a notice from a Community Carrier owner to their 'crew' - this is the long form command using a modal
 @bot.tree.command(name="send_notice",
-    description="Private command: Used by Community Carrier owners to send notices to their participants.", guild=guild_obj)
+    description="Private command: Used by Community Channel owners to send notices to their participants.", guild=guild_obj)
 @check_roles([cmentor_role_id, botadmin_role_id, cc_role_id]) # allow all owners for now then restrict during command
 async def _send_notice(interaction: discord.Interaction):
 
+    community_carrier = await _send_notice_channel_check(interaction)
+    if not community_carrier: return
+
+    # create a modal to take the message
+    await interaction.response.send_modal(SendNoticeModal(community_carrier.role_id))
+
+# modal for send_notice
+
+class SendNoticeModal(Modal):
+    def __init__(self, role_id, title = 'Send Notice to Community Channel', timeout = None) -> None:
+        self.role_id = role_id # we need to use the role_id in the response
+        super().__init__(title=title, timeout=timeout)
+
+    embedtitle = discord.ui.TextInput(
+        label='Optional: give your message a title',
+        placeholder='Leave blank for none.',
+        required=False,
+        max_length=256,
+    )
+    message = discord.ui.TextInput(
+        label='Enter your message below.',
+        style=discord.TextStyle.long,
+        placeholder='Normal Discord markdown works, but mentions and custom emojis require full code.',
+        required=True,
+        max_length=4000,
+    )
+
+    async def on_submit(self, interaction: discord.Interaction):
+        print(self.role_id)
+
+        embed = discord.Embed(title=self.embedtitle, description=self.message, color=constants.EMBED_COLOUR_QU)
+        embed.set_author(name=interaction.user.name, icon_url=interaction.user.avatar.url)
+        embed.set_thumbnail(url=interaction.user.avatar.url)
+        embed.timestamp= datetime.now(tz=timezone.utc)
+        embed.set_footer(text="Use \"/notify_me\" in this channel to sign up for future notifications."
+                     "\nYou can opt out at any time by using \"/notify_me\" again.")
+
+        # send the message to the CC channel
+        await interaction.channel.send(f"<@&{self.role_id}> New message from <@{interaction.user.id}> for <#{interaction.channel.id}>:", embed=embed)
+        # await interaction.channel.send("*Use* `/notify_me` *in this channel to sign up for future notifications."
+        #                f"\nYou can opt out at any time by using* `/notify_me` *again.*")
+        await interaction.response.defer()
+
+    async def on_error(self, interaction: discord.Interaction, error: Exception) -> None:
+        await interaction.response.send_message(f'Oops! Something went wrong: {error}', ephemeral=True)
+
+# send_notice app command - alternative to above, just noms a message like adroomba but via right click
+@bot.tree.context_menu(name='Send to Community Channel')
+@check_roles([cmentor_role_id, botadmin_role_id, cc_role_id])
+async def send_to_community_channel(interaction: discord.Interaction, message: discord.Message):
+
+    community_carrier = await _send_notice_channel_check(interaction)
+    if not community_carrier: return
+
+    # Discord now allows users to send messages with disallowed role mentions to it harder for spam bots to determine whether they're succcessful
+    # MAB has permissions to ping any role so would turn any such mention into a ping
+    # for this reason we scan message for the sign of a role mention and disallow if found
+    role_mention_string = '<@&'
+    if role_mention_string in message.content:
+        embed = discord.Embed(description="**ERROR**: Unable to resend messages containing role mentions. "
+                                          "Please edit out your role mention (i.e. `@role`) and try again.", color=constants.EMBED_COLOUR_ERROR)
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+        return
+
+    try:
+        await interaction.response.send_message(f"<@&{community_carrier.role_id}> New message from <@{interaction.user.id}> for <#{interaction.channel.id}>:\n\n"
+                                                f"{message.content}\n\n"
+                                                "*Use* `/notify_me` *in this channel to sign up for future notifications."
+                                                "\nYou can opt out at any time by using* `/notify_me` *again*.")
+        if message.author.id == interaction.user.id: await message.delete() # you can send anyone's message using this interaction
+                                                                            # this check protects the messages of random users from being deleted if sent
+    except Exception as e:
+        await interaction.response.send_message(f"Sorry, I couldn't send your message. Reason: {e}", ephemeral=True)
+
+# helper function shared by the send_notice commands
+async def _send_notice_channel_check(interaction):
     # check if we're in a community channel
     carrier_db.execute(f"SELECT * FROM community_carriers WHERE "
                     f"channelid = {interaction.channel.id}")
@@ -4071,52 +4151,71 @@ async def _send_notice(interaction: discord.Interaction):
     elif community_carrier:
         print(f"Found data: {community_carrier.owner_id} owner of {community_carrier.channel_id}")
         owner = await bot.fetch_user(community_carrier.owner_id)
-        channel_id = community_carrier.channel_id
-        owner_id = community_carrier.owner_id
-        role_id = community_carrier.role_id
 
     # check that the command user is the channel owner, or a Community Mentor/Admin
     if not interaction.user.id == owner.id:
         print("Channel user is not command user")
-        if not await checkroles(interaction, [cmentor_role_id, botadmin_role_id]):
-            interaction.response.defer()
-            return
+        if not await checkroles(interaction, [cmentor_role_id, botadmin_role_id]): return
+    return community_carrier
 
-    # create a modal to take the message
-    await interaction.response.send_modal(SendNoticeModal(role_id))
-
-
-
-# view for modal for send_notice
-
-class SendNoticeModal(Modal):
-    def __init__(self, role_id, title = 'Send Notice to Community Channel', timeout = None) -> None:
-        self.role_id = role_id
-        super().__init__(title=title, timeout=timeout)
-
-    message = discord.ui.TextInput(
-        label='Enter your message below.',
-        style=discord.TextStyle.long,
-        placeholder='You might want to copy/paste from text prepared in-channel.',
-        required=True,
-        max_length=2000,
-    )
-
-    async def on_submit(self, interaction: discord.Interaction):
-        print(self.role_id)
-
-        embed = discord.Embed(description=self.message, color=constants.EMBED_COLOUR_QU)
-
-        # send the message to the CC channel
-        await interaction.channel.send(f"<@&{self.role_id}> New message from <@{interaction.user.id}> for <#{interaction.channel.id}>:")
-        await interaction.channel.send(embed=embed) # this is the actual message
-        await interaction.channel.send("*Use* `/notify_me` *in this channel to sign up for future notifications."
-                        f"\nYou can opt out at any time by using* `/notify_me` *again.*")
-        await interaction.response.defer()
-
-    async def on_error(self, interaction: discord.Interaction, error: Exception) -> None:
-        await interaction.response.send_message(f'Oops! Something went wrong: {error}', ephemeral=True)
-    
+# help for Community Channel users. when we refactor we'll work on having proper custom help available in more depth
+@bot.tree.command(name="community_channel_help",
+    description="Private command: get help with Community Channel commands and functions.", guild=guild_obj)
+@check_roles([cmentor_role_id, botadmin_role_id, cc_role_id])
+async def _community_channel_help(interaction: discord.Interaction):
+    embed = discord.Embed(title="Community Channel Help",
+                          # sorry Kutu I'm not wrapping this too eagerly
+                          description=f"**Community Channel commands:**\n\nAll commands require the <@&{cmentor_role_id}> role unless specified."
+                          "\n\n:arrow_forward: `/create_community_channel`:\n"
+                          "**USE IN**: anywhere (but please use it in the back rooms only!)\n"
+                          "**REQUIRES:** a **user**, a **channel name**, and optionally an **emoji** to go at the beginning of the channel name.\n"
+                          "**FUNCTION**: creates a new Community Channel.\n"
+                          "Best practice for channel name is a single word or short phrase of no more than 30 characters. Disallowed characters "
+                          "are automatically stripped and spaces are converted to hyphens. The emoji, if supplied, is put at the beginning of the channel's name. "
+                          "Each CC is registered to one user, known as the channel 'owner', and each user can only have one CC registered to them. "
+                          "CC owners get full permissions on their channel and can rename them, pin messages, delete any message, etc. "
+                          "Creating a Community Channel also creates an associated role which users can sign up to for notices. "
+                          f"CC owners, as well as <@&{cmentor_role_id}>s, can use a special command to send notices to this role. "
+                          "Note: **new Community Channels are set to private** when created."
+                          "\n\n:arrow_forward: `/open_community channel`:\n"
+                          "**USE IN**: the target Community Channel\n"
+                          f"**USED BY**: channel owner or any <@&{cmentor_role_id}>\n"
+                          "**FUNCTION**: Makes the channel no longer private, i.e. open for any P.T.N. Pilot to view."
+                          "\n\n:arrow_forward: `/close_community channel`:\n"
+                          "**USE IN**: the target Community Channel\n"
+                          f"**USED BY**: channel owner or any <@&{cmentor_role_id}>\n"
+                          "**FUNCTION**: Makes the channel private again, i.e. hidden from normal users' view. Community roles and the channel's owner can still see private Community Channels."
+                          "\n\n:arrow_forward: `/remove_community_channel`:\n"
+                          "**USE IN**: the target Community Channel\n"
+                          "**FUNCTION**: Deletes or Archives the Community Channel.\n"
+                          "Archived CCs remain visible to Community team roles. If the channel's erstwhile owner has one of these roles, they will also be able to see it, but will no longer be considered "
+                          "its 'owner'. **This command also has a secondary purpose**: if used *outside a Community Channel*, it will scan the database and check for "
+                          "any orphaned owners (owners with a channel which is no longer valid) and purge them from the database. Useful if a community channel has "
+                          "been accidentally deleted or the database update failed upon the bot removing it."
+                          "\n\n:arrow_forward: `/restore_community_channel`:"
+                          "**USE IN**: target archived Community Channel\n"
+                          "**REQUIRES:** a **user** to be the channel's new owner\n"
+                          "**FUNCTION**: moves the archived Community Channel back to the Community Channel category and assigns it an owner. "
+                          "As with newly created  Community Channels, restored channels are also set to private until 'opened'."
+                          "\n\n**Broadcast message commands:**"
+                          f"\n\n:arrow_forward:`/send_notice`:\n"
+                          "**USE IN**: the target Community Channel\n"
+                          f"**USED BY**: channel owner or any <@&{cmentor_role_id}>\n"
+                          "**FUNCTION**: This command gives its user a pop-out form in which to type a message which will be sent to the channel as an embed, pinging the channel's "
+                          "associated role in the process. The embed can be up to 4000 characters and can optionally include a title. It will also "
+                          "feature the name and avatar picture of the sending user."
+                          "\n\n:arrow_forward: **Send notice app command**:\n"
+                          "**USE ON**: any message in the target Community Channel\n"
+                          f"**USED BY**: channel owner or any <@&{cmentor_role_id}>\n"
+                          "**FUNCTION**: Similar to the above, this sends a notice to the channel's associated role, but it can be "
+                          "used *on a message* in the channel. To access it:\n> :mouse_three_button: Right click or :point_up_2: long press on any message in the channel\n"
+                          "> :arrow_right: Apps\n> :arrow_right: Send to Community...\n"
+                          "If the message was sent by the command's user, it will be consumed by the bot and spat out with a role ping and helpful information appended. "
+                          "If the message was sent by anyone else, it will not be deleted, but the bot will instead copy it. Note: messages broadcast this way can be around **1800 characters at most**, "
+                          "otherwise the bot will return an error and nothing will be sent (or eaten).",
+                          color=constants.EMBED_COLOUR_QU)
+    await interaction.response.send_message(embed=embed, ephemeral=True)
+                        
 
 #
 #                       COMMUNITY NOMINATION COMMANDS
@@ -4515,6 +4614,5 @@ async def on_command_error(ctx, error):
     else:
         await ctx.send(gif)
         await ctx.send(f"Sorry, that didn't work. Check your syntax and permissions, error: {error}")
-
 
 bot.run(TOKEN)
