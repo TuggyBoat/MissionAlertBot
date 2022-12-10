@@ -4232,7 +4232,6 @@ async def stopquit(ctx):
 # If not already present, add 'Fleet Reserve' role to the owner.
 @tasks.loop(hours=24)
 async def lasttrade_cron():
-    return
     print(f"last trade cron running.")
     try:
         # get roles
@@ -4247,9 +4246,10 @@ async def lasttrade_cron():
         # get carriers who last traded >28 days ago
         # for owners with multiple carriers look at only the most recently used
         carrier_db.execute(f'''
-                            SELECT p_ID,shortname,ownerid,max(lasttrade) as lasttrade
-                            FROM carriers WHERE lasttrade < {int(lasttrade_max.timestamp())}
-                            GROUP BY ownerid
+                            SELECT p_ID, shortname, ownerid, lasttrade
+                            FROM carriers c1
+                            WHERE lasttrade = (SELECT MAX(lasttrade) FROM carriers c2 WHERE c1.ownerid = c2.ownerid)
+                            and lasttrade < {int(lasttrade_max.timestamp())}
                             ''')
         carriers = [CarrierData(carrier) for carrier in carrier_db.fetchall()]
         for carrier_data in carriers:
