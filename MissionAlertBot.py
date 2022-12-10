@@ -4139,9 +4139,9 @@ class SendNoticeModal(Modal):
         await interaction.response.send_message(f'Oops! Something went wrong: {error}', ephemeral=True)
 
 # send_notice app command - alternative to above, just noms a message like adroomba but via right click
-@bot.tree.context_menu(name='Send to Community Channel')
+@bot.tree.context_menu(name='Send Notice')
 @check_roles([cmentor_role_id, botadmin_role_id, cc_role_id])
-async def send_to_community_channel(interaction: discord.Interaction, message: discord.Message):
+async def send_notice(interaction: discord.Interaction, message: discord.Message):
     print(f"{interaction.user.name} used send context menu in {interaction.channel.name}")
 
     community_carrier = await _send_notice_channel_check(interaction)
@@ -4237,12 +4237,12 @@ async def _community_channel_help(interaction: discord.Interaction):
                           "**FUNCTION**: This command gives its user a pop-out form in which to type a message which will be sent to the channel as an embed, pinging the channel's "
                           "associated role in the process. The embed can be up to 4000 characters and can optionally include a title. It will also "
                           "feature the name and avatar picture of the sending user."
-                          "\n\n:arrow_forward: **Send notice app command**:\n"
+                          "\n\n:arrow_forward: **\"Send Notice\"** context menu command:\n"
                           "**USE ON**: any message in the target Community Channel\n"
                           f"**USED BY**: channel owner or any <@&{cmentor_role_id}>\n"
                           "**FUNCTION**: Similar to the above, this sends a notice to the channel's associated role, but it can be "
-                          "used *on a message* in the channel. To access it:\n> :mouse_three_button: Right click or :point_up_2: long press on any message in the channel\n"
-                          "> :arrow_right: Apps\n> :arrow_right: Send to Community...\n"
+                          "used *on a message* in the channel. To access it:\n> :mouse_three_button: **Right click** or :point_up_2: **long press** on any message in the channel\n"
+                          "> :arrow_right: **Apps**\n> :arrow_right: **Send Notice**\n"
                           "If the message was sent by the command's user, it will be consumed by the bot and spat out with a role ping and helpful information appended. "
                           "If the message was sent by anyone else, it will not be deleted, but the bot will instead copy it. Note: messages broadcast this way can be around **1800 characters at most**, "
                           "otherwise the bot will return an error and nothing will be sent (or eaten).",
