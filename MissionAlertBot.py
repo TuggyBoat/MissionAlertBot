@@ -4067,7 +4067,7 @@ async def _notify_me(interaction: discord.Interaction):
         await interaction.user.add_roles(notify_role)
         embed = discord.Embed(title=f"You've signed up for notifications for {interaction.channel.name}!",
                                 description=f"You'll receive notifications from <@{owner_id}> or "
-                                            f"<@&{cmentor_role_id}>s about this event or carrier's activity. You can cancel at any"
+                                            f"<@&{cmentor_role_id}>s about this event or channel's activity. You can cancel at any"
                                             f" time by using `/notify_me` again in this channel.", color=constants.EMBED_COLOUR_OK)
         await interaction.response.send_message(embed=embed, ephemeral=True)
     else:
