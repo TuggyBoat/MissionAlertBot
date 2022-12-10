@@ -206,13 +206,13 @@ boom_gifs = [
 ]
 
 hello_gifs = [
-    'https://tenor.com/view/hello-there-hi-there-greetings-gif-9442662',
-    'https://tenor.com/view/hey-tom-hanks-forrest-gump-gif-5114770',
-    'https://tenor.com/view/hello-there-baby-yoda-mandolorian-hello-gif-20136589',
-    'https://tenor.com/view/oh-hello-there-sassy-fab-gif-14129058',
-    'https://tenor.com/view/world-star-hey-girl-hey-there-when-you-see-your-crush-feeling-yourself-gif-10605207',
-    'https://tenor.com/view/bye-jim-carrey-ciao-gif-5139786',
-    'https://tenor.com/view/hi-friends-baby-goat-saying-hello-saying-hi-hi-neighbor-gif-14737423',
+    'https://media.tenor.com/DSG9ZID25nsAAAAC/hello-there-general-kenobi.gif', # obi wan
+    'https://media.tenor.com/uNQvTg9Tk_QAAAAC/hey-tom-hanks.gif', # tom hanks
+    'https://media.tenor.com/-z2KfO5zAckAAAAC/hello-there-baby-yoda.gif', # baby yoda
+    'https://media.tenor.com/iZPmuJ0KON8AAAAd/hello-there.gif', # toddler
+    'https://media.tenor.com/KKvpO702avgAAAAC/hey-hay.gif', # rollerskates
+    'https://media.tenor.com/pE2UP8CBBuwAAAAC/jim-carrey-funny.gif', # jim carrey
+    'https://media.tenor.com/-UiIDx_KNUUAAAAd/hi-friends-baby-goat.gif', # goat
 ]
 
 error_gifs = [
@@ -4015,6 +4015,17 @@ async def _openclose_community_channel(interaction, open):
                                       f"{' This channel is now visble to the server community 😊' if open else f' This channel is now hidden from the server community 😳'}",
                                        color=constants.EMBED_COLOUR_OK)
     await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    # notify channel
+    des_text = "Welcome everybody, it's good to see you here!" if open else "So long, farewell, auf Wiedersehen, goodbye."
+    embed = discord.Embed(title=f"★ COMMUNITY CHANNEL {status_text_adj.upper()} ★", description=f"**<#{interaction.channel.id}> is now {status_text_adj}!** *🎶 {des_text}*", color=constants.EMBED_COLOUR_OK)
+    embed.set_author(name=interaction.user.name, icon_url=interaction.user.avatar.url)
+    embed.set_thumbnail(url="https://pilotstradenetwork.com/wp-content/uploads/2021/08/PTN_Discord_Icon.png")
+    embed.timestamp= datetime.now(tz=timezone.utc)
+    if open: embed.set_image(url=random.choice(hello_gifs))
+    embed.set_footer(text="You can use \"/notify_me\" in this channel to sign up for notifications of announcements by the channel owner or Community Mentors."
+                    "\nYou can opt out at any time by using \"/notify_me\" again.")
+    await interaction.channel.send(embed=embed)
 
     return
 
