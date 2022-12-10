@@ -4084,6 +4084,7 @@ async def _notify_me(interaction: discord.Interaction):
     description="Private command: Used by Community Channel owners to send notices to their participants.", guild=guild_obj)
 @check_roles([cmentor_role_id, botadmin_role_id, cc_role_id]) # allow all owners for now then restrict during command
 async def _send_notice(interaction: discord.Interaction):
+    print(f"{interaction.user.name} used /send_notice in {interaction.channel.name}")
 
     community_carrier = await _send_notice_channel_check(interaction)
     if not community_carrier: return
