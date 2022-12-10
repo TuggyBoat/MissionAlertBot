@@ -3484,7 +3484,7 @@ async def _cc_db_enter(interaction, owner, new_channel, new_role):
                   guild=guild_obj)
 @check_roles([cmentor_role_id, botadmin_role_id])
 async def _create_community_channel(interaction: discord.Interaction, owner: discord.Member, channel_name: str, channel_emoji: str = None):
-    print(f"{interaction.user} used /create_community_channel")
+    print(f"{interaction.user.name} used /create_community_channel")
     print(f"Params: {owner} {channel_name} {channel_emoji}")
     # trim emojis to 1 character
     emoji_string = channel_emoji[:1] if not channel_emoji == None else None
@@ -3747,13 +3747,13 @@ class RemoveCCView(View):
     async def delete_button_callback(self, interaction, button):
         delete_channel = 1
         print("User wants to delete channel.")
-        await _remove_cc_manager(interaction, delete_channel)
+        await _remove_cc_manager(interaction, delete_channel, self)
         
     @discord.ui.button(label="Archive", style=discord.ButtonStyle.primary, emoji="📂", custom_id="archive")
     async def archive_button_callback(self, interaction, button):
         delete_channel = 0
         print("User chose to archive channel.")
-        await _remove_cc_manager(interaction, delete_channel)
+        await _remove_cc_manager(interaction, delete_channel, self)
         
         self.clear_items()
         await interaction.response.edit_message(view=self)
@@ -3776,7 +3776,7 @@ class RemoveCCView(View):
 @check_roles([cmentor_role_id, botadmin_role_id]) 
 async def _remove_community_channel(interaction: discord.Interaction):
 
-    print(f"{interaction.user} called `/remove_community_channel` command in <#{interaction.channel.id}>")
+    print(f"{interaction.user.name} called `/remove_community_channel` command in {interaction.channel.name}")
     author = interaction.user # define author here so we can use it to check the interaction later
     print(f"{interaction.user} is {author.name} as {author.display_name}")
 
@@ -3832,7 +3832,7 @@ async def _remove_community_channel(interaction: discord.Interaction):
     return
 
 # function called by button responses to process channel deletion
-async def _remove_cc_manager(interaction, delete_channel):
+async def _remove_cc_manager(interaction, delete_channel, button_self):
     # get the carrier data again because I can't figure out how to penetrate callbacks with additional variables or vice versa
     carrier_db.execute(f"SELECT * FROM community_carriers WHERE "
                     f"channelid = {interaction.channel.id}")
@@ -3873,11 +3873,11 @@ async def _remove_cc_manager(interaction, delete_channel):
     print("Returning finished embed...")
     if delete_channel: embed.add_field(name="Channel", value=f"<#{interaction.channel.id}> **will be deleted** in **10 seconds**.", inline=False)
     embed.set_image(url=random.choice(byebye_gifs))
-    await interaction.response.send_message(embed=embed)
+    await interaction.channel.send(embed=embed)
 
     # delete channel if relevant
     print("Processing delete flag...")
-    if delete_channel: await _delete_cc_channel(interaction) 
+    if delete_channel: await _delete_cc_channel(interaction, button_self) 
 
     # notify bot-spam
     print("Notifying bot-spam...")
@@ -3919,9 +3919,11 @@ async def _remove_cc_role_from_owner(interaction, owner):
     return embed
 
 # helper function for /remove_community_channel
-async def _delete_cc_channel(interaction):
+async def _delete_cc_channel(interaction, button_self):
     # start a timer so the user has time to read the status embed
     channel_name = interaction.channel.name
+    button_self.clear_items()
+    await interaction.response.edit_message(view=button_self)
     print(f"Starting countdown for deletion of {channel_name}")
     await asyncio.sleep(10)
     try:
@@ -3930,7 +3932,7 @@ async def _delete_cc_channel(interaction):
 
     except Exception as e:
         print(e)
-        await interaction.response.send_message(f"**Failed to delete <#{interaction.channel.id}>**: {e}")
+        await interaction.channel.send(f"**Failed to delete <#{interaction.channel.id}>**: {e}")
     
     return
 
@@ -3975,6 +3977,7 @@ async def _cc_role_delete(interaction, role_id, embed):
     description="Use in a Community Channel to open it to visitors (set it non-private).", guild=guild_obj)
 @check_roles([cmentor_role_id, botadmin_role_id, cc_role_id]) # allow owners to open/close their own channels
 async def _open_community_channel(interaction: discord.Interaction):
+    print(f"{interaction.user.name} used /open_community_channel in {interaction.channel.name}")
     open = True
     await _openclose_community_channel(interaction, open)
 
@@ -3983,6 +3986,7 @@ async def _open_community_channel(interaction: discord.Interaction):
     description="Use in a Community Channel to close it to visitors (set it private).", guild=guild_obj)
 @check_roles([cmentor_role_id, botadmin_role_id, cc_role_id]) # allow owners to open/close their own channels
 async def _close_community_channel(interaction: discord.Interaction):
+    print(f"{interaction.user.name} used /close_community_channel in {interaction.channel.name}")
     open = False
     await _openclose_community_channel(interaction, open)
 
