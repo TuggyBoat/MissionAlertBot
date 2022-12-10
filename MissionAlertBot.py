@@ -4023,6 +4023,7 @@ async def _openclose_community_channel(interaction, open):
 @bot.tree.command(name="notify_me",
     description="Private command: Use in a COMMUNITY CHANNEL to opt in/out to receive its notifications.", guild=guild_obj)
 async def _notify_me(interaction: discord.Interaction):
+    print(f"{interaction.user.name} used /notify_me in {interaction.channel.name}")
 
     # note channel ID
     msg_channel_id = interaction.channel.id
