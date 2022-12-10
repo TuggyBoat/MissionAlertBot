@@ -4140,6 +4140,7 @@ class SendNoticeModal(Modal):
 @bot.tree.context_menu(name='Send to Community Channel')
 @check_roles([cmentor_role_id, botadmin_role_id, cc_role_id])
 async def send_to_community_channel(interaction: discord.Interaction, message: discord.Message):
+    print(f"{interaction.user.name} used send context menu in {interaction.channel.name}")
 
     community_carrier = await _send_notice_channel_check(interaction)
     if not community_carrier: return
