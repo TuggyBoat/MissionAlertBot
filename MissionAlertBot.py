@@ -4091,10 +4091,15 @@ async def _send_notice(interaction: discord.Interaction):
     # create a modal to take the message
     await interaction.response.send_modal(SendNoticeModal(community_carrier.role_id))
 
+    try: # this to avoid annoying thinking response remaining bug if user cancels on mobile
+        await interaction.response.defer()
+    finally:
+        return
+
 # modal for send_notice
 
 class SendNoticeModal(Modal):
-    def __init__(self, role_id, title = 'Send Notice to Community Channel', timeout = None) -> None:
+    def __init__(self, role_id, title = 'Send to Community Channel', timeout = None) -> None:
         self.role_id = role_id # we need to use the role_id in the response
         super().__init__(title=title, timeout=timeout)
 
