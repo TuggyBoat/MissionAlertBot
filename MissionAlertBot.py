@@ -3362,6 +3362,29 @@ def _configure_all_carrier_detail_embed(embed, carrier_data: CarrierData):
 #                       COMMUNITY CARRIER COMMANDS
 #
 
+# app command to upload cc thumbnail
+@bot.tree.context_menu(name='Upload CC Thumb')
+@check_roles([cmentor_role_id, botadmin_role_id, cc_role_id])
+async def upload_cc_thumb(interaction: discord.Interaction, message: discord.Message):
+    # check we're in the CC channel
+    if not await _send_notice_channel_check(interaction): return
+
+    if message.attachments:
+        for attachment in message.attachments: # there can only be one attachment per message
+            await attachment.save(f'images/cc/{interaction.channel.id}.png')
+        await interaction.response.send_message(embed = discord.Embed(description="Image saved as Channel notice thumbnail. It should appear when you use `/send_notice`.", color=constants.EMBED_COLOUR_OK), ephemeral=True)
+    else:
+        # we'll be super lazy and use this as the offially mandated way to delete thumbnails 🤷‍♀️
+        await interaction.response.send_message(embed = discord.Embed(description="No image found in this message. If you had an existing thumbnail, it has been removed.", color=constants.EMBED_COLOUR_ERROR), ephemeral=True)
+
+        # see if there's already a thumbnail file
+        if os.path.isfile(f"images/cc/{interaction.channel.id}.png"):
+            print(f"Found image file images/cc/{interaction.channel.id}.png")
+            try: # try to delete it
+                os.remove(f"images/cc/{interaction.channel.id}.png")
+            except Exception as e:
+                await interaction.followup.send(embed = discord.Embed(description=f"**ERROR**: {e}", color=constants.EMBED_COLOUR_ERROR), ephemeral=True)
+    return
 
 # helper function to validate CC owner, returns False if owner already in db or True if check passes
 async def _cc_owner_check(interaction, owner):
@@ -4132,24 +4155,50 @@ class SendNoticeModal(Modal):
         required=True,
         max_length=4000,
     )
+    image = discord.ui.TextInput(
+        label='Optional: include an image',
+        placeholder='Enter the image\'s URL or leave blank for none.',
+        required=False,
+        max_length=512,
+    )
 
     async def on_submit(self, interaction: discord.Interaction):
         print(self.role_id)
 
-        embed = discord.Embed(title=self.embedtitle, description=f":speech_balloon: {self.message}", color=constants.EMBED_COLOUR_QU)
-        embed.set_author(name=interaction.user.name, icon_url=interaction.user.avatar.url)
-        embed.set_thumbnail(url=interaction.user.avatar.url)
-        embed.timestamp= datetime.now(tz=timezone.utc)
-        embed.set_footer(text="Use \"/notify_me\" in this channel to sign up for future notifications."
-                     "\nYou can opt out at any time by using \"/notify_me\" again.")
+        embed, file = await _generate_cc_notice_embed(interaction.channel.id, interaction.user.display_name, interaction.user.avatar.url, self.embedtitle, self.message, self.image)
 
         # send the message to the CC channel
-        await interaction.response.send_message(f":bell: <@&{self.role_id}> New message from <@{interaction.user.id}> for <#{interaction.channel.id}> :bell:", embed=embed)
+        if file:
+            await interaction.response.defer() # this is to give us time to upload the file
+            await interaction.followup.send(f":bell: <@&{self.role_id}> New message from <@{interaction.user.id}> for <#{interaction.channel.id}> :bell:", file=file, embed=embed)
+        else:
+            await interaction.response.send_message(f":bell: <@&{self.role_id}> New message from <@{interaction.user.id}> for <#{interaction.channel.id}> :bell:", embed=embed)
         # await interaction.channel.send("*Use* `/notify_me` *in this channel to sign up for future notifications."
         #                f"\nYou can opt out at any time by using* `/notify_me` *again.*")
 
     async def on_error(self, interaction: discord.Interaction, error: Exception) -> None:
         await interaction.response.send_message(f'Oops! Something went wrong: {error}', ephemeral=True)
+
+# embed generator for send_notice commands
+async def _generate_cc_notice_embed(channel_id, user, avatar, title, message, image_url):
+    print(f"generating embed for CC notice in channel {channel_id}")
+
+    thumb_file = None
+
+    if os.path.isfile(f"images/cc/{channel_id}.png"):
+        thumb_file = discord.File(f'images/cc/{channel_id}.png', filename='image.png') 
+        print(thumb_file)
+       
+
+    embed = discord.Embed(title=title, description=message, color=constants.EMBED_COLOUR_QU)
+    embed.set_author(name=user, icon_url=avatar)
+    embed.set_image(url=image_url)
+    if thumb_file: embed.set_thumbnail(url='attachment://image.png') 
+    embed.timestamp= datetime.now(tz=timezone.utc)
+    embed.set_footer(text="Use \"/notify_me\" in this channel to sign up for future notifications."
+                    "\nYou can opt out at any time by using \"/notify_me\" again.")
+
+    return embed, thumb_file
 
 # send_notice app command - alternative to above, just noms a message like adroomba but via right click
 @bot.tree.context_menu(name='Send CC Notice')
@@ -4160,25 +4209,17 @@ async def send_cc_notice(interaction: discord.Interaction, message: discord.Mess
     community_carrier = await _send_notice_channel_check(interaction)
     if not community_carrier: return
 
-    # Discord now allows users to send messages with disallowed role mentions to it harder for spam bots to determine whether they're succcessful
-    # MAB has permissions to ping any role so would turn any such mention into a ping
-    # for this reason we scan message for the sign of a role mention and disallow if found
-    role_mention_string = '<@&'
-    if role_mention_string in message.content:
-        embed = discord.Embed(description="**ERROR**: Unable to resend messages containing role mentions. "
-                                          "Please edit out your role mention (i.e. `@role`) and try again.", color=constants.EMBED_COLOUR_ERROR)
-        await interaction.response.send_message(embed=embed, ephemeral=True)
-        return
-
     try:
+        embed = await _generate_cc_notice_embed(message.channel.id, message.author.display_name, message.author.avatar.url, None, message.content, None) # get the embed
         if message.author.id == interaction.user.id:
             heading = f"<@&{community_carrier.role_id}> New message from <@{interaction.user.id}>"
         else:
             heading = f"<@&{community_carrier.role_id}>: <@{interaction.user.id}> has forwarded a message from <@{message.author.id}>"
             print("test")
-        await interaction.channel.send(f":bell: {heading} for <#{interaction.channel.id}> :bell:\n\n>>> :speech_balloon: {message.content}")
-        await interaction.channel.send("** **\n*Use* `/notify_me` *in this channel to sign up for future notifications."
-                                                "\nYou can opt out at any time by using* `/notify_me` *again*.")
+
+        # send the embed
+        await interaction.channel.send(f":bell: {heading} for <#{interaction.channel.id}> :bell:", embed=embed)
+
         if message.author.id == interaction.user.id: await message.delete() # you can send anyone's message using this interaction
                                                                             # this check protects the messages of random users from being deleted if sent
         embed = discord.Embed(description="Your notice has been sent.", color=constants.EMBED_COLOUR_OK)
