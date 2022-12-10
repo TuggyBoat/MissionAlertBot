@@ -4130,18 +4130,17 @@ class SendNoticeModal(Modal):
                      "\nYou can opt out at any time by using \"/notify_me\" again.")
 
         # send the message to the CC channel
-        await interaction.channel.send(f"<@&{self.role_id}> New message from <@{interaction.user.id}> for <#{interaction.channel.id}>:", embed=embed)
+        await interaction.response.send_message(f"<@&{self.role_id}> New message from <@{interaction.user.id}> for <#{interaction.channel.id}>:", embed=embed)
         # await interaction.channel.send("*Use* `/notify_me` *in this channel to sign up for future notifications."
         #                f"\nYou can opt out at any time by using* `/notify_me` *again.*")
-        await interaction.response.defer()
 
     async def on_error(self, interaction: discord.Interaction, error: Exception) -> None:
         await interaction.response.send_message(f'Oops! Something went wrong: {error}', ephemeral=True)
 
 # send_notice app command - alternative to above, just noms a message like adroomba but via right click
-@bot.tree.context_menu(name='Send Notice')
+@bot.tree.context_menu(name='Send CC Notice')
 @check_roles([cmentor_role_id, botadmin_role_id, cc_role_id])
-async def send_notice(interaction: discord.Interaction, message: discord.Message):
+async def send_cc_notice(interaction: discord.Interaction, message: discord.Message):
     print(f"{interaction.user.name} used send context menu in {interaction.channel.name}")
 
     community_carrier = await _send_notice_channel_check(interaction)
@@ -4158,12 +4157,15 @@ async def send_notice(interaction: discord.Interaction, message: discord.Message
         return
 
     try:
-        await interaction.response.send_message(f"<@&{community_carrier.role_id}> New message from <@{interaction.user.id}> for <#{interaction.channel.id}>:\n\n"
+        await interaction.channel.send(f"<@&{community_carrier.role_id}> New message from <@{interaction.user.id}> for <#{interaction.channel.id}>:\n\n"
                                                 f"{message.content}\n\n"
                                                 "*Use* `/notify_me` *in this channel to sign up for future notifications."
                                                 "\nYou can opt out at any time by using* `/notify_me` *again*.")
         if message.author.id == interaction.user.id: await message.delete() # you can send anyone's message using this interaction
                                                                             # this check protects the messages of random users from being deleted if sent
+        embed = discord.Embed(description="Your notice has been sent.", color=constants.EMBED_COLOUR_OK)
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
     except Exception as e:
         await interaction.response.send_message(f"Sorry, I couldn't send your message. Reason: {e}", ephemeral=True)
 
@@ -4237,12 +4239,12 @@ async def _community_channel_help(interaction: discord.Interaction):
                           "**FUNCTION**: This command gives its user a pop-out form in which to type a message which will be sent to the channel as an embed, pinging the channel's "
                           "associated role in the process. The embed can be up to 4000 characters and can optionally include a title. It will also "
                           "feature the name and avatar picture of the sending user."
-                          "\n\n:arrow_forward: **\"Send Notice\"** context menu command:\n"
+                          "\n\n:arrow_forward: **\"Send CC Notice\"** context menu command:\n"
                           "**USE ON**: any message in the target Community Channel\n"
                           f"**USED BY**: channel owner or any <@&{cmentor_role_id}>\n"
                           "**FUNCTION**: Similar to the above, this sends a notice to the channel's associated role, but it can be "
                           "used *on a message* in the channel. To access it:\n> :mouse_three_button: **Right click** or :point_up_2: **long press** on any message in the channel\n"
-                          "> :arrow_right: **Apps**\n> :arrow_right: **Send Notice**\n"
+                          "> :arrow_right: **Apps**\n> :arrow_right: **Send CC Notice**\n"
                           "If the message was sent by the command's user, it will be consumed by the bot and spat out with a role ping and helpful information appended. "
                           "If the message was sent by anyone else, it will not be deleted, but the bot will instead copy it. Note: messages broadcast this way can be around **1800 characters at most**, "
                           "otherwise the bot will return an error and nothing will be sent (or eaten).",
