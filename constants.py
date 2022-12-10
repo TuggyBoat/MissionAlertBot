@@ -24,6 +24,7 @@ PROD_CMENTOR_ROLE = 863521103434350613 # Community Mentor role on live server
 PROD_CERTCARRIER_ROLE = 800091463160430654 # Certified Carrier role on live server
 PROD_RESCARRIER_ROLE = 929985255903998002 # Fleet Reserve Carrier role on live server
 PROD_TRAINEE_ROLE = 800439864797167637 # CCO Trainee role on live server
+PROD_CPILLAR_ROLE = 863789660425027624 # Community Pillar role on live server
 PROD_DEV_ROLE = 812988180210909214 # Developer role ID on live
 PROD_TRADE_CAT = 801558838414409738 # Trade Carrier category on live server
 PROD_ARCHIVE_CAT = 1048957416781393970 # Archive category on live server
@@ -58,6 +59,7 @@ TEST_CMENTOR_ROLE = 877586763672072193 # Community Mentor role on test server
 TEST_CERTCARRIER_ROLE = 822999970012463154 # Certified Carrier role on test server
 TEST_RESCARRIER_ROLE = 947520552766152744 # Fleet Reserve Carrier role on test server
 TEST_TRAINEE_ROLE = 1048912218344923187 # CCO Trainee role on test server
+TEST_CPILLAR_ROLE = 903289927184314388 # Community Pillar role on test server
 TEST_DEV_ROLE = 1048913812163678278 # Dev role ID on test
 TEST_TRADE_CAT = 876569219259580436 # Trade Carrier category on live server
 TEST_ARCHIVE_CAT = 877244591579992144 # Archive category on live server
@@ -111,6 +113,7 @@ def get_constant(production: bool):
             'CERTCARRIER_ROLE' : PROD_CERTCARRIER_ROLE,
             'RESCARRIER_ROLE' : PROD_RESCARRIER_ROLE,
             'TRAINEE_ROLE' : PROD_TRAINEE_ROLE,
+            'CPILLAR_ROLE' : PROD_CPILLAR_ROLE,
             'DEV_ROLE' : PROD_DEV_ROLE,
             'TRADE_CAT' : PROD_TRADE_CAT,
             'ARCHIVE_CAT' : PROD_ARCHIVE_CAT,
@@ -143,6 +146,7 @@ def get_constant(production: bool):
             'CERTCARRIER_ROLE' : TEST_CERTCARRIER_ROLE,
             'RESCARRIER_ROLE' : TEST_RESCARRIER_ROLE,
             'TRAINEE_ROLE' : TEST_TRAINEE_ROLE,
+            'CPILLAR_ROLE' : TEST_CPILLAR_ROLE,
             'DEV_ROLE' : TEST_DEV_ROLE,
             'TRADE_CAT' : TEST_TRADE_CAT,
             'ARCHIVE_CAT' : TEST_ARCHIVE_CAT,

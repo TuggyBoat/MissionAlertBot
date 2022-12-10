@@ -78,6 +78,7 @@ archive_cat_id = conf['ARCHIVE_CAT']
 # role IDs
 hauler_role_id = conf['HAULER_ROLE']
 legacy_hauler_role_id = conf['LEGACY_HAULER_ROLE']
+cpillar_role_id = conf['CPILLAR_ROLE']
 cc_role_id = conf['CC_ROLE']
 cmentor_role_id = conf['CMENTOR_ROLE']
 certcarrier_role_id = conf['CERTCARRIER_ROLE']
@@ -4176,10 +4177,11 @@ async def _send_notice_channel_check(interaction):
         if not await checkroles(interaction, [cmentor_role_id, botadmin_role_id]): return
     return community_carrier
 
+
 # help for Community Channel users. when we refactor we'll work on having proper custom help available in more depth
 @bot.tree.command(name="community_channel_help",
     description="Private command: get help with Community Channel commands and functions.", guild=guild_obj)
-@check_roles([cmentor_role_id, botadmin_role_id, cc_role_id])
+@check_roles([cmentor_role_id, botadmin_role_id, cc_role_id, cpillar_role_id])
 async def _community_channel_help(interaction: discord.Interaction):
     embed = discord.Embed(title="Community Channel Help",
                           # sorry Kutu I'm not wrapping this too eagerly
