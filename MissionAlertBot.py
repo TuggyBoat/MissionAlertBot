@@ -3497,7 +3497,7 @@ async def _create_community_channel(interaction: discord.Interaction, owner: dis
         bu_link = Button(label="Full Emoji List", url="https://unicode.org/emoji/charts/full-emoji-list.html")
         view = View()
         view.add_item(bu_link)
-        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+        return await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
     # PROCESS: remove unusable characters and render to lowercase
     stripped_channel_name = _regex_alphanumeric_with_hyphens(channel_name.lower())
@@ -4020,10 +4020,11 @@ async def _openclose_community_channel(interaction, open):
     des_text = "Welcome everybody, it's good to see you here!" if open else "So long, farewell, auf Wiedersehen, goodbye."
     embed = discord.Embed(title=f"★ COMMUNITY CHANNEL {status_text_adj.upper()} ★", description=f"**<#{interaction.channel.id}> is now {status_text_adj}!** *🎶 {des_text}*", color=constants.EMBED_COLOUR_OK)
     embed.set_author(name=interaction.user.name, icon_url=interaction.user.avatar.url)
-    embed.set_thumbnail(url="https://pilotstradenetwork.com/wp-content/uploads/2021/08/PTN_Discord_Icon.png")
+    embed.set_thumbnail(url=interaction.guild.icon.url)
     embed.timestamp= datetime.now(tz=timezone.utc)
-    if open: embed.set_image(url=random.choice(hello_gifs))
-    embed.set_footer(text="You can use \"/notify_me\" in this channel to sign up for notifications of announcements by the channel owner or Community Mentors."
+    if open: # we don't need the notify_me footer on close and nobody's going to see any close gifs except community team members
+        embed.set_image(url=random.choice(hello_gifs))
+        embed.set_footer(text="You can use \"/notify_me\" in this channel to sign up for notifications of announcements by the channel owner or Community Mentors."
                     "\nYou can opt out at any time by using \"/notify_me\" again.")
     await interaction.channel.send(embed=embed)
 
@@ -4104,6 +4105,8 @@ async def _send_notice(interaction: discord.Interaction):
     # create a modal to take the message
     await interaction.response.send_modal(SendNoticeModal(community_carrier.role_id))
 
+    print("Back from modal interaction")
+
     try: # this to avoid annoying thinking response remaining bug if user cancels on mobile
         await interaction.response.defer()
     finally:
@@ -4133,7 +4136,7 @@ class SendNoticeModal(Modal):
     async def on_submit(self, interaction: discord.Interaction):
         print(self.role_id)
 
-        embed = discord.Embed(title=self.embedtitle, description=self.message, color=constants.EMBED_COLOUR_QU)
+        embed = discord.Embed(title=self.embedtitle, description=f":speech_balloon: {self.message}", color=constants.EMBED_COLOUR_QU)
         embed.set_author(name=interaction.user.name, icon_url=interaction.user.avatar.url)
         embed.set_thumbnail(url=interaction.user.avatar.url)
         embed.timestamp= datetime.now(tz=timezone.utc)
@@ -4141,7 +4144,7 @@ class SendNoticeModal(Modal):
                      "\nYou can opt out at any time by using \"/notify_me\" again.")
 
         # send the message to the CC channel
-        await interaction.response.send_message(f"<@&{self.role_id}> New message from <@{interaction.user.id}> for <#{interaction.channel.id}>:", embed=embed)
+        await interaction.response.send_message(f":bell: <@&{self.role_id}> New message from <@{interaction.user.id}> for <#{interaction.channel.id}> :bell:", embed=embed)
         # await interaction.channel.send("*Use* `/notify_me` *in this channel to sign up for future notifications."
         #                f"\nYou can opt out at any time by using* `/notify_me` *again.*")
 
@@ -4168,9 +4171,13 @@ async def send_cc_notice(interaction: discord.Interaction, message: discord.Mess
         return
 
     try:
-        await interaction.channel.send(f"<@&{community_carrier.role_id}> New message from <@{interaction.user.id}> for <#{interaction.channel.id}>:\n\n"
-                                                f"{message.content}\n\n"
-                                                "*Use* `/notify_me` *in this channel to sign up for future notifications."
+        if message.author.id == interaction.user.id:
+            heading = f"<@&{community_carrier.role_id}> New message from <@{interaction.user.id}>"
+        else:
+            heading = f"<@&{community_carrier.role_id}>: <@{interaction.user.id}> has forwarded a message from <@{message.author.id}>"
+            print("test")
+        await interaction.channel.send(f":bell: {heading} for <#{interaction.channel.id}> :bell:\n\n>>> :speech_balloon: {message.content}")
+        await interaction.channel.send("** **\n*Use* `/notify_me` *in this channel to sign up for future notifications."
                                                 "\nYou can opt out at any time by using* `/notify_me` *again*.")
         if message.author.id == interaction.user.id: await message.delete() # you can send anyone's message using this interaction
                                                                             # this check protects the messages of random users from being deleted if sent
