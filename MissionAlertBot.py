@@ -4296,8 +4296,9 @@ async def _community_channel_help(interaction: discord.Interaction):
                           "**USE IN**: the target Community Channel\n"
                           f"**USED BY**: channel owner or any <@&{cmentor_role_id}>\n"
                           "**FUNCTION**: This command gives its user a pop-out form in which to type a message which will be sent to the channel as an embed, pinging the channel's "
-                          "associated role in the process. The embed can be up to 4000 characters and can optionally include a title. It will also "
-                          "feature the name and avatar picture of the sending user."
+                          "associated role in the process. The embed can be up to 4000 characters and can optionally include a title and an image: images have to be linked, not uploaded,"
+                          " but you can upload them to Discord (anywhere, even in a DM or another server) and use the link from that. It will also "
+                          "feature the name and avatar of the sending user, and, if set up (see below), a thumbnail image."
                           "\n\n:arrow_forward: **\"Send CC Notice\"** context menu command:\n"
                           "**USE ON**: any message in the target Community Channel\n"
                           f"**USED BY**: channel owner or any <@&{cmentor_role_id}>\n"
@@ -4305,8 +4306,13 @@ async def _community_channel_help(interaction: discord.Interaction):
                           "used *on a message* in the channel. To access it:\n> :mouse_three_button: **Right click** or :point_up_2: **long press** on any message in the channel\n"
                           "> :arrow_right: **Apps**\n> :arrow_right: **Send CC Notice**\n"
                           "If the message was sent by the command's user, it will be consumed by the bot and spat out with a role ping and helpful information appended. "
-                          "If the message was sent by anyone else, it will not be deleted, but the bot will instead copy it. Note: messages broadcast this way can be around **1800 characters at most**, "
-                          "otherwise the bot will return an error and nothing will be sent (or eaten).",
+                          "If the message was sent by anyone else, it will not be deleted, but the bot will instead copy it."
+                          "\n\n:arrow_forward: **\"Upload CC Thumb\"** context menu command:\n"
+                          "**USE ON**: any message in the target Community Channel\n"
+                          f"**USED BY**: channel owner or any <@&{cmentor_role_id}>\n"
+                          "**FUNCTION**: if the message contains an attached image, that image will be uploaded for use as a thumbnail on `/send_notice` embeds. "
+                          "If not, any existing thumbnail will be deleted. To use it:\n> :mouse_three_button: **Right click** or :point_up_2: **long press** on any message in the channel\n"
+                          "> :arrow_right: **Apps**\n> :arrow_right: **Upload CC Thumb**\n",
                           color=constants.EMBED_COLOUR_QU)
     await interaction.response.send_message(embed=embed, ephemeral=True)
                         
