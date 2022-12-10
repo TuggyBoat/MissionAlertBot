@@ -2357,7 +2357,7 @@ async def _info(interaction: discord.Interaction):
         embed = discord.Embed(title="COMMUNITY CHANNEL",
                               description=f"<#{interaction.channel.id}> is a P.T.N. Community channel "
                                           f"registered to <@{community_carrier_data.owner_id}>.\n\n"
-                                          f"Community channels are for events and community building and"
+                                          f"Community channels are for events and community building and "
                                           f"are administered by the <@&{cc_role_id}> and <@&{cmentor_role_id}>s. See channel pins and description "
                                           f"more information about this channel's purpose and associated event(s).", color=constants.EMBED_COLOUR_OK)
         await interaction.response.send_message(embed=embed, ephemeral=True)
