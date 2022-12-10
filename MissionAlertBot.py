@@ -4183,6 +4183,7 @@ async def _send_notice_channel_check(interaction):
     description="Private command: get help with Community Channel commands and functions.", guild=guild_obj)
 @check_roles([cmentor_role_id, botadmin_role_id, cc_role_id, cpillar_role_id])
 async def _community_channel_help(interaction: discord.Interaction):
+    print(f"{interaction.user.name} used /community_channel_help")
     embed = discord.Embed(title="Community Channel Help",
                           # sorry Kutu I'm not wrapping this too eagerly
                           description=f"**Community Channel commands:**\n\nAll commands require the <@&{cmentor_role_id}> role unless specified."
