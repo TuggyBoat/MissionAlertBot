@@ -4188,7 +4188,6 @@ async def _generate_cc_notice_embed(channel_id, user, avatar, title, message, im
     if os.path.isfile(f"images/cc/{channel_id}.png"):
         thumb_file = discord.File(f'images/cc/{channel_id}.png', filename='image.png') 
         print(thumb_file)
-       
 
     embed = discord.Embed(title=title, description=message, color=constants.EMBED_COLOUR_QU)
     embed.set_author(name=user, icon_url=avatar)
@@ -4210,7 +4209,7 @@ async def send_cc_notice(interaction: discord.Interaction, message: discord.Mess
     if not community_carrier: return
 
     try:
-        embed = await _generate_cc_notice_embed(message.channel.id, message.author.display_name, message.author.avatar.url, None, message.content, None) # get the embed
+        embed, file = await _generate_cc_notice_embed(message.channel.id, message.author.display_name, message.author.avatar.url, None, message.content, None) # get the embed
         if message.author.id == interaction.user.id:
             heading = f"<@&{community_carrier.role_id}> New message from <@{interaction.user.id}>"
         else:
@@ -4218,7 +4217,10 @@ async def send_cc_notice(interaction: discord.Interaction, message: discord.Mess
             print("test")
 
         # send the embed
-        await interaction.channel.send(f":bell: {heading} for <#{interaction.channel.id}> :bell:", embed=embed)
+        if file:
+            await interaction.channel.send(f":bell: {heading} for <#{interaction.channel.id}> :bell:", file=file, embed=embed)
+        else:
+            await interaction.channel.send(f":bell: {heading} for <#{interaction.channel.id}> :bell:", embed=embed)
 
         if message.author.id == interaction.user.id: await message.delete() # you can send anyone's message using this interaction
                                                                             # this check protects the messages of random users from being deleted if sent
