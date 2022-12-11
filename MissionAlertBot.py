@@ -1836,7 +1836,7 @@ async def _owner(interaction: discord.Interaction, owner: discord.Member):
 
         for carrier_data in carrier_list:
             embed.add_field(name=f"{carrier_data.carrier_long_name} ({carrier_data.carrier_identifier})",
-                            value=f"Channel Name: #{carrier_data.discord_channel}",
+                            value=f"Last Trade: <t:{carrier_data.lasttrade}> (<t:{carrier_data.lasttrade}:R>)",
                             inline=False)
 
         await interaction.response.send_message(embed=embed, ephemeral=True)
@@ -2041,7 +2041,7 @@ async def _cleanup_completed_mission(ctx, mission_data, reddit_complete_text, di
                         alert_channel = bot.get_channel(wine_alerts_unloading_id)
                 else:
                     alert_channel = bot.get_channel(trade_alerts_id)
-                
+
                 discord_alert_id = mission_data.discord_alert_id
 
                 try: # shitty hacky message of incorporating legacy trades without extra DB fields
@@ -2322,7 +2322,7 @@ async def complete(ctx, comment: str = None):
 
 # backup databases
 @bot.command(name='backup', help='Backs up the carrier and mission databases.')
-@commands.has_role(botadmin_role_id)
+@check_roles([botadmin_role_id])
 async def backup(ctx):
 
     # make sure we are in the right channel
@@ -2521,7 +2521,7 @@ async def carrier_list(ctx):
                                       'with quotes.\n'
                                       '<carrier_id> is the carrier\'s unique identifier in the format ABC-XYZ\n'
                                       '<owner_id> is the owner\'s Discord ID')
-@commands.has_role(botadmin_role_id)
+@check_roles([botadmin_role_id])
 async def carrier_add(ctx, short_name: str, long_name: str, carrier_id: str, owner_id: int):
 
     # make sure we are in the right channel
@@ -2572,7 +2572,7 @@ async def carrier_add(ctx, short_name: str, long_name: str, carrier_id: str, own
 
 # remove FC from database
 @bot.command(name='carrier_del', help='Delete a Fleet Carrier from the database using its database entry ID#.')
-@commands.has_role(botadmin_role_id)
+@check_roles([botadmin_role_id])
 async def carrier_del(ctx, db_id: int):
 
     # make sure we are in the right channel
@@ -3072,7 +3072,7 @@ async def search_for_commodity(ctx, commodity_search_term: str):
 
 
 @bot.command(name='carrier_edit', help='Edit a specific carrier in the database by providing specific inputs')
-@commands.has_role(botadmin_role_id)
+@check_roles([botadmin_role_id])
 async def edit_carrier(ctx, carrier_name_search_term: str):
     """
     Edits a carriers information in the database. Provide a carrier name that can be partially matched and follow the
@@ -4641,7 +4641,7 @@ async def cron_status(ctx):
 
 # quit the bot
 @bot.command(name='stopquit', help="Stops the bots process on the VM, ending all functions.")
-@commands.has_role(botadmin_role_id)
+@check_roles([botadmin_role_id])
 async def stopquit(ctx):
     await ctx.send(f"k thx bye")
     await user_exit()
@@ -4667,9 +4667,10 @@ async def lasttrade_cron():
         # get carriers who last traded >28 days ago
         # for owners with multiple carriers look at only the most recently used
         carrier_db.execute(f'''
-                            SELECT p_ID,shortname,ownerid,max(lasttrade)
-                            FROM carriers WHERE lasttrade < {int(lasttrade_max.timestamp())}
-                            GROUP BY ownerid
+                            SELECT p_ID, shortname, ownerid, lasttrade
+                            FROM carriers c1
+                            WHERE lasttrade = (SELECT MAX(lasttrade) FROM carriers c2 WHERE c1.ownerid = c2.ownerid)
+                            and lasttrade < {int(lasttrade_max.timestamp())}
                             ''')
         carriers = [CarrierData(carrier) for carrier in carrier_db.fetchall()]
         for carrier_data in carriers:
