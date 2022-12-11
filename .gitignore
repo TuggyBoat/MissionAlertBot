@@ -3,6 +3,7 @@ missions.db
 missions.db.backup
 backup/
 __pycache__/
+images/cc/
 db_sql/
 .idea
 
