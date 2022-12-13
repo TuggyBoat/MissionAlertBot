@@ -4326,7 +4326,7 @@ async def _community_channel_help(interaction: discord.Interaction):
                           "its 'owner'. **This command also has a secondary purpose**: if used *outside a Community Channel*, it will scan the database and check for "
                           "any orphaned owners (owners with a channel which is no longer valid) and purge them from the database. Useful if a community channel has "
                           "been accidentally deleted or the database update failed upon the bot removing it."
-                          "\n\n:arrow_forward: `/restore_community_channel`:"
+                          "\n\n:arrow_forward: `/restore_community_channel`:\n"
                           "**USE IN**: target archived Community Channel\n"
                           "**REQUIRES:** a **user** to be the channel's new owner\n"
                           "**FUNCTION**: moves the archived Community Channel back to the Community Channel category and assigns it an owner. "
@@ -4336,7 +4336,7 @@ async def _community_channel_help(interaction: discord.Interaction):
     embed = discord.Embed(title="Community Channel Help",
                             # sorry Kutu I'm not wrapping this too eagerly
                             description="\n\n**Broadcast message commands:**"
-                            f"\n\n:arrow_forward:`/send_notice`:\n"
+                            f"\n\n:arrow_forward: `/send_notice`:\n"
                             "**USE IN**: the target Community Channel\n"
                             f"**USED BY**: channel owner or any <@&{cmentor_role_id}>\n"
                             "**FUNCTION**: This command gives its user a pop-out form in which to type a message which will be sent to the channel as an embed, pinging the channel's "
@@ -4356,7 +4356,13 @@ async def _community_channel_help(interaction: discord.Interaction):
                             f"**USED BY**: channel owner or any <@&{cmentor_role_id}>\n"
                             "**FUNCTION**: if the message contains an attached image, that image will be uploaded for use as a thumbnail on `/send_notice` embeds. "
                             "If not, any existing thumbnail will be deleted. To use it:\n> :mouse_three_button: **Right click** or :point_up_2: **long press** on any message in the channel\n"
-                            "> :arrow_right: **Apps**\n> :arrow_right: **Upload CC Thumb**\n",
+                            "> :arrow_right: **Apps**\n> :arrow_right: **Upload CC Thumb**\n"
+                            "\n:arrow_forward: **\"Edit CC Notice\"** context menu command:\n"
+                            "**USED BY**: author of a CC notice message\n"
+                            "**FUNCTION**: Edits (recreates from scratch) any CC Notice message sent by MAB *of which the user is the original author*."
+                            "You may not edit messages you forward from another user, or CC Notices sent by another user. To use it:\n"
+                            "> :mouse_three_button: **Right click** or :point_up_2: **long press** on a CC Notice message in the channel\n"
+                            "> :arrow_right: **Apps**\n> :arrow_right: **Edit CC Notice**\n",
                             color=constants.EMBED_COLOUR_QU)
     await interaction.followup.send(embed=embed, ephemeral=True)
 
