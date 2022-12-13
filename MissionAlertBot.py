@@ -4277,7 +4277,7 @@ async def edit_cc_notice(interaction: discord.Interaction, message: discord.Mess
     We can check 2 & 3 with the same string
     """
     if not message.author.id == bot.user.id or not f"New message from <@{interaction.user.id}>" in message.content:
-        await interaction.response.send_message(embed=discord.Embed(description=f"Error: This does not appear to be a CC Notice message, or a CC Notice message authored by you.", color=constants.EMBED_COLOUR_ERROR))
+        await interaction.response.send_message(embed=discord.Embed(description=f"Error: This does not appear to be a CC Notice message, or a CC Notice message authored by you.", color=constants.EMBED_COLOUR_ERROR), ephemeral=True)
 
     # Zhu'li, do the thing
     # call the sendnotice modal to take the message
