@@ -4126,7 +4126,7 @@ async def _send_notice(interaction: discord.Interaction):
     if not community_carrier: return
 
     # create a modal to take the message
-    await interaction.response.send_modal(SendNoticeModal(community_carrier.role_id))
+    await interaction.response.send_modal(SendNoticeModal(community_carrier.role_id, None)) # the None parameter tells the modal we are sending, not editing
 
     print("Back from modal interaction")
 
@@ -4136,10 +4136,10 @@ async def _send_notice(interaction: discord.Interaction):
         return
 
 # modal for send_notice
-
 class SendNoticeModal(Modal):
-    def __init__(self, role_id, title = 'Send to Community Channel', timeout = None) -> None:
+    def __init__(self, role_id, orginal_message, title = 'Send to Community Channel', timeout = None) -> None:
         self.role_id = role_id # we need to use the role_id in the response
+        self.original_message = orginal_message # if used via edit, this will be a discord.Message object
         super().__init__(title=title, timeout=timeout)
 
     embedtitle = discord.ui.TextInput(
@@ -4167,17 +4167,25 @@ class SendNoticeModal(Modal):
 
         embed, file = await _generate_cc_notice_embed(interaction.channel.id, interaction.user.display_name, interaction.user.avatar.url, self.embedtitle, self.message, self.image)
 
-        # send the message to the CC channel
-        if file:
-            await interaction.response.defer() # this is to give us time to upload the file
-            await interaction.followup.send(f":bell: <@&{self.role_id}> New message from <@{interaction.user.id}> for <#{interaction.channel.id}> :bell:", file=file, embed=embed)
+        header_text = f":bell: <@&{self.role_id}> New message from <@{interaction.user.id}> for <#{interaction.channel.id}> :bell:"
+
+        if self.original_message: # if the modal was called by the edit command, we'll edit instead of sending a new message
+            print("Editing existing message")
+            await self.original_message.edit(content=f"{header_text}\n*(edited {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')})*", embed=embed)
+            await interaction.response.send_message(embed=discord.Embed(description=f"Message edited: {self.original_message.jump_url}", color=constants.EMBED_COLOUR_OK), ephemeral=True)
+
         else:
-            await interaction.response.send_message(f":bell: <@&{self.role_id}> New message from <@{interaction.user.id}> for <#{interaction.channel.id}> :bell:", embed=embed)
-        # await interaction.channel.send("*Use* `/notify_me` *in this channel to sign up for future notifications."
-        #                f"\nYou can opt out at any time by using* `/notify_me` *again.*")
+            await interaction.response.defer() # this gives us time to upload the file, but also responses and followups do not ping
+            print("Sending new message")
+            # send the message to the CC channel
+            if file: # "file" is the thumbnail image
+                await interaction.channel.send(header_text, file=file, embed=embed)
+            else:
+                await interaction.channel.send(header_text, embed=embed)
 
     async def on_error(self, interaction: discord.Interaction, error: Exception) -> None:
         await interaction.response.send_message(f'Oops! Something went wrong: {error}', ephemeral=True)
+
 
 # embed generator for send_notice commands
 async def _generate_cc_notice_embed(channel_id, user, avatar, title, message, image_url):
@@ -4214,10 +4222,9 @@ async def send_cc_notice(interaction: discord.Interaction, message: discord.Mess
             heading = f"<@&{community_carrier.role_id}> New message from <@{interaction.user.id}>"
         else:
             heading = f"<@&{community_carrier.role_id}>: <@{interaction.user.id}> has forwarded a message from <@{message.author.id}>"
-            print("test")
 
         # send the embed
-        if file:
+        if file: # this "file" is the message thumbnail, if any
             await interaction.channel.send(f":bell: {heading} for <#{interaction.channel.id}> :bell:", file=file, embed=embed)
         else:
             await interaction.channel.send(f":bell: {heading} for <#{interaction.channel.id}> :bell:", embed=embed)
@@ -4251,6 +4258,37 @@ async def _send_notice_channel_check(interaction):
         print("Channel user is not command user")
         if not await checkroles(interaction, [cmentor_role_id, botadmin_role_id]): return
     return community_carrier
+
+# edit notice app command - edits an existing sent notice
+@bot.tree.context_menu(name='Edit CC Notice')
+@check_roles([cmentor_role_id, botadmin_role_id, cc_role_id])
+async def edit_cc_notice(interaction: discord.Interaction, message: discord.Message):
+    print(f"{interaction.user.name} used edit CC notice context menu in {interaction.channel.name}")
+
+    # check we're in a CC channel and get the CC data
+    community_carrier = await _send_notice_channel_check(interaction)
+    if not community_carrier: return
+
+    """
+    Now we check the message that we've been given. It must:
+    1. be by MAB
+    2. have been originally authored by the interaction.user
+    3. have characteristics of a send_notice message
+    We can check 2 & 3 with the same string
+    """
+    if not message.author.id == bot.user.id or not f"New message from <@{interaction.user.id}>" in message.content:
+        await interaction.response.send_message(embed=discord.Embed(description=f"Error: This does not appear to be a CC Notice message, or a CC Notice message authored by you.", color=constants.EMBED_COLOUR_ERROR))
+
+    # Zhu'li, do the thing
+    # call the sendnotice modal to take the message
+    await interaction.response.send_modal(SendNoticeModal(community_carrier.role_id, message))
+
+    print("Back from modal interaction")
+
+    try: # this to avoid annoying thinking response remaining bug if user cancels on mobile
+        await interaction.response.defer()
+    finally:
+        return 
 
 
 # help for Community Channel users. when we refactor we'll work on having proper custom help available in more depth
