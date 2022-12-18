@@ -3059,7 +3059,10 @@ async def _carrier_edit(interaction: discord.Interaction, carrier_name_search_te
     orig_carrier_data = copy.copy(carrier_data)
     print(carrier_data)
     if carrier_data:
+        embed = discord.Embed(title="Original Carrier Data", color=discord.Color.green())
+        embed = await _configure_all_carrier_detail_embed(embed, carrier_data)
         return await interaction.response.send_message(
+            embed=embed,
             view=CarrierEditView(carrier_data=carrier_data,orig_carrier_data=orig_carrier_data), ephemeral=True)
     else:
         embed = discord.Embed(title=f'No result found for the carrier: "{carrier_name_search_term}"', color=constants.EMBED_COLOUR_ERROR)
@@ -3092,7 +3095,7 @@ class CarrierEditView(discord.ui.View):
             self.stop()
             return await interaction.response.edit_message(content=None, embed=embed, view=None)
         else:
-            embed = discord.Embed(title="Review the Data!", color=discord.Color.orange())
+            embed = discord.Embed(title="Review Carrier Changes", color=discord.Color.orange())
             embed = await _configure_all_carrier_detail_embed(embed, self.carrier_data)
             await interaction.response.edit_message(
                 content=None,
