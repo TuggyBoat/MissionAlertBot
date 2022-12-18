@@ -53,3 +53,9 @@ class CarrierData:
         :rtype: bool
         """
         return any([value for key, value in vars(self).items() if value])
+
+    def __eq__(self, other):
+        """
+        When comparing two CarrierData class objects, compare them as dicts
+        """
+        return self.__dict__ == other.__dict__

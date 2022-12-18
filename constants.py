@@ -26,6 +26,7 @@ PROD_RESCARRIER_ROLE = 929985255903998002 # Fleet Reserve Carrier role on live s
 PROD_TRAINEE_ROLE = 800439864797167637 # CCO Trainee role on live server
 PROD_CPILLAR_ROLE = 863789660425027624 # Community Pillar role on live server
 PROD_DEV_ROLE = 812988180210909214 # Developer role ID on live
+PROD_MOD_ROLE = 813814494563401780 # Mod role ID on Live
 PROD_TRADE_CAT = 801558838414409738 # Trade Carrier category on live server
 PROD_ARCHIVE_CAT = 1048957416781393970 # Archive category on live server
 PROD_SECONDS_SHORT = 120
@@ -55,6 +56,7 @@ TEST_LEGACY_HAULER__ROLE = 1047152762707787786 # legacy hauler role ID on test s
 TEST_CC_ROLE = 877220476827619399 # CC role on test server
 TEST_CC_CAT = 877108931699310592 # Community Carrier category on test server
 TEST_ADMIN_ROLE = 836367194979041351 # Bot Admin role on test server
+TEST_MOD_ROLE = 903292469049974845 # Mod role on test server
 TEST_CMENTOR_ROLE = 877586763672072193 # Community Mentor role on test server
 TEST_CERTCARRIER_ROLE = 822999970012463154 # Certified Carrier role on test server
 TEST_RESCARRIER_ROLE = 947520552766152744 # Fleet Reserve Carrier role on test server
@@ -109,6 +111,7 @@ def get_constant(production: bool):
             'CC_ROLE' : PROD_CC_ROLE,
             'CC_CAT' : PROD_CC_CAT,
             'ADMIN_ROLE' : PROD_ADMIN_ROLE,
+            'MOD_ROLE' : PROD_MOD_ROLE,
             'CMENTOR_ROLE' : PROD_CMENTOR_ROLE,
             'CERTCARRIER_ROLE' : PROD_CERTCARRIER_ROLE,
             'RESCARRIER_ROLE' : PROD_RESCARRIER_ROLE,
@@ -142,6 +145,7 @@ def get_constant(production: bool):
             'CC_ROLE' : TEST_CC_ROLE,
             'CC_CAT' : TEST_CC_CAT,
             'ADMIN_ROLE' : TEST_ADMIN_ROLE,
+            'MOD_ROLE' : TEST_MOD_ROLE,
             'CMENTOR_ROLE' : TEST_CMENTOR_ROLE,
             'CERTCARRIER_ROLE' : TEST_CERTCARRIER_ROLE,
             'RESCARRIER_ROLE' : TEST_RESCARRIER_ROLE,
