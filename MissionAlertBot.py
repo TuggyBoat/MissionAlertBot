@@ -247,6 +247,30 @@ def check_database_table_exists(table_name, database):
     return bool(database.fetchone()[0])
 
 
+def create_missing_table(table, db_obj, create_stmt):
+    print(f'{table} table missing - creating it now')
+
+    if os.path.exists(os.path.join(os.getcwd(), 'db_sql', f'{table}_dump.sql')):
+
+        # recreate from backup file
+        print('Recreating database from backup ...')
+        with open(os.path.join(os.getcwd(), 'db_sql', f'{table}_dump.sql')) as f:
+
+            sql_script = f.read()
+            db_obj.executescript(sql_script)
+
+
+        # print('Loaded the following data: ')
+        # carrier_db.execute('''SELECT * from carriers ''')
+        # for e in carrier_db.fetchall():
+        #     print(f'\t {CarrierData(e)}')
+    else:
+        # Create a new version
+        print('No backup found - Creating empty database')
+
+        db_obj.execute(create_stmt)
+
+
 def check_table_column_exists(column_name, table_name, database):
     """
     Checks whether a column exists in a table for a database.
@@ -329,7 +353,7 @@ database_table_map = {
 for table_name in database_table_map:
     t = database_table_map[table_name]
     if not check_database_table_exists(table_name, t['obj']):
-        t['obj'].execute(t['create'])
+        create_missing_table(table_name, t['obj'], t['create'])
     else:
         print(f'{table_name} table exists, do nothing')
 
@@ -369,6 +393,30 @@ for column_name in new_column_map:
         print(f'{column_name} exists, do nothing')
 
 
+def dump_database_test(database_name):
+    """
+    Dumps the database object to a .sql text file while backing up the database. Used just to get something we can
+    recreate the database from.  This will only store the last state and should periodically be committed to the repo
+    from the bot.
+    :param str database_name: The DB name to connect against.
+    :returns: None
+    :raises ValueError: if the db name is unknown
+    """
+    # We only have 2 databases today, carriers and missions, though this could really just be 2 tables in a single
+    # database at some stage.
+
+    if database_name == 'missions':
+        connection = missions_conn
+    elif database_name == 'carriers':
+        connection = carriers_conn
+    else:
+        raise ValueError(f'Unknown DB dump handling for: {database_name}')
+
+    os.makedirs('db_sql', exist_ok=True)
+    with open(f'db_sql/{database_name}_dump.sql', 'w') as f:
+        for line in connection.iterdump():
+            f.write(line)
+
 # function to backup carrier database
 def backup_database(database_name):
     """
@@ -384,6 +432,7 @@ def backup_database(database_name):
 
     shutil.copy(f'{database_name}.db', f'backup/{database_name}.{dt_file_string}.db')
     print(f'Backed up {database_name}.db at {dt_file_string}')
+    dump_database_test(database_name)
 
 
 # function to add carrier, being sure to correct case
