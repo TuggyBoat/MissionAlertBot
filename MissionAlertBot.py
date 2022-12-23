@@ -3778,10 +3778,6 @@ class RemoveCCView(View):
         print("User chose to archive channel.")
         await _remove_cc_manager(interaction, delete_channel, self)
         
-        self.clear_items()
-        await interaction.response.edit_message(view=self)
-        await interaction.delete_original_response()
-
     @discord.ui.button(label="Cancel", style=discord.ButtonStyle.gray, emoji="✖", custom_id="cancel")
     async def cancel_button_callback(self, interaction, button):
         embed = discord.Embed(title="Remove Community Channel",
@@ -3886,7 +3882,7 @@ async def _remove_cc_manager(interaction, delete_channel, button_self):
 
     # archive channel if relevant - we save deleting for later so user can read bot status messages in channel
     print("Processing archive flag...")
-    if not delete_channel: embed = await _archive_cc_channel(interaction, embed)
+    if not delete_channel: embed = await _archive_cc_channel(interaction, embed, button_self)
      
     # delete role
     print("Deleting role...")
@@ -3960,7 +3956,7 @@ async def _delete_cc_channel(interaction, button_self):
     return
 
 # helper function for /remove_community_channel
-async def _archive_cc_channel(interaction, embed):
+async def _archive_cc_channel(interaction, embed, button_self):
     archive_category = discord.utils.get(interaction.guild.categories, id=archive_cat_id)
     try:
         await interaction.channel.edit(category=archive_category)
@@ -3974,6 +3970,10 @@ async def _archive_cc_channel(interaction, embed):
     except Exception as e:
         print(e)
         embed.add_field(name="Channel", value=f"**Failed archiving <#{interaction.channel.id}>**: {e}", inline=False)
+
+    button_self.clear_items()
+    await interaction.response.edit_message(view=button_self)
+    await interaction.delete_original_response()
 
     return embed
 
@@ -4620,7 +4620,7 @@ async def nom_delete(ctx, userid: Union[str, int]):
 @bot.command(name='ping', help='Ping the bot')
 @check_roles(any_elevated_role)
 async def ping(ctx):
-
+    print(f"{ctx.author} used PING in {ctx.channel.name}")
     gif = random.choice(hello_gifs)
     await ctx.send(gif)
     # await ctx.send("**PING? PONG!**")
