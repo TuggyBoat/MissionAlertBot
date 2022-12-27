@@ -1097,6 +1097,9 @@ async def _monitor_reddit_comments():
                     print("Sent comment to channel")
         except Exception as e:
             print(f"Error while monitoring {to_subreddit} for comments: {e}")
+            spamchannel = bot.get_channel(bot_spam_id)
+            await spamchannel.send(f"<@211891698551226368> error with Reddit monitoring: {e}") # this is a mention for Sihmm
+
 
 
 
@@ -3616,6 +3619,8 @@ async def _restore_community_channel(interaction: discord.Interaction, owner: di
         embed = discord.Embed(description=f"<#{interaction.channel.id}> moved to <#{cc_cat_id}>.", color=constants.EMBED_COLOUR_OK)
         await interaction.response.send_message(embed=embed)
     except Exception as e:
+        embed = discord.Embed(description=f"**Error**: {e}", color=constants.EMBED_COLOUR_ERROR)
+        await interaction.response.send_message(embed=embed)
         raise EnvironmentError(f"Error moving channel: {e}")
 
     # create the role
@@ -3882,7 +3887,7 @@ async def _remove_cc_manager(interaction, delete_channel, button_self):
 
     # archive channel if relevant - we save deleting for later so user can read bot status messages in channel
     print("Processing archive flag...")
-    if not delete_channel: embed = await _archive_cc_channel(interaction, embed, button_self)
+    if not delete_channel: embed = await _archive_cc_channel(interaction, embed, button_self, 0) # the 0 sets the number of attempts to archive the channel
      
     # delete role
     print("Deleting role...")
@@ -3956,10 +3961,15 @@ async def _delete_cc_channel(interaction, button_self):
     return
 
 # helper function for /remove_community_channel
-async def _archive_cc_channel(interaction, embed, button_self):
+async def _archive_cc_channel(interaction, embed, button_self, attempt):
     archive_category = discord.utils.get(interaction.guild.categories, id=archive_cat_id)
     try:
         await interaction.channel.edit(category=archive_category)
+        # this interaction seems to take some time on the live server.
+        # let's try adding a check that it's completed before proceeding
+        if not interaction.channel.category == archive_category:
+            attempt = attempt + 1
+            await _archive_cc_channel_delay(interaction, embed, button_self, attempt)
         print("moved channel to archive")
         # now make sure it has the default permissions for the archive category
         await interaction.channel.edit(sync_permissions=True)
@@ -3970,6 +3980,23 @@ async def _archive_cc_channel(interaction, embed, button_self):
     except Exception as e:
         print(e)
         embed.add_field(name="Channel", value=f"**Failed archiving <#{interaction.channel.id}>**: {e}", inline=False)
+
+    button_self.clear_items()
+    await interaction.response.edit_message(view=button_self)
+    await interaction.delete_original_response()
+
+    return embed
+
+# helper function for archive function
+async def _archive_cc_channel_delay(interaction, embed, button_self, attempt):
+    print(f"Channel not moved yet. Number of attempts so far: {attempt}")
+    attempt = attempt + 1
+    print(f"Beginning attempt {attempt}")
+    if attempt <= 5:
+        await asyncio.sleep(2)
+        await _archive_cc_channel(interaction, embed, button_self, attempt) # we probably don't need to attempt the channel edit again but is there a disadvantage to doing so?
+    else: # still nothing after 10 seconds, give up I guess
+        embed.add_field(name="Channel", value=f"**Failed archiving <#{interaction.channel.id}>**: channel does not appear to be moved after {attempt} attempts.", inline=False)
 
     button_self.clear_items()
     await interaction.response.edit_message(view=button_self)
