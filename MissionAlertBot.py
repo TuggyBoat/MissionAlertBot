@@ -3940,9 +3940,12 @@ async def _delete_cc_channel(interaction, button_self):
 async def _archive_cc_channel(interaction, embed, button_self, attempt):
     archive_category = discord.utils.get(interaction.guild.categories, id=archive_cat_id)
 
-    button_self.clear_items()
-    await interaction.response.edit_message(view=button_self)
-    await interaction.delete_original_response()
+    try: # there's probably a better way to do this using an if statement
+        button_self.clear_items()
+        await interaction.response.edit_message(view=button_self)
+        await interaction.delete_original_response()
+    except:
+        pass
 
     try:
         await interaction.channel.edit(category=archive_category)
@@ -3956,7 +3959,9 @@ async def _archive_cc_channel(interaction, embed, button_self, attempt):
         await interaction.channel.edit(sync_permissions=True)
         print("Synced permissions")
 
-        embed.add_field(name="Channel", value=f"<#{interaction.channel.id}> moved to Archives.", inline=False)
+        print(embed.fields)
+
+        if len(embed.fields)==1: embed.add_field(name="Channel", value=f"<#{interaction.channel.id}> moved to Archives.", inline=False)
 
     except Exception as e:
         print(e)
