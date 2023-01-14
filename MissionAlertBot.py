@@ -874,6 +874,7 @@ def txt_create_discord(carrier_data, mission_type, commodity, station, system, p
 def txt_create_reddit_title(carrier_data, legacy):
     reddit_title = (
         f"{'◄ LEGACY UNIVERSE ► : ' if legacy else ''}"
+        f"P.T.N. TRADE MISSION: "
         f"P.T.N. News - Trade mission - {carrier_data.carrier_long_name} {carrier_data.carrier_identifier}" \
                    f" - {get_formatted_date_string()[0]}"
     )
@@ -3929,6 +3930,11 @@ async def _delete_cc_channel(interaction, button_self):
 # helper function for /remove_community_channel
 async def _archive_cc_channel(interaction, embed, button_self, attempt):
     archive_category = discord.utils.get(interaction.guild.categories, id=archive_cat_id)
+
+    button_self.clear_items()
+    await interaction.response.edit_message(view=button_self)
+    await interaction.delete_original_response()
+
     try:
         await interaction.channel.edit(category=archive_category)
         # this interaction seems to take some time on the live server.
@@ -3947,10 +3953,6 @@ async def _archive_cc_channel(interaction, embed, button_self, attempt):
         print(e)
         embed.add_field(name="Channel", value=f"**Failed archiving <#{interaction.channel.id}>**: {e}", inline=False)
 
-    button_self.clear_items()
-    await interaction.response.edit_message(view=button_self)
-    await interaction.delete_original_response()
-
     return embed
 
 # helper function for archive function
@@ -3963,10 +3965,6 @@ async def _archive_cc_channel_delay(interaction, embed, button_self, attempt):
         await _archive_cc_channel(interaction, embed, button_self, attempt) # we probably don't need to attempt the channel edit again but is there a disadvantage to doing so?
     else: # still nothing after 10 seconds, give up I guess
         embed.add_field(name="Channel", value=f"**Failed archiving <#{interaction.channel.id}>**: channel does not appear to be moved after {attempt} attempts.", inline=False)
-
-    button_self.clear_items()
-    await interaction.response.edit_message(view=button_self)
-    await interaction.delete_original_response()
 
     return embed
 
@@ -4035,7 +4033,7 @@ async def _openclose_community_channel(interaction, open):
     # notify channel
     des_text = "Welcome everybody, it's good to see you here!" if open else "So long, farewell, auf Wiedersehen, goodbye."
     embed = discord.Embed(title=f"★ COMMUNITY CHANNEL {status_text_adj.upper()} ★", description=f"**<#{interaction.channel.id}> is now {status_text_adj}!** *🎶 {des_text}*", color=constants.EMBED_COLOUR_OK)
-    embed.set_author(name=interaction.user.name, icon_url=interaction.user.avatar.url)
+    embed.set_author(name=interaction.user.name, icon_url=interaction.user.display_avatar.url)
     embed.set_thumbnail(url=interaction.guild.icon.url)
     embed.timestamp= datetime.now(tz=timezone.utc)
     if open: # we don't need the notify_me footer on close and nobody's going to see any close gifs except community team members
@@ -4158,7 +4156,7 @@ class SendNoticeModal(Modal):
     async def on_submit(self, interaction: discord.Interaction):
         print(self.role_id)
 
-        embed, file = await _generate_cc_notice_embed(interaction.channel.id, interaction.user.display_name, interaction.user.avatar.url, self.embedtitle, self.message, self.image)
+        embed, file = await _generate_cc_notice_embed(interaction.channel.id, interaction.user.display_name, interaction.user.display_avatar.url, self.embedtitle, self.message, self.image)
 
         header_text = f":bell: <@&{self.role_id}> New message from <@{interaction.user.id}> for <#{interaction.channel.id}> :bell:"
 
@@ -4210,7 +4208,7 @@ async def send_cc_notice(interaction: discord.Interaction, message: discord.Mess
     if not community_carrier: return
 
     try:
-        embed, file = await _generate_cc_notice_embed(message.channel.id, message.author.display_name, message.author.avatar.url, None, message.content, None) # get the embed
+        embed, file = await _generate_cc_notice_embed(message.channel.id, message.author.display_name, message.author.display_avatar.url, None, message.content, None) # get the embed
         if message.author.id == interaction.user.id:
             heading = f"<@&{community_carrier.role_id}> New message from <@{interaction.user.id}>"
         else:
