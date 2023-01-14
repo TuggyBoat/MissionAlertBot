@@ -84,6 +84,7 @@ cmentor_role_id = conf['CMENTOR_ROLE']
 certcarrier_role_id = conf['CERTCARRIER_ROLE']
 rescarrier_role_id = conf['RESCARRIER_ROLE']
 botadmin_role_id = conf['ADMIN_ROLE']
+mod_role_id = conf['MOD_ROLE']
 trainee_role_id = conf['TRAINEE_ROLE']
 botdev_role_id = conf['DEV_ROLE']
 any_elevated_role = [cc_role_id, cmentor_role_id, certcarrier_role_id, rescarrier_role_id, botadmin_role_id, trainee_role_id, botdev_role_id]
@@ -245,6 +246,7 @@ def check_database_table_exists(table_name, database):
     database.execute(f"SELECT count(name) FROM sqlite_master WHERE TYPE = 'table' AND name = '{table_name}'")
     return bool(database.fetchone()[0])
 
+
 def create_missing_table(table, db_obj, create_stmt):
     print(f'{table} table missing - creating it now')
 
@@ -396,7 +398,6 @@ def dump_database_test(database_name):
     Dumps the database object to a .sql text file while backing up the database. Used just to get something we can
     recreate the database from.  This will only store the last state and should periodically be committed to the repo
     from the bot.
-
     :param str database_name: The DB name to connect against.
     :returns: None
     :raises ValueError: if the db name is unknown
@@ -411,10 +412,10 @@ def dump_database_test(database_name):
     else:
         raise ValueError(f'Unknown DB dump handling for: {database_name}')
 
+    os.makedirs('db_sql', exist_ok=True)
     with open(f'db_sql/{database_name}_dump.sql', 'w') as f:
         for line in connection.iterdump():
             f.write(line)
-
 
 # function to backup carrier database
 def backup_database(database_name):
@@ -873,6 +874,7 @@ def txt_create_discord(carrier_data, mission_type, commodity, station, system, p
 def txt_create_reddit_title(carrier_data, legacy):
     reddit_title = (
         f"{'◄ LEGACY UNIVERSE ► : ' if legacy else ''}"
+        f"P.T.N. TRADE MISSION: "
         f"P.T.N. News - Trade mission - {carrier_data.carrier_long_name} {carrier_data.carrier_identifier}" \
                    f" - {get_formatted_date_string()[0]}"
     )
@@ -915,7 +917,10 @@ def getrole(ctx, id): # takes a Discord role ID and returns the role object
     role = discord.utils.get(ctx.guild.roles, id=id)
     return role
 
-async def checkroles(ctx, permitted_role_ids): # checks a list of roles against a user's roles
+async def checkroles(ctx, permitted_role_ids):
+    """
+    Check if the user has at least one of the permitted roles to run a command
+    """
     try: # hacky way to make this work with both slash and normal commands
         author_roles = ctx.author.roles
     except: # slash commands use interaction instead of ctx and user instead of author
@@ -940,11 +945,46 @@ async def checkroles(ctx, permitted_role_ids): # checks a list of roles against 
     return permission
 
 def check_roles(permitted_role_ids):
+    """
+    Decorator used on a normal or slash command to enforce the command
+    can only be users with a specific role(s)
+    """
     def decorator(function):
         @wraps(function)
         async def wrapper(*args, **kwargs):
             permission = await checkroles(args[0], permitted_role_ids)
             if permission:
+                return await function(*args, **kwargs)
+            else:
+                return
+        return wrapper
+    return decorator
+
+
+async def check_channel(ctx, permitted_channel):
+    """
+    Check if the channel the command was run in, matches the channel it can only be run from
+    """
+    permitted = bot.get_channel(permitted_channel)
+    if ctx.channel != permitted:
+        # problem, wrong channel, no progress
+        embed=discord.Embed(description=f"Sorry, you can only run this command out of: {permitted}.", color=constants.EMBED_COLOUR_ERROR)
+        await ctx.channel.send(embed=embed) if hasattr(ctx, 'author') else await ctx.response.send_message(embed=embed, ephemeral=True)
+        return False
+    else:
+        return True
+
+
+def check_command_channel(permitted_channel):
+    """
+    Decorator used on a normal or slash command to enforce the command
+    can only be run in specific channels
+    """
+    def decorator(function):
+        @wraps(function)
+        async def wrapper(*args, **kwargs):
+            correct_channel = await check_channel(args[0], permitted_channel)
+            if correct_channel:
                 return await function(*args, **kwargs)
             else:
                 return
@@ -1018,7 +1058,6 @@ async def on_ready():
     except Exception as e:
         print(f"Tree sync failed: {e}.")
 
-    
     # define our background tasks
     reddit_task = asyncio.create_task(_monitor_reddit_comments())
     # Check if any trade channels were not deleted before bot restart/stop
@@ -1119,6 +1158,7 @@ async def _monitor_reddit_comments():
                                'ETA is optional and should be expressed as a number of minutes e.g. 15.\n'
                                'Case is automatically corrected for all inputs.')
 @check_roles([certcarrier_role_id, trainee_role_id])
+@check_command_channel(conf['MISSION_CHANNEL'])
 async def load(ctx, carrier_name_search_term: str, commodity_search_term: str, system: str, station: str,
                profit: Union[int, float], pads: str, demand: str, eta: str = None):
     rp = False
@@ -1133,6 +1173,7 @@ async def load(ctx, carrier_name_search_term: str, commodity_search_term: str, s
                                  'and sent to the carrier\'s Discord channel in quote format if those options are '
                                  'chosen')
 @check_roles([certcarrier_role_id, trainee_role_id])
+@check_command_channel(conf['MISSION_CHANNEL'])
 async def loadrp(ctx, carrier_name_search_term: str, commodity_search_term: str, system: str, station: str,
                  profit: Union[int, float], pads: str, demand: str, eta: str = None):
     rp = True
@@ -1154,6 +1195,7 @@ async def loadrp(ctx, carrier_name_search_term: str, commodity_search_term: str,
                                'ETA is optional and should be expressed as a number of minutes e.g. 15.\n'
                                'Case is automatically corrected for all inputs.')
 @check_roles([certcarrier_role_id, trainee_role_id])
+@check_command_channel(conf['MISSION_CHANNEL'])
 async def loadlegacy(ctx, carrier_name_search_term: str, commodity_search_term: str, system: str, station: str,
                profit: Union[int, float], pads: str, demand: str, eta: str = None):
     rp = False
@@ -1168,6 +1210,7 @@ async def loadlegacy(ctx, carrier_name_search_term: str, commodity_search_term: 
                                  'and sent to the carrier\'s Discord channel in quote format if those options are '
                                  'chosen')
 @check_roles([certcarrier_role_id, trainee_role_id])
+@check_command_channel(conf['MISSION_CHANNEL'])
 async def loadrplegacy(ctx, carrier_name_search_term: str, commodity_search_term: str, system: str, station: str,
                  profit: Union[int, float], pads: str, demand: str, eta: str = None):
     rp = True
@@ -1188,6 +1231,7 @@ async def loadrplegacy(ctx, carrier_name_search_term: str, commodity_search_term
                                  'ETA is optional and should be expressed as a number of minutes e.g. 15.\n'
                                  'Case is automatically corrected for all inputs.')
 @check_roles([certcarrier_role_id, trainee_role_id])
+@check_command_channel(conf['MISSION_CHANNEL'])
 async def unload(ctx, carrier_name_search_term: str, commodity_search_term: str, system: str, station: str,
                  profit: Union[int, float], pads: str, supply: str, eta: str = None):
     rp = False
@@ -1202,6 +1246,7 @@ async def unload(ctx, carrier_name_search_term: str, commodity_search_term: str,
                                    'and sent to the carrier\'s Discord channel in quote format if those options are '
                                    'chosen')
 @check_roles([certcarrier_role_id, trainee_role_id])
+@check_command_channel(conf['MISSION_CHANNEL'])
 async def unloadrp(ctx, carrier_name_search_term: str, commodity_search_term: str, system: str, station: str,
                    profit: Union[int, float], pads: str, demand: str, eta: str = None):
 
@@ -1223,6 +1268,7 @@ async def unloadrp(ctx, carrier_name_search_term: str, commodity_search_term: st
                                  'ETA is optional and should be expressed as a number of minutes e.g. 15.\n'
                                  'Case is automatically corrected for all inputs.')
 @check_roles([certcarrier_role_id, trainee_role_id])
+@check_command_channel(conf['MISSION_CHANNEL'])
 async def unload(ctx, carrier_name_search_term: str, commodity_search_term: str, system: str, station: str,
                  profit: Union[int, float], pads: str, supply: str, eta: str = None):
     rp = False
@@ -1237,6 +1283,7 @@ async def unload(ctx, carrier_name_search_term: str, commodity_search_term: str,
                                    'and sent to the carrier\'s Discord channel in quote format if those options are '
                                    'chosen')
 @check_roles([certcarrier_role_id, trainee_role_id])
+@check_command_channel(conf['MISSION_CHANNEL'])
 async def unloadrp(ctx, carrier_name_search_term: str, commodity_search_term: str, system: str, station: str,
                    profit: Union[int, float], pads: str, demand: str, eta: str = None):
     rp = True
@@ -1250,16 +1297,11 @@ async def unloadrp(ctx, carrier_name_search_term: str, commodity_search_term: st
 async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term: str, system: str, station: str,
                       profit: Union[int, float], pads: str, demand: str, rp: str, mission_type: str,
                       eta: str, legacy):
-    # Check we are in the designated mission channel, if not go no farther.
-    mission_gen_channel = bot.get_channel(conf['MISSION_CHANNEL'])
     current_channel = ctx.channel
 
     print(f'Mission generation type: {mission_type} with RP: {rp}, requested by {ctx.author}. Request triggered from '
           f'channel {current_channel}.')
 
-    if current_channel != mission_gen_channel:
-        # problem, wrong channel, no progress
-        return await ctx.send(f'Sorry, you can only run this command out of: {mission_gen_channel}.')
     if pads.upper() not in ['M', 'L']:
         # In case a user provides some junk for pads size, gate it
         print(f'Exiting mission generation requested by {ctx.author} as pad size is invalid, provided: {pads}')
@@ -1984,18 +2026,13 @@ async def _missions(interaction: discord.Interaction):
                                'appropriate.\n\nAnything after the carrier name will be treated as a '
                                'quote to be sent along with the completion notice. This can be used for RP if desired.')
 @check_roles([certcarrier_role_id, trainee_role_id, rescarrier_role_id])
+@check_command_channel(conf['MISSION_CHANNEL'])
 async def done(ctx, carrier_name_search_term: str, *, rp: str = None):
 
-    # Check we are in the designated mission channel, if not go no farther.
-    mission_gen_channel = bot.get_channel(conf['MISSION_CHANNEL'])
     current_channel = ctx.channel
 
     print(f'Request received from {ctx.author} to mark the mission of {carrier_name_search_term} as done from channel: '
           f'{current_channel}')
-
-    if current_channel != mission_gen_channel:
-        # problem, wrong channel, no progress
-        return await ctx.send(f'Sorry, you can only run this command out of: <#{mission_gen_channel.id}>.')
 
     mission_data = find_mission(carrier_name_search_term, "carrier")
     if not mission_data:
@@ -2326,15 +2363,8 @@ async def complete(ctx, comment: str = None):
 # backup databases
 @bot.command(name='backup', help='Backs up the carrier and mission databases.')
 @check_roles([botadmin_role_id])
+@check_command_channel(conf['BOT_COMMAND_CHANNEL'])
 async def backup(ctx):
-
-    # make sure we are in the right channel
-    bot_command_channel = bot.get_channel(conf['BOT_COMMAND_CHANNEL'])
-    current_channel = ctx.channel
-    if current_channel != bot_command_channel:
-        # problem, wrong channel, no progress
-        return await ctx.send(f'Sorry, you can only run this command out of: {bot_command_channel}.')
-
     print(f"{ctx.author} requested a manual DB backup")
     backup_database('missions')
     backup_database('carriers')
@@ -2525,14 +2555,8 @@ async def carrier_list(ctx):
                                       '<carrier_id> is the carrier\'s unique identifier in the format ABC-XYZ\n'
                                       '<owner_id> is the owner\'s Discord ID')
 @check_roles([botadmin_role_id])
+@check_command_channel(conf['BOT_COMMAND_CHANNEL'])
 async def carrier_add(ctx, short_name: str, long_name: str, carrier_id: str, owner_id: int):
-
-    # make sure we are in the right channel
-    bot_command_channel = bot.get_channel(conf['BOT_COMMAND_CHANNEL'])
-    current_channel = ctx.channel
-    if current_channel != bot_command_channel:
-        # problem, wrong channel, no progress
-        return await ctx.send(f'Sorry, you can only run this command out of: {bot_command_channel}.')
 
     # check the ID code is correct format (thanks boozebot code!)
     if not re.match(r"\w{3}-\w{3}", carrier_id):
@@ -2545,7 +2569,7 @@ async def carrier_add(ctx, short_name: str, long_name: str, carrier_id: str, own
         # Carrier exists already, go skip it.
         print(f'Request recieved from {ctx.author} to add a carrier that already exists in the database ({long_name}).')
 
-        embed = discord.Embed(title="Fleet carrier already exists, use m.carrier_edit to change its details.",
+        embed = discord.Embed(title="Fleet carrier already exists, use /carrier_edit to change its details.",
                               description=f"Carrier data matched for {long_name}", color=constants.EMBED_COLOUR_OK)
         embed = _add_common_embed_fields(embed, carrier_data, ctx)
         return await ctx.send(embed=embed)
@@ -2576,15 +2600,8 @@ async def carrier_add(ctx, short_name: str, long_name: str, carrier_id: str, own
 # remove FC from database
 @bot.command(name='carrier_del', help='Delete a Fleet Carrier from the database using its database entry ID#.')
 @check_roles([botadmin_role_id])
+@check_command_channel(conf['BOT_COMMAND_CHANNEL'])
 async def carrier_del(ctx, db_id: int):
-
-    # make sure we are in the right channel
-    bot_command_channel = bot.get_channel(conf['BOT_COMMAND_CHANNEL'])
-    current_channel = ctx.channel
-    if current_channel != bot_command_channel:
-        # problem, wrong channel, no progress
-        return await ctx.send(f'Sorry, you can only run this command out of: {bot_command_channel}.')
-
     try:
         carrier_data = find_carrier(db_id, CarrierDbFields.p_id.name)
         if carrier_data:
@@ -3074,123 +3091,192 @@ async def search_for_commodity(ctx, commodity_search_term: str):
     await ctx.send(f'No such commodity found for: "{commodity_search_term}".')
 
 
-@bot.command(name='carrier_edit', help='Edit a specific carrier in the database by providing specific inputs')
+@bot.tree.command(name="carrier_edit",
+    description="Edit a specific carrier in the database", guild=guild_obj)
 @check_roles([botadmin_role_id])
-async def edit_carrier(ctx, carrier_name_search_term: str):
+@check_command_channel(conf['BOT_COMMAND_CHANNEL'])
+async def _carrier_edit(interaction: discord.Interaction, carrier_name_search_term: str):
     """
     Edits a carriers information in the database. Provide a carrier name that can be partially matched and follow the
     steps.
 
-    :param discord.ext.commands.Context ctx: The discord context
+    :param discord.interaction interaction: The discord interaction
     :param str carrier_name_search_term: The carrier name to find
     :returns: None
     """
-    print(f'edit_carrier called by {ctx.author} to update the carrier: {carrier_name_search_term} from channel: {ctx.channel}')
-
-    # make sure we are in the right channel
-    bot_command_channel = bot.get_channel(conf['BOT_COMMAND_CHANNEL'])
-    current_channel = ctx.channel
-    if current_channel != bot_command_channel:
-        # problem, wrong channel, no progress
-        return await ctx.send(f'Sorry, you can only run this command out of: {bot_command_channel}.')
+    print(f'/carrier_edit called by {interaction.user} to update the carrier: {carrier_name_search_term} from channel: {interaction.channel}')
 
     # Go fetch the carrier details by searching for the name
 
     carrier_data = copy.copy(find_carrier(carrier_name_search_term, CarrierDbFields.longname.name))
+    orig_carrier_data = copy.copy(carrier_data)
     print(carrier_data)
     if carrier_data:
-        embed = discord.Embed(title=f"Edit DB request received.",
-                              description=f"Editing starting for {carrier_data.carrier_long_name} requested by "
-                                          f"{ctx.author}",
-                              color=constants.EMBED_COLOUR_OK)
-        embed = _configure_all_carrier_detail_embed(embed, carrier_data)
+        embed = discord.Embed(title="Original Carrier Data", color=discord.Color.green())
+        embed = await _configure_all_carrier_detail_embed(embed, carrier_data)
+        return await interaction.response.send_message(
+            embed=embed,
+            view=CarrierEditView(carrier_data=carrier_data,orig_carrier_data=orig_carrier_data), ephemeral=True)
+    else:
+        embed = discord.Embed(title=f'No result found for the carrier: "{carrier_name_search_term}"', color=constants.EMBED_COLOUR_ERROR)
+        return await interaction.response.send_message(embed=embed)
 
-        # Store this, we might want to update it later
-        initial_message = await ctx.send(embed=embed)
-        edit_carrier_data = await _determine_db_fields_to_edit(ctx, carrier_data)
-        if not edit_carrier_data:
-            # The determination told the user there was an error. Wipe the original message and move on
-            initial_message.delete()
-            return
 
-        # Now we know what fields to edit, go do something with them, first display them to the user
-        edited_embed = discord.Embed(title=f"Please validate the inputs are correct",
-                                     description=f"Validate the new settings for {carrier_data.carrier_long_name}",
-                                     color=constants.EMBED_COLOUR_OK)
-        edited_embed = _configure_all_carrier_detail_embed(edited_embed, edit_carrier_data)
-        edit_send = await ctx.send(embed=edited_embed)
+class CarrierEditView(discord.ui.View):
+    """
+    Main trade view containing the:
+        select menu, station|system modal, trade data modal
+    If self.data is not set, create a dict with default keys set to ''
+    """
+    def __init__(self, carrier_data, orig_carrier_data):
+        self.carrier_data = carrier_data
+        self.orig_carrier_data = orig_carrier_data
+        super().__init__()
 
-        # Get the user to agree before we write
-        confirm_embed = discord.Embed(title="Confirm you want to write these values to the database please",
-                                      description="Yes or No.", color=constants.EMBED_COLOUR_QU)
-        confirm_embed.set_footer(text='y/n - yes, no.')
-        message_confirm = await ctx.send(embed=confirm_embed)
+    @discord.ui.button(label="Name|ID|ShortName", row=1, custom_id='name_id')
+    async def name_callback(self, interaction, button):
+        await interaction.response.send_modal(CarrierNameIDModal(title='Carrier Name | ID | ShortName', view=self))
 
-        def check_confirm(message):
-            return message.content and message.author == ctx.author and message.channel == ctx.channel and \
-                   all(character in 'yn' for character in set(message.content.lower())) and len(message.content) == 1
+    @discord.ui.button(label="Channel|Owner|LastTrade", row=1, custom_id='discord_data')
+    async def discord_callback(self, interaction, button):
+        await interaction.response.send_modal(CarrierDiscordDataModal(title='Channel | Owner | LastTrade', view=self))
 
-        try:
+    @discord.ui.button(label="Update Carrier", row=2, custom_id='update', style=discord.ButtonStyle.green)
+    async def update_callback(self, interaction, button):
+        if self.carrier_data == self.orig_carrier_data:
+            embed = discord.Embed(title="No Edits made", color=constants.EMBED_COLOUR_ERROR)
+            self.stop()
+            return await interaction.response.edit_message(content=None, embed=embed, view=None)
+        else:
+            embed = discord.Embed(title="Review Carrier Changes", color=discord.Color.orange())
+            embed = await _configure_all_carrier_detail_embed(embed, self.carrier_data)
+            await interaction.response.edit_message(
+                content=None,
+                embed=embed,
+                view=CarrierEditConfirmationView(self.carrier_data, self.orig_carrier_data)
+            )
 
-            msg = await bot.wait_for("message", check=check_confirm, timeout=30)
-            if "n" in msg.content.lower():
-                print(f'User {ctx.author} requested to cancel the edit operation.')
-                # immediately stop if there's an x anywhere in the message, even if there are other proper inputs
-                await ctx.send("**Edit operation cancelled by the user.**")
-                await msg.delete()
-                await message_confirm.delete()
-                await edit_send.delete()
-                await initial_message.delete()
-                return None  # Exit the check logic
+    @discord.ui.button(label="Cancel", row=2, custom_id='cancel', style=discord.ButtonStyle.red)
+    async def quit_button_callback(self, interaction, button):
+        embed = discord.Embed(title="Carrier Edit Cancelled", color=constants.EMBED_COLOUR_ERROR)
+        await interaction.response.edit_message(content=None, embed=embed, view=None)
+        print('Carrier Edit cancelled')
+        self.stop()
 
-            elif 'y' in msg.content.lower():
-                await ctx.send("**Writing the values now ...**")
-                await message_confirm.delete()
-                await msg.delete()
-                await edit_send.delete()
-        except asyncio.TimeoutError:
-            await ctx.send("**Write operation from {ctx.author} timed out.**")
-            await edit_send.delete()
-            await message_confirm.delete()
-            await initial_message.delete()
-            return None  # Exit the check logic
 
-        # Go update the details to the database
-        await _update_carrier_details_in_database(ctx, edit_carrier_data, carrier_data.carrier_long_name)
+class CarrierEditConfirmationView(discord.ui.View):
+    """
+    """
+    def __init__(self, carrier_data, orig_carrier_data):
+        self.carrier_data = carrier_data
+        self.orig_carrier_data = orig_carrier_data
+        super().__init__()
 
-        # Double check if we need to edit the carrier shortname, if so then we also need to edit the backup image
-        if edit_carrier_data.carrier_short_name != carrier_data.carrier_short_name:
+    @discord.ui.button(label="Confirm", style=discord.ButtonStyle.green)
+    async def save_button_callback(self, interaction, button):
+        await _update_carrier_details_in_database(self.carrier_data, self.orig_carrier_data.carrier_long_name)
+        print(f'Carrier data now looks like:')
+        print(f'\t Original: {self.orig_carrier_data}')
+        print(f'\t Updated: {self.carrier_data}')
+        if self.carrier_data.carrier_short_name != self.orig_carrier_data.carrier_short_name:
             print('Renaming the carriers image')
             os.rename(
-                f'images/{carrier_data.carrier_short_name}.png',
-                f'images/{edit_carrier_data.carrier_short_name}.png'
+                f'images/{self.orig_carrier_data.carrier_short_name}.png',
+                f'images/{self.carrier_data.carrier_short_name}.png'
             )
-            print(f'Carrier image renamed from: images/{carrier_data.carrier_short_name}.png to '
-                  f'images/{edit_carrier_data.carrier_short_name}.png')
+            print(f'Carrier image renamed from: images/{self.orig_carrier_data.carrier_short_name}.png to '
+                  f'images/{self.carrier_data.carrier_short_name}.png')
 
-        # Go grab the details again, make sure it is correct and display to the user
-        updated_carrier_data = find_carrier(edit_carrier_data.carrier_long_name, CarrierDbFields.longname.name)
+        updated_carrier_data = find_carrier(self.carrier_data.carrier_long_name, CarrierDbFields.longname.name)
         if updated_carrier_data:
             embed = discord.Embed(title=f"Reading the settings from DB:",
                                   description=f"Double check and re-run if incorrect the settings for old name: "
-                                              f"{carrier_data.carrier_long_name}",
+                                              f"{self.orig_carrier_data.carrier_long_name}",
                                   color=constants.EMBED_COLOUR_OK)
-            embed = _configure_all_carrier_detail_embed(embed, updated_carrier_data)
-            await initial_message.delete()
-            return await ctx.send(embed=embed)
-        else:
-            await ctx.send('We did not find the new database entry - that is not good.')
+            embed = await _configure_all_carrier_detail_embed(embed, updated_carrier_data)
+            self.stop()
+            return await interaction.response.edit_message(content=None, view=None, embed=embed)
 
-    else:
-        return await ctx.send(f'No result found for the carrier: "{carrier_name_search_term}".')
+    @discord.ui.button(label="Cancel", style=discord.ButtonStyle.red)
+    async def quit_button_callback(self, interaction, button):
+        embed = discord.Embed(title="Carrier Edit Cancelled", color=constants.EMBED_COLOUR_ERROR)
+        await interaction.response.edit_message(content=None, embed=embed, view=None)
+        print('Carrier Edit cancelled')
+        self.stop()
 
 
-async def _update_carrier_details_in_database(ctx, carrier_data, original_name):
+class CarrierNameIDModal(discord.ui.Modal):
     """
-    Updates the carrier details into the database. It first ensures that the discord channel actually exists, if it
-    does not then you are getting an error back.
+    """
+    def __init__(self, title, view, timeout=None):
+        self.view = view
+        self.longname = discord.ui.TextInput(
+            label = 'Long Name',
+            custom_id = 'long_name',
+            default = self.view.carrier_data.carrier_long_name
+            )
 
-    :param discord.ext.commands.Context ctx: The discord context
+        self.shortname = discord.ui.TextInput(
+            label = 'Short Name',
+            custom_id = 'short_name',
+            default = self.view.carrier_data.carrier_short_name
+            )
+
+        self.cid = discord.ui.TextInput(
+            label = 'Carrier Identifier',
+            custom_id = 'c_id',
+            default = self.view.carrier_data.carrier_identifier
+            )
+        super().__init__(title=title, timeout=timeout)
+        self.add_item(self.longname)
+        self.add_item(self.shortname)
+        self.add_item(self.cid)
+
+    async def on_submit(self, interaction):
+        self.view.carrier_data.carrier_long_name = self.children[0].value.strip().upper()
+        self.view.carrier_data.carrier_short_name = self.children[1].value.strip().lower()
+        self.view.carrier_data.carrier_identifier = self.children[2].value.strip().upper()
+        await interaction.response.edit_message(view=self.view)
+
+
+class CarrierDiscordDataModal(discord.ui.Modal):
+    """
+    """
+    def __init__(self, title, view, timeout=None):
+        self.view = view
+
+        self.discord_channel = discord.ui.TextInput(
+            label = 'Discord Channel',
+            custom_id = 'discord_channel',
+            default = self.view.carrier_data.discord_channel
+            )
+        self.ownerid = discord.ui.TextInput(
+            label = 'Owner ID',
+            custom_id = 'owner_id',
+            default = self.view.carrier_data.ownerid
+            )
+        self.lasttrade = discord.ui.TextInput(
+            label = 'Last Trade',
+            custom_id = 'last_trade',
+            default = self.view.carrier_data.lasttrade
+            )
+        super().__init__(title=title, timeout=timeout)
+        self.add_item(self.discord_channel)
+        self.add_item(self.ownerid)
+        self.add_item(self.lasttrade)
+
+    async def on_submit(self, interaction):
+        self.view.carrier_data.discord_channel = self.children[0].value.strip().lower()
+        self.view.carrier_data.ownerid = self.children[1].value.strip()
+        self.view.carrier_data.lasttrade = self.children[2].value.strip()
+
+        await interaction.response.edit_message(view=self.view)
+
+
+async def _update_carrier_details_in_database(carrier_data, original_name):
+    """
+    Updates the carrier details into the database.
+
     :param CarrierData carrier_data: The carrier data to write
     :param str original_name: The original carrier name, needed so we can find it in the database
     """
@@ -3222,128 +3308,7 @@ async def _update_carrier_details_in_database(ctx, carrier_data, original_name):
         carrier_db_lock.release()
 
 
-async def _determine_db_fields_to_edit(ctx, carrier_data):
-    """
-    Loop through a dummy CarrierData object and see if the user wants to update any of the fields.
-
-    :param discord.ext.commands.Context ctx: The discord context object
-    :param CarrierData carrier_data: The carriers data you want to edit.
-    :returns: A carrier data object to edit into the database
-    :rtype: CarrierData
-    """
-    # We operate and return from this a copy of the object, not the object itself. Else things outside this also get
-    # affected. Because python uses pass by reference, and this is a mutable object, things can go wrong.
-    new_carrier_data = copy.copy(carrier_data)
-
-    embed = discord.Embed(title=f"Edit DB request in progress ...",
-                          description=f"Editing in progress for {carrier_data.carrier_long_name}",
-                          color=constants.EMBED_COLOUR_OK)
-
-    def check_confirm(message):
-        return message.content and message.author == ctx.author and message.channel == ctx.channel and \
-            all(character in 'ynx' for character in set(message.content.lower())) and len(message.content) == 1
-
-    def check_user(message):
-        return message.content and message.author == ctx.author and message.channel == ctx.channel
-
-    # These two are used below, initial value so we can wipe the message out if needed
-    message_confirm = None  # type: discord.Message
-    msg = None  # type: discord.Message
-
-    for field in vars(carrier_data):
-
-        # Remove any pre-existing messages/responses if they were present.
-        if message_confirm:
-            await message_confirm.delete()
-        if msg:
-            await msg.delete()
-
-        if field == 'pid':
-            # We cant edit the DB ID here, so skip over it.
-            # TODO: DB ID uses autoincrement, we probably want our own index if we want to use this.
-            continue
-
-        print(f'Looking to see if the user wants to edit the field {field} for carrier: '
-              f'{carrier_data.carrier_long_name}')
-
-        # Go ask the user for each one if they want to update, and if yes then to what.
-        embed.add_field(name=f'Do you want to update the carriers: "{field}" value?',
-                        value=f'Current Value: "{getattr(carrier_data, field)}"', inline=True)
-        embed.set_footer(text='y/n/x - yes, no or cancel the operation')
-        message_confirm = await ctx.send(embed=embed)
-
-        try:
-            msg = await bot.wait_for("message", check=check_confirm, timeout=30)
-            if "x" in msg.content.lower():
-                print(f'User {ctx.author} requested to cancel the edit operation.')
-                # immediately stop if there's an x anywhere in the message, even if there are other proper inputs
-                await ctx.send("**Edit operation cancelled by the user.**")
-                await msg.delete()
-                await message_confirm.delete()
-                return None  # Exit the check logic
-
-            elif 'n' in msg.content.lower():
-                # Log a message and skip over
-                print(f'User {ctx.author} does not want to edit the field: {field}')
-                # We do not care, just move on
-            elif 'y' in msg.content.lower():
-                # Remove this, we re-assign it now.
-                await msg.delete()
-                await message_confirm.delete()
-
-                # Log a message and skip over
-                print(f'User {ctx.author} wants to edit the field: {field}')
-                embed.remove_field(0)   # Remove the current field, add a new one and resend
-
-                embed.add_field(name=f'What is the new value for: {field}?', value='Type your response now.')
-                embed.set_footer()   # Clear the foot as well
-                message_confirm = await ctx.send(embed=embed)
-
-                msg = await bot.wait_for("message", check=check_user, timeout=30)
-                print(f'Setting the value for {new_carrier_data.carrier_long_name} field {field} to '
-                      f'"{msg.content.strip()}"')
-
-                if field in ['carrier_long_name', 'carrier_identifier']:
-                    # always uppercase
-                    msg_content = msg.content.strip().upper()
-                elif field in ['carrier_short_name', 'discord_channel']:
-                    # always lowercase
-                    msg_content = msg.content.strip().lower()
-                else:
-                    # keep user case
-                    msg_content = msg.content.strip()
-
-                # Use setattr to change the value of the variable field object to the user input
-                setattr(new_carrier_data, field, msg_content)
-            else:
-                print(f'{ctx.author} provided the invalid input: {msg.content} from object: {ctx}.')
-                # Should never be hitting this as we gate the message
-                await ctx.send(f"**I cannot do anything with that entry '{msg.content}', please stick to y, n or x.**")
-                return None  # Break condition just in case
-        except asyncio.TimeoutError:
-            print(f'Carrier edit requested by {ctx.author} timed out. Context: {ctx}')
-            await ctx.send("**Edit operation timed out (no valid response from user).**")
-            await message_confirm.delete()
-            return None
-
-        # Remove the previous field so we have things in a nice view
-        embed.remove_field(0)
-
-    print(f'Current tracking of carrier data: {carrier_data}')
-    # If the current thing is the same as the old thing, why did we bother?
-    if new_carrier_data == carrier_data:
-        print(f'User {ctx.author} went through the whole process and does not want to edit anything.')
-        await ctx.send("**After all those button clicks you did not want to edit anything, fun.**")
-        return None
-
-    print(f'Carrier data now looks like:')
-    print(f'\t Original: {carrier_data}')
-    print(f'\t Updated: {new_carrier_data}')
-
-    return new_carrier_data
-
-
-def _configure_all_carrier_detail_embed(embed, carrier_data: CarrierData):
+async def _configure_all_carrier_detail_embed(embed, carrier_data: CarrierData):
     """
     Adds all the common fields to a message embed and returns the embed.
 
@@ -3517,7 +3482,7 @@ async def _create_community_channel(interaction: discord.Interaction, owner: dis
 
     # PROCESS: check for valid emoji
     print(emoji.is_emoji(emoji_string))
-    if not emoji.is_emoji(emoji_string) and not emoji_string == None: 
+    if not emoji.is_emoji(emoji_string) and not emoji_string == None:
         embed = discord.Embed(description="**Error**: Invalid emoji supplied. Use a valid Unicode emoji from your emoji keyboard,"
                                         f"or leave the field blank. **Discord custom emojis will not work**.", color=constants.EMBED_COLOUR_ERROR)
         bu_link = Button(label="Full Emoji List", url="https://unicode.org/emoji/charts/full-emoji-list.html")
@@ -3539,7 +3504,7 @@ async def _create_community_channel(interaction: discord.Interaction, owner: dis
 
     # CHECK: user already owns a channel
     if not await _cc_owner_check(interaction, owner): return
- 
+
     # get the CC category as a discord channel category object
     cc_category = discord.utils.get(interaction.guild.categories, id=cc_cat_id)
     archive_category = discord.utils.get(interaction.guild.categories, id=archive_cat_id)
@@ -3574,7 +3539,7 @@ async def _create_community_channel(interaction: discord.Interaction, owner: dis
     else:
         # channel does not exist, create it
         new_channel = await _cc_create_channel(interaction, new_channel_name, cc_category)
-    
+
     # create the role
     new_role = await _cc_role_create(interaction, new_channel_name)
 
@@ -3776,13 +3741,14 @@ class RemoveCCView(View):
         delete_channel = 1
         print("User wants to delete channel.")
         await _remove_cc_manager(interaction, delete_channel, self)
-        
+
     @discord.ui.button(label="Archive", style=discord.ButtonStyle.primary, emoji="📂", custom_id="archive")
     async def archive_button_callback(self, interaction, button):
         delete_channel = 0
         print("User chose to archive channel.")
         await _remove_cc_manager(interaction, delete_channel, self)
         
+
     @discord.ui.button(label="Cancel", style=discord.ButtonStyle.gray, emoji="✖", custom_id="cancel")
     async def cancel_button_callback(self, interaction, button):
         embed = discord.Embed(title="Remove Community Channel",
@@ -3797,7 +3763,7 @@ class RemoveCCView(View):
 @bot.tree.command(name="remove_community_channel",
                   description="Retires a community channel.",
                   guild=guild_obj)
-@check_roles([cmentor_role_id, botadmin_role_id]) 
+@check_roles([cmentor_role_id, botadmin_role_id])
 async def _remove_community_channel(interaction: discord.Interaction):
 
     print(f"{interaction.user.name} called `/remove_community_channel` command in {interaction.channel.name}")
@@ -3852,7 +3818,7 @@ async def _remove_community_channel(interaction: discord.Interaction):
     view = RemoveCCView(author)
 
     await interaction.response.send_message(embed=embed, view=view)
-    
+
     return
 
 # function called by button responses to process channel deletion
@@ -3887,6 +3853,7 @@ async def _remove_cc_manager(interaction, delete_channel, button_self):
 
     # archive channel if relevant - we save deleting for later so user can read bot status messages in channel
     print("Processing archive flag...")
+
     if not delete_channel: embed = await _archive_cc_channel(interaction, embed, button_self, 0) # the 0 sets the number of attempts to archive the channel
      
     # delete role
@@ -3901,7 +3868,7 @@ async def _remove_cc_manager(interaction, delete_channel, button_self):
 
     # delete channel if relevant
     print("Processing delete flag...")
-    if delete_channel: await _delete_cc_channel(interaction, button_self) 
+    if delete_channel: await _delete_cc_channel(interaction, button_self)
 
     # notify bot-spam
     print("Notifying bot-spam...")
@@ -3957,12 +3924,17 @@ async def _delete_cc_channel(interaction, button_self):
     except Exception as e:
         print(e)
         await interaction.channel.send(f"**Failed to delete <#{interaction.channel.id}>**: {e}")
-    
+
     return
 
 # helper function for /remove_community_channel
 async def _archive_cc_channel(interaction, embed, button_self, attempt):
     archive_category = discord.utils.get(interaction.guild.categories, id=archive_cat_id)
+
+    button_self.clear_items()
+    await interaction.response.edit_message(view=button_self)
+    await interaction.delete_original_response()
+
     try:
         await interaction.channel.edit(category=archive_category)
         # this interaction seems to take some time on the live server.
@@ -3981,10 +3953,6 @@ async def _archive_cc_channel(interaction, embed, button_self, attempt):
         print(e)
         embed.add_field(name="Channel", value=f"**Failed archiving <#{interaction.channel.id}>**: {e}", inline=False)
 
-    button_self.clear_items()
-    await interaction.response.edit_message(view=button_self)
-    await interaction.delete_original_response()
-
     return embed
 
 # helper function for archive function
@@ -3997,10 +3965,6 @@ async def _archive_cc_channel_delay(interaction, embed, button_self, attempt):
         await _archive_cc_channel(interaction, embed, button_self, attempt) # we probably don't need to attempt the channel edit again but is there a disadvantage to doing so?
     else: # still nothing after 10 seconds, give up I guess
         embed.add_field(name="Channel", value=f"**Failed archiving <#{interaction.channel.id}>**: channel does not appear to be moved after {attempt} attempts.", inline=False)
-
-    button_self.clear_items()
-    await interaction.response.edit_message(view=button_self)
-    await interaction.delete_original_response()
 
     return embed
 
@@ -4045,7 +4009,7 @@ async def _openclose_community_channel(interaction, open):
 
     status_text_verb = "open" if open else "close"
     status_text_adj = "open" if open else "closed"
-   
+
     #check we're in the right category
     cc_category = discord.utils.get(interaction.guild.categories, id=cc_cat_id)
     if not interaction.channel.category == cc_category:
@@ -4059,7 +4023,7 @@ async def _openclose_community_channel(interaction, open):
         embed = discord.Embed(description=f"**ERROR**: Could not {status_text_verb} channel: {e}")
         await interaction.response.send_message(embed=embed, ephemeral=True)
         return
-    
+
     # notify user
     embed = discord.Embed(description=f"**<#{interaction.channel.id}> is {status_text_adj}!**"
                                       f"{' This channel is now visble to the server community 😊' if open else f' This channel is now hidden from the server community 😳'}",
@@ -4069,7 +4033,7 @@ async def _openclose_community_channel(interaction, open):
     # notify channel
     des_text = "Welcome everybody, it's good to see you here!" if open else "So long, farewell, auf Wiedersehen, goodbye."
     embed = discord.Embed(title=f"★ COMMUNITY CHANNEL {status_text_adj.upper()} ★", description=f"**<#{interaction.channel.id}> is now {status_text_adj}!** *🎶 {des_text}*", color=constants.EMBED_COLOUR_OK)
-    embed.set_author(name=interaction.user.name, icon_url=interaction.user.avatar.url)
+    embed.set_author(name=interaction.user.name, icon_url=interaction.user.display_avatar.url)
     embed.set_thumbnail(url=interaction.guild.icon.url)
     embed.timestamp= datetime.now(tz=timezone.utc)
     if open: # we don't need the notify_me footer on close and nobody's going to see any close gifs except community team members
@@ -4192,7 +4156,7 @@ class SendNoticeModal(Modal):
     async def on_submit(self, interaction: discord.Interaction):
         print(self.role_id)
 
-        embed, file = await _generate_cc_notice_embed(interaction.channel.id, interaction.user.display_name, interaction.user.avatar.url, self.embedtitle, self.message, self.image)
+        embed, file = await _generate_cc_notice_embed(interaction.channel.id, interaction.user.display_name, interaction.user.display_avatar.url, self.embedtitle, self.message, self.image)
 
         header_text = f":bell: <@&{self.role_id}> New message from <@{interaction.user.id}> for <#{interaction.channel.id}> :bell:"
 
@@ -4221,13 +4185,13 @@ async def _generate_cc_notice_embed(channel_id, user, avatar, title, message, im
     thumb_file = None
 
     if os.path.isfile(f"images/cc/{channel_id}.png"):
-        thumb_file = discord.File(f'images/cc/{channel_id}.png', filename='image.png') 
+        thumb_file = discord.File(f'images/cc/{channel_id}.png', filename='image.png')
         print(thumb_file)
 
     embed = discord.Embed(title=title, description=message, color=constants.EMBED_COLOUR_QU)
     embed.set_author(name=user, icon_url=avatar)
     embed.set_image(url=image_url)
-    if thumb_file: embed.set_thumbnail(url='attachment://image.png') 
+    if thumb_file: embed.set_thumbnail(url='attachment://image.png')
     embed.timestamp= datetime.now(tz=timezone.utc)
     embed.set_footer(text="Use \"/notify_me\" in this channel to sign up for future notifications."
                     "\nYou can opt out at any time by using \"/notify_me\" again.")
@@ -4244,7 +4208,7 @@ async def send_cc_notice(interaction: discord.Interaction, message: discord.Mess
     if not community_carrier: return
 
     try:
-        embed, file = await _generate_cc_notice_embed(message.channel.id, message.author.display_name, message.author.avatar.url, None, message.content, None) # get the embed
+        embed, file = await _generate_cc_notice_embed(message.channel.id, message.author.display_name, message.author.display_avatar.url, None, message.content, None) # get the embed
         if message.author.id == interaction.user.id:
             heading = f"<@&{community_carrier.role_id}> New message from <@{interaction.user.id}>"
         else:
@@ -4315,7 +4279,7 @@ async def edit_cc_notice(interaction: discord.Interaction, message: discord.Mess
     try: # this to avoid annoying thinking response remaining bug if user cancels on mobile
         await interaction.response.defer()
     finally:
-        return 
+        return
 
 
 # help for Community Channel users. when we refactor we'll work on having proper custom help available in more depth
@@ -4409,6 +4373,16 @@ async def _nominate(interaction: discord.Interaction, user: discord.Member, *, r
         print(f"{interaction.user} tried to nominate themselves for Community Pillar :]")
         return await interaction.response.send_message("You can't nominate yourself! But congrats on the positive self-esteem :)", ephemeral=True)
 
+    #Skip nominating Cpillar|Cmentor|Council|Mod
+    for avoid_role in [cpillar_role_id, cmentor_role_id, botadmin_role_id, mod_role_id]:
+        if user.get_role(avoid_role):
+            print(f"{interaction.user} tried to nominate a Cpillar|Cmentor|Council|Mod : {user.name}")
+            return await interaction.response.send_message(
+                ("You can't nominate an existing Community Pillar,"
+                " Community Mentor, Council or Mod."
+                " But we appreciate your nomination attempt!"),
+                ephemeral=True)
+
     print(f"{interaction.user} wants to nominate {user}")
     spamchannel = bot.get_channel(bot_spam_id)
 
@@ -4494,14 +4468,8 @@ def nom_count_user(pillarid):
 
 @bot.command(name='nom_count', help='Shows all users with more than X nominations')
 @check_roles([cmentor_role_id, botadmin_role_id])
+@check_command_channel(conf['ADMIN_BOT_CHANNEL'])
 async def nom_count(ctx, number: int):
-
-    # make sure we are in the right channel
-    bot_command_channel = bot.get_channel(conf['ADMIN_BOT_CHANNEL'])
-    current_channel = ctx.channel
-    if current_channel != bot_command_channel:
-        # problem, wrong channel, no progress
-        return await ctx.send(f'Sorry, you can only run this command out of: {bot_command_channel}.')
 
     numberint = int(number)
 
@@ -4532,6 +4500,7 @@ async def nom_count(ctx, number: int):
 
 @bot.command(name='nom_details', help='Shows nomination details for given user by ID or @ mention')
 @check_roles([cmentor_role_id, botadmin_role_id])
+@check_command_channel(conf['ADMIN_BOT_CHANNEL'])
 async def nom_details(ctx, userid: Union[discord.Member, int]):
     # userID should really be a discord.Member object, but that lacks a sensible way to cast back to a userid,
     # so just use a string and ignore the problem.
@@ -4549,13 +4518,6 @@ async def nom_details(ctx, userid: Union[discord.Member, int]):
         userid = userid.id  # Actually the ID
 
     print(f"nom_details called by {ctx.author} for member: {member}")
-
-    # make sure we are in the right channel
-    bot_command_channel = bot.get_channel(conf['ADMIN_BOT_CHANNEL'])
-    current_channel = ctx.channel
-    if current_channel != bot_command_channel:
-        # problem, wrong channel, no progress
-        return await ctx.send(f'Sorry, you can only run this command out of: {bot_command_channel}.')
 
     embed=discord.Embed(title=f"Nomination details", description=f"Discord user <@{member.id}>", color=constants.EMBED_COLOUR_OK)
 
@@ -4576,6 +4538,7 @@ async def nom_details(ctx, userid: Union[discord.Member, int]):
 
 @bot.command(name='nom_delete', help='Completely removes all nominations for a user by user ID or @ mention. NOT RECOVERABLE.')
 @check_roles([cmentor_role_id, botadmin_role_id])
+@check_command_channel(conf['ADMIN_BOT_CHANNEL'])
 async def nom_delete(ctx, userid: Union[str, int]):
 
     print(f"nom_delete called by {ctx.author}")
@@ -4594,13 +4557,6 @@ async def nom_delete(ctx, userid: Union[str, int]):
         # if we have a member object, then the member is the userid, and the id is the userid.id ... confused?
         member = userid
         userid = userid.id  # Actually the ID
-
-    # make sure we are in the right channel
-    bot_command_channel = bot.get_channel(conf['ADMIN_BOT_CHANNEL'])
-    current_channel = ctx.channel
-    if current_channel != bot_command_channel:
-        # problem, wrong channel, no progress
-        return await ctx.send(f'Sorry, you can only run this command out of: {bot_command_channel}.')
 
     # check whether user has any nominations
     nominees_data = find_nominee_with_id(userid)
