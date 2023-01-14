@@ -14,6 +14,7 @@ PROD_MISSION_CHANNEL = 822603169104265276    # The ID for the production mission
 PROD_BOT_COMMAND_CHANNEL = 802523724674891826   # Bot backend commands are locked to a channel
 PROD_ADMIN_BOT_CHANNEL = 895083178761547806 # bot command channel for admins only
 PROD_BOT_SPAM_CHANNEL = 801258393205604372 # Certain bot logging messages go here
+PROD_DEV_CHANNEL = 827656814911815702 # Development channel for MAB on live
 PROD_UPVOTE_EMOJI = 828287733227192403 # upvote emoji on live server
 PROD_HAULER_ROLE = 875313960834965544 # hauler role ID on live server
 PROD_LEGACY_HAULER__ROLE = 1047133548886364190 # legacy hauler role ID on live server
@@ -50,6 +51,7 @@ TEST_MISSION_CHANNEL = 842138710651961364    # The ID for the production mission
 TEST_BOT_COMMAND_CHANNEL = 842152343441375283   # Bot backend commands are locked to a channel
 TEST_ADMIN_BOT_CHANNEL = 842152343441375283 # bot command channel for admins only
 TEST_BOT_SPAM_CHANNEL = 842525081858867211 # Bot logging messages on the test server
+TEST_DEV_CHANNEL = 1063765215457583164 # Development channel for MAB on test
 TEST_UPVOTE_EMOJI = 849388681382068225 # upvote emoji on test server
 TEST_HAULER_ROLE = 875439909102575647 # hauler role ID on test server
 TEST_LEGACY_HAULER__ROLE = 1047152762707787786 # legacy hauler role ID on test server
@@ -105,6 +107,7 @@ def get_constant(production: bool):
             'BOT_COMMAND_CHANNEL': PROD_BOT_COMMAND_CHANNEL,
             'ADMIN_BOT_CHANNEL' : PROD_ADMIN_BOT_CHANNEL,
             'BOT_SPAM_CHANNEL': PROD_BOT_SPAM_CHANNEL,
+            'BOT_DEV_CHANNEL' : PROD_DEV_CHANNEL,
             'UPVOTE_EMOJI': PROD_UPVOTE_EMOJI,
             'HAULER_ROLE' : PROD_HAULER_ROLE,
             'LEGACY_HAULER_ROLE' : PROD_LEGACY_HAULER__ROLE,
@@ -139,6 +142,7 @@ def get_constant(production: bool):
             'BOT_COMMAND_CHANNEL': TEST_BOT_COMMAND_CHANNEL,
             'ADMIN_BOT_CHANNEL' : TEST_ADMIN_BOT_CHANNEL,
             'BOT_SPAM_CHANNEL': TEST_BOT_SPAM_CHANNEL,
+            'BOT_DEV_CHANNEL' : TEST_DEV_CHANNEL,
             'UPVOTE_EMOJI': TEST_UPVOTE_EMOJI,
             'HAULER_ROLE' : TEST_HAULER_ROLE,
             'LEGACY_HAULER_ROLE' : TEST_LEGACY_HAULER__ROLE,
