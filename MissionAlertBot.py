@@ -45,6 +45,7 @@ from Commodity import Commodity
 from MissionData import MissionData
 from CommunityCarrierData import CommunityCarrierData
 from NomineesData import NomineesData
+from version import version
 
 _production = ast.literal_eval(os.environ.get('PTN_MISSION_ALERT_SERVICE', 'False'))
 
@@ -68,12 +69,16 @@ trade_alerts_id = conf['TRADE_ALERTS_ID']
 legacy_alerts_id = conf['LEGACY_ALERTS_ID']
 wine_alerts_loading_id = conf['WINE_ALERTS_LOADING_ID']
 wine_alerts_unloading_id = conf['WINE_ALERTS_UNLOADING_ID']
-
 bot_spam_id = conf['BOT_SPAM_CHANNEL']
-to_subreddit = conf['SUB_REDDIT']
+dev_channel_id = conf['BOT_DEV_CHANNEL']
+
+# category IDs
 cc_cat_id = conf['CC_CAT']
 trade_cat_id = conf['TRADE_CAT']
 archive_cat_id = conf['ARCHIVE_CAT']
+
+# reddit IDs
+to_subreddit = conf['SUB_REDDIT']
 
 # role IDs
 hauler_role_id = conf['HAULER_ROLE']
@@ -1050,6 +1055,10 @@ bot = commands.Bot(command_prefix='m.', intents=discord.Intents.all())
 @bot.event
 async def on_ready():
     print(f'{bot.user.name} has connected to Discord!')
+    devchannel = bot.get_channel(dev_channel_id)
+    embed = discord.Embed(title="MISSION ALERT BOT ONLINE", description=f"<@{bot.user.id}> connected, version **{version}**.", color=constants.EMBED_COLOUR_OK)
+    embed.set_image(url=random.choice(hello_gifs))
+    await devchannel.send(embed=embed)
     # sync slash commands
     try:
         bot.tree.copy_global_to(guild=guild_obj)
