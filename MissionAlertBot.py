@@ -2175,7 +2175,7 @@ async def _cleanup_completed_mission(ctx, mission_data, reddit_complete_text, di
                 This can probably be reworked to be neater and use fewer than 3 separate variables for one short message in the future.
                 """
                 reason = f"\n{desc_msg}" if desc_msg else None
-                await owner.send(f"Ahoy CMDR! {ctx.author.display_name} has concluded the trade mission for your Fleet Carrier **{carrier_data.carrier_long_name}** using `m.done`. **Reason given**: {reason}\nIts mission channel will be removed in {seconds_long//60} minutes unless a new mission is started.")
+                await owner.send(f"Ahoy CMDR! {ctx.author.display_name} has concluded the trade mission for your Fleet Carrier **{carrier_data.carrier_long_name}**. **Reason given**: {reason}\nIts mission channel will be removed in {seconds_long//60} minutes unless a new mission is started.")
             else:
                 await owner.send(f"Ahoy CMDR! The trade mission for your Fleet Carrier **{carrier_data.carrier_long_name}** has been marked as complete by {ctx.author.display_name}. Its mission channel will be removed in {seconds_long//60} minutes unless a new mission is started.")
 
@@ -2300,7 +2300,7 @@ async def remove_carrier_channel(mission_channel_id, seconds):
 
 # a command for users to mark a carrier mission complete from within the carrier channel
 @bot.command(name='complete', help="Use in a carrier's channel to mark the current trade mission complete.")
-async def complete(ctx, comment: str = None):
+async def complete(ctx, *, comment: str = None):
 
     print(f"m.complete called in {ctx.channel} by {ctx.author}")
 
