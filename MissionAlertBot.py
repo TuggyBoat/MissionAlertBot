@@ -1518,7 +1518,7 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
             if "d" in msg.content.lower():
                 print("User used option d, creating mission channel")
 
-                mission_temp_channel_id = await create_mission_temp_channel(ctx, carrier_data.discord_channel, carrier_data.ownerid)
+                mission_temp_channel_id = await create_mission_temp_channel(ctx, carrier_data.discord_channel, carrier_data.ownerid, carrier_data.carrier_short_name)
                 mission_temp_channel = bot.get_channel(mission_temp_channel_id)
 
                 # Recreate this text since we know the channel id
@@ -1701,7 +1701,7 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
 
 
 
-async def create_mission_temp_channel(ctx, discord_channel, owner_id):
+async def create_mission_temp_channel(ctx, discord_channel, owner_id, shortname):
     # create the carrier's channel for the mission
 
     # first check whether channel already exists
@@ -1727,8 +1727,10 @@ async def create_mission_temp_channel(ctx, discord_channel, owner_id):
     else:
         # channel does not exist, create it
 
+        topic = f"Use \";stock {shortname}\" to retrieve stock levels for this carrier."
+
         category = discord.utils.get(ctx.guild.categories, id=trade_cat_id)
-        mission_temp_channel = await ctx.guild.create_text_channel(discord_channel, category=category)
+        mission_temp_channel = await ctx.guild.create_text_channel(discord_channel, category=category, topic=topic)
         mission_temp_channel_id = mission_temp_channel.id
         print(f"Created {mission_temp_channel}")
 
@@ -2173,7 +2175,7 @@ async def _cleanup_completed_mission(ctx, mission_data, reddit_complete_text, di
                 This can probably be reworked to be neater and use fewer than 3 separate variables for one short message in the future.
                 """
                 reason = f"\n{desc_msg}" if desc_msg else None
-                await owner.send(f"Ahoy CMDR! {ctx.author.display_name} has concluded the trade mission for your Fleet Carrier **{carrier_data.carrier_long_name}** using `m.done`. **Reason given**: {reason}\nIts mission channel will be removed in {seconds_long//60} minutes unless a new mission is started.")
+                await owner.send(f"Ahoy CMDR! {ctx.author.display_name} has concluded the trade mission for your Fleet Carrier **{carrier_data.carrier_long_name}**. **Reason given**: {reason}\nIts mission channel will be removed in {seconds_long//60} minutes unless a new mission is started.")
             else:
                 await owner.send(f"Ahoy CMDR! The trade mission for your Fleet Carrier **{carrier_data.carrier_long_name}** has been marked as complete by {ctx.author.display_name}. Its mission channel will be removed in {seconds_long//60} minutes unless a new mission is started.")
 
@@ -2298,7 +2300,7 @@ async def remove_carrier_channel(mission_channel_id, seconds):
 
 # a command for users to mark a carrier mission complete from within the carrier channel
 @bot.command(name='complete', help="Use in a carrier's channel to mark the current trade mission complete.")
-async def complete(ctx, comment: str = None):
+async def complete(ctx, *, comment: str = None):
 
     print(f"m.complete called in {ctx.channel} by {ctx.author}")
 
@@ -3472,7 +3474,7 @@ async def _cc_db_enter(interaction, owner, new_channel, new_role):
 
     # tell the user what's going on
     embed = discord.Embed(description=f"<@{owner.id}> is now a <@&{cc_role_id}> and owns <#{new_channel.id}> with notification role <@&{new_role.id}>."
-                                      f" **This channel will remained closed** (private) until `/open_community_channel` is used in it."
+                                      f" **This channel will remain closed** (private) until `/open_community_channel` is used in it."
                                       f"\n\nNote channels and roles can be freely renamed.", color=constants.EMBED_COLOUR_OK)
     await interaction.followup.send(embed=embed)
 
@@ -4374,6 +4376,19 @@ async def _community_channel_help(interaction: discord.Interaction):
 #
 #                       COMMUNITY NOMINATION COMMANDS
 #
+
+# prints information about /nominate to current channel
+@bot.tree.command(name="thanks",
+    description="COMMUNITY TEAM ONLY: Display information about the /nominate command.", guild=guild_obj)
+@check_roles([cpillar_role_id, cmentor_role_id, botadmin_role_id, mod_role_id]) 
+async def _thanks(interaction: discord.Interaction):
+    print(f"/thanks called by {interaction.user} in {interaction.channel.name}")
+    embed = discord.Embed(title=":heart: NOMINATE TO APPRECIATE :heart:",
+                          description="Did someone **go out of their way to be helpful**? Use the </nominate:878304221118742578> "
+                                      "command to help them be considered "
+                                      f"for <@&{cpillar_role_id}> and show your appreciation!", color=constants.EMBED_COLOUR_QU)
+    embed.set_thumbnail(url='https://pilotstradenetwork.com/wp-content/uploads/2021/08/PTN_Discord_Icon.png')
+    await interaction.response.send_message(embed=embed)
 
 @bot.tree.command(name="nominate",
     description="Private command: Nominate an @member to become a Community Pillar.", guild=guild_obj)
