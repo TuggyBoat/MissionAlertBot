@@ -4379,7 +4379,7 @@ async def _community_channel_help(interaction: discord.Interaction):
 
 # prints information about /nominate to current channel
 @bot.tree.command(name="thanks",
-    description="Display information about the /nominate command", guild=guild_obj)
+    description="COMMUNITY TEAM ONLY: Display information about the /nominate command.", guild=guild_obj)
 @check_roles([cpillar_role_id, cmentor_role_id, botadmin_role_id, mod_role_id]) 
 async def _thanks(interaction: discord.Interaction):
     print(f"/thanks called by {interaction.user} in {interaction.channel.name}")
