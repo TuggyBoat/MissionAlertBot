@@ -1145,8 +1145,8 @@ async def _monitor_reddit_comments():
                     print("Sent comment to channel")
         except Exception as e:
             print(f"Error while monitoring {to_subreddit} for comments: {e}")
-            spamchannel = bot.get_channel(bot_spam_id)
-            await spamchannel.send(f"<@211891698551226368> error with Reddit monitoring: {e}") # this is a mention for Sihmm
+            # spamchannel = bot.get_channel(bot_spam_id)
+            # await spamchannel.send(f"<@211891698551226368> error with Reddit monitoring: {e}") # this is a mention for Sihmm
 
 
 
