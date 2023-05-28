@@ -24,17 +24,21 @@ _production = ast.literal_eval(os.environ.get('PTN_MISSION_ALERT_SERVICE', 'Fals
 
 # define paths
 # TODO - check these all work in both live and testing, particularly default / fonts
-TESTING_DATA_PATH = os.path.join('ptn', 'missionalertbot', 'data')
+TESTING_DATA_PATH = os.path.join('ptn', 'missionalertbot', 'data') # defines the path for use in a local testing environment
 DATA_DIR = os.getenv('PTN_MAB_DATA_DIR', TESTING_DATA_PATH)
 
+# database paths
 DB_PATH = os.path.join(os.getcwd(), DATA_DIR, 'database')
 CARRIERS_DB_PATH = os.path.join(os.getcwd(), DATA_DIR, 'database', 'carriers.db')
 MISSIONS_DB_PATH = os.path.join(os.getcwd(), DATA_DIR, 'database', 'missions.db')
 BACKUP_DB_PATH = os.path.join(os.getcwd(), DATA_DIR, 'database', 'backups')
 SQL_PATH = os.path.join(os.getcwd(), DATA_DIR, 'database', 'db_sql')
 
+# image paths
 IMAGE_PATH = os.path.join(os.getcwd(), DATA_DIR, 'images')
 CC_IMAGE_PATH = os.path.join(os.getcwd(), DATA_DIR, 'images', 'cc')
+
+# static resource paths
 RESOURCE_PATH = os.path.join(os.getcwd(), 'ptn', 'missionalertbot', 'resources')
 DEF_IMAGE_PATH = os.path.join(os.getcwd(), 'ptn', 'missionalertbot', 'resources', 'default')
 EDMC_OFF_PATH = os.path.join(os.getcwd(),'ptn', 'missionalertbot', 'resources', 'edmc_off')
