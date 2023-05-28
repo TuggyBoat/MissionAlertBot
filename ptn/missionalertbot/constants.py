@@ -23,33 +23,33 @@ _production = ast.literal_eval(os.environ.get('PTN_MISSION_ALERT_SERVICE', 'Fals
 
 # define paths
 # TODO - check these all work in both live and testing, particularly default / fonts
-TESTING_DATA_PATH = os.path.join('ptn', 'missionalertbot', 'data') # defines the path for use in a local testing environment
+TESTING_DATA_PATH = os.path.join(os.getcwd(), 'ptn', 'missionalertbot', 'data') # defines the path for use in a local testing environment
 DATA_DIR = os.getenv('PTN_MAB_DATA_DIR', TESTING_DATA_PATH)
-TESTING_RESOURCE_PATH = os.path.join('ptn', 'missionalertbot', 'resouces') # defines the path for static resources in the local testing environment
+TESTING_RESOURCE_PATH = os.path.join(os.getcwd(), 'ptn', 'missionalertbot', 'resouces') # defines the path for static resources in the local testing environment
 RESOURCE_DIR = os.getenv('PTN_MAB_RESOURCE_DIR', TESTING_RESOURCE_PATH)
 
 # database paths
-DB_PATH = os.path.join(os.getcwd(), DATA_DIR, 'database')
-CARRIERS_DB_PATH = os.path.join(os.getcwd(), DATA_DIR, 'database', 'carriers.db')
-MISSIONS_DB_PATH = os.path.join(os.getcwd(), DATA_DIR, 'database', 'missions.db')
-BACKUP_DB_PATH = os.path.join(os.getcwd(), DATA_DIR, 'database', 'backups')
-SQL_PATH = os.path.join(os.getcwd(), DATA_DIR, 'database', 'db_sql')
+DB_PATH = os.path.join(DATA_DIR, 'database')
+CARRIERS_DB_PATH = os.path.join(DATA_DIR, 'database', 'carriers.db')
+MISSIONS_DB_PATH = os.path.join(DATA_DIR, 'database', 'missions.db')
+BACKUP_DB_PATH = os.path.join(DATA_DIR, 'database', 'backups')
+SQL_PATH = os.path.join(DATA_DIR, 'database', 'db_sql')
 
 # image paths
-IMAGE_PATH = os.path.join(os.getcwd(), DATA_DIR, 'images')
-CC_IMAGE_PATH = os.path.join(os.getcwd(), DATA_DIR, 'images', 'cc')
+IMAGE_PATH = os.path.join(DATA_DIR, 'images')
+CC_IMAGE_PATH = os.path.join(DATA_DIR, 'images', 'cc')
 
 # static resource paths
-RESOURCE_PATH = os.path.join(os.getcwd(), RESOURCE_DIR)
-DEF_IMAGE_PATH = os.path.join(os.getcwd(), RESOURCE_DIR, 'default')
-EDMC_OFF_PATH = os.path.join(os.getcwd(), RESOURCE_DIR, 'edmc_off')
-FONT_PATH = os.path.join(os.getcwd(), RESOURCE_DIR, 'font')
+RESOURCE_PATH = os.path.join(RESOURCE_DIR)
+DEF_IMAGE_PATH = os.path.join(RESOURCE_DIR, 'default')
+EDMC_OFF_PATH = os.path.join(RESOURCE_DIR, 'edmc_off')
+FONT_PATH = os.path.join(RESOURCE_DIR, 'font')
 
 
 # Get the discord token from the local .env file. Deliberately not hosted in the repo or Discord takes the bot down
 # because the keys are exposed. DO NOT HOST IN THE PUBLIC REPO.
 # load_dotenv(os.path.join(DATA_DIR, '.env'))
-load_dotenv(os.path.join(os.getcwd(), DATA_DIR, '.env'))
+load_dotenv(os.path.join(DATA_DIR, '.env'))
 
 
 # define bot token
