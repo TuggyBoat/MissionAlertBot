@@ -1,0 +1,8 @@
+# ignore SQL dump
+db_sql/
+
+# ignore pycache
+__pycache__/
+
+# ignore .db files
+*.db
