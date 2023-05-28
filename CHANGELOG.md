@@ -15,6 +15,11 @@ Refactoring:
 - Many small improvements to code
 - Many, many more improvements to do
 
+New environment variables:
+
+- `PTN_MAB_DATA_DIR` - specifies the path to the `/data` directory where the bot stores all mutable files (databases, carrier images, community channel thumbnails)
+- `PTN_MAB_RESOURCE_DIR` - specifies the path to the `/resource` directory which houses static non-Python files (default carrier images, mission template images, edmc off images, and fonts)
+
 New commands:
 
 - `/greet` - functionally identical to m.ping but as a slash command
