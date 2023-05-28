@@ -1,8 +1,6 @@
 """
 Functions relating to the databases used by MAB.
 
-Refactor status: COMPLETE for included functions, more functions may be added while refactoring other commands
-
 """
 
 # libraries

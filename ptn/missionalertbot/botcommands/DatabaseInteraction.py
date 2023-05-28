@@ -1,8 +1,6 @@
 """
 A Cog for commands that are primarily concerned with the bot's databases.
 
-Refactor Status: Complete
-
 """
 
 # import libraries

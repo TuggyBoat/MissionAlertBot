@@ -3,7 +3,6 @@ Define classes for Views used by Interactions
 
 Depends on: constants, database, Embeds, helpers
 
-Refactor status: COMPLETE for included Views, more may be added while refactoring other commands
 """
 
 # import libraries

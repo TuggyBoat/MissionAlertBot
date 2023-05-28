@@ -1,7 +1,6 @@
 """
 Commands for use by CCOs 
 
-Refactor status: initial population
 """
 # import libraries
 from typing import Union

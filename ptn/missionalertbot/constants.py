@@ -5,7 +5,6 @@ Depends on: nothing
 Modules are imported according to the following hierarchy:
 constants -> database -> helpers/embeds -> Views -> commands
 
-Refactor status: COMPLETE except for any new variables that come up during refactoring
 """
 
 # libraries

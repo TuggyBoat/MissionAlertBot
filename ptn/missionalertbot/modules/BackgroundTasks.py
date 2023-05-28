@@ -1,8 +1,6 @@
 """
 BackgroundTasks.py
 
-Refactor Status: COMPLETE
-
 """
 
 # import libraries

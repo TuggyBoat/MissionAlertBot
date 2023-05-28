@@ -3,7 +3,6 @@ A module for helper functions called by other modules.
 
 Depends on: constants, database
 
-Refactor status: COMPLETE for included functions, more may be added while refactoring other commands
 """
 
 # import libraries

@@ -1,8 +1,6 @@
 """
 A Cog for general bot commands that don't fit in other categories.
 
-Refactor Status: COMPLETE
-
 """
 
 # libraries

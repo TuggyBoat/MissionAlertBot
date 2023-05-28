@@ -1,8 +1,6 @@
 """
 Cog for Community Team commands
 
-Refactor status: COMPLETE
-
 """
 
 # import libaries
@@ -408,7 +406,7 @@ class CTeamCommands(commands.Cog):
             return
 
 
-    # help for Community Channel users. when we refactor we'll work on having proper custom help available in more depth
+    # help for Community Channel users. TODO when we refactor we'll work on having proper custom help available in more depth
     # TODO: import from a text file?
     @app_commands.command(name="community_channel_help",
         description="Private command: get help with Community Channel commands and functions.", )
