@@ -10,6 +10,8 @@ Refactoring:
 - New global error handlers for interactions and text commands respectively
 - Implemented setup.py, the bot is now installed via `pip install -e.`
 - Cleaned up requirements
+- Removed interaction sync listener, replaced with command
+    - sync is a high intensity action, best practice is to only do it when needed
 - Added persistant data directory for use when containerised
     - this contains all carrier images, carrier backup images, and community channel images, as well as all database, database dump, and database backups
 - Many small improvements to code
@@ -23,6 +25,8 @@ New environment variables:
 New commands:
 
 - `/greet` - functionally identical to m.ping but as a slash command
+- `m.sync` - syncs interactions with the server
+    - this has to be done any time an interaction is added, removed, or has its definition changed
 
 Changed commands
 

@@ -363,7 +363,7 @@ class DatabaseInteraction(commands.Cog):
 
         await message.add_reaction("❌")
         # From page 0 we can only go forwards
-        await message.add_reaction("▶️")
+        if not current_page == max_pages: await message.add_reaction("▶️")
 
         # 60 seconds time out gets raised by Asyncio
         while True:
@@ -375,6 +375,7 @@ class DatabaseInteraction(commands.Cog):
                     await ctx.send(embed=embed)
                     await message.delete()
                     await ctx.message.delete()
+                    return
 
                 elif str(reaction.emoji) == "▶️" and current_page != max_pages:
                     print(f'{ctx.author} requested to go forward a page.')
@@ -428,12 +429,15 @@ class DatabaseInteraction(commands.Cog):
                     await message.remove_reaction(reaction, user)
 
             except asyncio.TimeoutError:
-                print(f'Timeout hit during carrier request by: {ctx.author}')
-                embed = discord.Embed(description=f'Closed the active carrier list request from {ctx.author} due to no input in 60 seconds.', color=constants.EMBED_COLOUR_QU)
-                await ctx.send(embed=embed)
-                await message.delete()
-                await ctx.message.delete()
-                break
+                if ctx.fetch_message(message.id) and ctx.fetch_message(ctx.message.id):
+                    print(f'Timeout hit during carrier request by: {ctx.author}')
+                    embed = discord.Embed(description=f'Closed the active carrier list request from {ctx.author} due to no input in 60 seconds.', color=constants.EMBED_COLOUR_QU)
+                    await ctx.send(embed=embed)
+                    await message.delete()
+                    await ctx.message.delete()
+                    break
+                else:
+                    return
 
 
     """
@@ -724,7 +728,7 @@ class DatabaseInteraction(commands.Cog):
 
 
     # list all community carriers
-    @commands.command(name='cc_list', help='List all Community Carriers.')
+    @commands.command(name='cc_list', help='List all Community Channels.')
     @commands.has_any_role(cmentor_role(), admin_role())
     async def cc_list(self, ctx):
 
@@ -742,7 +746,7 @@ class DatabaseInteraction(commands.Cog):
                 yield chunk_list[i:i + max_size]
 
         def validate_response(react, user):
-            return user == ctx.author and str(react.emoji) in ["◀️", "▶️"]
+            return user == ctx.author and str(react.emoji) in ["◀️", "❌", "▶️"]
             # This makes sure nobody except the command sender can interact with the "menu"
 
         # TODO: should pages just be a list of embed_fields we want to add?
@@ -761,6 +765,7 @@ class DatabaseInteraction(commands.Cog):
         # Now go send it and wait on a reaction
         message = await ctx.send(embed=embed)
 
+        await message.add_reaction("❌")
         # From page 0 we can only go forwards
         if not current_page == max_pages: await message.add_reaction("▶️")
 
@@ -768,11 +773,18 @@ class DatabaseInteraction(commands.Cog):
         while True:
             try:
                 reaction, user = await bot.wait_for('reaction_add', timeout=60, check=validate_response)
-                if str(reaction.emoji) == "▶️" and current_page != max_pages:
+                if str(reaction.emoji) == "❌":
+                    print(f'Closed list community channel request by: {ctx.author}')
+                    embed = discord.Embed(description=f'Closed the active Community Channel list.', color=constants.EMBED_COLOUR_OK)
+                    await ctx.send(embed=embed)
+                    await message.delete()
+                    await ctx.message.delete()
+                    return
 
+                elif str(reaction.emoji) == "▶️" and current_page != max_pages:
                     print(f'{ctx.author} requested to go forward a page.')
                     current_page += 1   # Forward a page
-                    new_embed = discord.Embed(title=f"{len(community_carriers)} Registered Community Carriers Page:{current_page}")
+                    new_embed = discord.Embed(title=f"{len(community_carriers)} Registered Community Channels Page:{current_page}")
                     for community_carriers in pages[current_page-1]:
                         # Page -1 as humans think page 1, 2, but python thinks 0, 1, 2
                         count += 1
@@ -792,7 +804,7 @@ class DatabaseInteraction(commands.Cog):
                     print(f'{ctx.author} requested to go back a page.')
                     current_page -= 1   # Go back a page
 
-                    new_embed = discord.Embed(title=f"{len(community_carriers)} Registered Community Carriers Page:{current_page}")
+                    new_embed = discord.Embed(title=f"{len(community_carriers)} Registered Community Channels Page:{current_page}")
                     # Start by counting back however many carriers are in the current page, minus the new page, that way
                     # when we start a 3rd page we don't end up in problems
                     count -= len(pages[current_page - 1])
@@ -821,12 +833,15 @@ class DatabaseInteraction(commands.Cog):
                     await message.remove_reaction(reaction, user)
 
             except asyncio.TimeoutError:
-                print(f'Timeout hit during community carrier request by: {ctx.author}')
-                embed = discord.Embed(description=f'Closed the active carrier list request from {ctx.author} due to no input in 60 seconds.', color=constants.EMBED_COLOUR_QU)
-                await ctx.send(embed=embed)
-                await message.delete()
-                await ctx.message.delete()
-                break
+                if ctx.fetch_message(message.id) and ctx.fetch_message(ctx.message.id):
+                    print(f'Timeout hit during community channel request by: {ctx.author}')
+                    embed = discord.Embed(description=f'Closed the active community channel list request from {ctx.author} due to no input in 60 seconds.', color=constants.EMBED_COLOUR_QU)
+                    await ctx.send(embed=embed)
+                    await message.delete()
+                    await ctx.message.delete()
+                    break
+                else:
+                    return
 
 
     # find a community carrier channel by owner
