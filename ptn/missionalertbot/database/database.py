@@ -266,6 +266,7 @@ def create_missing_column(table, column, existing, db_name, db_obj, db_conn, cre
 
 # ensure all paths function for a clean install
 def build_directory_structure_on_startup():
+    print("Building directory structure...")
     os.makedirs(constants.DB_PATH, exist_ok=True) # /database - the main database files
     os.makedirs(constants.IMAGE_PATH, exist_ok=True) # /images - carrier images
     os.makedirs(f"{constants.IMAGE_PATH}/old", exist_ok=True) # /images/old - backed up carrier images
@@ -276,6 +277,7 @@ def build_directory_structure_on_startup():
 
 # build the databases, from scratch if needed
 def build_database_on_startup():
+    print("Building databases...")
 
     # Add a mapping when a new table needs to be created
     # Requires:

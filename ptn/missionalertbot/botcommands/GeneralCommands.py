@@ -170,6 +170,9 @@ class GeneralCommands(commands.Cog):
     async def _greet(self, interaction: discord.Interaction):
         print(f"{interaction.user.name} used /greet in {interaction.channel}")
         await interaction.response.send_message("Ok, saying hi for you!", ephemeral=True)
+        spamchannel = bot.get_channel(bot_spam_channel())
+        embed = discord.Embed(description=f"<@{interaction.user.id}> used {interaction.command.name} in <#{interaction.channel.id}>", color=constants.EMBED_COLOUR_OK)
+        await spamchannel.send(embed=embed)
         gif = random.choice(constants.hello_gifs)
         await interaction.channel.send(gif)
 
