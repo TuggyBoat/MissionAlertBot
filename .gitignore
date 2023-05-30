@@ -1,14 +1,46 @@
-result.png
-missions.db
-missions.db.backup
-backup/
+# Byte-compiled / optimized / DLL files
 __pycache__/
-images/cc/
-db_sql/*.sql
-.idea
+*.py[cod]
+*$py.class
 
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+#  Usually these files are written by a python script from a template
+#  before PyInstaller builds the exe, so as to inject date/other infos into it.
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# local data
+.idea
+*.db
+*.pyc
+*.sql
+test.py
+
+# secrets
 .env
 praw.ini
-
-*.db
-*.sql

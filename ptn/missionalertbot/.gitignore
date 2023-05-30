@@ -1,0 +1,6 @@
+# ignore cache and backup folders
+__pycache__/
+backup/
+
+# ignore data folder
+data/
