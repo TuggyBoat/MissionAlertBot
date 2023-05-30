@@ -7,14 +7,16 @@ The Python script that starts the bot.
 import asyncio
 import os
 
+# import build functions
+from ptn.missionalertbot.database.database import build_database_on_startup, build_directory_structure_on_startup
+
+build_directory_structure_on_startup() # build directory structure
+
 # import bot Cogs
 from ptn.missionalertbot.botcommands.GeneralCommands import GeneralCommands
 from ptn.missionalertbot.botcommands.CCOCommands import CCOCommands
 from ptn.missionalertbot.botcommands.CTeamCommands import CTeamCommands
 from ptn.missionalertbot.botcommands.DatabaseInteraction import DatabaseInteraction
-
-# import database build function
-from ptn.missionalertbot.database.database import build_database_on_startup, build_directory_structure_on_startup
 
 # import bot object, token, production status
 from ptn.missionalertbot.constants import bot, TOKEN, _production, DATA_DIR
@@ -30,7 +32,6 @@ def run():
 
 async def missionalertbot():
     async with bot:
-        build_directory_structure_on_startup()
         build_database_on_startup()
         await bot.add_cog(GeneralCommands(bot))
         await bot.add_cog(CCOCommands(bot))
