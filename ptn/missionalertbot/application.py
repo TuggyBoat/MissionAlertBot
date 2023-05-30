@@ -20,7 +20,6 @@ from ptn.missionalertbot.database.database import build_database_on_startup, bui
 from ptn.missionalertbot.constants import bot, TOKEN, _production, DATA_DIR
 
 print(f"Data dir is {DATA_DIR} from {os.path.join(os.getcwd(), 'ptn', 'missionalertbot', DATA_DIR, '.env')}")
-print(f"Token is {TOKEN}")
 
 print(f'MissionAlertBot is connecting against production: {_production}.')
 
