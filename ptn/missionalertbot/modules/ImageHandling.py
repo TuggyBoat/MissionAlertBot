@@ -39,33 +39,33 @@ async def _overlay_mission_image(carrier_data):
 
 
 # function to create image for loading
-async def create_carrier_mission_image(carrier_data, commodity, system, station, profit, pads, demand, mission_type):
+async def create_carrier_mission_image(mission_params):
     print("Called mission image generator")
     """
     Builds the carrier image and returns the relative path.
     """
 
-    template = await _overlay_mission_image(carrier_data)
+    template = await _overlay_mission_image(mission_params.carrier_data)
 
     image_editable = ImageDraw.Draw(template)
 
-    mission_action = 'LOADING' if mission_type == 'load' else 'UNLOADING'
+    mission_action = 'LOADING' if mission_params.mission_type == 'load' else 'UNLOADING'
     image_editable.text((46, 304), "PILOTS TRADE NETWORK", (255, 255, 255), font=TITLE_FONT)
     image_editable.text((46, 327), f"CARRIER {mission_action} MISSION", (191, 53, 57), font=TITLE_FONT)
-    image_editable.text((46, 366), "FLEET CARRIER " + carrier_data.carrier_identifier, (0, 217, 255), font=REG_FONT)
-    image_editable.text((46, 382), carrier_data.carrier_long_name, (0, 217, 255), font=NAME_FONT)
+    image_editable.text((46, 366), "FLEET CARRIER " + mission_params.carrier_data.carrier_identifier, (0, 217, 255), font=REG_FONT)
+    image_editable.text((46, 382), mission_params.carrier_data.carrier_long_name, (0, 217, 255), font=NAME_FONT)
     image_editable.text((46, 439), "COMMODITY:", (255, 255, 255), font=FIELD_FONT)
-    image_editable.text((170, 439), commodity.name.upper(), (255, 255, 255), font=NORMAL_FONT)
+    image_editable.text((170, 439), mission_params.commodity_data.name.upper(), (255, 255, 255), font=NORMAL_FONT)
     image_editable.text((46, 477), "SYSTEM:", (255, 255, 255), font=FIELD_FONT)
-    image_editable.text((170, 477), system.upper(), (255, 255, 255), font=NORMAL_FONT)
+    image_editable.text((170, 477), mission_params.system.upper(), (255, 255, 255), font=NORMAL_FONT)
     image_editable.text((46, 514), "STATION:", (255, 255, 255), font=FIELD_FONT)
-    image_editable.text((170, 514), f"{station.upper()} ({pads.upper()} pads)", (255, 255, 255), font=NORMAL_FONT)
+    image_editable.text((170, 514), f"{mission_params.station.upper()} ({mission_params.pads.upper()} pads)", (255, 255, 255), font=NORMAL_FONT)
     image_editable.text((46, 552), "PROFIT:", (255, 255, 255), font=FIELD_FONT)
-    image_editable.text((170, 552), f"{profit}k per unit, {demand} units", (255, 255, 255), font=NORMAL_FONT)
+    image_editable.text((170, 552), f"{mission_params.profit}k per unit, {mission_params.demand} units", (255, 255, 255), font=NORMAL_FONT)
 
     # Check if this will work fine, we might need to delete=False and clean it ourselves
     result_name = tempfile.NamedTemporaryFile(suffix='.png', delete=False)
-    print(f'Saving temporary mission file for carrier: {carrier_data.carrier_long_name} to: {result_name.name}')
+    print(f'Saving temporary mission file for carrier: {mission_params.carrier_data.carrier_long_name} to: {result_name.name}')
     template.save(result_name.name)
     return result_name.name
 

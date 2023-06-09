@@ -25,7 +25,7 @@ _production = ast.literal_eval(os.environ.get('PTN_MISSION_ALERT_SERVICE', 'Fals
 # TODO - check these all work in both live and testing, particularly default / fonts
 TESTING_DATA_PATH = os.path.join(os.getcwd(), 'ptn', 'missionalertbot', 'data') # defines the path for use in a local testing environment
 DATA_DIR = os.getenv('PTN_MAB_DATA_DIR', TESTING_DATA_PATH)
-TESTING_RESOURCE_PATH = os.path.join(os.getcwd(), 'ptn', 'missionalertbot', 'resouces') # defines the path for static resources in the local testing environment
+TESTING_RESOURCE_PATH = os.path.join(os.getcwd(), 'ptn', 'missionalertbot', 'resources') # defines the path for static resources in the local testing environment
 RESOURCE_DIR = os.getenv('PTN_MAB_RESOURCE_DIR', TESTING_RESOURCE_PATH)
 
 # database paths

@@ -21,6 +21,7 @@ from discord.errors import HTTPException, Forbidden, NotFound
 
 # import local classes
 from ptn.missionalertbot.classes.MissionData import MissionData
+from ptn.missionalertbot.classes.MissionParams import MissionParams
 
 # import local constants
 import ptn.missionalertbot.constants as constants
@@ -228,6 +229,106 @@ async def cleanup_trade_channel(channel):
     await remove_carrier_channel(channel['channelid'], seconds_long())
     return
 
+"""
+Mission generator helpers
+
+"""
+async def send_mission_to_discord(ctx, mission_params):
+    print("User used option d, creating mission channel")
+
+    mission_params.mission_temp_channel_id = await create_mission_temp_channel(ctx, mission_params.carrier_data.discord_channel, mission_params.carrier_data.ownerid, mission_params.carrier_data.carrier_short_name)
+    mission_temp_channel = bot.get_channel(mission_params.mission_temp_channel_id)
+
+    # Recreate this text since we know the channel id
+    discord_text = txt_create_discord(mission_params)
+    message_send = await ctx.send("**Sending to Discord...**")
+    try:
+        # send trade alert to trade alerts channel, or to wine alerts channel if loading wine
+        if mission_params.commodity_data.name.title() == "Wine":
+            if mission_params.mission_type == 'load':
+                channel = bot.get_channel(wine_alerts_loading_channel())
+                channelId = wine_alerts_loading_channel()
+            else:   # unloading block
+                channel = bot.get_channel(wine_alerts_unloading_channel())
+                channelId = wine_alerts_unloading_channel()
+        else:
+            if mission_params.legacy:
+                channel = bot.get_channel(legacy_alerts_channel())
+                channelId = legacy_alerts_channel()
+            else:
+                channel = bot.get_channel(trade_alerts_channel())
+                channelId = trade_alerts_channel()
+
+        if mission_params.mission_type == 'load':
+            embed = discord.Embed(description=discord_text, color=constants.EMBED_COLOUR_LOADING)
+        else:
+            embed = discord.Embed(description=discord_text, color=constants.EMBED_COLOUR_UNLOADING)
+        embed.set_author(name=ctx.author.display_name, icon_url=ctx.author.display_avatar)
+
+        trade_alert_msg = await channel.send(embed=embed)
+        mission_params.discord_alert_id = trade_alert_msg.id
+
+        discord_file = discord.File(mission_params.file_name, filename="image.png")
+
+        embed_colour = constants.EMBED_COLOUR_LOADING if mission_params.mission_type == 'load' \
+            else constants.EMBED_COLOUR_UNLOADING
+        embed = discord.Embed(title="P.T.N TRADE MISSION STARTING",
+                            description=f">>> {mission_params.rp_text}" if mission_params.rp else "", color=embed_colour)
+
+        embed.add_field(name="Destination", value=f"Station: {mission_params.station.upper()}\nSystem: {mission_params.system.upper()}", inline=True)
+        embed.add_field(name="Carrier Owner", value=f"<@{mission_params.carrier_data.ownerid}>")
+        if mission_params.eta:
+            embed.add_field(name="ETA", value=f"{mission_params.eta} minutes", inline=False)
+
+        embed.set_image(url="attachment://image.png")
+        stock_field = f'\n;stock {mission_params.carrier_data.carrier_short_name} will show carrier market data'
+        embed.set_footer(
+            text=
+                f"m.complete will mark this mission complete"
+                f"{stock_field if not mission_params.legacy else ''}"
+                f"\n/info will show this carrier's details")
+        # pin the carrier trade msg sent by the bot
+        pin_msg = await mission_temp_channel.send(file=discord_file, embed=embed)
+        await pin_msg.pin()
+        embed = discord.Embed(title=f"Discord trade alerts sent for {mission_params.carrier_data.carrier_long_name}",
+                            description=f"Check <#{channelId}> for trade alert and "
+                                        f"<#{mission_params.mission_temp_channel_id}> for image.",
+                            color=constants.EMBED_COLOUR_DISCORD)
+        await ctx.send(embed=embed)
+        await message_send.delete()
+
+        if mission_params.edmc_off:
+            print('Sending EDMC OFF messages to haulers')
+            embed = discord.Embed(title='PLEASE STOP ALL 3RD PARTY SOFTWARE: EDMC, EDDISCOVERY, ETC',
+                    description=("Maximising our haulers' profits for this mission means keeping market data at this station"
+                            " **a secret**! For this reason **please disable/exit all journal reporting plugins/programs**"
+                            " and leave them off until all missions at this location are complete. Thanks CMDRs!"),
+                    color=constants.EMBED_COLOUR_REDDIT)
+            edmc_file_name = f'edmc_off_{random.randint(1,2)}.png'
+            edmc_path = os.path.join(constants.EDMC_OFF_PATH, edmc_file_name)
+            edmc_file = discord.File(edmc_path, filename="image.png")
+
+            embed.set_image(url="attachment://image.png")
+            pin_edmc = await mission_temp_channel.send(file=edmc_file, embed=embed)
+            await pin_edmc.pin()
+
+            embed = discord.Embed(title=f"EDMC OFF messages sent", description='Reddit posts will be skipped',
+                        color=constants.EMBED_COLOUR_DISCORD)
+            await ctx.send(embed=embed)
+
+            print('Reacting to #official-trade-alerts message with EDMC OFF')
+            for r in ["🇪","🇩","🇲","🇨","📴"]:
+                await trade_alert_msg.add_reaction(r)
+
+        submit_mission = True
+
+        return submit_mission, mission_temp_channel, mission_params
+
+    except Exception as e:
+        print(f"Error sending to Discord: {e}")
+        await ctx.send(f"Error sending to Discord: {e}\nAttempting to continue with mission gen...")
+
+
 
 """
 Mission generation
@@ -241,401 +342,301 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
                     profit: Union[int, float], pads: str, demand: str, rp: str, mission_type: str,
                     eta: str, legacy):
     current_channel = ctx.channel
-    async with ctx.typing():
 
-        print(f'Mission generation type: {mission_type} with RP: {rp}, requested by {ctx.author}. Request triggered from '
-            f'channel {current_channel}.')
+    print(f'Mission generation type: {mission_type} with RP: {rp}, requested by {ctx.author}. Request triggered from '
+        f'channel {current_channel}.')
 
-        if pads.upper() not in ['M', 'L']:
-            # In case a user provides some junk for pads size, gate it
-            print(f'Exiting mission generation requested by {ctx.author} as pad size is invalid, provided: {pads}')
-            return await ctx.send(f'Sorry, your pad size is not L or M. Provided: {pads}. Mission generation cancelled.')
+    if pads.upper() not in ['M', 'L']:
+        # In case a user provides some junk for pads size, gate it
+        print(f'Exiting mission generation requested by {ctx.author} as pad size is invalid, provided: {pads}')
+        return await ctx.send(f'Sorry, your pad size is not L or M. Provided: {pads}. Mission generation cancelled.')
 
-        # check if commodity can be found, exit gracefully if not
-        # gen_mission.returnflag = False
-        commodity_data = await find_commodity(commodity_search_term, ctx)
-        # if not gen_mission.returnflag:
-            #return # we've already given the user feedback on why there's a problem, we just want to quit gracefully now
-        if not commodity_data:
-            raise ValueError('Missing commodity data')
+    # check if commodity can be found, exit gracefully if not
+    # gen_mission.returnflag = False
+    commodity_data = await find_commodity(commodity_search_term, ctx)
+    # if not gen_mission.returnflag:
+        #return # we've already given the user feedback on why there's a problem, we just want to quit gracefully now
+    if not commodity_data:
+        raise ValueError('Missing commodity data')
 
-        # check if the carrier can be found, exit gracefully if not
-        carrier_data = find_carrier(carrier_name_search_term, CarrierDbFields.longname.name)
-        if not carrier_data:
-            return await ctx.send(f"No carrier found for {carrier_name_search_term}. You can use `/find` or `/owner` to search for carrier names.")
+    # check if the carrier can be found, exit gracefully if not
+    carrier_data = find_carrier(carrier_name_search_term, CarrierDbFields.longname.name)
+    if not carrier_data:
+        return await ctx.send(f"No carrier found for {carrier_name_search_term}. You can use `/find` or `/owner` to search for carrier names.")
 
-        # check carrier isn't already on a mission
-        mission_data = find_mission(carrier_data.carrier_long_name, "carrier")
-        if mission_data:
-            embed = discord.Embed(title="Error",
-                                description=f"{mission_data.carrier_name} is already on a mission, please "
-                                            f"use **m.done** to mark it complete before starting a new mission.",
-                                color=constants.EMBED_COLOUR_ERROR)
-            await ctx.send(embed=embed)
-            return  # We want to stop here, so go exit out
+    # check carrier isn't already on a mission TODO change to ID lookup
+    mission_data = find_mission(carrier_data.carrier_long_name, "carrier")
+    if mission_data:
+        embed = discord.Embed(title="Error",
+                            description=f"{mission_data.carrier_name} is already on a mission, please "
+                                        f"use **m.done** to mark it complete before starting a new mission.",
+                            color=constants.EMBED_COLOUR_ERROR)
+        await ctx.send(embed=embed)
+        return  # We want to stop here, so go exit out
 
-        # check if the carrier has an associated image
-        image_name = carrier_data.carrier_short_name + '.png'
-        image_path = os.path.join(constants.IMAGE_PATH, image_name)
+    # check if the carrier has an associated image
+    image_name = carrier_data.carrier_short_name + '.png'
+    image_path = os.path.join(constants.IMAGE_PATH, image_name)
+    if os.path.isfile(image_path):
+        print("Carrier mission image found, checking size...")
+        image = Image.open(image_path)
+        image_is_good = image.size == (506, 285)
+    else:
+        image_is_good = False
+    if not image_is_good:
+        print(f"No valid carrier image found for {carrier_data.carrier_long_name}")
+        # send the user to upload an image
+        embed = discord.Embed(description="**YOUR FLEET CARRIER MUST HAVE A VALID MISSION IMAGE TO CONTINUE**.", color=constants.EMBED_COLOUR_QU)
+        await ctx.send(embed=embed)
+        await assign_carrier_image(ctx, carrier_data.carrier_long_name)
+        # OK, let's see if they fixed the problem. Once again we check the image exists and is the right size
         if os.path.isfile(image_path):
-            print("Carrier mission image found, checking size...")
+            print("Found an image file, checking size")
             image = Image.open(image_path)
             image_is_good = image.size == (506, 285)
         else:
             image_is_good = False
         if not image_is_good:
-            print(f"No valid carrier image found for {carrier_data.carrier_long_name}")
-            # send the user to upload an image
-            embed = discord.Embed(description="**YOUR FLEET CARRIER MUST HAVE A VALID MISSION IMAGE TO CONTINUE**.", color=constants.EMBED_COLOUR_QU)
+            print("Still no good image, aborting")
+            embed = discord.Embed(description="**ERROR**: You must have a valid mission image to continue.", color=constants.EMBED_COLOUR_ERROR)
             await ctx.send(embed=embed)
-            await assign_carrier_image(ctx, carrier_data.carrier_long_name)
-            # OK, let's see if they fixed the problem. Once again we check the image exists and is the right size
-            if os.path.isfile(image_path):
-                print("Found an image file, checking size")
-                image = Image.open(image_path)
-                image_is_good = image.size == (506, 285)
-            else:
-                image_is_good = False
-            if not image_is_good:
-                print("Still no good image, aborting")
-                embed = discord.Embed(description="**ERROR**: You must have a valid mission image to continue.", color=constants.EMBED_COLOUR_ERROR)
-                await ctx.send(embed=embed)
-                return
+            return
 
-        # TODO: This method is way too long, break it up into logical steps.
+    # TODO: This method is way too long, break it up into logical steps.
 
-        try: # this try/except pair is to try and ensure the channel lock is released if something breaks during mission gen
-            # otherwise the bot freezes next time the lock is attempted
+    mission_params = MissionParams(carrier_name_search_term, commodity_search_term, system, station,
+                    profit, pads, demand, eta, mission_type, legacy, carrier_data, commodity_data)
+    mission_params.print_values()
 
-            # None-strings, should hopefully not break the database. If it does revert these to 'NULL'
-            rp_text = None
-            reddit_post_id = None
-            reddit_post_url = None
-            reddit_comment_id = None
-            reddit_comment_url = None
-            discord_alert_id = None
-            mission_temp_channel_id = None
-            check_characters = None
-            edmc_off = False
+    try: # this try/except pair is to try and ensure the channel lock is released if something breaks during mission gen
+        # otherwise the bot freezes next time the lock is attempted
 
+        mission_params.eta_text = f" (ETA {eta} minutes)" if eta else ""
+        mission_params.print_values()
 
-            eta_text = f" (ETA {eta} minutes)" if eta else ""
+        embed = discord.Embed(title="Generating and fetching mission alerts...", color=constants.EMBED_COLOUR_QU)
+        message_gen = await ctx.send(embed=embed)
 
-            embed = discord.Embed(title="Generating and fetching mission alerts...", color=constants.EMBED_COLOUR_QU)
-            message_gen = await ctx.send(embed=embed)
+        def check_confirm(message):
+            # use all to verify that all the characters in the message content are present in the allowed list (dtrx).
+            # Anything outwith this grouping will cause all to fail. Use set to throw away any duplicate objects.
+            # not sure if the msg.content can ever be None, but lets gate it anyway
+            return message.content and message.author == ctx.author and message.channel == ctx.channel and \
+                all(character in check_characters for character in set(message.content.lower()))
 
-            def check_confirm(message):
-                # use all to verify that all the characters in the message content are present in the allowed list (dtrx).
-                # Anything outwith this grouping will cause all to fail. Use set to throw away any duplicate objects.
-                # not sure if the msg.content can ever be None, but lets gate it anyway
-                return message.content and message.author == ctx.author and message.channel == ctx.channel and \
-                    all(character in check_characters for character in set(message.content.lower()))
+        def check_rp(message):
+            return message.author == ctx.author and message.channel == ctx.channel
 
-            def check_rp(message):
-                return message.author == ctx.author and message.channel == ctx.channel
-
-            async def default_timeout_message(location):
-                await ctx.send(f"**Mission generation cancelled (waiting too long for user input)** ({location})")
+        async def default_timeout_message(location):
+            await ctx.send(f"**Mission generation cancelled (waiting too long for user input)** ({location})")
 
 
-            # gen_mission.returnflag = False
-            # mission_temp_channel_id = await create_mission_temp_channel(ctx, carrier_data.discord_channel, carrier_data.ownerid)
-            # mission_temp_channel = bot.get_channel(mission_temp_channel_id)
-            # # flag is set to True if mission channel creation is successful
-            # if not gen_mission.returnflag:
-            #     return # we've already notified the user
+        # gen_mission.returnflag = False
+        # mission_temp_channel_id = await create_mission_temp_channel(ctx, carrier_data.discord_channel, carrier_data.ownerid)
+        # mission_temp_channel = bot.get_channel(mission_temp_channel_id)
+        # # flag is set to True if mission channel creation is successful
+        # if not gen_mission.returnflag:
+        #     return # we've already notified the user
 
-            # beyond this point any exits need to release the channel lock
+        # beyond this point any exits need to release the channel lock
 
-            if rp:
-                embed = discord.Embed(title="Input roleplay text",
-                                    description="Roleplay text is sent in quote style like this:\n\n> This is a quote!"
-                                                "\n\nYou can use all regular Markdown formatting. If the 'send to Discord' "
-                                                "option is chosen, your quote will be broadcast to your carrier's channel "
-                                                "following its mission image. If the 'send to Reddit' option is chosen, "
-                                                "the quote is inserted above the mission details in the top-level comment.",
-                                    color=constants.EMBED_COLOUR_RP)
-                message_rp = await ctx.send(embed=embed)
-
-                try:
-
-                    message_rp_text = await bot.wait_for("message", check=check_rp, timeout=120)
-                    rp_text = message_rp_text.content
-
-                except asyncio.TimeoutError:
-                    await default_timeout_message('rp')
-                    return
-
-            # Options that should create a mission db entry will change this to True
-            submit_mission = False
-
-            # generate the mission elements
-
-            file_name = await create_carrier_mission_image(carrier_data, commodity_data, system, station, profit, pads, demand,
-                                                    mission_type)
-            discord_text = txt_create_discord(carrier_data, mission_type, commodity_data, station, system, profit, pads,
-                            demand, eta_text, mission_temp_channel_id, edmc_off, legacy)
-            print("Generated discord elements")
-            reddit_title = txt_create_reddit_title(carrier_data, legacy)
-            reddit_body = txt_create_reddit_body(carrier_data, mission_type, commodity_data, station, system, profit, pads,
-                                                demand, eta_text, legacy)
-            print("Generated Reddit elements")
-
-            # check they're happy with output and offer to send
-            embed = discord.Embed(title=f"Mission pending for {carrier_data.carrier_long_name}{eta_text}",
-                                color=constants.EMBED_COLOUR_OK)
-            embed.add_field(name="Mission type", value=f"{mission_type.title()}ing", inline=True)
-            embed.add_field(name="Commodity", value=f"{demand} of {commodity_data.name.title()} at {profit}k/unit", inline=True)
-            embed.add_field(name="Location",
-                            value=f"{station.upper()} station ({pads.upper()}-pads) in system {system.upper()}", inline=True)
-            if rp:
-                await message_rp.delete()
-                await message_rp_text.delete()
-                embed.add_field(name="Roleplay text", value=rp_text, inline=False)
-            message_pending = await ctx.send(embed=embed)
-            await message_gen.delete()
-            print("Output check displayed")
-
-            embed = discord.Embed(title="Where would you like to send the alert?",
-                                description="(**d**)iscord, (**r**)eddit, (**t**)ext for copy/pasting or (**x**) to cancel\n"
-                                "You can also use (**n**) to also notify PTN Haulers, and (**e**) to flag your mission as EDMC-OFF.",
-                                color=constants.EMBED_COLOUR_QU)
-            embed.set_footer(text="Enter all that apply, e.g. **drn** will send alerts to Discord and Reddit and notify PTN Haulers.")
-            message_confirm = await ctx.send(embed=embed)
-            print("Prompted user for alert destination")
+        if rp:
+            embed = discord.Embed(title="Input roleplay text",
+                                description="Roleplay text is sent in quote style like this:\n\n> This is a quote!"
+                                            "\n\nYou can use all regular Markdown formatting. If the 'send to Discord' "
+                                            "option is chosen, your quote will be broadcast to your carrier's channel "
+                                            "following its mission image. If the 'send to Reddit' option is chosen, "
+                                            "the quote is inserted above the mission details in the top-level comment.",
+                                color=constants.EMBED_COLOUR_RP)
+            message_rp = await ctx.send(embed=embed)
 
             try:
-                check_characters = 'dertnx'
-                msg = await bot.wait_for("message", check=check_confirm, timeout=30)
-                edmc_off = True if "e" in msg.content.lower() else False
 
-                if "x" in msg.content.lower():
-                    # immediately stop if there's an x anywhere in the message, even if there are other proper inputs
-                    message_cancelled = await ctx.send("**Mission creation cancelled.**")
-                    await msg.delete()
-                    await message_confirm.delete()
-                    print("User cancelled mission generation")
-                    return
-
-                if "t" in msg.content.lower():
-                    print("User used option t")
-                    embed = discord.Embed(title="Trade Alert (Discord)", description=f"`{discord_text}`",
-                                        color=constants.EMBED_COLOUR_DISCORD)
-                    await ctx.send(embed=embed)
-                    if rp:
-                        embed = discord.Embed(title="Roleplay Text (Discord)", description=f"`>>> {rp_text}`",
-                                            color=constants.EMBED_COLOUR_DISCORD)
-                        await ctx.send(embed=embed)
-
-                    embed = discord.Embed(title="Reddit Post Title", description=f"`{reddit_title}`",
-                                        color=constants.EMBED_COLOUR_REDDIT)
-                    await ctx.send(embed=embed)
-                    if rp:
-                        embed = discord.Embed(title="Reddit Post Body - PASTE INTO MARKDOWN MODE",
-                                            description=f"```> {rp_text}\n\n{reddit_body}```",
-                                            color=constants.EMBED_COLOUR_REDDIT)
-                    else:
-                        embed = discord.Embed(title="Reddit Post Body - PASTE INTO MARKDOWN MODE",
-                                            description=f"```{reddit_body}```", color=constants.EMBED_COLOUR_REDDIT)
-                    embed.set_footer(text="**REMEMBER TO USE MARKDOWN MODE WHEN PASTING TEXT TO REDDIT.**")
-                    await ctx.send(embed=embed)
-                    await ctx.send(file=discord.File(file_name))
-
-                    embed = discord.Embed(title=f"Alert Generation Complete for {carrier_data.carrier_long_name}",
-                                        description="Paste Reddit content into **MARKDOWN MODE** in the editor. You can swap "
-                                                    "back to Fancy Pants afterwards and make any changes/additions or embed "
-                                                    "the image.\n\nBest practice for Reddit is an image post with a top level"
-                                                    " comment that contains the text version of the advert. This ensures the "
-                                                    "image displays with highest possible compatibility across platforms and "
-                                                    "apps. When mission complete, flag the post as *Spoiler* to prevent "
-                                                    "image showing and add a comment to inform.",
-                                        color=constants.EMBED_COLOUR_OK)
-                    await ctx.send(embed=embed)
-
-                if "d" in msg.content.lower():
-                    print("User used option d, creating mission channel")
-
-                    mission_temp_channel_id = await create_mission_temp_channel(ctx, carrier_data.discord_channel, carrier_data.ownerid, carrier_data.carrier_short_name)
-                    mission_temp_channel = bot.get_channel(mission_temp_channel_id)
-
-                    # Recreate this text since we know the channel id
-                    discord_text = txt_create_discord(carrier_data, mission_type, commodity_data, station, system, profit, pads,
-                                    demand, eta_text, mission_temp_channel_id, edmc_off, legacy)
-                    message_send = await ctx.send("**Sending to Discord...**")
-                    try:
-                        # send trade alert to trade alerts channel, or to wine alerts channel if loading wine
-                        if commodity_data.name.title() == "Wine":
-                            if mission_type == 'load':
-                                channel = bot.get_channel(wine_alerts_loading_channel())
-                                channelId = wine_alerts_loading_channel()
-                            else:   # unloading block
-                                channel = bot.get_channel(wine_alerts_unloading_channel())
-                                channelId = wine_alerts_unloading_channel()
-                        else:
-                            if legacy:
-                                channel = bot.get_channel(legacy_alerts_channel())
-                                channelId = legacy_alerts_channel()
-                            else:
-                                channel = bot.get_channel(trade_alerts_channel())
-                                channelId = trade_alerts_channel()
-
-                        if mission_type == 'load':
-                            embed = discord.Embed(description=discord_text, color=constants.EMBED_COLOUR_LOADING)
-                        else:
-                            embed = discord.Embed(description=discord_text, color=constants.EMBED_COLOUR_UNLOADING)
-                        embed.set_author(name=ctx.author.display_name, icon_url=ctx.author.display_avatar)
-
-                        trade_alert_msg = await channel.send(embed=embed)
-                        discord_alert_id = trade_alert_msg.id
-
-                        discord_file = discord.File(file_name, filename="image.png")
-
-                        embed_colour = constants.EMBED_COLOUR_LOADING if mission_type == 'load' \
-                            else constants.EMBED_COLOUR_UNLOADING
-                        embed = discord.Embed(title="P.T.N TRADE MISSION STARTING",
-                                            description=f">>> {rp_text}" if rp else "", color=embed_colour)
-
-                        embed.add_field(name="Destination", value=f"Station: {station.upper()}\nSystem: {system.upper()}", inline=True)
-                        embed.add_field(name="Carrier Owner", value=f"<@{carrier_data.ownerid}>")
-                        if eta:
-                            embed.add_field(name="ETA", value=f"{eta} minutes", inline=False)
-
-                        embed.set_image(url="attachment://image.png")
-                        stock_field = f'\n;stock {carrier_data.carrier_short_name} will show carrier market data'
-                        embed.set_footer(
-                            text=
-                                f"m.complete will mark this mission complete"
-                                f"{stock_field if not legacy else ''}"
-                                f"\n/info will show this carrier's details")
-                        # pin the carrier trade msg sent by the bot
-                        pin_msg = await mission_temp_channel.send(file=discord_file, embed=embed)
-                        await pin_msg.pin()
-                        embed = discord.Embed(title=f"Discord trade alerts sent for {carrier_data.carrier_long_name}",
-                                            description=f"Check <#{channelId}> for trade alert and "
-                                                        f"<#{mission_temp_channel_id}> for image.",
-                                            color=constants.EMBED_COLOUR_DISCORD)
-                        await ctx.send(embed=embed)
-                        await message_send.delete()
-                        submit_mission = True
-                    except Exception as e:
-                        print(f"Error sending to Discord: {e}")
-                        await ctx.send(f"Error sending to Discord: {e}\nAttempting to continue with mission gen...")
-
-                if "r" in msg.content.lower() and not edmc_off:
-                    print("User used option r")
-                    # profit is a float, not an int.
-                    if float(profit) < 10:
-                        print(f'Not posting the mission from {ctx.author} to reddit due to low profit margin <10k/t.')
-                        await ctx.send(f'Skipped Reddit posting due to profit margin of {profit}k/t being below the PTN 10k/t '
-                                    f'minimum. (Did you try to post a Wine load?)')
-                    else:
-                        message_send = await ctx.send("**Sending to Reddit...**")
-
-                        try:
-
-                            # post to reddit
-                            reddit = await get_reddit()
-                            subreddit = await reddit.subreddit(sub_reddit())
-                            submission = await subreddit.submit_image(reddit_title, image_path=file_name,
-                                                                    flair_id=reddit_flair_mission_start)
-                            reddit_post_url = submission.permalink
-                            reddit_post_id = submission.id
-                            if rp:
-                                comment = await submission.reply(f"> {rp_text}\n\n&#x200B;\n\n{reddit_body}")
-                            else:
-                                comment = await submission.reply(reddit_body)
-                            reddit_comment_url = comment.permalink
-                            reddit_comment_id = comment.id
-                            embed = discord.Embed(title=f"Reddit trade alert sent for {carrier_data.carrier_long_name}",
-                                                description=f"https://www.reddit.com{reddit_post_url}",
-                                                color=constants.EMBED_COLOUR_REDDIT)
-                            await ctx.send(embed=embed)
-                            await message_send.delete()
-                            embed = discord.Embed(title=f"{carrier_data.carrier_long_name} REQUIRES YOUR UPDOOTS",
-                                                description=f"https://www.reddit.com{reddit_post_url}",
-                                                color=constants.EMBED_COLOUR_REDDIT)
-                            channel = bot.get_channel(channel_upvotes())
-                            upvote_message = await channel.send(embed=embed)
-                            emoji = bot.get_emoji(upvote_emoji())
-                            await upvote_message.add_reaction(emoji)
-                            submit_mission = True
-                        except Exception as e:
-                            print(f"Error posting to Reddit: {e}")
-                            await ctx.send(f"Error posting to Reddit: {e}\nAttempting to continue with rest of mission gen...")
-
-                if "n" in msg.content.lower() and "d" in msg.content.lower():
-                    print("User used option n")
-
-                    ping_role_id = legacy_hauler_role() if legacy else hauler_role()
-                    await mission_temp_channel.send(f"<@&{ping_role_id}>: {discord_text}")
-
-                    embed = discord.Embed(title=f"Mission notification sent for {carrier_data.carrier_long_name}",
-                                description=f"Pinged <@&{ping_role_id}> in <#{mission_temp_channel_id}>",
-                                color=constants.EMBED_COLOUR_DISCORD)
-                    await ctx.send(embed=embed)
-
-                if "e" in msg.content.lower() and "d" in msg.content.lower():
-                    print('Sending EDMC OFF messages to haulers')
-                    embed = discord.Embed(title='PLEASE STOP ALL 3RD PARTY SOFTWARE: EDMC, EDDISCOVERY, ETC',
-                            description=("Maximising our haulers' profits for this mission means keeping market data at this station"
-                                    " **a secret**! For this reason **please disable/exit all journal reporting plugins/programs**"
-                                    " and leave them off until all missions at this location are complete. Thanks CMDRs!"),
-                            color=constants.EMBED_COLOUR_REDDIT)
-                    edmc_file_name = f'edmc_off_{random.randint(1,2)}.png'
-                    edmc_path = os.path.join(constants.EDMC_OFF_PATH, edmc_file_name)
-                    edmc_file = discord.File(edmc_path, filename="image.png")
-
-                    embed.set_image(url="attachment://image.png")
-                    pin_edmc = await mission_temp_channel.send(file=edmc_file, embed=embed)
-                    await pin_edmc.pin()
-
-                    embed = discord.Embed(title=f"EDMC OFF messages sent", description='Reddit posts will be skipped',
-                                color=constants.EMBED_COLOUR_DISCORD)
-                    await ctx.send(embed=embed)
-
-                    print('Reacting to #official-trade-alerts message with EDMC OFF')
-                    for r in ["🇪","🇩","🇲","🇨","📴"]:
-                        await trade_alert_msg.add_reaction(r)
+                message_rp_text = await bot.wait_for("message", check=check_rp, timeout=120)
+                mission_params.rp_text = message_rp_text.content
 
             except asyncio.TimeoutError:
-                await default_timeout_message('notification_type_decision')
-                try:
-                    if mission_temp_channel_id:
-                        carrier_channel_lock.release()
-                        print("Channel lock released")
-                finally:
-                    if mission_temp_channel_id:
-                        await remove_carrier_channel(mission_temp_channel_id, seconds_short)
+                await default_timeout_message('rp')
                 return
 
-            print("All options worked through, now clean up")
+        # Options that should create a mission db entry will change this to True
+        submit_mission = False
 
-            # now clear up by deleting the prompt message and user response
-            try:
+        # generate the mission elements
+
+        mission_params.file_name = await create_carrier_mission_image(mission_params)
+        discord_text = txt_create_discord(mission_params)
+        print("Defined discord elements")
+        reddit_title = txt_create_reddit_title(mission_params)
+        reddit_body = txt_create_reddit_body(mission_params)
+        print("Defined Reddit elements")
+
+        # check they're happy with output and offer to send
+        embed = discord.Embed(title=f"Mission pending for {carrier_data.carrier_long_name}{mission_params.eta_text}",
+                            color=constants.EMBED_COLOUR_OK)
+        embed.add_field(name="Mission type", value=f"{mission_type.title()}ing", inline=True)
+        embed.add_field(name="Commodity", value=f"{demand} of {commodity_data.name.title()} at {profit}k/unit", inline=True)
+        embed.add_field(name="Location",
+                        value=f"{station.upper()} station ({pads.upper()}-pads) in system {system.upper()}", inline=True)
+        if rp:
+            await message_rp.delete()
+            await message_rp_text.delete()
+            embed.add_field(name="Roleplay text", value=mission_params.rp_text, inline=False)
+        message_pending = await ctx.send(embed=embed)
+        await message_gen.delete()
+        print("Output check displayed")
+
+        embed = discord.Embed(title="Where would you like to send the alert?",
+                            description="(**d**)iscord, (**r**)eddit, (**t**)ext for copy/pasting or (**x**) to cancel\n"
+                            "You can also use (**n**) to also notify PTN Haulers, and (**e**) to flag your mission as EDMC-OFF.",
+                            color=constants.EMBED_COLOUR_QU)
+        embed.set_footer(text="Enter all that apply, e.g. **drn** will send alerts to Discord and Reddit and notify PTN Haulers.")
+        message_confirm = await ctx.send(embed=embed)
+        print("Prompted user for alert destination")
+
+        try:
+            check_characters = 'dertnx'
+            msg = await bot.wait_for("message", check=check_confirm, timeout=30)
+            edmc_off = True if "e" in msg.content.lower() else False
+
+            if "x" in msg.content.lower():
+                # immediately stop if there's an x anywhere in the message, even if there are other proper inputs
+                message_cancelled = await ctx.send("**Mission creation cancelled.**")
                 await msg.delete()
                 await message_confirm.delete()
-            except Exception as e:
-                print(f"Error during clearup: {e}")
-                await ctx.send(f"Oops, error detected: {e}\nAttempting to continue with mission gen.")
+                print("User cancelled mission generation")
+                return
 
-            if submit_mission:
-                await mission_add(ctx, carrier_data, commodity_data, mission_type, system, station, profit, pads, demand,
-                            rp_text, reddit_post_id, reddit_post_url, reddit_comment_id, reddit_comment_url, discord_alert_id, mission_temp_channel_id)
-                await mission_generation_complete(ctx, carrier_data, message_pending, eta_text)
-            cleanup_temp_image_file(file_name)
-            if mission_temp_channel_id:
-                await mark_cleanup_channel(mission_temp_channel_id, 0)
+            if "t" in msg.content.lower():
+                print("User used option t")
+                embed = discord.Embed(title="Trade Alert (Discord)", description=f"`{discord_text}`",
+                                    color=constants.EMBED_COLOUR_DISCORD)
+                await ctx.send(embed=embed)
+                if rp:
+                    embed = discord.Embed(title="Roleplay Text (Discord)", description=f"`>>> {mission_params.rp_text}`",
+                                        color=constants.EMBED_COLOUR_DISCORD)
+                    await ctx.send(embed=embed)
 
-            print("Reached end of mission generator")
+                embed = discord.Embed(title="Reddit Post Title", description=f"`{reddit_title}`",
+                                    color=constants.EMBED_COLOUR_REDDIT)
+                await ctx.send(embed=embed)
+                if rp:
+                    embed = discord.Embed(title="Reddit Post Body - PASTE INTO MARKDOWN MODE",
+                                        description=f"```> {mission_params.rp_text}\n\n{reddit_body}```",
+                                        color=constants.EMBED_COLOUR_REDDIT)
+                else:
+                    embed = discord.Embed(title="Reddit Post Body - PASTE INTO MARKDOWN MODE",
+                                        description=f"```{reddit_body}```", color=constants.EMBED_COLOUR_REDDIT)
+                embed.set_footer(text="**REMEMBER TO USE MARKDOWN MODE WHEN PASTING TEXT TO REDDIT.**")
+                await ctx.send(embed=embed)
+                await ctx.send(file=discord.File(mission_params.file_name))
+
+                embed = discord.Embed(title=f"Alert Generation Complete for {carrier_data.carrier_long_name}",
+                                    description="Paste Reddit content into **MARKDOWN MODE** in the editor. You can swap "
+                                                "back to Fancy Pants afterwards and make any changes/additions or embed "
+                                                "the image.\n\nBest practice for Reddit is an image post with a top level"
+                                                " comment that contains the text version of the advert. This ensures the "
+                                                "image displays with highest possible compatibility across platforms and "
+                                                "apps. When mission complete, flag the post as *Spoiler* to prevent "
+                                                "image showing and add a comment to inform.",
+                                    color=constants.EMBED_COLOUR_OK)
+                await ctx.send(embed=embed)
+
+            if "d" in msg.content.lower():
+                submit_mission, mission_temp_channel = send_mission_to_discord(mission_params)
+
+            if "r" in msg.content.lower() and not edmc_off:
+                print("User used option r")
+                # profit is a float, not an int.
+                if float(profit) < 10:
+                    print(f'Not posting the mission from {ctx.author} to reddit due to low profit margin <10k/t.')
+                    await ctx.send(f'Skipped Reddit posting due to profit margin of {profit}k/t being below the PTN 10k/t '
+                                f'minimum. (Did you try to post a Wine load?)')
+                else:
+                    message_send = await ctx.send("**Sending to Reddit...**")
+
+                    try:
+
+                        # post to reddit
+                        reddit = await get_reddit()
+                        subreddit = await reddit.subreddit(sub_reddit())
+                        submission = await subreddit.submit_image(reddit_title, image_path=mission_params.file_name,
+                                                                flair_id=reddit_flair_mission_start)
+                        reddit_post_url = submission.permalink
+                        reddit_post_id = submission.id
+                        if rp:
+                            comment = await submission.reply(f"> {mission_params.rp_text}\n\n&#x200B;\n\n{reddit_body}")
+                        else:
+                            comment = await submission.reply(reddit_body)
+                        reddit_comment_url = comment.permalink
+                        reddit_comment_id = comment.id
+                        embed = discord.Embed(title=f"Reddit trade alert sent for {carrier_data.carrier_long_name}",
+                                            description=f"https://www.reddit.com{reddit_post_url}",
+                                            color=constants.EMBED_COLOUR_REDDIT)
+                        await ctx.send(embed=embed)
+                        await message_send.delete()
+                        embed = discord.Embed(title=f"{carrier_data.carrier_long_name} REQUIRES YOUR UPDOOTS",
+                                            description=f"https://www.reddit.com{reddit_post_url}",
+                                            color=constants.EMBED_COLOUR_REDDIT)
+                        channel = bot.get_channel(channel_upvotes())
+                        upvote_message = await channel.send(embed=embed)
+                        emoji = bot.get_emoji(upvote_emoji())
+                        await upvote_message.add_reaction(emoji)
+                        submit_mission = True
+                    except Exception as e:
+                        print(f"Error posting to Reddit: {e}")
+                        await ctx.send(f"Error posting to Reddit: {e}\nAttempting to continue with rest of mission gen...")
+
+            if "n" in msg.content.lower() and "d" in msg.content.lower():
+                print("User used option n")
+
+                ping_role_id = legacy_hauler_role() if legacy else hauler_role()
+                await mission_temp_channel.send(f"<@&{ping_role_id}>: {discord_text}")
+
+                embed = discord.Embed(title=f"Mission notification sent for {carrier_data.carrier_long_name}",
+                            description=f"Pinged <@&{ping_role_id}> in <#{mission_params.mission_temp_channel_id}>",
+                            color=constants.EMBED_COLOUR_DISCORD)
+                await ctx.send(embed=embed)
+
+        except asyncio.TimeoutError:
+            await default_timeout_message('notification_type_decision')
+            try:
+                if mission_params.mission_temp_channel_id:
+                    carrier_channel_lock.release()
+                    print("Channel lock released")
+            finally:
+                if mission_params.mission_temp_channel_id:
+                    await remove_carrier_channel(mission_params.mission_temp_channel_id, seconds_short)
             return
+
+        print("All options worked through, now clean up")
+
+        # now clear up by deleting the prompt message and user response
+        try:
+            await msg.delete()
+            await message_confirm.delete()
         except Exception as e:
-            await ctx.send("Oh no! Something went wrong :( Mission generation aborted.")
-            await ctx.send(e)
-            print("Something went wrong with mission generation :(")
-            print(e)
-            carrier_channel_lock.release()
-            if mission_temp_channel_id:
-                await remove_carrier_channel(mission_temp_channel_id, seconds_short)
+            print(f"Error during clearup: {e}")
+            await ctx.send(f"Oops, error detected: {e}\nAttempting to continue with mission gen.")
+
+        if submit_mission:
+            await mission_add(ctx, carrier_data, commodity_data, mission_type, system, station, profit, pads, demand,
+                        mission_params.rp_text, reddit_post_id, reddit_post_url, reddit_comment_id, reddit_comment_url, mission_params.discord_alert_id, mission_params.mission_temp_channel_id)
+            await mission_generation_complete(ctx, carrier_data, message_pending, mission_params.eta_text)
+        cleanup_temp_image_file(mission_params.file_name)
+        if mission_params.mission_temp_channel_id:
+            await mark_cleanup_channel(mission_params.mission_temp_channel_id, 0)
+
+        print("Reached end of mission generator")
+        return
+    except Exception as e:
+        await ctx.send("Oh no! Something went wrong :( Mission generation aborted.")
+        await ctx.send(e)
+        print("Something went wrong with mission generation :(")
+        print(e)
+        carrier_channel_lock.release()
+        if mission_params.mission_temp_channel_id:
+            await remove_carrier_channel(mission_params.mission_temp_channel_id, seconds_short)
 
 
 async def create_mission_temp_channel(ctx, discord_channel, owner_id, shortname):
