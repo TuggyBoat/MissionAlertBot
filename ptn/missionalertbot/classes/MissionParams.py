@@ -11,8 +11,8 @@ class MissionParams:
                  eta=None, rp=None, mission_type=None, legacy=False, carrier_data=None, commodity_data=None,
                  file_name=None, edmc_off=False, eta_text=None, rp_text=None, reddit_title=None, reddit_body=None,
                  reddit_post_id=None, reddit_post_url=None, reddit_comment_id=None, reddit_comment_url=None,
-                 discord_text=None, discord_alert_id=None, mission_temp_channel_id=None, webhook_msg_id=None,
-                 webhook_urls=None):
+                 discord_text=None, discord_alert_id=None, mission_temp_channel_id=None, webhook_msg_ids=[None],
+                 webhook_urls=[None]):
         self.carrier_name_search_term = carrier_name_search_term # the carrier name fragment to search for
         self.commodity_search_term = commodity_search_term # the commodity name fragment to search for
         self.system = system.upper() # the target system
@@ -39,8 +39,8 @@ class MissionParams:
         self.discord_text = discord_text # the text used for the trade alert sent to Discord
         self.discord_alert_id = discord_alert_id # the message ID of the Discord trade alerts entry
         self.mission_temp_channel_id = mission_temp_channel_id # the channel ID of the Discord carrier mission channel
-        self.webhook_urls = webhook_urls # the URLs for any webhooks used
-        self.webhook_msg_id = webhook_msg_id # the IDs of any messages sent via webhook
+        self.webhook_urls = webhook_urls # a list of the URLs for any webhooks used
+        self.webhook_msg_ids = webhook_msg_ids # a list of the IDs of any messages sent via webhook
 
     def print_values(self):
         print(f"carrier_name_search_term: {self.carrier_name_search_term}")
@@ -69,5 +69,5 @@ class MissionParams:
         print(f"discord_alert_id: {self.discord_alert_id}")
         print(f"mission_temp_channel_id: {self.mission_temp_channel_id}")
         print(f"webhook_urls: {self.webhook_urls}")
-        print(f"webhook_msg_id: {self.webhook_msg_id}")
+        print(f"webhook_msg_ids: {self.webhook_msg_ids}")
 

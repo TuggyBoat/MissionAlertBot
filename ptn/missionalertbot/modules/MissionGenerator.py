@@ -9,6 +9,7 @@ TODO: gen_mission.returnflag, gracefully exit if generation fails (remove posts 
 
 """
 # import libraries
+import aiohttp
 import asyncio
 import os
 from PIL import Image
@@ -17,6 +18,7 @@ from typing import Union
 
 # import discord.py
 import discord
+from discord import Webhook
 from discord.errors import HTTPException, Forbidden, NotFound
 
 # import local classes
@@ -233,6 +235,38 @@ async def cleanup_trade_channel(channel):
 Mission generator helpers
 
 """
+async def return_discord_alert_embed(ctx, mission_params):
+    if mission_params.mission_type == 'load':
+        embed = discord.Embed(description=mission_params.discord_text, color=constants.EMBED_COLOUR_LOADING)
+    else:
+        embed = discord.Embed(description=mission_params.discord_text, color=constants.EMBED_COLOUR_UNLOADING)
+    embed.set_author(name=ctx.author.display_name, icon_url=ctx.author.display_avatar)
+    return embed
+
+
+async def return_discord_channel_embed(mission_params):
+    discord_file = discord.File(mission_params.file_name, filename="image.png")
+
+    embed_colour = constants.EMBED_COLOUR_LOADING if mission_params.mission_type == 'load' \
+        else constants.EMBED_COLOUR_UNLOADING
+    embed = discord.Embed(title="P.T.N TRADE MISSION STARTING",
+                        description=f">>> {mission_params.rp_text}" if mission_params.rp else "", color=embed_colour)
+
+    embed.add_field(name="Destination", value=f"Station: {mission_params.station.upper()}\nSystem: {mission_params.system.upper()}", inline=True)
+    embed.add_field(name="Carrier Owner", value=f"<@{mission_params.carrier_data.ownerid}>")
+    if mission_params.eta:
+        embed.add_field(name="ETA", value=f"{mission_params.eta} minutes", inline=False)
+
+    embed.set_image(url="attachment://image.png")
+    stock_field = f'\n;stock {mission_params.carrier_data.carrier_short_name} will show carrier market data'
+    embed.set_footer(
+        text=
+            f"m.complete will mark this mission complete"
+            f"{stock_field if not mission_params.legacy else ''}"
+            f"\n/info will show this carrier's details")
+    return discord_file, embed
+
+
 async def send_mission_to_discord(ctx, mission_params):
     print("User used option d, creating mission channel")
 
@@ -259,34 +293,13 @@ async def send_mission_to_discord(ctx, mission_params):
                 channel = bot.get_channel(trade_alerts_channel())
                 channelId = trade_alerts_channel()
 
-        if mission_params.mission_type == 'load':
-            embed = discord.Embed(description=mission_params.discord_text, color=constants.EMBED_COLOUR_LOADING)
-        else:
-            embed = discord.Embed(description=mission_params.discord_text, color=constants.EMBED_COLOUR_UNLOADING)
-        embed.set_author(name=ctx.author.display_name, icon_url=ctx.author.display_avatar)
+        embed = await return_discord_alert_embed(ctx, mission_params)
 
         trade_alert_msg = await channel.send(embed=embed)
         mission_params.discord_alert_id = trade_alert_msg.id
 
-        discord_file = discord.File(mission_params.file_name, filename="image.png")
+        discord_file, embed = await return_discord_channel_embed(mission_params)
 
-        embed_colour = constants.EMBED_COLOUR_LOADING if mission_params.mission_type == 'load' \
-            else constants.EMBED_COLOUR_UNLOADING
-        embed = discord.Embed(title="P.T.N TRADE MISSION STARTING",
-                            description=f">>> {mission_params.rp_text}" if mission_params.rp else "", color=embed_colour)
-
-        embed.add_field(name="Destination", value=f"Station: {mission_params.station.upper()}\nSystem: {mission_params.system.upper()}", inline=True)
-        embed.add_field(name="Carrier Owner", value=f"<@{mission_params.carrier_data.ownerid}>")
-        if mission_params.eta:
-            embed.add_field(name="ETA", value=f"{mission_params.eta} minutes", inline=False)
-
-        embed.set_image(url="attachment://image.png")
-        stock_field = f'\n;stock {mission_params.carrier_data.carrier_short_name} will show carrier market data'
-        embed.set_footer(
-            text=
-                f"m.complete will mark this mission complete"
-                f"{stock_field if not mission_params.legacy else ''}"
-                f"\n/info will show this carrier's details")
         # pin the carrier trade msg sent by the bot
         pin_msg = await mission_temp_channel.send(file=discord_file, embed=embed)
         await pin_msg.pin()
@@ -371,6 +384,42 @@ async def send_mission_to_subreddit(ctx, mission_params):
         except Exception as e:
             print(f"Error posting to Reddit: {e}")
             await ctx.send(f"Error posting to Reddit: {e}\nAttempting to continue with rest of mission gen...")
+
+
+async def send_mission_to_webhook(ctx, mission_params):
+    print("User used option w")
+
+    # first we need to get a list of all the webhooks the CCO has saved
+    # TODO: create CCO webhook database table user_id, webhooks[list]
+    # TODO: crossref CCO user ID with database and return webhook URLs
+
+    mission_params.webhook_urls = ["https://discord.com/api/webhooks/1086562484250488872/Y9b9_Wz_3xY9nQ4xiBqBokTIge33bxZczEv7r-uaSnBPhblKwT-riY4GHxYcIYMtWnbD", "https://discord.com/api/webhooks/1117188947227975821/vMYyzfOMggbQXTY6cJ2jSQ4OzshCeh2qsx8141DNtE4ZyKnyG2egkMgCj0JEXtDPui_O"]
+
+    mission_params.print_values()
+
+    async with aiohttp.ClientSession() as session: # send messages to each webhook URL
+        for webhook_url in mission_params.webhook_urls:
+            print(webhook_url)
+            # insert webhook URL
+            webhook = Webhook.from_url(webhook_url, session=session, client=bot)
+            # get mission image and channel embed
+            discord_file, embed = await return_discord_channel_embed(mission_params)
+            # send embed and image to webhook
+            hook = await webhook.send(file=discord_file, embed=embed, username='Pilots Trade Network', avatar_url=bot.user.avatar.url, wait=True)
+            """
+            To return to the message later, we need its ID which is the .id attribute
+            By default, the object returned from webhook.send is only partial, which limits what we can do with it.
+            To access all its attributes and methods like a regular sent message, we first have to fetch it using its ID.
+            """
+            hook_message = await webhook.fetch_message(hook.id)
+            mission_params.webhook_msg_ids.append(hook_message.id) # add the message ID to our MissionParams
+
+            embed = discord.Embed(title=f"Webhook trade alert sent for {mission_params.carrier_data.carrier_long_name}:",
+                                  description=f"{hook.jump_url}",
+                                  color=constants.EMBED_COLOUR_DISCORD)
+
+            await ctx.send(embed=embed)
+
 
 
 async def send_mission_text_to_user(ctx, mission_params):
@@ -575,7 +624,7 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
         print("Prompted user for alert destination")
 
         try:
-            check_characters = 'dertnx'
+            check_characters = 'dertnwx'
             msg = await bot.wait_for("message", check=check_confirm, timeout=30)
             edmc_off = True if "e" in msg.content.lower() else False
 
@@ -599,6 +648,10 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
             if "r" in msg.content.lower() and not edmc_off: # send to subreddit
                 async with ctx.typing():
                     submit_mission = await send_mission_to_subreddit(ctx, mission_params)
+
+            if "w" in msg.content.lower() and not edmc_off: # send to webhook
+                async with ctx.typing():
+                    submit_mission = await send_mission_to_webhook(ctx, mission_params)
 
             if "n" in msg.content.lower() and "d" in msg.content.lower(): # notify haulers with role ping
                 async with ctx.typing():
