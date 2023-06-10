@@ -240,7 +240,7 @@ async def send_mission_to_discord(ctx, mission_params):
     mission_temp_channel = bot.get_channel(mission_params.mission_temp_channel_id)
 
     # Recreate this text since we know the channel id
-    discord_text = txt_create_discord(mission_params)
+    mission_params.discord_text = txt_create_discord(mission_params)
     message_send = await ctx.send("**Sending to Discord...**")
     try:
         # send trade alert to trade alerts channel, or to wine alerts channel if loading wine
@@ -260,9 +260,9 @@ async def send_mission_to_discord(ctx, mission_params):
                 channelId = trade_alerts_channel()
 
         if mission_params.mission_type == 'load':
-            embed = discord.Embed(description=discord_text, color=constants.EMBED_COLOUR_LOADING)
+            embed = discord.Embed(description=mission_params.discord_text, color=constants.EMBED_COLOUR_LOADING)
         else:
-            embed = discord.Embed(description=discord_text, color=constants.EMBED_COLOUR_UNLOADING)
+            embed = discord.Embed(description=mission_params.discord_text, color=constants.EMBED_COLOUR_UNLOADING)
         embed.set_author(name=ctx.author.display_name, icon_url=ctx.author.display_avatar)
 
         trade_alert_msg = await channel.send(embed=embed)
@@ -322,12 +322,92 @@ async def send_mission_to_discord(ctx, mission_params):
 
         submit_mission = True
 
-        return submit_mission, mission_temp_channel, mission_params
+        return submit_mission, mission_temp_channel
 
     except Exception as e:
         print(f"Error sending to Discord: {e}")
         await ctx.send(f"Error sending to Discord: {e}\nAttempting to continue with mission gen...")
 
+
+async def send_mission_to_subreddit(ctx, mission_params):
+    print("User used option r")
+    # profit is a float, not an int.
+    if float(mission_params.profit) < 10:
+        print(f'Not posting the mission from {ctx.author} to reddit due to low profit margin <10k/t.')
+        await ctx.send(f'Skipped Reddit posting due to profit margin of {mission_params.profit}k/t being below the PTN 10k/t '
+                    f'minimum. (Did you try to post a Wine load?)')
+    else:
+        message_send = await ctx.send("**Sending to Reddit...**")
+
+        try:
+
+            # post to reddit
+            reddit = await get_reddit()
+            subreddit = await reddit.subreddit(sub_reddit())
+            submission = await subreddit.submit_image(mission_params.reddit_title, image_path=mission_params.file_name,
+                                                    flair_id=reddit_flair_mission_start)
+            mission_params.reddit_post_url = submission.permalink
+            mission_params.reddit_post_id = submission.id
+            if mission_params.rp:
+                comment = await submission.reply(f"> {mission_params.rp_text}\n\n&#x200B;\n\n{mission_params.reddit_body}")
+            else:
+                comment = await submission.reply(mission_params.reddit_body)
+            mission_params.reddit_comment_url = comment.permalink
+            mission_params.reddit_comment_id = comment.id
+            embed = discord.Embed(title=f"Reddit trade alert sent for {mission_params.carrier_data.carrier_long_name}",
+                                description=f"https://www.reddit.com{mission_params.reddit_post_url}",
+                                color=constants.EMBED_COLOUR_REDDIT)
+            await ctx.send(embed=embed)
+            await message_send.delete()
+            embed = discord.Embed(title=f"{mission_params.carrier_data.carrier_long_name} REQUIRES YOUR UPDOOTS",
+                                description=f"https://www.reddit.com{mission_params.reddit_post_url}",
+                                color=constants.EMBED_COLOUR_REDDIT)
+            channel = bot.get_channel(channel_upvotes())
+            upvote_message = await channel.send(embed=embed)
+            emoji = bot.get_emoji(upvote_emoji())
+            await upvote_message.add_reaction(emoji)
+            submit_mission = True
+            return submit_mission
+        except Exception as e:
+            print(f"Error posting to Reddit: {e}")
+            await ctx.send(f"Error posting to Reddit: {e}\nAttempting to continue with rest of mission gen...")
+
+
+async def send_mission_text_to_user(ctx, mission_params):
+    print("User used option t")
+    embed = discord.Embed(title="Trade Alert (Discord)", description=f"`{mission_params.discord_text}`",
+                        color=constants.EMBED_COLOUR_DISCORD)
+    await ctx.send(embed=embed)
+    if mission_params.rp:
+        embed = discord.Embed(title="Roleplay Text (Discord)", description=f"`>>> {mission_params.rp_text}`",
+                            color=constants.EMBED_COLOUR_DISCORD)
+        await ctx.send(embed=embed)
+
+    embed = discord.Embed(title="Reddit Post Title", description=f"`{mission_params.reddit_title}`",
+                        color=constants.EMBED_COLOUR_REDDIT)
+    await ctx.send(embed=embed)
+    if mission_params.rp:
+        embed = discord.Embed(title="Reddit Post Body - PASTE INTO MARKDOWN MODE",
+                            description=f"```> {mission_params.rp_text}\n\n{mission_params.reddit_body}```",
+                            color=constants.EMBED_COLOUR_REDDIT)
+    else:
+        embed = discord.Embed(title="Reddit Post Body - PASTE INTO MARKDOWN MODE",
+                            description=f"```{mission_params.reddit_body}```", color=constants.EMBED_COLOUR_REDDIT)
+    embed.set_footer(text="**REMEMBER TO USE MARKDOWN MODE WHEN PASTING TEXT TO REDDIT.**")
+    await ctx.send(embed=embed)
+    await ctx.send(file=discord.File(mission_params.file_name))
+
+    embed = discord.Embed(title=f"Alert Generation Complete for {mission_params.carrier_data.carrier_long_name}",
+                        description="Paste Reddit content into **MARKDOWN MODE** in the editor. You can swap "
+                                    "back to Fancy Pants afterwards and make any changes/additions or embed "
+                                    "the image.\n\nBest practice for Reddit is an image post with a top level"
+                                    " comment that contains the text version of the advert. This ensures the "
+                                    "image displays with highest possible compatibility across platforms and "
+                                    "apps. When mission complete, flag the post as *Spoiler* to prevent "
+                                    "image showing and add a comment to inform.",
+                        color=constants.EMBED_COLOUR_OK)
+    await ctx.send(embed=embed)
+    return
 
 
 """
@@ -405,7 +485,7 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
     # TODO: This method is way too long, break it up into logical steps.
 
     mission_params = MissionParams(carrier_name_search_term, commodity_search_term, system, station,
-                    profit, pads, demand, eta, mission_type, legacy, carrier_data, commodity_data)
+                    profit, pads, demand, eta, rp, mission_type, legacy, carrier_data, commodity_data)
     mission_params.print_values()
 
     try: # this try/except pair is to try and ensure the channel lock is released if something breaks during mission gen
@@ -465,10 +545,10 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
         # generate the mission elements
 
         mission_params.file_name = await create_carrier_mission_image(mission_params)
-        discord_text = txt_create_discord(mission_params)
+        mission_params.discord_text = txt_create_discord(mission_params)
         print("Defined discord elements")
-        reddit_title = txt_create_reddit_title(mission_params)
-        reddit_body = txt_create_reddit_body(mission_params)
+        mission_params.reddit_title = txt_create_reddit_title(mission_params)
+        mission_params.reddit_body = txt_create_reddit_body(mission_params)
         print("Defined Reddit elements")
 
         # check they're happy with output and offer to send
@@ -500,103 +580,37 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
             edmc_off = True if "e" in msg.content.lower() else False
 
             if "x" in msg.content.lower():
-                # immediately stop if there's an x anywhere in the message, even if there are other proper inputs
-                message_cancelled = await ctx.send("**Mission creation cancelled.**")
-                await msg.delete()
-                await message_confirm.delete()
-                print("User cancelled mission generation")
-                return
+                async with ctx.typing():
+                    # immediately stop if there's an x anywhere in the message, even if there are other proper inputs
+                    message_cancelled = await ctx.send("**Mission creation cancelled.**")
+                    await msg.delete()
+                    await message_confirm.delete()
+                    print("User cancelled mission generation")
+                    return
 
-            if "t" in msg.content.lower():
-                print("User used option t")
-                embed = discord.Embed(title="Trade Alert (Discord)", description=f"`{discord_text}`",
-                                    color=constants.EMBED_COLOUR_DISCORD)
-                await ctx.send(embed=embed)
-                if rp:
-                    embed = discord.Embed(title="Roleplay Text (Discord)", description=f"`>>> {mission_params.rp_text}`",
-                                        color=constants.EMBED_COLOUR_DISCORD)
+            if "t" in msg.content.lower(): # send full text to mission gen channel
+                async with ctx.typing():
+                    await send_mission_text_to_user(ctx, mission_params)
+
+            if "d" in msg.content.lower(): # send to discord
+                async with ctx.typing():
+                    submit_mission, mission_temp_channel = await send_mission_to_discord(ctx, mission_params)
+
+            if "r" in msg.content.lower() and not edmc_off: # send to subreddit
+                async with ctx.typing():
+                    submit_mission = await send_mission_to_subreddit(ctx, mission_params)
+
+            if "n" in msg.content.lower() and "d" in msg.content.lower(): # notify haulers with role ping
+                async with ctx.typing():
+                    print("User used option n")
+
+                    ping_role_id = legacy_hauler_role() if legacy else hauler_role()
+                    await mission_temp_channel.send(f"<@&{ping_role_id}>: {mission_params.discord_text}")
+
+                    embed = discord.Embed(title=f"Mission notification sent for {carrier_data.carrier_long_name}",
+                                description=f"Pinged <@&{ping_role_id}> in <#{mission_params.mission_temp_channel_id}>",
+                                color=constants.EMBED_COLOUR_DISCORD)
                     await ctx.send(embed=embed)
-
-                embed = discord.Embed(title="Reddit Post Title", description=f"`{reddit_title}`",
-                                    color=constants.EMBED_COLOUR_REDDIT)
-                await ctx.send(embed=embed)
-                if rp:
-                    embed = discord.Embed(title="Reddit Post Body - PASTE INTO MARKDOWN MODE",
-                                        description=f"```> {mission_params.rp_text}\n\n{reddit_body}```",
-                                        color=constants.EMBED_COLOUR_REDDIT)
-                else:
-                    embed = discord.Embed(title="Reddit Post Body - PASTE INTO MARKDOWN MODE",
-                                        description=f"```{reddit_body}```", color=constants.EMBED_COLOUR_REDDIT)
-                embed.set_footer(text="**REMEMBER TO USE MARKDOWN MODE WHEN PASTING TEXT TO REDDIT.**")
-                await ctx.send(embed=embed)
-                await ctx.send(file=discord.File(mission_params.file_name))
-
-                embed = discord.Embed(title=f"Alert Generation Complete for {carrier_data.carrier_long_name}",
-                                    description="Paste Reddit content into **MARKDOWN MODE** in the editor. You can swap "
-                                                "back to Fancy Pants afterwards and make any changes/additions or embed "
-                                                "the image.\n\nBest practice for Reddit is an image post with a top level"
-                                                " comment that contains the text version of the advert. This ensures the "
-                                                "image displays with highest possible compatibility across platforms and "
-                                                "apps. When mission complete, flag the post as *Spoiler* to prevent "
-                                                "image showing and add a comment to inform.",
-                                    color=constants.EMBED_COLOUR_OK)
-                await ctx.send(embed=embed)
-
-            if "d" in msg.content.lower():
-                submit_mission, mission_temp_channel = send_mission_to_discord(mission_params)
-
-            if "r" in msg.content.lower() and not edmc_off:
-                print("User used option r")
-                # profit is a float, not an int.
-                if float(profit) < 10:
-                    print(f'Not posting the mission from {ctx.author} to reddit due to low profit margin <10k/t.')
-                    await ctx.send(f'Skipped Reddit posting due to profit margin of {profit}k/t being below the PTN 10k/t '
-                                f'minimum. (Did you try to post a Wine load?)')
-                else:
-                    message_send = await ctx.send("**Sending to Reddit...**")
-
-                    try:
-
-                        # post to reddit
-                        reddit = await get_reddit()
-                        subreddit = await reddit.subreddit(sub_reddit())
-                        submission = await subreddit.submit_image(reddit_title, image_path=mission_params.file_name,
-                                                                flair_id=reddit_flair_mission_start)
-                        reddit_post_url = submission.permalink
-                        reddit_post_id = submission.id
-                        if rp:
-                            comment = await submission.reply(f"> {mission_params.rp_text}\n\n&#x200B;\n\n{reddit_body}")
-                        else:
-                            comment = await submission.reply(reddit_body)
-                        reddit_comment_url = comment.permalink
-                        reddit_comment_id = comment.id
-                        embed = discord.Embed(title=f"Reddit trade alert sent for {carrier_data.carrier_long_name}",
-                                            description=f"https://www.reddit.com{reddit_post_url}",
-                                            color=constants.EMBED_COLOUR_REDDIT)
-                        await ctx.send(embed=embed)
-                        await message_send.delete()
-                        embed = discord.Embed(title=f"{carrier_data.carrier_long_name} REQUIRES YOUR UPDOOTS",
-                                            description=f"https://www.reddit.com{reddit_post_url}",
-                                            color=constants.EMBED_COLOUR_REDDIT)
-                        channel = bot.get_channel(channel_upvotes())
-                        upvote_message = await channel.send(embed=embed)
-                        emoji = bot.get_emoji(upvote_emoji())
-                        await upvote_message.add_reaction(emoji)
-                        submit_mission = True
-                    except Exception as e:
-                        print(f"Error posting to Reddit: {e}")
-                        await ctx.send(f"Error posting to Reddit: {e}\nAttempting to continue with rest of mission gen...")
-
-            if "n" in msg.content.lower() and "d" in msg.content.lower():
-                print("User used option n")
-
-                ping_role_id = legacy_hauler_role() if legacy else hauler_role()
-                await mission_temp_channel.send(f"<@&{ping_role_id}>: {discord_text}")
-
-                embed = discord.Embed(title=f"Mission notification sent for {carrier_data.carrier_long_name}",
-                            description=f"Pinged <@&{ping_role_id}> in <#{mission_params.mission_temp_channel_id}>",
-                            color=constants.EMBED_COLOUR_DISCORD)
-                await ctx.send(embed=embed)
 
         except asyncio.TimeoutError:
             await default_timeout_message('notification_type_decision')
@@ -621,7 +635,7 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
 
         if submit_mission:
             await mission_add(ctx, carrier_data, commodity_data, mission_type, system, station, profit, pads, demand,
-                        mission_params.rp_text, reddit_post_id, reddit_post_url, reddit_comment_id, reddit_comment_url, mission_params.discord_alert_id, mission_params.mission_temp_channel_id)
+                        mission_params.rp_text, mission_params.reddit_post_id, mission_params.reddit_post_url, mission_params.reddit_comment_id, mission_params.reddit_comment_url, mission_params.discord_alert_id, mission_params.mission_temp_channel_id)
             await mission_generation_complete(ctx, carrier_data, message_pending, mission_params.eta_text)
         cleanup_temp_image_file(mission_params.file_name)
         if mission_params.mission_temp_channel_id:
