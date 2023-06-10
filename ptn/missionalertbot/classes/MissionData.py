@@ -13,8 +13,6 @@ class MissionData:
         else:
             info_dict = dict()
 
-        # TODO: transform NULL into None at some stage
-
         self.carrier_name = info_dict.get('carrier', None)
         self.carrier_identifier = info_dict.get('cid', None)
         self.channel_id = info_dict.get('channelid', None)
@@ -31,6 +29,7 @@ class MissionData:
         self.reddit_comment_id = info_dict.get('reddit_comment_id', None)
         self.reddit_comment_url = info_dict.get('reddit_comment_url', None)
         self.discord_alert_id = info_dict.get('discord_alert_id', None)
+        self.mission_params = info_dict.get('mission_params', None)
 
     def to_dictionary(self):
         """

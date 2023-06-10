@@ -12,6 +12,7 @@ TODO: gen_mission.returnflag, gracefully exit if generation fails (remove posts 
 import aiohttp
 import asyncio
 import os
+import pickle
 from PIL import Image
 import random
 from typing import Union
@@ -47,6 +48,10 @@ MISSION COMPLETE & CLEANUP
 # clean up a completed mission
 async def _cleanup_completed_mission(ctx, mission_data, reddit_complete_text, discord_complete_embed, desc_msg):
         print("called _cleanup_completed_mission")
+
+        mission_params = pickle.loads(mission_data.mission_params)
+
+        mission_params.print_values()
 
         async with ctx.typing():
             completed_mission_channel = bot.get_channel(mission_data.channel_id)
@@ -325,7 +330,7 @@ async def send_mission_to_discord(ctx, mission_params):
             pin_edmc = await mission_temp_channel.send(file=edmc_file, embed=embed)
             await pin_edmc.pin()
 
-            embed = discord.Embed(title=f"EDMC OFF messages sent", description='Reddit posts will be skipped',
+            embed = discord.Embed(title=f"EDMC OFF messages sent", description='External posts (Reddit, Webhooks) will be skipped',
                         color=constants.EMBED_COLOUR_DISCORD)
             await ctx.send(embed=embed)
 
@@ -379,8 +384,7 @@ async def send_mission_to_subreddit(ctx, mission_params):
             upvote_message = await channel.send(embed=embed)
             emoji = bot.get_emoji(upvote_emoji())
             await upvote_message.add_reaction(emoji)
-            submit_mission = True
-            return submit_mission
+            return
         except Exception as e:
             print(f"Error posting to Reddit: {e}")
             await ctx.send(f"Error posting to Reddit: {e}\nAttempting to continue with rest of mission gen...")
@@ -616,8 +620,8 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
         print("Output check displayed")
 
         embed = discord.Embed(title="Where would you like to send the alert?",
-                            description="(**d**)iscord, (**r**)eddit, (**t**)ext for copy/pasting or (**x**) to cancel\n"
-                            "You can also use (**n**) to also notify PTN Haulers, and (**e**) to flag your mission as EDMC-OFF.",
+                            description="- (**d**)iscord\n- (**r**)eddit\n- (**w**)ebhooks\n- (**t**)ext for copy/pasting\n\nInput (**x**) to cancel.\n\n"
+                            "Additional flags:\n- (**n**) to notify PTN Haulers by role ping\n- (**e**) to flag your mission as EDMC-OFF (this will disable external alert sending).",
                             color=constants.EMBED_COLOUR_QU)
         embed.set_footer(text="Enter all that apply, e.g. **drn** will send alerts to Discord and Reddit and notify PTN Haulers.")
         message_confirm = await ctx.send(embed=embed)
@@ -641,29 +645,35 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
                 async with ctx.typing():
                     await send_mission_text_to_user(ctx, mission_params)
 
-            if "d" in msg.content.lower(): # send to discord
+            if "d" in msg.content.lower(): # send to discord and save to mission database
                 async with ctx.typing():
                     submit_mission, mission_temp_channel = await send_mission_to_discord(ctx, mission_params)
 
-            if "r" in msg.content.lower() and not edmc_off: # send to subreddit
-                async with ctx.typing():
-                    submit_mission = await send_mission_to_subreddit(ctx, mission_params)
+                if "r" in msg.content.lower() and not edmc_off: # send to subreddit
+                    async with ctx.typing():
+                        await send_mission_to_subreddit(ctx, mission_params)
 
-            if "w" in msg.content.lower() and not edmc_off: # send to webhook
-                async with ctx.typing():
-                    submit_mission = await send_mission_to_webhook(ctx, mission_params)
+                if "w" in msg.content.lower() and "d" in msg.content.lower() and not edmc_off: # send to webhook
+                    async with ctx.typing():
+                        await send_mission_to_webhook(ctx, mission_params)
 
-            if "n" in msg.content.lower() and "d" in msg.content.lower(): # notify haulers with role ping
-                async with ctx.typing():
-                    print("User used option n")
+                if "n" in msg.content.lower() and "d" in msg.content.lower(): # notify haulers with role ping
+                    async with ctx.typing():
+                        print("User used option n")
 
-                    ping_role_id = legacy_hauler_role() if legacy else hauler_role()
-                    await mission_temp_channel.send(f"<@&{ping_role_id}>: {mission_params.discord_text}")
+                        ping_role_id = legacy_hauler_role() if legacy else hauler_role()
+                        await mission_temp_channel.send(f"<@&{ping_role_id}>: {mission_params.discord_text}")
 
-                    embed = discord.Embed(title=f"Mission notification sent for {carrier_data.carrier_long_name}",
-                                description=f"Pinged <@&{ping_role_id}> in <#{mission_params.mission_temp_channel_id}>",
-                                color=constants.EMBED_COLOUR_DISCORD)
-                    await ctx.send(embed=embed)
+                        embed = discord.Embed(title=f"Mission notification sent for {carrier_data.carrier_long_name}",
+                                    description=f"Pinged <@&{ping_role_id}> in <#{mission_params.mission_temp_channel_id}>",
+                                    color=constants.EMBED_COLOUR_DISCORD)
+                        await ctx.send(embed=embed)
+
+            else: # for mission gen to work and be stored in the database, the d option MUST be selected.
+                embed = discord.Embed(title="ERROR: Mission generation cancelled",
+                                      description="You must include the **d**iscord option to use role pings or send external alerts (Reddit, Webhooks).",
+                                      color=constants.EMBED_COLOUR_ERROR)
+                await ctx.send(embed=embed)
 
         except asyncio.TimeoutError:
             await default_timeout_message('notification_type_decision')
@@ -687,9 +697,8 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
             await ctx.send(f"Oops, error detected: {e}\nAttempting to continue with mission gen.")
 
         if submit_mission:
-            await mission_add(ctx, carrier_data, commodity_data, mission_type, system, station, profit, pads, demand,
-                        mission_params.rp_text, mission_params.reddit_post_id, mission_params.reddit_post_url, mission_params.reddit_comment_id, mission_params.reddit_comment_url, mission_params.discord_alert_id, mission_params.mission_temp_channel_id)
-            await mission_generation_complete(ctx, carrier_data, message_pending, mission_params.eta_text)
+            await mission_add(mission_params)
+            await mission_generation_complete(ctx, mission_params, message_pending)
         cleanup_temp_image_file(mission_params.file_name)
         if mission_params.mission_temp_channel_id:
             await mark_cleanup_channel(mission_params.mission_temp_channel_id, 0)
@@ -802,36 +811,39 @@ Mission database
 
 
 # add mission to DB, called from mission generator
-async def mission_add(ctx, carrier_data, commodity_data, mission_type, system, station, profit, pads, demand,
-                    rp_text, reddit_post_id, reddit_post_url, reddit_comment_id, reddit_comment_url, discord_alert_id, mission_temp_channel_id):
+async def mission_add(mission_params):
     backup_database('missions')  # backup the missions database before going any further
 
+    # pickle the mission_params
+    pickled_mission_params = pickle.dumps(mission_params)
+
     print("Called mission_add to write to database")
-    mission_db.execute(''' INSERT INTO missions VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ''', (
-        carrier_data.carrier_long_name, carrier_data.carrier_identifier, mission_temp_channel_id,
-        commodity_data.name.title(), mission_type.lower(), system.title(), station.title(), profit, pads.upper(),
-        demand, rp_text, reddit_post_id, reddit_post_url, reddit_comment_id, reddit_comment_url, discord_alert_id
+    mission_db.execute(''' INSERT INTO missions VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ''', (
+        mission_params.carrier_data.carrier_long_name, mission_params.carrier_data.carrier_identifier, mission_params.mission_temp_channel_id,
+        mission_params.commodity_data.name.title(), mission_params.mission_type.lower(), mission_params.system.title(), mission_params.station.title(),
+        mission_params.profit, mission_params.pads.upper(), mission_params.demand, mission_params.rp_text, mission_params.reddit_post_id,
+        mission_params.reddit_post_url, mission_params.reddit_comment_id, mission_params.reddit_comment_url, mission_params.discord_alert_id, pickled_mission_params
     ))
     missions_conn.commit()
     print("Mission added to db")
 
     print("Updating last trade timestamp for carrier")
-    carrier_db.execute(''' UPDATE carriers SET lasttrade=strftime('%s','now') WHERE p_ID=? ''', ( [ carrier_data.pid ] ))
+    carrier_db.execute(''' UPDATE carriers SET lasttrade=strftime('%s','now') WHERE p_ID=? ''', ( [ mission_params.carrier_data.pid ] ))
     carriers_conn.commit()
 
     # now we can release the channel lock
-    if mission_temp_channel_id:
+    if mission_params.mission_temp_channel_id:
         carrier_channel_lock.release()
         print("Channel lock released")
     return
 
 
-async def mission_generation_complete(ctx, carrier_data, message_pending, eta_text):
+async def mission_generation_complete(ctx, mission_params, message_pending):
 
     # fetch data we just committed back
 
     mission_db.execute('''SELECT * FROM missions WHERE carrier LIKE (?)''',
-                        ('%' + carrier_data.carrier_long_name + '%',))
+                        ('%' + mission_params.carrier_data.carrier_long_name + '%',))
     print('DB command ran, go fetch the result')
     mission_data = MissionData(mission_db.fetchone())
     print(f'Found mission data: {mission_data}')
@@ -845,7 +857,7 @@ async def mission_generation_complete(ctx, carrier_data, message_pending, eta_te
     if mission_data.rp_text and mission_data.rp_text != 'NULL':
         mission_description = f"> {mission_data.rp_text}"
 
-    embed = discord.Embed(title=f"{mission_data.mission_type.upper()}ING {mission_data.carrier_name} ({mission_data.carrier_identifier}) {eta_text}",
+    embed = discord.Embed(title=f"{mission_data.mission_type.upper()}ING {mission_data.carrier_name} ({mission_data.carrier_identifier}) {mission_params.eta_text}",
                             description=mission_description, color=embed_colour)
 
     embed = _mission_summary_embed(mission_data, embed)

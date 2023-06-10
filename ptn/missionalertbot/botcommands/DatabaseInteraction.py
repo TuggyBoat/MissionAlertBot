@@ -647,7 +647,7 @@ class DatabaseInteraction(commands.Cog):
 
     @app_commands.command(name="info",
                           description="Private command: Use in a Fleet Carrier's channel to show information about it.")
-    async def _info(self, interaction: discord.Interaction):
+    async def info(self, interaction: discord.Interaction):
 
         print(f'/info command carrier_data called by {interaction.user} in {interaction.channel}')
 

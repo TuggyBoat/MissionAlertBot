@@ -299,7 +299,7 @@ class GeneralCommands(commands.Cog):
     # mission slash command - private, non spammy
     @app_commands.command(name="mission",
         description="Private command: Use in a Fleet Carrier's channel to display its current mission.")
-    async def _mission(self, interaction: discord.Interaction):
+    async def mission(self, interaction: discord.Interaction):
 
         print(f"{interaction.user} asked for active mission in <#{interaction.channel}> (used /mission)")
 

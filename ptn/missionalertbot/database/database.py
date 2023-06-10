@@ -10,6 +10,7 @@ import asyncio
 import shutil
 import enum
 import discord
+import pickle
 from datetime import datetime
 from datetime import timezone
 
@@ -91,12 +92,13 @@ missions_table_create = '''
         "reddit_post_url"	TEXT,
         "reddit_comment_id"	TEXT,
         "reddit_comment_url"	TEXT,
-        "discord_alert_id"	INT
+        "discord_alert_id"	INT,
+        "mission_params"    BLOB
     )
     '''
 missions_tables_columns = ['carrier', 'cid', 'channelid', 'commodity', 'missiontype', 'system', 'station',\
     'profit', 'pad', 'demand', 'rp_text', 'reddit_post_id', 'reddit_post_url', 'reddit_comment_id',\
-    'reddit_comment_url', 'discord_alert_id', 'is_complete']
+    'reddit_comment_url', 'discord_alert_id', 'mission_params']
 
 channel_cleanup_table_create = '''
     CREATE TABLE channel_cleanup(
@@ -326,6 +328,14 @@ def build_database_on_startup():
             'conn': carriers_conn,
             'create': community_carriers_table_create
         },
+        'mission_params': {
+            'db_name': 'missions',
+            'table': 'missions',
+            'obj': mission_db,
+            'columns': missions_tables_columns,
+            'conn': missions_conn,
+            'create': missions_table_create
+        }
     }
 
     for column_name in new_column_map:
@@ -634,6 +644,14 @@ def find_mission(searchterm, searchfield):
                         (f'%{searchterm}%',))
     mission_data = MissionData(mission_db.fetchone())
     print(f'Found mission data: {mission_data}')
+
+    # TODO: test code, remove before release
+    if mission_params:
+        mission_params = pickle.loads(mission_data.mission_params)
+        mission_params.print_values()
+    else:
+        return mission_data
+
     return mission_data
 
 
