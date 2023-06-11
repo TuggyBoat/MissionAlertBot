@@ -15,6 +15,7 @@ import discord
 from discord.ext import commands
 from dotenv import load_dotenv
 from PIL import ImageFont
+from time import strftime
 
 
 # Define whether the bot is in testing or live mode. Default is testing mode.
@@ -184,9 +185,29 @@ error_gifs = [
     'https://tenor.com/view/angry-panda-rage-mad-gif-11780191',
 ]
 
+current_month = strftime('%B')
+
 # logo URLs from website
 ptn_logo_dark_wtext_transparent = 'https://pilotstradenetwork.com/wp-content/uploads/2021/08/PTN_Dark_wText.png'
-ptn_logo_discord_transparent = 'https://pilotstradenetwork.com/wp-content/uploads/2023/02/discord-logo-transparent.png'
+ptn_logo_pride_dark_wtext_transparent = 'https://pilotstradenetwork.com/wp-content/uploads/2023/06/PTN_Pride_2022_transparent_wText.png'
+
+ptn_logo_discord_wbackground = 'https://pilotstradenetwork.com/wp-content/uploads/2021/08/PTN_Discord_Icon.png'
+ptn_logo_pride_discord_wbackground = 'https://pilotstradenetwork.com/wp-content/uploads/2023/06/discord-logo-pride-2023-cropped.png'
+
+def ptn_logo_full():
+  return ptn_logo_pride_dark_wtext_transparent if current_month == 'June' else ptn_logo_dark_wtext_transparent
+
+def ptn_logo_discord():
+  return ptn_logo_pride_discord_wbackground if current_month == 'June' else ptn_logo_discord_wbackground
+
+
+# mission template filenames
+template = 'original-template.png'
+template_pride = 'pride-template.png'
+
+def mission_template_filename():
+  return template_pride if current_month == 'June' else template
+
 
 # discord direct invite URL
 DISCORD_INVITE_URL = 'https://discord.gg/ptn'

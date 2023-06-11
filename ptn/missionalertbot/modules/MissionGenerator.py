@@ -30,7 +30,7 @@ from ptn.missionalertbot.classes.MissionParams import MissionParams
 import ptn.missionalertbot.constants as constants
 from ptn.missionalertbot.constants import bot, bot_spam_channel, wine_alerts_loading_channel, wine_alerts_unloading_channel, trade_alerts_channel, legacy_alerts_channel, get_reddit, sub_reddit, \
     reddit_flair_mission_stop, reddit_flair_mission_start, seconds_short, seconds_long, sub_reddit, channel_upvotes, upvote_emoji, legacy_hauler_role, hauler_role, \
-    trade_cat, get_guild, get_overwrite_perms, mission_command_channel
+    trade_cat, get_guild, get_overwrite_perms, mission_command_channel, ptn_logo_discord
 
 # import local modules
 from ptn.missionalertbot.database.database import remove_channel_cleanup_entry, backup_database, mission_db, missions_conn, find_carrier, mark_cleanup_channel, CarrierDbFields, \
@@ -128,12 +128,12 @@ async def _cleanup_completed_mission(ctx, mission_data, reddit_complete_text, di
 
                             # edit the original message
                             print("Editing original webhook message...")
-                            embed = discord.Embed(description="# PTN Trade Mission Completed\n"
-                                                             f"**{mission_params.carrier_data.carrier_long_name}** finished {mission_params.mission_type}ing "
-                                                             f"{mission_params.commodity_data.name} from **{mission_params.station}** in **{mission_params.system}**.",
-                                                  color=constants.EMBED_COLOUR_OK)
+                            embed = discord.Embed(title="PTN Trade Mission Completed",
+                                                  description=f"**{mission_params.carrier_data.carrier_long_name}** finished {mission_params.mission_type}ing "
+                                                              f"{mission_params.commodity_data.name} from **{mission_params.station}** in **{mission_params.system}**.",
+                                                  color=constants.EMBED_COLOUR_QU)
                             embed.set_footer(text=f"Join {constants.DISCORD_INVITE_URL} for more trade opportunities.")
-                            embed.set_thumbnail(url=constants.ptn_logo_discord_transparent)
+                            embed.set_thumbnail(url=ptn_logo_discord())
                             await webhook_msg.remove_attachments(webhook_msg.attachments)
                             await webhook_msg.edit(embed=embed)
 
@@ -141,8 +141,8 @@ async def _cleanup_completed_mission(ctx, mission_data, reddit_complete_text, di
 
                             print("Sending webhook update message...")
                             # send a new message to update the target channel
-                            embed = discord.Embed(description=f"# PTN Trade Mission Completed\n"
-                                                              f"The mission {webhook_jump_url} posted at <t:{mission_params.timestamp}:f> (<t:{mission_params.timestamp}:R> "
+                            embed = discord.Embed(title="PTN Trade Mission Completed",
+                                                  description=f"The mission {webhook_jump_url} posted at <t:{mission_params.timestamp}:f> (<t:{mission_params.timestamp}:R> "
                                                               f"has been marked as completed on the [PTN Discord]({constants.DISCORD_INVITE_URL}).{reason}",
                                                   color=constants.EMBED_COLOUR_OK)
                             await webhook.send(embed=embed, username='Pilots Trade Network', avatar_url=bot.user.avatar.url, wait=True)

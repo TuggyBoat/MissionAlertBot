@@ -17,7 +17,7 @@ import discord
 
 # import local constants
 import ptn.missionalertbot.constants as constants
-from ptn.missionalertbot.constants import bot, REG_FONT, NAME_FONT, TITLE_FONT, NORMAL_FONT, FIELD_FONT
+from ptn.missionalertbot.constants import bot, REG_FONT, NAME_FONT, TITLE_FONT, NORMAL_FONT, FIELD_FONT, mission_template_filename
 
 # import local modules
 from ptn.missionalertbot.modules.DateString import get_formatted_date_string
@@ -31,7 +31,7 @@ async def _overlay_mission_image(carrier_data):
     template:       the background image with logo, frame elements etc
     carrier_image:  the inset image optionally created by the Carrier Owner
     """
-    template = Image.open(os.path.join(constants.RESOURCE_PATH, "template.png"))
+    template = Image.open(os.path.join(constants.RESOURCE_PATH, mission_template_filename()))
     carrier_image_filename = carrier_data.carrier_short_name + '.png'
     carrier_image = Image.open(os.path.join(constants.IMAGE_PATH, carrier_image_filename))
     template.paste(carrier_image, (47,13))
@@ -165,7 +165,7 @@ async def assign_carrier_image(ctx, lookname):
 
     elif not valid_image and not image_exists:
         # there's no mission image, prompt the user to upload one or use a PTN placeholder
-        file = discord.File(os.path.join(constants.RESOURCE_PATH, "template.png"), filename="image.png")
+        file = discord.File(os.path.join(constants.RESOURCE_PATH, mission_template_filename()), filename="image.png")
         embed = discord.Embed(title=f"NO MISSION IMAGE FOUND",
                                 color=constants.EMBED_COLOUR_QU)
         embed.set_image(url="attachment://image.png")
