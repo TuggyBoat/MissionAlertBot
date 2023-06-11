@@ -645,11 +645,13 @@ def find_mission(searchterm, searchfield):
     mission_data = MissionData(mission_db.fetchone())
     print(f'Found mission data: {mission_data}')
 
-    # TODO: test code, remove before release
-    if mission_params:
-        mission_params = pickle.loads(mission_data.mission_params)
-        mission_params.print_values()
+    # unpickle the mission_params object if it exists
+    if mission_data.mission_params:
+        print("Found mission_params, enumerating...")
+        mission_data.mission_params = pickle.loads(mission_data.mission_params)
+        mission_data.mission_params.print_values()
     else:
+        print("No mission_params found")
         return mission_data
 
     return mission_data

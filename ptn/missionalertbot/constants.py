@@ -71,7 +71,7 @@ PROD_WINE_ALERTS_UNLOADING_ID = 932918003639648306 # booze alerts channel ID for
 PROD_SUB_REDDIT = "PilotsTradeNetwork"  # subreddit for live
 PROD_CHANNEL_UPVOTES = 828279034387103744    # The ID for the updoots channel
 PROD_REDDIT_CHANNEL = 878029150336720936 # the ID for the Reddit Comments channel
-PROD_mission_command_channel = 822603169104265276    # The ID for the production mission channel
+PROD_MISSION_COMMAND_CHANNEL = 822603169104265276    # The ID for the production mission channel
 PROD_BOT_COMMAND_CHANNEL = 802523724674891826   # Bot backend commands are locked to a channel
 PROD_CTEAM_BOT_CHANNEL = 895083178761547806 # bot command channel for cteam only
 PROD_BOT_SPAM_CHANNEL = 801258393205604372 # Certain bot logging messages go here
@@ -107,7 +107,7 @@ TEST_WINE_ALERTS_UNLOADING_ID = 870425638127943700 # booze alerts channel ID for
 TEST_SUB_REDDIT = "PTNBotTesting"  # subreddit for testing
 TEST_CHANNEL_UPVOTES = 839918504676294666    # The ID for the updoots channel on test
 TEST_REDDIT_CHANNEL = 878029350933520484 # the ID for the Reddit Comments channel
-TEST_mission_command_channel = 842138710651961364    # The ID for the production mission channel
+TEST_MISSION_COMMAND_CHANNEL = 842138710651961364    # The ID for the production mission channel
 TEST_BOT_COMMAND_CHANNEL = 842152343441375283   # Bot backend commands are locked to a channel
 TEST_CTEAM_BOT_CHANNEL = 842152343441375283 # bot command channel for cteam only
 TEST_BOT_SPAM_CHANNEL = 842525081858867211 # Bot logging messages on the test server
@@ -184,6 +184,12 @@ error_gifs = [
     'https://tenor.com/view/angry-panda-rage-mad-gif-11780191',
 ]
 
+# logo URLs from website
+ptn_logo_dark_wtext_transparent = 'https://pilotstradenetwork.com/wp-content/uploads/2021/08/PTN_Dark_wText.png'
+ptn_logo_discord_transparent = 'https://pilotstradenetwork.com/wp-content/uploads/2023/02/discord-logo-transparent.png'
+
+# discord direct invite URL
+DISCORD_INVITE_URL = 'https://discord.gg/ptn'
 
 # link to our Discord by way of Josh's original post on Reddit
 REDDIT_DISCORD_LINK_URL = \
@@ -224,7 +230,7 @@ def reddit_channel():
   return PROD_REDDIT_CHANNEL if _production else TEST_REDDIT_CHANNEL
 
 def mission_command_channel():
-  return PROD_mission_command_channel if _production else TEST_mission_command_channel
+  return PROD_MISSION_COMMAND_CHANNEL if _production else TEST_MISSION_COMMAND_CHANNEL
 
 def bot_command_channel():
   return PROD_BOT_COMMAND_CHANNEL if _production else TEST_BOT_COMMAND_CHANNEL

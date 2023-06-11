@@ -9,10 +9,10 @@ class MissionParams:
     """
     def __init__(self, carrier_name_search_term, commodity_search_term, system, station, profit, pads, demand,
                  eta=None, rp=None, mission_type=None, legacy=False, carrier_data=None, commodity_data=None,
-                 file_name=None, edmc_off=False, eta_text=None, rp_text=None, reddit_title=None, reddit_body=None,
-                 reddit_post_id=None, reddit_post_url=None, reddit_comment_id=None, reddit_comment_url=None,
-                 discord_text=None, discord_alert_id=None, mission_temp_channel_id=None, webhook_msg_ids=[None],
-                 webhook_urls=[None]):
+                 file_name=None, edmc_off=False, eta_text=None, rp_text=None, timestamp=None, reddit_title=None,
+                 reddit_body=None, reddit_post_id=None, reddit_post_url=None, reddit_comment_id=None, reddit_comment_url=None,
+                 discord_text=None, discord_alert_id=None, mission_temp_channel_id=None, webhook_msg_ids=[],
+                 webhook_urls=[], webhook_jump_urls=[]):
         self.carrier_name_search_term = carrier_name_search_term # the carrier name fragment to search for
         self.commodity_search_term = commodity_search_term # the commodity name fragment to search for
         self.system = system.upper() # the target system
@@ -30,6 +30,7 @@ class MissionParams:
         self.commodity_data = commodity_data # commodity data class retrieved from db
         self.file_name = file_name # the image file name
         self.rp_text = rp_text # roleplay text entered by user
+        self.timestamp = timestamp # the posix time the mission was generated
         self.reddit_title = reddit_title # title for the subreddit post
         self.reddit_body = reddit_body # body text for the top-level comment on the subreddit post
         self.reddit_post_id = reddit_post_id # the ID of the mission's Reddit post
@@ -41,6 +42,7 @@ class MissionParams:
         self.mission_temp_channel_id = mission_temp_channel_id # the channel ID of the Discord carrier mission channel
         self.webhook_urls = webhook_urls # a list of the URLs for any webhooks used
         self.webhook_msg_ids = webhook_msg_ids # a list of the IDs of any messages sent via webhook
+        self.webhook_jump_urls = webhook_jump_urls # webhook jump URL
 
     def print_values(self):
         print(f"carrier_name_search_term: {self.carrier_name_search_term}")
@@ -59,6 +61,7 @@ class MissionParams:
         print(f"carrier_data: {self.carrier_data}")
         print(f"commodity_data: {self.commodity_data}")
         print(f"rp_text: {self.rp_text}")
+        print(f"timestamp: {self.timestamp}")
         print(f"reddit_title: {self.reddit_title}")
         print(f"reddit_body: {self.reddit_body}")
         print(f"reddit_post_id: {self.reddit_post_id}")
@@ -70,4 +73,5 @@ class MissionParams:
         print(f"mission_temp_channel_id: {self.mission_temp_channel_id}")
         print(f"webhook_urls: {self.webhook_urls}")
         print(f"webhook_msg_ids: {self.webhook_msg_ids}")
+        print(f"webhook_jump_urls: {self.webhook_jump_urls}")
 

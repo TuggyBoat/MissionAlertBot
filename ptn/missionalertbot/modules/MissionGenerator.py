@@ -35,6 +35,7 @@ from ptn.missionalertbot.constants import bot, bot_spam_channel, wine_alerts_loa
 # import local modules
 from ptn.missionalertbot.database.database import remove_channel_cleanup_entry, backup_database, mission_db, missions_conn, find_carrier, mark_cleanup_channel, CarrierDbFields, \
     find_commodity, find_mission, carrier_db, carriers_conn
+from ptn.missionalertbot.modules.DateString import get_formatted_date_string
 from ptn.missionalertbot.modules.Embeds import _mission_summary_embed
 from ptn.missionalertbot.modules.helpers import lock_mission_channel, carrier_channel_lock, clean_up_pins
 from ptn.missionalertbot.modules.ImageHandling import assign_carrier_image, create_carrier_mission_image
@@ -49,9 +50,7 @@ MISSION COMPLETE & CLEANUP
 async def _cleanup_completed_mission(ctx, mission_data, reddit_complete_text, discord_complete_embed, desc_msg):
         print("called _cleanup_completed_mission")
 
-        mission_params = pickle.loads(mission_data.mission_params)
-
-        mission_params.print_values()
+        mission_params = mission_data.mission_params
 
         async with ctx.typing():
             completed_mission_channel = bot.get_channel(mission_data.channel_id)
@@ -115,6 +114,43 @@ async def _cleanup_completed_mission(ctx, mission_data, reddit_complete_text, di
                     await submission.mod.spoiler()
                 except:
                     await ctx.send("Failed updating Reddit :(")
+
+
+            # update webhooks
+            print("Update sent webhooks...")
+            if mission_params.webhook_urls and mission_params.webhook_msg_ids and mission_params.webhook_jump_urls:
+                for webhook_url, webhook_msg_id, webhook_jump_url in zip(mission_params.webhook_urls, mission_params.webhook_msg_ids, mission_params.webhook_jump_urls):
+                    try: 
+                        async with aiohttp.ClientSession() as session:
+                            print(f"Fetching webhook for {webhook_url} with jumpurl {webhook_jump_url} and ID {webhook_msg_id}")
+                            webhook = Webhook.from_url(webhook_url, session=session, client=bot)
+                            webhook_msg = await webhook.fetch_message(webhook_msg_id)
+
+                            # edit the original message
+                            print("Editing original webhook message...")
+                            embed = discord.Embed(description="# PTN Trade Mission Completed\n"
+                                                             f"**{mission_params.carrier_data.carrier_long_name}** finished {mission_params.mission_type}ing "
+                                                             f"{mission_params.commodity_data.name} from **{mission_params.station}** in **{mission_params.system}**.",
+                                                  color=constants.EMBED_COLOUR_OK)
+                            embed.set_footer(text=f"Join {constants.DISCORD_INVITE_URL} for more trade opportunities.")
+                            embed.set_thumbnail(url=constants.ptn_logo_discord_transparent)
+                            await webhook_msg.remove_attachments(webhook_msg.attachments)
+                            await webhook_msg.edit(embed=embed)
+
+                            reason = f"\n\n{desc_msg}" if desc_msg else None
+
+                            print("Sending webhook update message...")
+                            # send a new message to update the target channel
+                            embed = discord.Embed(description=f"# PTN Trade Mission Completed\n"
+                                                              f"The mission {webhook_jump_url} posted at <t:{mission_params.timestamp}:f> (<t:{mission_params.timestamp}:R> "
+                                                              f"has been marked as completed on the [PTN Discord]({constants.DISCORD_INVITE_URL}).{reason}",
+                                                  color=constants.EMBED_COLOUR_OK)
+                            await webhook.send(embed=embed, username='Pilots Trade Network', avatar_url=bot.user.avatar.url, wait=True)
+
+                    except Exception as e:
+                        print(f"Failed updating webhook message {webhook_jump_url} with URL {webhook_url}: {e}")
+                        await ctx.send(f"Failed updating webhook message {webhook_jump_url} with URL {webhook_url}: {e}")
+
 
             # delete mission entry from db
             print("Remove from mission database...")
@@ -403,27 +439,28 @@ async def send_mission_to_webhook(ctx, mission_params):
 
     async with aiohttp.ClientSession() as session: # send messages to each webhook URL
         for webhook_url in mission_params.webhook_urls:
-            print(webhook_url)
+            print(f"Sending webhook to {webhook_url}")
             # insert webhook URL
             webhook = Webhook.from_url(webhook_url, session=session, client=bot)
             # get mission image and channel embed
             discord_file, embed = await return_discord_channel_embed(mission_params)
             # send embed and image to webhook
-            hook = await webhook.send(file=discord_file, embed=embed, username='Pilots Trade Network', avatar_url=bot.user.avatar.url, wait=True)
+            webhook_sent = await webhook.send(file=discord_file, embed=embed, username='Pilots Trade Network', avatar_url=bot.user.avatar.url, wait=True)
             """
             To return to the message later, we need its ID which is the .id attribute
             By default, the object returned from webhook.send is only partial, which limits what we can do with it.
             To access all its attributes and methods like a regular sent message, we first have to fetch it using its ID.
             """
-            hook_message = await webhook.fetch_message(hook.id)
-            mission_params.webhook_msg_ids.append(hook_message.id) # add the message ID to our MissionParams
+            mission_params.webhook_msg_ids.append(webhook_sent.id) # add the message ID to our MissionParams
+            mission_params.webhook_jump_urls.append(webhook_sent.jump_url) # add the jump_url to our MissionParams for convenience
+
+            print(f"Sent webhook trade alert with ID {webhook_sent.id} for webhook URL {webhook_url}")
 
             embed = discord.Embed(title=f"Webhook trade alert sent for {mission_params.carrier_data.carrier_long_name}:",
-                                  description=f"{hook.jump_url}",
+                                  description=f"{webhook_sent.jump_url}",
                                   color=constants.EMBED_COLOUR_DISCORD)
 
             await ctx.send(embed=embed)
-
 
 
 async def send_mission_text_to_user(ctx, mission_params):
@@ -596,6 +633,8 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
         submit_mission = False
 
         # generate the mission elements
+
+        mission_params.timestamp = get_formatted_date_string()[2]
 
         mission_params.file_name = await create_carrier_mission_image(mission_params)
         mission_params.discord_text = txt_create_discord(mission_params)

@@ -5,8 +5,9 @@ Depends on: none
 """
 
 # import libraries
-from datetime import datetime, timezone
+from datetime import datetime
 from dateutil.relativedelta import relativedelta
+import time
 
 
 # get date and time
@@ -17,10 +18,15 @@ def get_formatted_date_string():
 
     :rtype: tuple
     """
-    dt_now = datetime.now(tz=timezone.utc)
+    posix_time_string = int(time.time())
+    print(f"POSIX time is {posix_time_string}")
+
+    dt_now = datetime.utcnow()
     # elite_time_string is the current time as reported by Elite Dangerous, UTC plus 1286 years
     elite_time_string = (dt_now + relativedelta(years=1286)).strftime("%d %B %Y %H:%M %Z")
     print(f"Elite time string: {elite_time_string}")
+
     current_time_string = dt_now.strftime("%Y%m%d_%H%M%S")
     print(f"Current time string: {current_time_string}")
-    return elite_time_string, current_time_string
+
+    return elite_time_string, current_time_string, posix_time_string
