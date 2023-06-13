@@ -38,8 +38,19 @@ from ptn.missionalertbot.database.database import remove_channel_cleanup_entry, 
 from ptn.missionalertbot.modules.DateString import get_formatted_date_string
 from ptn.missionalertbot.modules.Embeds import _mission_summary_embed
 from ptn.missionalertbot.modules.helpers import lock_mission_channel, carrier_channel_lock, clean_up_pins
-from ptn.missionalertbot.modules.ImageHandling import assign_carrier_image, create_carrier_mission_image
+from ptn.missionalertbot.modules.ImageHandling import assign_carrier_image, create_carrier_reddit_mission_image, create_carrier_discord_mission_image
 from ptn.missionalertbot.modules.TextGen import txt_create_discord, txt_create_reddit_body, txt_create_reddit_title
+
+
+# a class to hold all our Discord embeds
+class DiscordEmbeds:
+    def __init__(self, buy_embed, sell_embed, info_embed, help_embed, owner_text_embed, webhook_info_embed):
+        self.buy_embed = buy_embed
+        self.sell_embed = sell_embed
+        self.info_embed = info_embed
+        self.help_embed = help_embed
+        self.owner_text_embed = owner_text_embed
+        self.webhook_info_embed = webhook_info_embed
 
 
 """
@@ -128,7 +139,7 @@ async def _cleanup_completed_mission(ctx, mission_data, reddit_complete_text, di
 
                             # edit the original message
                             print("Editing original webhook message...")
-                            embed = discord.Embed(title="PTN Trade Mission Completed",
+                            embed = discord.Embed(title="PTN TRADE MISSION COMPLETED",
                                                   description=f"**{mission_params.carrier_data.carrier_long_name}** finished {mission_params.mission_type}ing "
                                                               f"{mission_params.commodity_data.name} from **{mission_params.station}** in **{mission_params.system}**.",
                                                   color=constants.EMBED_COLOUR_QU)
@@ -137,11 +148,11 @@ async def _cleanup_completed_mission(ctx, mission_data, reddit_complete_text, di
                             await webhook_msg.remove_attachments(webhook_msg.attachments)
                             await webhook_msg.edit(embed=embed)
 
-                            reason = f"\n\n{desc_msg}" if desc_msg else None
+                            reason = f"\n\n{desc_msg}" if desc_msg else ""
 
                             print("Sending webhook update message...")
                             # send a new message to update the target channel
-                            embed = discord.Embed(title="PTN Trade Mission Completed",
+                            embed = discord.Embed(title="PTN TRADE MISSION COMPLETED",
                                                   description=f"The mission {webhook_jump_url} posted at <t:{mission_params.timestamp}:f> (<t:{mission_params.timestamp}:R> "
                                                               f"has been marked as completed on the [PTN Discord]({constants.DISCORD_INVITE_URL}).{reason}",
                                                   color=constants.EMBED_COLOUR_OK)
@@ -197,7 +208,7 @@ async def _cleanup_completed_mission(ctx, mission_data, reddit_complete_text, di
                     desc_msg is "" if received from empty rp argument, so reason converts it to None if empty and adds a line break.
                     This can probably be reworked to be neater and use fewer than 3 separate variables for one short message in the future.
                     """
-                    reason = f"\n{desc_msg}" if desc_msg else None
+                    reason = f"\n{desc_msg}" if desc_msg else ""
                     await owner.send(f"Ahoy CMDR! {ctx.author.display_name} has concluded the trade mission for your Fleet Carrier **{carrier_data.carrier_long_name}**. **Reason given**: {reason}\nIts mission channel will be removed in {seconds_long()//60} minutes unless a new mission is started.")
                 else:
                     await owner.send(f"Ahoy CMDR! The trade mission for your Fleet Carrier **{carrier_data.carrier_long_name}** has been marked as complete by {ctx.author.display_name}. Its mission channel will be removed in {seconds_long()//60} minutes unless a new mission is started.")
@@ -285,27 +296,119 @@ async def return_discord_alert_embed(ctx, mission_params):
     return embed
 
 
-async def return_discord_channel_embed(mission_params):
-    discord_file = discord.File(mission_params.file_name, filename="image.png")
+async def return_discord_channel_embeds(mission_params):
+    # generates embeds used for the PTN carrier channel as well as any webhooks
 
-    embed_colour = constants.EMBED_COLOUR_LOADING if mission_params.mission_type == 'load' \
-        else constants.EMBED_COLOUR_UNLOADING
-    embed = discord.Embed(title="P.T.N TRADE MISSION STARTING",
-                        description=f">>> {mission_params.rp_text}" if mission_params.rp else "", color=embed_colour)
+    eta_text = f"\n⏲ ETA: **{mission_params.eta} MINS**" if mission_params.eta else ""
 
-    embed.add_field(name="Destination", value=f"Station: {mission_params.station.upper()}\nSystem: {mission_params.system.upper()}", inline=True)
-    embed.add_field(name="Carrier Owner", value=f"<@{mission_params.carrier_data.ownerid}>")
-    if mission_params.eta:
-        embed.add_field(name="ETA", value=f"{mission_params.eta} minutes", inline=False)
+    # define owner avatar
+    owner = await bot.fetch_user(mission_params.carrier_data.ownerid)
+    owner_name = owner.display_name
+    owner_avatar = owner.display_avatar
 
-    embed.set_image(url="attachment://image.png")
-    stock_field = f'\n;stock {mission_params.carrier_data.carrier_short_name} will show carrier market data'
-    embed.set_footer(
-        text=
-            f"m.complete will mark this mission complete"
-            f"{stock_field if not mission_params.legacy else ''}"
-            f"\n/info will show this carrier's details")
-    return discord_file, embed
+    # define embed content
+    if mission_params.mission_type == 'load': # embeds for a loading mission
+        buy_description=f"📌 Station: **{mission_params.station.upper()}**" \
+                        f"\n🌟 System: **{mission_params.system.upper()}**" \
+                        f"\n📦 Commodity: **{mission_params.commodity_data.name.upper()}**"
+        
+        buy_thumb = constants.ICON_BUY
+
+        sell_description=f"🎯 Fleet Carrier: **{mission_params.carrier_data.carrier_long_name}**" \
+                         f"\n🔢 Carrier ID: **{mission_params.carrier_data.carrier_identifier}**" \
+                         f"\n💰 Profit: **{mission_params.profit}K PER TON**" \
+                         f"\n📥 Demand: **{mission_params.demand.upper()} TONS**" \
+                         f"{eta_text}"
+        
+        sell_thumb = ptn_logo_discord()
+
+        embed_colour = constants.EMBED_COLOUR_LOADING
+
+    else: # embeds for an unloading mission
+        buy_description=f"🎯 Fleet Carrier: **{mission_params.carrier_data.carrier_long_name}**" \
+                        f"\n🔢 Carrier ID: **{mission_params.carrier_data.carrier_identifier}**" \
+                        f"{eta_text}" \
+                        f"\n🌟 System: **{mission_params.system.upper()}**" \
+                        f"\n📦 Commodity: **{mission_params.commodity_data.name.upper()}**"
+
+        buy_thumb = ptn_logo_discord()
+
+        sell_description=f"📌 Station: **{mission_params.station.upper()}**" \
+                         f"💰 Profit: **{mission_params.profit}K PER TON**" \
+                         f"\n📥 Demand: **{mission_params.demand.upper()} TONS**"
+        
+        sell_thumb = constants.ICON_SELL
+
+        embed_colour = constants.EMBED_COLOUR_UNLOADING
+
+    # desc used by the local PTN additional info embed
+    additional_info_description = f"💎 Carrier Owner: <@{mission_params.carrier_data.ownerid}>" \
+                                  f"\n🔤 Carrier information: 👆 </info:849040914948554766>" \
+                                  f"\n📊 Stock information: `;stock {mission_params.carrier_data.carrier_short_name}`\n\n"
+
+    # desc used by the local PTN help embed
+    help_description = "✅ Use `m.complete` in this channel if the mission is completed, or unable to be completed (e.g. because of a station price change, or supply exhaustion)." \
+                       "\n\n💡 Need help? Here's our [complete guide to PTN trade missions](https://pilotstradenetwork.com/fleet-carrier-trade-missions/)."
+
+    # desc used for sending RP text
+    owner_text_description = mission_params.rp_text
+
+    # desc used by the webhook additional info embed    
+    webhook_info_description = f"💎 Carrier Owner: <@{mission_params.carrier_data.ownerid}>" \
+                               f"\n🔤 [PTN Discord](https://discord.gg/ptn)" \
+                                "\n💡 [PTN trade mission guide](https://pilotstradenetwork.com/fleet-carrier-trade-missions/)"
+
+    buy_embed = discord.Embed(
+        title="BUY FROM",
+        description=buy_description,
+        color=embed_colour
+    )
+    buy_embed.set_image(url=constants.BLANKLINE_400PX)
+    buy_embed.set_thumbnail(url=buy_thumb)
+
+    sell_embed = discord.Embed(
+        title="SELL TO",
+        description=sell_description,
+        color=embed_colour
+    )
+    sell_embed.set_image(url=constants.BLANKLINE_400PX)
+    sell_embed.set_thumbnail(url=sell_thumb)
+
+    info_embed = discord.Embed(
+        title="ADDITIONAL INFORMATION",
+        description=additional_info_description,
+        color=embed_colour
+    )
+    info_embed.set_image(url=constants.BLANKLINE_400PX)
+    info_embed.set_thumbnail(url=owner_avatar)
+    
+    help_embed = discord.Embed(
+        description=help_description,
+        color=embed_colour
+    )
+    help_embed.set_image(url=constants.BLANKLINE_400PX)
+
+    owner_text_embed = discord.Embed(
+        title=f"MESSAGE FROM {owner_name}",
+        description=owner_text_description,
+        color=constants.EMBED_COLOUR_RP
+    )
+    owner_text_embed.set_image(url=constants.BLANKLINE_400PX)
+    owner_text_embed.set_thumbnail(url=constants.ICON_DATA)
+
+    webhook_info_embed = discord.Embed(
+        title="ADDITIONAL INFORMATION",
+        description=webhook_info_description,
+        color=embed_colour
+    )
+    webhook_info_embed.set_image(url=constants.BLANKLINE_400PX)
+    webhook_info_embed.set_thumbnail(url=owner_avatar)
+
+    discord_embeds = DiscordEmbeds(buy_embed, sell_embed, info_embed, help_embed, owner_text_embed, webhook_info_embed)
+
+    mission_params.discord_embeds = discord_embeds
+
+    return discord_embeds
 
 
 async def send_mission_to_discord(ctx, mission_params):
@@ -339,11 +442,22 @@ async def send_mission_to_discord(ctx, mission_params):
         trade_alert_msg = await channel.send(embed=embed)
         mission_params.discord_alert_id = trade_alert_msg.id
 
-        discord_file, embed = await return_discord_channel_embed(mission_params)
+        discord_file = discord.File(mission_params.discord_img_name, filename="image.png")
 
+        print("Defining Discord embeds...")
+        discord_embeds = await return_discord_channel_embeds(mission_params)
+
+        send_embeds = [discord_embeds.buy_embed, discord_embeds.sell_embed, discord_embeds.info_embed, discord_embeds.help_embed]
+
+        print("Checking for RP status...")
+        if mission_params.rp: send_embeds.append(discord_embeds.owner_text_embed)
+
+        print("Sending image and embeds...")
         # pin the carrier trade msg sent by the bot
-        pin_msg = await mission_temp_channel.send(file=discord_file, embed=embed)
+        pin_msg = await mission_temp_channel.send(file=discord_file, embeds=send_embeds)
+        print("Pinning sent message...")
         await pin_msg.pin()
+        print("Feeding back to user...")
         embed = discord.Embed(title=f"Discord trade alerts sent for {mission_params.carrier_data.carrier_long_name}",
                             description=f"Check <#{channelId}> for trade alert and "
                                         f"<#{mission_params.mission_temp_channel_id}> for image.",
@@ -437,15 +551,22 @@ async def send_mission_to_webhook(ctx, mission_params):
 
     mission_params.print_values()
 
+    print("Defining Discord embeds...")
+    discord_embeds = mission_params.discord_embeds
+    webhook_embeds = [discord_embeds.buy_embed, discord_embeds.sell_embed, discord_embeds.webhook_info_embed]
+
+    if mission_params.rp: webhook_embeds.append(discord_embeds.owner_text_embed)
+
     async with aiohttp.ClientSession() as session: # send messages to each webhook URL
         for webhook_url in mission_params.webhook_urls:
             print(f"Sending webhook to {webhook_url}")
             # insert webhook URL
             webhook = Webhook.from_url(webhook_url, session=session, client=bot)
-            # get mission image and channel embed
-            discord_file, embed = await return_discord_channel_embed(mission_params)
-            # send embed and image to webhook
-            webhook_sent = await webhook.send(file=discord_file, embed=embed, username='Pilots Trade Network', avatar_url=bot.user.avatar.url, wait=True)
+
+            discord_file = discord.File(mission_params.discord_img_name, filename="image.png")
+
+            # send embeds and image to webhook
+            webhook_sent = await webhook.send(file=discord_file, embeds=webhook_embeds, username='Pilots Trade Network', avatar_url=bot.user.avatar.url, wait=True)
             """
             To return to the message later, we need its ID which is the .id attribute
             By default, the object returned from webhook.send is only partial, which limits what we can do with it.
@@ -636,11 +757,13 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
 
         mission_params.timestamp = get_formatted_date_string()[2]
 
-        mission_params.file_name = await create_carrier_mission_image(mission_params)
+        mission_params.discord_img_name = await create_carrier_discord_mission_image(mission_params)
         mission_params.discord_text = txt_create_discord(mission_params)
         print("Defined discord elements")
+
         mission_params.reddit_title = txt_create_reddit_title(mission_params)
         mission_params.reddit_body = txt_create_reddit_body(mission_params)
+        mission_params.reddit_img_name = await create_carrier_reddit_mission_image(mission_params)
         print("Defined Reddit elements")
 
         # check they're happy with output and offer to send
@@ -738,7 +861,8 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
         if submit_mission:
             await mission_add(mission_params)
             await mission_generation_complete(ctx, mission_params, message_pending)
-        cleanup_temp_image_file(mission_params.file_name)
+        cleanup_temp_image_file(mission_params.discord_img_name)
+        cleanup_temp_image_file(mission_params.reddit_img_name)
         if mission_params.mission_temp_channel_id:
             await mark_cleanup_channel(mission_params.mission_temp_channel_id, 0)
 

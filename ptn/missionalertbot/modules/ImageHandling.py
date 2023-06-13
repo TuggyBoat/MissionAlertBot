@@ -17,37 +17,55 @@ import discord
 
 # import local constants
 import ptn.missionalertbot.constants as constants
-from ptn.missionalertbot.constants import bot, REG_FONT, NAME_FONT, TITLE_FONT, NORMAL_FONT, FIELD_FONT, mission_template_filename
+from ptn.missionalertbot.constants import bot, REG_FONT, NAME_FONT, TITLE_FONT, NORMAL_FONT, FIELD_FONT, DISCORD_NAME_FONT, DISCORD_ID_FONT, mission_template_filename
 
 # import local modules
 from ptn.missionalertbot.modules.DateString import get_formatted_date_string
 from ptn.missionalertbot.database.database import find_carrier, CarrierDbFields
 
 
-# function to overlay carrier image with background template
-async def _overlay_mission_image(carrier_data):
-    print("Called mission image overlay function")
+# function to overlay carrier image with background template for Reddit
+async def _overlay_reddit_mission_image(carrier_data):
+    print("Called reddit mission image overlay function")
     """
     template:       the background image with logo, frame elements etc
     carrier_image:  the inset image optionally created by the Carrier Owner
     """
-    template = Image.open(os.path.join(constants.RESOURCE_PATH, mission_template_filename()))
+    reddit_template = Image.open(os.path.join(constants.RESOURCE_PATH, mission_template_filename()))
     carrier_image_filename = carrier_data.carrier_short_name + '.png'
     carrier_image = Image.open(os.path.join(constants.IMAGE_PATH, carrier_image_filename))
-    template.paste(carrier_image, (47,13))
-    return template
+    reddit_template.paste(carrier_image, (47,13))
+    return reddit_template
 
 
-# function to create image for loading
-async def create_carrier_mission_image(mission_params):
-    print("Called mission image generator")
+# function to overlay carrier image with background template for Reddit
+async def _overlay_discord_mission_image(carrier_data):
+    print("Called discord mission image overlay function")
+    """
+    template:       the background image with logo, frame elements etc
+    carrier_image:  the inset image optionally created by the Carrier Owner
+    """
+    print("Defining path to template...")
+    discord_template = Image.open(os.path.join(constants.RESOURCE_PATH, constants.DISCORD_TEMPLATE))
+    print("Defining path to carrier image...")
+    carrier_image_filename = carrier_data.carrier_short_name + '.png'
+    carrier_image = Image.open(os.path.join(constants.IMAGE_PATH, carrier_image_filename))
+    print("Overlaying carrier image...")
+    discord_template.paste(carrier_image, (16, 0))
+    print("Returning overlaid template...")
+    return discord_template
+
+
+# function to create image for Reddit
+async def create_carrier_reddit_mission_image(mission_params):
+    print("Called Reddit mission image generator")
     """
     Builds the carrier image and returns the relative path.
     """
 
-    template = await _overlay_mission_image(mission_params.carrier_data)
+    reddit_template = await _overlay_reddit_mission_image(mission_params.carrier_data)
 
-    image_editable = ImageDraw.Draw(template)
+    image_editable = ImageDraw.Draw(reddit_template)
 
     mission_action = 'LOADING' if mission_params.mission_type == 'load' else 'UNLOADING'
     image_editable.text((46, 304), "PILOTS TRADE NETWORK", (255, 255, 255), font=TITLE_FONT)
@@ -65,8 +83,38 @@ async def create_carrier_mission_image(mission_params):
 
     # Check if this will work fine, we might need to delete=False and clean it ourselves
     result_name = tempfile.NamedTemporaryFile(suffix='.png', delete=False)
-    print(f'Saving temporary mission file for carrier: {mission_params.carrier_data.carrier_long_name} to: {result_name.name}')
-    template.save(result_name.name)
+    print(f'Saving temporary Reddit mission file for carrier: {mission_params.carrier_data.carrier_long_name} to: {result_name.name}')
+    reddit_template.save(result_name.name)
+    return result_name.name
+
+
+# function to create image for Discord
+async def create_carrier_discord_mission_image(mission_params):
+    print("Called Discord mission image generator")
+    """
+    Builds the carrier image and returns the relative path.
+    """
+
+    discord_template = await _overlay_discord_mission_image(mission_params.carrier_data)
+
+    image_editable = ImageDraw.Draw(discord_template)
+
+    mission_action = 'LOADING: ' if mission_params.mission_type == 'load' else 'UNLOADING: '
+
+    image_editable.text((17, 283), mission_action + mission_params.carrier_data.carrier_long_name, (0, 217, 255), font=DISCORD_NAME_FONT)
+    image_editable.text((17, 315), "FLEET CARRIER " + mission_params.carrier_data.carrier_identifier, (0, 217, 255), font=DISCORD_ID_FONT)
+
+    # Check if this will work fine, we might need to delete=False and clean it ourselves
+    result_name = tempfile.NamedTemporaryFile(suffix='.png', delete=False)
+
+    print("Scaling image...")
+
+    discord_template.thumbnail((430, 430)) # scale the image for our embed width, this is a bit lazy since we should have it the proper size already but UGH let's just let pillow do it for us. EVERY. SINGLE. TIME
+
+    print(f'Saving temporary Discord mission file for carrier: {mission_params.carrier_data.carrier_long_name} to: {result_name.name}')
+
+    discord_template.save(result_name.name)
+
     return result_name.name
 
 
@@ -290,7 +338,7 @@ async def assign_carrier_image(ctx, lookname):
                 print(f"Error deleting file {attachment.filename}: {e}")
 
         # now we can show the user the result in situ
-        in_image = await _overlay_mission_image(carrier_data)
+        in_image = await _overlay_reddit_mission_image(carrier_data)
         result_name = tempfile.NamedTemporaryFile(suffix='.png', delete=False)
         print(f'Saving temporary mission image preview file for carrier: {carrier_data.carrier_long_name} to: {result_name.name}')
         in_image.save(result_name.name)

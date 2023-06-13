@@ -17,13 +17,17 @@ from discord.ext import commands
 from ptn.missionalertbot.classes.CommunityCarrierData import CommunityCarrierData
 from ptn.missionalertbot.classes.NomineesData import NomineesData
 from ptn.missionalertbot.classes.Views import db_delete_View, BroadcastView, CarrierEditView
+from ptn.missionalertbot.classes.WebhookData import WebhookData
 
 # local constants
 import ptn.missionalertbot.constants as constants
-from ptn.missionalertbot.constants import bot, cmentor_role, admin_role, cteam_bot_channel, cteam_bot_channel, bot_command_channel, cc_role
+from ptn.missionalertbot.constants import bot, cmentor_role, admin_role, cteam_bot_channel, cteam_bot_channel, bot_command_channel, cc_role, bot_spam_channel, \
+    certcarrier_role, trainee_role, mission_command_channel
 
 # local modules
-from ptn.missionalertbot.database.database import find_nominee_with_id, carrier_db, CarrierDbFields, CarrierData, find_carrier, backup_database, add_carrier_to_database, find_carriers_mult, find_commodity, find_community_carrier, CCDbFields
+from ptn.missionalertbot.database.database import find_nominee_with_id, carrier_db, CarrierDbFields, CarrierData, find_carrier, backup_database, \
+     add_carrier_to_database, find_carriers_mult, find_commodity, find_community_carrier, CCDbFields, find_webhook_from_owner, add_webhook_to_database, \
+     delete_webhook_by_name, find_webhook_by_name
 from ptn.missionalertbot.modules.helpers import on_app_command_error, check_roles, check_command_channel, _regex_alphanumeric_with_hyphens
 from ptn.missionalertbot.modules.Embeds import _add_common_embed_fields, _configure_all_carrier_detail_embed
 
@@ -48,6 +52,8 @@ findid - database
 findshort - database
 /info - general/database
 /owner - general/database
+/webhook_add - database/CCO
+/webhooks_view - database/CCO
 """
 
 
@@ -156,7 +162,6 @@ class DatabaseInteraction(commands.Cog):
 
 
     # command to retrieve text for all nominations for a given user from the database
-    # TODO: ephemeral with option to broadcast
     @app_commands.command(name='cp_nomination_details', description='Shows details of all nominations for a given user by ID.')
     @app_commands.describe(userid='The Discord ID of the target user. Use Developer Mode to retrieve user IDs.')
     @check_roles([cmentor_role(), admin_role()])
@@ -859,3 +864,141 @@ class DatabaseInteraction(commands.Cog):
                 return
         else:
             await ctx.send(f"No Community Carrier registered to {owner.display_name}")
+
+
+# CCO command to add a webhook to their carriers
+    @app_commands.command(name="webhook_add",
+                          description="Add a webhook to your library for sending mission alerts.")
+    @app_commands.describe(webhook_url='The URL of your webhook.',
+                           webhook_name='A short (preferably one-word) descriptor you can use to identify your webhook.')
+    @check_roles([certcarrier_role(), trainee_role()])
+    @check_command_channel(mission_command_channel())
+    async def webhook_add(self, interaction: discord.Interaction, webhook_url: str, webhook_name: str):
+        print(f"Called /webhook_add for {interaction.user.display_name}")
+
+        spamchannel = bot.get_channel(bot_spam_channel())
+
+        # first check the webhook URL and name aren't in the DB already
+        print("Looking up existing webhook data...")
+        webhook_data = find_webhook_from_owner(interaction.user.id)
+        if webhook_data:
+            for webhook in webhook_data:
+                if webhook.webhook_url == webhook_url:
+                    print("Found duplicate webhook for URL")
+                    embed = discord.Embed(
+                        description=f"ERROR: You already have a webhook with that URL called \"{webhook.webhook_name}\": {webhook.webhook_url}",
+                        color=constants.EMBED_COLOUR_ERROR
+                    )
+                    await interaction.response.send_message(embed=embed, ephemeral=True)
+                    return
+
+                elif webhook.webhook_name == webhook_name:
+                    print("Found duplicate webhook for name")
+                    embed = discord.Embed(
+                        description=f"ERROR: You already have a webhook called \"{webhook.webhook_name}\": {webhook.webhook_url}",
+                        color=constants.EMBED_COLOUR_ERROR
+                    )
+                    await interaction.response.send_message(embed=embed, ephemeral=True)
+                    return
+                
+                else:
+                    print("Webhook is not duplicate, proceeding")
+
+        # enter the webhook into the database
+        try:
+            await add_webhook_to_database(interaction.user.id, webhook_url, webhook_name)
+        except Exception as e:
+            embed = discord.Embed(
+                description=f"ERROR: {e}",
+                color=constants.EMBED_COLOUR_ERROR
+            )
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+
+            # notify in bot_spam
+            embed = discord.Embed(
+                description=f"Error on /webhook_add by {interaction.user}: {e}",
+                color=constants.EMBED_COLOUR_ERROR
+            )
+            await spamchannel.send(embed=embed)
+            return print(f"Error on /webhook_add by {interaction.user}: {e}")
+
+        # notify user of success
+        embed = discord.Embed(title="WEBHOOK ADDED",
+                              color=constants.EMBED_COLOUR_OK)
+        embed.add_field(name="Identifier", value=webhook_name, inline=False)
+        embed.add_field(name="URL", value=webhook_url)
+        embed.set_thumbnail(url=interaction.user.display_avatar)
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+        # also tell bot-spam
+        embed = discord.Embed(
+            description=f"<@{interaction.user.id}> added a webhook.",
+            color=constants.EMBED_COLOUR_QU
+        )
+        await spamchannel.send(embed=embed)
+        return print("/webhook_add complete")
+    
+
+    # command for a CCO to view all their webhooks
+    @app_commands.command(name='webhooks_view', description='Shows details of all your registered webhooks.')
+    @check_roles([certcarrier_role(), trainee_role()])
+    @check_command_channel(mission_command_channel())
+    async def webhooks_view(self, interaction: discord.Interaction):
+        print(f"/webhooks_view called by {interaction.user.display_name}")
+
+        webhook_data = find_webhook_from_owner(interaction.user.id)
+        if not webhook_data: # no webhooks to show
+            embed = discord.Embed(
+                description=f"No webhooks found. You can add webhooks using `/webhook_add`",
+                color=constants.EMBED_COLOUR_ERROR
+            )
+            return await interaction.response.send_message(embed=embed, ephemeral=True)
+        
+        embed = discord.Embed(
+            description=f"Showing webhooks for <@{interaction.user.id}>",
+            color=constants.EMBED_COLOUR_OK
+        )
+        embed.set_thumbnail(url=interaction.user.display_avatar)
+
+        for webhook in webhook_data:
+            embed.add_field(name=webhook.webhook_name, value=webhook.webhook_url, inline=False)
+
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+
+    # command for a CCO to delete a webhook
+    @app_commands.command(name="webhook_delete",
+                          description="Remove one of your webhooks from MAB's database.")
+    @app_commands.describe(webhook_name='The name (identifier) of the webhook you wish to remove.')
+    @check_roles([certcarrier_role(), trainee_role()])
+    @check_command_channel(mission_command_channel())
+    async def webhook_delete(self, interaction: discord.Interaction, webhook_name: str):
+
+        print(f"{interaction.user.display_name} called /webhook_delete for {webhook_name}")
+
+        # find the webhook
+        webhook_data = find_webhook_by_name(interaction.user.id, webhook_name)
+
+        if webhook_data:
+            try:
+                await delete_webhook_by_name(interaction.user.id, webhook_name)
+                embed = discord.Embed(
+                    description=f"Webhook removed: **{webhook_data.webhook_name}**\n{webhook_data.webhook_url}",
+                    color=constants.EMBED_COLOUR_OK
+                )
+                await interaction.response.send_message(embed=embed, ephemeral=True)
+            except Exception as e:
+                embed = discord.Embed(
+                    description=f"ERROR: {e}",
+                    color=constants.EMBED_COLOUR_ERROR
+                )
+                await interaction.response.send_message(embed=embed, ephemeral=True)
+
+        else: # no webhook data found
+            embed = discord.Embed(
+                description=f"No webhook found matching {webhook_data.webhook_name}",
+                color=constants.EMBED_COLOUR_ERROR
+            )
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+
+        return

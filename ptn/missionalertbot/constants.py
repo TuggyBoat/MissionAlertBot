@@ -131,14 +131,14 @@ TEST_ARCHIVE_CAT = 877244591579992144 # Archive category on live server
 TEST_SECONDS_SHORT = 5
 TEST_SECONDS_LONG = 10
 
-EMBED_COLOUR_LOADING = 0x80ffff         # blue
-EMBED_COLOUR_UNLOADING = 0x80ff80       # green
+EMBED_COLOUR_LOADING = 0x00d9ff         # PTN faded blue
+EMBED_COLOUR_UNLOADING = 0x80ff80       # PTN emph blue
 EMBED_COLOUR_REDDIT = 0xff0000          # red
 EMBED_COLOUR_DISCORD = 0x8080ff         # purple
-EMBED_COLOUR_RP = 0xff00ff              # pink
+EMBED_COLOUR_RP = 0xe63946              # PTN red
 EMBED_COLOUR_ERROR = 0x800000           # dark red
-EMBED_COLOUR_QU = 0x80ffff              # same as loading
-EMBED_COLOUR_OK = 0x80ff80              # same as unloading
+EMBED_COLOUR_QU = 0x00d9ff              # que?
+EMBED_COLOUR_OK = 0x80ff80              # we're good here thanks, how are you?
 
 
 # defining fonts for pillow use
@@ -147,6 +147,8 @@ NAME_FONT = ImageFont.truetype(os.path.join(FONT_PATH, 'Exo/static/Exo-ExtraBold
 TITLE_FONT = ImageFont.truetype(os.path.join(FONT_PATH, 'Exo/static/Exo-ExtraBold.ttf'), 22)
 NORMAL_FONT = ImageFont.truetype(os.path.join(FONT_PATH, 'Exo/static/Exo-Medium.ttf'), 18)
 FIELD_FONT = ImageFont.truetype(os.path.join(FONT_PATH, 'Exo/static/Exo-Light.ttf'), 18)
+DISCORD_NAME_FONT = ImageFont.truetype(os.path.join(FONT_PATH, 'Exo/static/Exo-ExtraBold.ttf'), 27)
+DISCORD_ID_FONT = ImageFont.truetype(os.path.join(FONT_PATH, 'Exo/static/Exo-Medium.ttf'), 16)
 
 
 # random gifs and images
@@ -202,11 +204,20 @@ def ptn_logo_discord():
 
 
 # mission template filenames
-template = 'original-template.png'
-template_pride = 'pride-template.png'
+reddit_template = 'reddit_template.png'
+reddit_template_pride = 'reddit_template_pride.png'
 
 def mission_template_filename():
-  return template_pride if current_month == 'June' else template
+  return reddit_template_pride if current_month == 'June' else reddit_template
+
+DISCORD_TEMPLATE = 'discord_template.png'
+
+# images and icons used in mission embeds
+BLANKLINE_400PX = 'https://pilotstradenetwork.com/wp-content/uploads/2023/01/400x1-00000000.png'
+ICON_BUY = 'https://pilotstradenetwork.com/wp-content/uploads/2023/05/Trade.png'
+ICON_SELL = 'https://pilotstradenetwork.com/wp-content/uploads/2023/06/Credit.png'
+ICON_DATA = 'https://pilotstradenetwork.com/wp-content/uploads/2023/06/Data.png'
+
 
 
 # discord direct invite URL

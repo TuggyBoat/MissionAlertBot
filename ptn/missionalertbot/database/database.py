@@ -20,6 +20,7 @@ from ptn.missionalertbot.classes.Commodity import Commodity
 from ptn.missionalertbot.classes.MissionData import MissionData
 from ptn.missionalertbot.classes.CommunityCarrierData import CommunityCarrierData
 from ptn.missionalertbot.classes.NomineesData import NomineesData
+from ptn.missionalertbot.classes.WebhookData import WebhookData
 
 # local constants
 import ptn.missionalertbot.constants as constants
@@ -49,6 +50,15 @@ carriers_table_create = '''
     )
     '''
 carriers_table_columns = ['p_ID', 'shortname', 'longname', 'cid', 'discordchannel', 'channelid', 'ownerid', 'lasttrade']
+
+webhooks_table_create = '''
+    CREATE TABLE webhooks(
+        webhook_owner_id INT NOT NULL,
+        webhook_url TEXT NOT NULL,
+        webhook_name TEXT NOT NULL
+    )
+    '''
+webhooks_table_columns = ['webhook_owner_id', 'webhook_url', 'webhook_name']
 
 community_carriers_table_create = '''
     CREATE TABLE community_carriers(
@@ -288,6 +298,7 @@ def build_database_on_startup():
     #       create (str): sql create statement for table
     database_table_map = {
         'carriers' : {'obj': carrier_db, 'create': carriers_table_create},
+        'webhooks' : {'obj': carrier_db, 'create': webhooks_table_create},
         'community_carriers': {'obj': carrier_db, 'create': community_carriers_table_create},
         'nominees': {'obj': carrier_db, 'create': nominees_table_create},
         'missions': {'obj': mission_db, 'create': missions_table_create},
@@ -431,6 +442,23 @@ async def add_carrier_to_database(short_name, long_name, carrier_id, channel, ch
         carrier_db_lock.release()
 
 
+# add a webhook to the database
+async def add_webhook_to_database(owner_id, webhook_url, webhook_name):
+    print("Called add_webhook_to_database")
+    await carrier_db_lock.acquire()
+    print("Carrier DB locked.")
+    try:
+        carrier_db.execute(''' INSERT INTO webhooks VALUES(?, ?, ?) ''',
+                        (owner_id, webhook_url, webhook_name))
+        carriers_conn.commit()
+        print(f"Successfully added webhook {webhook_url} to database for {owner_id} with name {webhook_name}")
+    except Exception as e:
+        print(e)
+    finally:
+        carrier_db_lock.release()
+        print("Carrier DB unlocked.")
+
+
 # carrier edit function
 async def _update_carrier_details_in_database(carrier_data, original_name):
     """
@@ -484,6 +512,19 @@ async def delete_carrier_from_db(p_id):
         print('Unable to backup image file, perhaps it never existed?')
 
     return
+
+
+# function to remove a webhook
+async def delete_webhook_by_name(userid, webhook_name):
+    print(f"Attempting to delete {userid} {webhook_name} match.")
+    try:
+        await carrier_db_lock.acquire()
+        query = f"DELETE FROM webhooks WHERE webhook_owner_id = ? AND webhook_name = ?"
+        carrier_db.execute(query, (userid, webhook_name))
+        carriers_conn.commit()
+        return print("Deleted")
+    finally:
+        carrier_db_lock.release()
 
 
 # function to remove a community carrier
@@ -573,6 +614,44 @@ def find_carriers_mult(searchterm, searchfield):
               f"and owner {carrier.ownerid} called from find_carriers_mult.")
 
     return carrier_data
+
+
+def find_webhook_from_owner(ownerid):
+    """
+    Returns owner ID, webhook URL and webhook name matching the nominee's user ID
+
+    :param int ownerid: The user id to match
+    :returns: A list of webhook data objects
+    :rtype: list[WebhookData]
+    """
+    carrier_db.execute(f"SELECT * FROM webhooks WHERE "
+                       f"webhook_owner_id = {ownerid} ")
+    webhook_data = [WebhookData(webhooks) for webhooks in carrier_db.fetchall()]
+    for webhooks in webhook_data:
+        print(f"{webhooks.webhook_owner_id} owns {webhooks.webhook_url} called {webhooks.webhook_name}"
+              f" called from find_webhook_from_owner.")
+
+    return webhook_data
+
+
+def find_webhook_by_name(ownerid, name): # TODO: why doesn't this work?
+    print("Called find_webhook_by_name")
+    """
+    Returns owner ID, webhook URL and webhook name matching the nominee's user ID
+
+    :param int ownerid: The user id to match
+    :param str name: The webhook name to match
+    :returns: A webhook data object
+    """
+    try:
+        query = f"SELECT * FROM webhooks WHERE webhook_owner_id = ? AND webhook_name = ?"
+        carrier_db.execute(query, (ownerid, name))
+        webhook_data = WebhookData(carrier_db.fetchone())
+        print(f"Found {webhook_data}")
+        return webhook_data
+    except Exception as e:
+        print(e)
+        return
 
 
 def find_community_carrier(searchterm, searchfield):
