@@ -59,7 +59,7 @@ class MissionCompleteView(View):
             await _cleanup_completed_mission(interaction, self.mission_data, reddit_complete_text, discord_complete_embed, desc_msg)
 
         async def failed(interaction: discord.Interaction):
-            await interaction.response.send_modal(MissionFailedModal(view=self)) # not working :(
+            await interaction.response.send_modal(MissionFailedModal())
             pass
 
         async def cancel(interaction: discord.Interaction):
