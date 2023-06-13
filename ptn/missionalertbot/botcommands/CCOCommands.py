@@ -7,7 +7,10 @@ from typing import Union
 
 # import discord.py
 import discord
+from discord import app_commands
+from discord.app_commands import Group, command, describe
 from discord.ext import commands
+from discord.ext.commands import GroupCog
 
 # import local classes
 
@@ -17,9 +20,10 @@ from ptn.missionalertbot.constants import bot, mission_command_channel, certcarr
 
 # import local modules
 from ptn.missionalertbot.database.database import find_mission
-from ptn.missionalertbot.modules.helpers import on_app_command_error, check_text_command_channel
+from ptn.missionalertbot.modules.helpers import on_app_command_error, check_text_command_channel, convert_str_to_float_or_int, check_command_channel, check_roles
 from ptn.missionalertbot.modules.ImageHandling import assign_carrier_image
-from ptn.missionalertbot.modules.MissionGenerator import gen_mission, _cleanup_completed_mission
+from ptn.missionalertbot.modules.MissionGenerator import gen_mission
+from ptn.missionalertbot.modules.MissionCleaner import _cleanup_completed_mission
 
 
 """
@@ -59,77 +63,56 @@ class CCOCommands(commands.Cog):
     Load/unload commands
     """
 
-    # load commands
-    @commands.command(name='load', help='Generate details for a loading mission and optionally broadcast.\n'
-                                '\n'
-                                'carrier_name_search_term should be a unique part of your carrier\'s name. (Use quotes if spaces are required)\n'
-                                'commodity_name_partial should be a unique part of any commodity\'s name.\n'
-                                'System and Station names should be enclosed in quotes if they contain spaces.\n'
-                                'Profit should be expressed as a simple number e.g. enter 10 for 10k/unit profit.\n'
-                                'Pad size should be expressed as L or M.\n'
-                                'Demand should be expressed as an absolute number e.g. 20k, 20,000, etc.\n'
-                                'ETA is optional and should be expressed as a number of minutes e.g. 15.\n'
-                                'Case is automatically corrected for all inputs.')
-    @commands.has_any_role(*[certcarrier_role(), trainee_role()])
-    @check_text_command_channel(mission_command_channel())
-    async def load(self, ctx, carrier_name_search_term: str, commodity_search_term: str, system: str, station: str,
-                profit: Union[int, float], pads: str, demand: str, eta: str = None):
+    cco_group = Group(name='cco', description='CCO commands')
+
+    # load subcommand
+    @cco_group.command(name='load', description='Generate a Fleet Carrier loading mission.')
+    @describe(
+        carrier = "A unique fragment of the carrier name you want to search for.",
+        commodity = "A unique fragment of the commodity name you want to search for.",
+        system = "The system your mission takes place in.",
+        station = "The station the Fleet Carrier is loading from.",
+        profit = 'The profit offered in thousands of credits, e.g. for 10k credits per ton enter \'10\'',
+        pads = 'The size of the largest landing pad available at the station.',
+        demand = 'The total demand for the commodity on the Fleet Carrier.'
+        )
+    @check_roles([certcarrier_role(), trainee_role(), rescarrier_role()])
+    @check_command_channel(mission_command_channel())
+    async def load(self, interaction: discord.Interaction, carrier: str, commodity: str, system: str, station: str,
+                profit: str, pads: str, demand: str):
         rp = False
         mission_type = 'load'
-        await gen_mission(ctx, carrier_name_search_term, commodity_search_term, system, station, profit, pads, demand,
-                        rp, mission_type, eta)
+
+        # convert profit from STR to an INT or FLOAT
+        profit = convert_str_to_float_or_int(profit)
+
+        await gen_mission(interaction, carrier, commodity, system, station, profit, pads, demand,
+                        rp, mission_type)
 
 
-    @commands.command(name="loadrp", help='Same as load command but prompts user to enter roleplay text\n'
-                                    'This is added to the Reddit comment as as a quote above the mission details\n'
-                                    'and sent to the carrier\'s Discord channel in quote format if those options are '
-                                    'chosen')
-    @commands.has_any_role(*[certcarrier_role(), trainee_role()])
-    @check_text_command_channel(mission_command_channel())
-    async def loadrp(self, ctx, carrier_name_search_term: str, commodity_search_term: str, system: str, station: str,
-                    profit: Union[int, float], pads: str, demand: str, eta: str = None):
-        rp = True
-        mission_type = 'load'
-        await gen_mission(ctx, carrier_name_search_term, commodity_search_term, system, station, profit, pads, demand,
-                        rp, mission_type, eta)
-
-
-    # unload commands
-    @commands.command(name='unload', help='Generate details for an unloading mission.\n'
-                                    '\n'
-                                    'carrier_name_search_term should be a unique part of your carrier\'s name. (Use quotes if spaces are required)\n'
-                                    'commodity_name_partial should be a unique part of any commodity\'s name.\n'
-                                    'System and Station names should be enclosed in quotes if they contain spaces.\n'
-                                    'Profit should be expressed as a simple number e.g. enter 10 for 10k/unit profit.\n'
-                                    'Pad size should be expressed as L or M.\n'
-                                    'Supply should be expressed as an absolute number e.g. 20k, 20,000, etc.\n'
-                                    'ETA is optional and should be expressed as a number of minutes e.g. 15.\n'
-                                    'Case is automatically corrected for all inputs.')
-    @commands.has_any_role(*[certcarrier_role(), trainee_role()])
-    @check_text_command_channel(mission_command_channel())
-    async def unload(self, ctx, carrier_name_search_term: str, commodity_search_term: str, system: str, station: str,
-                    profit: Union[int, float], pads: str, supply: str, eta: str = None):
+    # unload subcommand
+    @cco_group.command(name='unload', description='Generate a Fleet Carrier unloading mission.')
+    @describe(
+        carrier = "A unique fragment of the Fleet Carrier name you want to search for.",
+        commodity = "A unique fragment of the commodity name you want to search for.",
+        system = "The system your mission takes place in.",
+        station = "The station the Fleet Carrier is unloading to.",
+        profit = 'The profit offered in thousands of credits, e.g. for 10k credits per ton enter \'10\'',
+        pads = 'The size of the largest landing pad available at the station.',
+        supply = 'The total amount of the commodity available to buy on the Fleet Carrier.'
+        )
+    @check_roles([certcarrier_role(), trainee_role(), rescarrier_role()])
+    @check_command_channel(mission_command_channel())
+    async def unload(self, interaction: discord.Interaction, carrier: str, commodity: str, system: str, station: str,
+                profit: str, pads: str, supply: str):
         rp = False
         mission_type = 'unload'
 
-        await gen_mission(ctx, carrier_name_search_term, commodity_search_term, system, station, profit, pads, supply, rp,
-                        mission_type, eta)
+        # convert profit from STR to an INT or FLOAT
+        profit = convert_str_to_float_or_int(profit)
 
-
-    @commands.command(name="unloadrp", help='Same as unload command but prompts user to enter roleplay text\n'
-                                    'This is added to the Reddit comment as as a quote above the mission details\n'
-                                    'and sent to the carrier\'s Discord channel in quote format if those options are '
-                                    'chosen')
-    @commands.has_any_role(*[certcarrier_role(), trainee_role()])
-    @check_text_command_channel(mission_command_channel())
-    async def unloadrp(self, ctx, carrier_name_search_term: str, commodity_search_term: str, system: str, station: str,
-                    profit: Union[int, float], pads: str, demand: str, eta: str = None):
-
-        rp = True
-        mission_type = 'unload'
-
-        await gen_mission(ctx, carrier_name_search_term, commodity_search_term, system, station, profit, pads, demand,
-                        rp, mission_type, eta)
+        await gen_mission(interaction, carrier, commodity, system, station, profit, pads, supply, rp,
+                        mission_type)
 
 
     """
@@ -138,38 +121,44 @@ class CCOCommands(commands.Cog):
 
 
     # CO command to quickly mark mission as complete, optionally send some RP text
-    @commands.command(name='done', help='Marks a mission as complete for specified carrier.\n\n'
-                                'Deletes trade alert in Discord and sends messages to carrier channel, reddit and owner if '
-                                'appropriate.\n\nAnything after the carrier name will be treated as a '
-                                'quote to be sent along with the completion notice. This can be used for RP if desired.')
-    @commands.has_any_role(*[certcarrier_role(), trainee_role(), rescarrier_role()])
-    @check_text_command_channel(mission_command_channel())
-    async def done(self, ctx, carrier_name_search_term: str, *, rp: str = None):
-        async with ctx.typing():
+    @cco_group.command(name='done', description='Marks a mission as complete for specified carrier.')
+    @describe()
+    @check_roles([certcarrier_role(), trainee_role(), rescarrier_role()])
+    @check_command_channel(mission_command_channel())
+    async def done(self, interaction: discord.Interaction, carrier: str, *, message: str = None):
+        async with interaction.channel.typing():
 
-            current_channel = ctx.channel
+            current_channel = interaction.channel
 
-            print(f'Request received from {ctx.author} to mark the mission of {carrier_name_search_term} as done from channel: '
+            print(f'Request received from {interaction.user.display_name} to mark the mission of {carrier} as done from channel: '
                 f'{current_channel}')
 
-            mission_data = find_mission(carrier_name_search_term, "carrier")
+            mission_data = find_mission(carrier, "carrier")
             if not mission_data:
                 embed = discord.Embed(
-                    description=f"**ERROR**: no trade missions found for carriers matching \"**{carrier_name_search_term}\"**.",
+                    description=f"**ERROR**: no trade missions found for carriers matching \"**{carrier}\"**.",
                     color=constants.EMBED_COLOUR_ERROR)
-                return await ctx.send(embed=embed)
+                return await interaction.response.send_message(embed=embed)
 
             else:
-                pass
+                embed = discord.Embed(
+                    description=f"Closing mission for {mission_data.carrier_name}...",
+                    color=constants.EMBED_COLOUR_QU
+                )
+                await interaction.response.send_message(embed=embed)
 
         # fill in some info for messages
-        desc_msg = f"> {rp}\n" if rp else ""
+        desc_msg = f"> {message}\n" if message else ""
         reddit_complete_text = f"    INCOMING WIDEBAND TRANSMISSION: P.T.N. CARRIER MISSION UPDATE\n\n**{mission_data.carrier_name}** mission complete. o7 CMDRs!\n\n{desc_msg}"
         discord_complete_embed = discord.Embed(title=f"{mission_data.carrier_name} MISSION COMPLETE", description=f"{desc_msg}",
                                 color=constants.EMBED_COLOUR_OK)
         discord_complete_embed.set_footer(text=f"This mission channel will be removed in {seconds_long()//60} minutes.")
 
-        await _cleanup_completed_mission(ctx, mission_data, reddit_complete_text, discord_complete_embed, desc_msg)
+        embed = await _cleanup_completed_mission(interaction, mission_data, reddit_complete_text, discord_complete_embed, desc_msg)
+
+        # notify user in mission gen channel
+
+        await interaction.edit_original_response(embed=embed)
 
         return
 

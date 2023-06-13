@@ -539,6 +539,25 @@ async def _send_notice_channel_check(interaction):
     return community_carrier
 
 
+# helper function to convert a STR into an INT or FLOAT
+def convert_str_to_float_or_int(element: any) -> bool: # this code turns a STR into a FLOAT or INT based on value
+    if element is None: 
+        return False
+    try:
+        value = float(element)
+        print(f"We can float {value}")
+        if value.is_integer():
+            value = int(value)
+            print(f"{value} is an integer")
+            return value
+        else:
+            print(f"{value} is not an integer")
+            return value
+    except ValueError:
+        print(f"We can't float {element}")
+        return False
+
+
 # presently unused
 # TODO: remove or incorporate
 def _get_id_from_mention(mention):

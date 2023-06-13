@@ -77,6 +77,7 @@ PROD_CTEAM_BOT_CHANNEL = 895083178761547806 # bot command channel for cteam only
 PROD_BOT_SPAM_CHANNEL = 801258393205604372 # Certain bot logging messages go here
 PROD_DEV_CHANNEL = 827656814911815702 # Development channel for MAB on live
 PROD_UPVOTE_EMOJI = 828287733227192403 # upvote emoji on live server
+PROD_O7_EMOJI = 806138784294371368 # o7 emoji on live server
 PROD_HAULER_ROLE = 875313960834965544 # hauler role ID on live server
 PROD_CC_ROLE = 869340261057196072 # CC role on live server
 PROD_CC_CAT = 877107894452117544 # Community Carrier category on live server
@@ -111,6 +112,7 @@ TEST_CTEAM_BOT_CHANNEL = 842152343441375283 # bot command channel for cteam only
 TEST_BOT_SPAM_CHANNEL = 842525081858867211 # Bot logging messages on the test server
 TEST_DEV_CHANNEL = 1063765215457583164 # Development channel for MAB on test
 TEST_UPVOTE_EMOJI = 849388681382068225 # upvote emoji on test server
+TEST_O7_EMOJI = 903744117144698950 # o7 emoji on test server
 TEST_HAULER_ROLE = 875439909102575647 # hauler role ID on test server
 TEST_CC_ROLE = 877220476827619399 # CC role on test server
 TEST_CC_CAT = 877108931699310592 # Community Carrier category on test server
@@ -271,6 +273,9 @@ def bot_dev_channel():
 
 def upvote_emoji():
   return PROD_UPVOTE_EMOJI if _production else TEST_UPVOTE_EMOJI
+
+def o7_emoji():
+  return PROD_O7_EMOJI if _production else TEST_O7_EMOJI
 
 def hauler_role():
   return PROD_HAULER_ROLE if _production else TEST_HAULER_ROLE

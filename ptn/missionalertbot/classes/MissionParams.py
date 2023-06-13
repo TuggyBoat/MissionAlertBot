@@ -8,8 +8,8 @@ class MissionParams:
     is included below for the purpose of clarity.
     """
     def __init__(self, carrier_name_search_term, commodity_search_term, system, station, profit, pads, demand,
-                 eta=None, rp=None, mission_type=None, carrier_data=None, commodity_data=None,
-                 reddit_img_name=None, discord_img_name=None, edmc_off=False, eta_text=None, rp_text=None, timestamp=None,
+                 rp=None, mission_type=None, carrier_data=None, commodity_data=None,
+                 reddit_img_name=None, discord_img_name=None, edmc_off=False, rp_text=None, timestamp=None,
                  reddit_title=None, reddit_body=None, reddit_post_id=None, reddit_post_url=None, reddit_comment_id=None,
                  reddit_comment_url=None, discord_text=None, discord_embeds=None, discord_alert_id=None, mission_temp_channel_id=None,
                  webhook_msg_ids=[], webhook_urls=[], webhook_names=[], webhook_jump_urls=[]):
@@ -20,9 +20,7 @@ class MissionParams:
         self.profit = profit # profit as int or float
         self.pads = pads.upper() # size of largest landing pad L or M
         self.demand = demand # total supply/demand for commodity
-        self.eta = eta # optional ETA in minutes
         self.rp = rp # flag for whether the mission uses roleplay text TODO: switch to a modal triggered by button?
-        self.eta_text = eta_text # ETA converted into a text string TODO: ETA is slated to be deprecated into a general addendum string
         self.mission_type = mission_type # whether the mission is loading or unloading
         self.edmc_off = edmc_off # whether the mission is EDMC off flagged
         self.carrier_data = carrier_data # carrier data class retrieved from db
@@ -55,9 +53,7 @@ class MissionParams:
             print(f"profit: {self.profit}")
             print(f"pads: {self.pads}")
             print(f"demand: {self.demand}")
-            print(f"eta: {self.eta}")
             print(f"rp flag: {self.rp}")
-            print(f"eta_text: {self.eta_text}")
             print(f"mission_type: {self.mission_type}")
             print(f"edmc_off: {self.edmc_off}")
             print(f"carrier_data: {self.carrier_data}")

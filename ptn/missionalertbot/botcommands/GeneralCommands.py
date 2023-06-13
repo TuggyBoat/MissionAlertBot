@@ -10,11 +10,13 @@ import random
 
 # discord.py
 import discord
+from discord.app_commands import Group, describe
 from discord.ext import commands
 from discord import app_commands
 
 # local classes
 from ptn.missionalertbot.classes.MissionData import MissionData
+from ptn.missionalertbot.classes.Views import MissionCompleteView
 
 # local constants
 from ptn.missionalertbot._metadata import __version__
@@ -28,7 +30,7 @@ from ptn.missionalertbot.database.database import get_trade_channels_on_startup,
 from ptn.missionalertbot.modules.Embeds import _is_mission_active_embed, _format_missions_embed
 from ptn.missionalertbot.modules.helpers import bot_exit, carrier_channel_lock, check_roles, check_command_channel, on_app_command_error
 from ptn.missionalertbot.modules.BackgroundTasks import lasttrade_cron, _monitor_reddit_comments
-from ptn.missionalertbot.modules.MissionGenerator import _cleanup_completed_mission, cleanup_trade_channel
+from ptn.missionalertbot.modules.MissionCleaner import cleanup_trade_channel
 
 
 """
@@ -295,11 +297,13 @@ class GeneralCommands(commands.Cog):
 
         await ctx.send(embed=embed)
         return
-    
-    # mission slash command - private, non spammy
-    @app_commands.command(name="mission",
-        description="Private command: Use in a Fleet Carrier's channel to display its current mission.")
-    async def mission(self, interaction: discord.Interaction):
+
+
+    mission_group = Group(name='mission', description='Private command: Use in a Fleet Carrier\'s channel to display its current mission')
+
+    # mission information slash command - private, non spammy
+    @mission_group.command(name="information", description="Private command: Use in a Fleet Carrier's channel to display its current mission.")
+    async def information(self, interaction: discord.Interaction):
 
         print(f"{interaction.user} asked for active mission in <#{interaction.channel}> (used /mission)")
 
@@ -314,7 +318,6 @@ class GeneralCommands(commands.Cog):
 
         await interaction.response.send_message(embed=embed, ephemeral=True)
         return
-
 
     # list all active carrier trade missions from DB
     @commands.command(name='issions', help='List all active trade missions.')
@@ -412,71 +415,67 @@ class GeneralCommands(commands.Cog):
 
     # a command for users to mark a carrier mission complete from within the carrier channel
     # TODO: slashify with button prompts
-    @commands.command(name='complete', help="Use in a carrier's channel to mark the current trade mission complete.")
-    async def complete(self, ctx, *, comment: str = None):
+    @mission_group.command(name='complete', description="Use in a carrier's channel to mark the current trade mission complete.")
+    @describe(comment='Optional: send a message to know why you used this command, e.g., if the price changed at the station!')
+    async def complete(self, interaction: discord.Interaction, *, comment: str = None):
 
-        print(f"m.complete called in {ctx.channel} by {ctx.author}")
+        print(f"/mission complete called in {interaction.channel} by {interaction.user.display_name}")
 
         # look for a match for the channel name in the carrier DB
         print("Looking for carrier by channel name match")
-        carrier_data = find_carrier(ctx.channel.name, "discordchannel")
+        carrier_data = find_carrier(interaction.channel.name, "discordchannel")
         if not carrier_data:
             # if there's no channel match, return an error
             embed = discord.Embed(description="**You need to be in a carrier's channel to mark its mission as complete.**",
                                 color=constants.EMBED_COLOUR_ERROR)
-            await ctx.send(embed=embed)
+            await interaction.response.send_message(embed=embed, ephemeral=True)
             return
 
         # now look to see if the carrier is on an active mission
         print("Looking for mission by channel ID match")
-        mission_data = find_mission(ctx.channel.id, "channelid")
+        mission_data = find_mission(interaction.channel.id, "channelid")
         if not mission_data:
             # if there's no result, return an error
-            embed = discord.Embed(description=f"**{carrier_data.carrier_long_name} doesn't seem to be on a trade "
+            embed = discord.Embed(
+                description=f"**{carrier_data.carrier_long_name} doesn't seem to be on a trade "
                                                 f"mission right now.**",
-                                    color=constants.EMBED_COLOUR_ERROR)
-            return await ctx.send(embed=embed)
-
+                color=constants.EMBED_COLOUR_ERROR)
+            return await interaction.response.send_message(embed=embed, ephemeral=True)
 
         # user is in correct channel and carrier is on a mission, so check whether user is sure they want to proceed
-        print("Send user confirm prompt")
+
         embed = discord.Embed(
-            description=f"Please confirm that **{mission_data.carrier_name}** has been fully "
-                        f"{mission_data.mission_type}ed : **y** / **n**",
-            color=constants.EMBED_COLOUR_QU)
-        # embed.set_footer(text="For other issues (e.g. station price changes) please @ the Carrier Owner
-        # directly.")
-        await ctx.send(embed=embed)
+            description=f"Please confirm status of **{mission_data.carrier_name}**:",
+            color=constants.EMBED_COLOUR_QU
+        )
 
-        def check(message):
-            return message.author == ctx.author and message.channel == ctx.channel and \
-                    message.content.lower() in ["y", "n"]
+        view = MissionCompleteView(mission_data, comment) # buttons to add
 
-        try:
-            msg = await bot.wait_for("message", check=check, timeout=30)
-            if msg.content.lower() == "n":
-                # whoops lol actually no
+        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+
+        # TODO
+    """                # whoops lol actually no
                 print("User responded no")
                 embed = discord.Embed(description="OK, mission will remain listed as in-progress.",
                                         color=constants.EMBED_COLOUR_OK)
-                await ctx.send(embed=embed)
+                await interaction.followup.send(embed=embed)
                 return
             elif msg.content.lower() == "y":
                 # they said yes!
                 print("User responded yes")
                 reddit_complete_text = f"    INCOMING WIDEBAND TRANSMISSION: P.T.N. CARRIER MISSION UPDATE\n\n**" \
                                     f"{mission_data.carrier_name}** mission complete. o7 CMDRs!\n\n\n\n*Reported on " \
-                                    f"PTN Discord by {ctx.author.display_name}*"
+                                    f"PTN Discord by {interaction.user.display_name}*"
                 discord_complete_embed = discord.Embed(title=f"{mission_data.carrier_name} MISSION COMPLETE",
-                                                    description=f"<@{ctx.author.id}> reports mission complete! **This mission channel will be removed in {(seconds_long())//60} minutes.**",
+                                                    description=f"<@{interaction.user.id}> reports mission complete! **This mission channel will be removed in {(seconds_long())//60} minutes.**",
                                                     color=constants.EMBED_COLOUR_OK)
                 print("Sending to _cleanup_completed_mission")
                 desc_msg = f"> {comment}\n" if comment else ""
-                await _cleanup_completed_mission(ctx, mission_data, reddit_complete_text, discord_complete_embed, desc_msg)
+                await _cleanup_completed_mission(interaction, mission_data, reddit_complete_text, discord_complete_embed, desc_msg)
 
         except asyncio.TimeoutError:
             embed = discord.Embed(description="No response, mission will remain listed as in-progress.")
-            await ctx.send(embed=embed)
+            await interaction.followup.send(embed=embed)"""
 
 
     # public command to nominate a user for CP

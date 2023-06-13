@@ -747,11 +747,11 @@ async def _is_carrier_channel(carrier_data):
 
 
 # function to search for a commodity by name or partial name
-async def find_commodity(commodity_search_term, ctx):
+async def find_commodity(commodity_search_term, interaction):
     # TODO: Where do we get set up this database? it is searching for things, but what is the source of the data, do
     #  we update it periodically?
 
-    print(f'Searching for commodity against match "{commodity_search_term}" requested by {ctx.author}')
+    print(f'Searching for commodity against match "{commodity_search_term}" requested by {interaction.user.display_name}')
 
     carrier_db.execute(
         f"SELECT * FROM commodities WHERE commodity LIKE (?)",
@@ -761,7 +761,7 @@ async def find_commodity(commodity_search_term, ctx):
     commodity = None
     if not commodities:
         print('No commodities found for request')
-        await ctx.send(f"No commodities found for {commodity_search_term}")
+        await interaction.channel.send(f"No commodities found for {commodity_search_term}")
         # Did not find anything, short-circuit out of the next block
         return
     elif len(commodities) == 1:
@@ -771,12 +771,12 @@ async def find_commodity(commodity_search_term, ctx):
     elif len(commodities) > 3:
         # If we ever get into a scenario where more than 3 commodities can be found with the same search directly, then
         # we need to revisit this limit
-        print(f'More than 3 commodities found for: "{commodity_search_term}", {ctx.author} needs to search better.')
-        await ctx.send(f'Please narrow down your commodity search, we found {len(commodities)} matches for your '
+        print(f'More than 3 commodities found for: "{commodity_search_term}", {interaction.user.display_name} needs to search better.')
+        await interaction.channel.send(f'Please narrow down your commodity search, we found {len(commodities)} matches for your '
                        f'input choice: "{commodity_search_term}"')
         return # Just return None here and let the calling method figure out what is needed to happen
     else:
-        print(f'Between 1 and 3 commodities found for: "{commodity_search_term}", asking {ctx.author} which they want.')
+        print(f'Between 1 and 3 commodities found for: "{commodity_search_term}", asking {interaction.user.display_name} which they want.')
         # The database runs a partial match, in the case we have more than 1 ask the user which they want.
         # here we have less than 3, but more than 1 match
         embed = discord.Embed(title=f"Multiple commodities found for input: {commodity_search_term}", color=constants.EMBED_COLOUR_OK)
@@ -790,18 +790,18 @@ async def find_commodity(commodity_search_term, ctx):
         embed.set_footer(text='Please select the commodity with 1, 2 or 3')
 
         def check(message):
-            return message.author == ctx.author and message.channel == ctx.channel and \
+            return message.author == interaction.user.display_name and message.channel == interaction.channel and \
                    len(message.content) == 1 and message.content.lower() in ["1", "2", "3"]
 
-        message_confirm = await ctx.send(embed=embed)
+        message_confirm = await interaction.channel.send(embed=embed)
         try:
             # Wait on the user input, this might be better by using a reaction?
             response = await bot.wait_for("message", check=check, timeout=15)
-            print(f'{ctx.author} responded with: "{response.content}", type: {type(response.content)}.')
+            print(f'{interaction.user.display_name} responded with: "{response.content}", type: {type(response.content)}.')
             index = int(response.content) - 1  # Users count from 1, computers count from 0
             commodity = commodities[index]
         except asyncio.TimeoutError:
-            await ctx.send("Commodity selection timed out. Cancelling.")
+            await interaction.channel.send("Commodity selection timed out. Cancelling.")
             print('User failed to respond in time')
             return
         await message_confirm.delete()

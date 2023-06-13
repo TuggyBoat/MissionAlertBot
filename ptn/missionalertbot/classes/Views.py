@@ -1,7 +1,7 @@
 """
 Define classes for Views used by Interactions
 
-Depends on: constants, database, Embeds, helpers
+Depends on: constants, database, Embeds, helpers, MissionCleaner
 
 """
 
@@ -15,14 +15,86 @@ from discord.ui import View, Modal
 
 # import local constants
 import ptn.missionalertbot.constants as constants
+from ptn.missionalertbot.constants import seconds_long, o7_emoji
 
 # import local modules
 from ptn.missionalertbot.database.database import delete_nominee_from_db, delete_carrier_from_db, _update_carrier_details_in_database, find_carrier, CarrierDbFields
 from ptn.missionalertbot.modules.Embeds import _configure_all_carrier_detail_embed, _generate_cc_notice_embed
 from ptn.missionalertbot.modules.helpers import _remove_cc_manager
+from ptn.missionalertbot.modules.MissionCleaner import _cleanup_completed_mission
 
 
-# generic button for "Broadcast" function
+# buttons for mission complete
+class MissionCompleteView(View):
+    def __init__(self, mission_data, comment):
+        self.mission_data = mission_data
+        self.comment = comment
+        self.status_label = "Fully " + self.mission_data.mission_type + "ed"
+        super().__init__()
+        self.add_buttons()
+
+    def add_buttons(self):
+        complete_button = discord.ui.Button(label=self.status_label, style=discord.ButtonStyle.success, emoji="💰", custom_id="complete")
+        failed_button = discord.ui.Button(label='Unable to complete', style=discord.ButtonStyle.secondary, emoji="🙁", custom_id="failed")
+        cancel_button = discord.ui.Button(label='Cancel', style=discord.ButtonStyle.danger, emoji="❌", custom_id="cancel")
+
+        async def complete(interaction: discord.Interaction):
+            print(f"{interaction.user.display_name} confirms mission complete")
+
+            embed = discord.Embed(
+                title="Mission marked complete",
+                description=f"Mission marked as complete <:o7:{o7_emoji()}>",
+                color=constants.EMBED_COLOUR_OK
+            )
+            await interaction.response.edit_message(embed=embed, view=None)
+
+            reddit_complete_text = f"    INCOMING WIDEBAND TRANSMISSION: P.T.N. CARRIER MISSION UPDATE\n\n**" \
+                                f"{self.mission_data.carrier_name}** mission complete. o7 CMDRs!\n\n\n\n*Reported on " \
+                                f"PTN Discord by {interaction.user.display_name}*"
+            discord_complete_embed = discord.Embed(title=f"{self.mission_data.carrier_name} MISSION COMPLETE",
+                                                description=f"<@{interaction.user.id}> reports mission complete! **This mission channel will be removed in {(seconds_long())//60} minutes.**",
+                                                color=constants.EMBED_COLOUR_OK)
+            print("Sending to _cleanup_completed_mission")
+            desc_msg = f"> {self.comment}\n" if self.comment else ""
+            await _cleanup_completed_mission(interaction, self.mission_data, reddit_complete_text, discord_complete_embed, desc_msg)
+
+        async def failed(interaction: discord.Interaction):
+            await interaction.response.send_modal(MissionFailedModal(view=self)) # not working :(
+            pass
+
+        async def cancel(interaction: discord.Interaction):
+            embed = discord.Embed(
+                title="Cancelled",
+                description=f"Mission will remain listed <:o7:{o7_emoji()}>",
+                color=constants.EMBED_COLOUR_OK
+            )
+            return await interaction.response.edit_message(embed=embed, view=None)
+
+        complete_button.callback = complete
+        failed_button.callback = failed
+        cancel_button.callback = cancel
+        self.add_item(complete_button)
+        self.add_item(failed_button)
+        self.add_item(cancel_button)
+
+
+# Modal for Mission Failed on /mission_complete
+class MissionFailedModal(Modal):
+    def __init__(self, title = 'Mission failed confirmation', timeout = None) -> None:
+        super().__init__(title=title, timeout=timeout)
+
+    reason = discord.ui.TextInput(
+        label='Mission failed reason',
+        placeholder='Please give a short explanation for the carrier\'s owner.',
+        required=True,
+        max_length=512,
+    )
+
+    async def on_submit(self, interaction: discord.Interaction):
+        pass # TODO: call cleanup with reddit and discord texts defined appropriately
+
+
+ # generic button for "Broadcast" function
 class BroadcastView(View):
     def __init__(self, embed):
         self.embed = embed
