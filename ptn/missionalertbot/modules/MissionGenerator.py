@@ -28,13 +28,13 @@ from ptn.missionalertbot.classes.MissionParams import MissionParams
 
 # import local constants
 import ptn.missionalertbot.constants as constants
-from ptn.missionalertbot.constants import bot, bot_spam_channel, wine_alerts_loading_channel, wine_alerts_unloading_channel, trade_alerts_channel, legacy_alerts_channel, get_reddit, sub_reddit, \
-    reddit_flair_mission_stop, reddit_flair_mission_start, seconds_short, seconds_long, sub_reddit, channel_upvotes, upvote_emoji, legacy_hauler_role, hauler_role, \
+from ptn.missionalertbot.constants import bot, bot_spam_channel, wine_alerts_loading_channel, wine_alerts_unloading_channel, trade_alerts_channel, get_reddit, sub_reddit, \
+    reddit_flair_mission_stop, reddit_flair_mission_start, seconds_short, seconds_long, sub_reddit, channel_upvotes, upvote_emoji, hauler_role, \
     trade_cat, get_guild, get_overwrite_perms, mission_command_channel, ptn_logo_discord
 
 # import local modules
 from ptn.missionalertbot.database.database import remove_channel_cleanup_entry, backup_database, mission_db, missions_conn, find_carrier, mark_cleanup_channel, CarrierDbFields, \
-    find_commodity, find_mission, carrier_db, carriers_conn
+    find_commodity, find_mission, carrier_db, carriers_conn, find_webhook_from_owner
 from ptn.missionalertbot.modules.DateString import get_formatted_date_string
 from ptn.missionalertbot.modules.Embeds import _mission_summary_embed
 from ptn.missionalertbot.modules.helpers import lock_mission_channel, carrier_channel_lock, clean_up_pins
@@ -92,13 +92,11 @@ async def _cleanup_completed_mission(ctx, mission_data, reddit_complete_text, di
 
                     discord_alert_id = mission_data.discord_alert_id
 
-                    try: # shitty hacky message of incorporating legacy trades without extra DB fields
+                    try:
                         msg = await alert_channel.fetch_message(discord_alert_id)
                         await msg.delete()
-                    except: # if it can't find a message in the normal channel it'll look in legacy instead
-                        alert_channel = bot.get_channel(legacy_alerts_channel())
-                        msg = await alert_channel.fetch_message(discord_alert_id)
-                        await msg.delete()
+                    except:
+                        print("No alert found, maybe user deleted it?")
 
                 except:
                     print(f"Looks like this mission alert for {mission_data.carrier_name} was already deleted"
@@ -334,7 +332,7 @@ async def return_discord_channel_embeds(mission_params):
         buy_thumb = ptn_logo_discord()
 
         sell_description=f"📌 Station: **{mission_params.station.upper()}**" \
-                         f"💰 Profit: **{mission_params.profit}K PER TON**" \
+                         f"\n💰 Profit: **{mission_params.profit}K PER TON**" \
                          f"\n📥 Demand: **{mission_params.demand.upper()} TONS**"
         
         sell_thumb = constants.ICON_SELL
@@ -430,12 +428,8 @@ async def send_mission_to_discord(ctx, mission_params):
                 channel = bot.get_channel(wine_alerts_unloading_channel())
                 channelId = wine_alerts_unloading_channel()
         else:
-            if mission_params.legacy:
-                channel = bot.get_channel(legacy_alerts_channel())
-                channelId = legacy_alerts_channel()
-            else:
-                channel = bot.get_channel(trade_alerts_channel())
-                channelId = trade_alerts_channel()
+            channel = bot.get_channel(trade_alerts_channel())
+            channelId = trade_alerts_channel()
 
         embed = await return_discord_alert_embed(ctx, mission_params)
 
@@ -543,14 +537,6 @@ async def send_mission_to_subreddit(ctx, mission_params):
 async def send_mission_to_webhook(ctx, mission_params):
     print("User used option w")
 
-    # first we need to get a list of all the webhooks the CCO has saved
-    # TODO: create CCO webhook database table user_id, webhooks[list]
-    # TODO: crossref CCO user ID with database and return webhook URLs
-
-    mission_params.webhook_urls = ["https://discord.com/api/webhooks/1086562484250488872/Y9b9_Wz_3xY9nQ4xiBqBokTIge33bxZczEv7r-uaSnBPhblKwT-riY4GHxYcIYMtWnbD", "https://discord.com/api/webhooks/1117188947227975821/vMYyzfOMggbQXTY6cJ2jSQ4OzshCeh2qsx8141DNtE4ZyKnyG2egkMgCj0JEXtDPui_O"]
-
-    mission_params.print_values()
-
     print("Defining Discord embeds...")
     discord_embeds = mission_params.discord_embeds
     webhook_embeds = [discord_embeds.buy_embed, discord_embeds.sell_embed, discord_embeds.webhook_info_embed]
@@ -558,7 +544,7 @@ async def send_mission_to_webhook(ctx, mission_params):
     if mission_params.rp: webhook_embeds.append(discord_embeds.owner_text_embed)
 
     async with aiohttp.ClientSession() as session: # send messages to each webhook URL
-        for webhook_url in mission_params.webhook_urls:
+        for webhook_url, webhook_name in zip(mission_params.webhook_urls, mission_params.webhook_names):
             print(f"Sending webhook to {webhook_url}")
             # insert webhook URL
             webhook = Webhook.from_url(webhook_url, session=session, client=bot)
@@ -578,7 +564,7 @@ async def send_mission_to_webhook(ctx, mission_params):
             print(f"Sent webhook trade alert with ID {webhook_sent.id} for webhook URL {webhook_url}")
 
             embed = discord.Embed(title=f"Webhook trade alert sent for {mission_params.carrier_data.carrier_long_name}:",
-                                  description=f"{webhook_sent.jump_url}",
+                                  description=f"Sent to your webhook **{webhook_name}**: {webhook_sent.jump_url}",
                                   color=constants.EMBED_COLOUR_DISCORD)
 
             await ctx.send(embed=embed)
@@ -631,7 +617,7 @@ The core of MAB: its mission generator
 # mission generator called by loading/unloading commands
 async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term: str, system: str, station: str,
                     profit: Union[int, float], pads: str, demand: str, rp: str, mission_type: str,
-                    eta: str, legacy):
+                    eta: str):
     current_channel = ctx.channel
 
     print(f'Mission generation type: {mission_type} with RP: {rp}, requested by {ctx.author}. Request triggered from '
@@ -642,6 +628,10 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
         print(f'Exiting mission generation requested by {ctx.author} as pad size is invalid, provided: {pads}')
         return await ctx.send(f'Sorry, your pad size is not L or M. Provided: {pads}. Mission generation cancelled.')
 
+    mission_params = MissionParams(carrier_name_search_term, commodity_search_term, system, station,
+                    profit, pads, demand, eta, rp, mission_type)
+    mission_params.print_values()
+
     # check if commodity can be found, exit gracefully if not
     # gen_mission.returnflag = False
     commodity_data = await find_commodity(commodity_search_term, ctx)
@@ -649,11 +639,20 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
         #return # we've already given the user feedback on why there's a problem, we just want to quit gracefully now
     if not commodity_data:
         raise ValueError('Missing commodity data')
+    mission_params.commodity_data = commodity_data
+    
+    # check if the user has any webhooks
+    webhook_data = find_webhook_from_owner(ctx.author.id)
+    if webhook_data:
+        for webhook in webhook_data:
+            mission_params.webhook_urls.append(webhook.webhook_url)
+            mission_params.webhook_names.append(webhook.webhook_name)
 
     # check if the carrier can be found, exit gracefully if not
     carrier_data = find_carrier(carrier_name_search_term, CarrierDbFields.longname.name)
     if not carrier_data:
         return await ctx.send(f"No carrier found for {carrier_name_search_term}. You can use `/find` or `/owner` to search for carrier names.")
+    mission_params.carrier_data = carrier_data
 
     # check carrier isn't already on a mission TODO change to ID lookup
     mission_data = find_mission(carrier_data.carrier_long_name, "carrier")
@@ -695,9 +694,7 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
 
     # TODO: This method is way too long, break it up into logical steps.
 
-    mission_params = MissionParams(carrier_name_search_term, commodity_search_term, system, station,
-                    profit, pads, demand, eta, rp, mission_type, legacy, carrier_data, commodity_data)
-    mission_params.print_values()
+
 
     try: # this try/except pair is to try and ensure the channel lock is released if something breaks during mission gen
         # otherwise the bot freezes next time the lock is attempted
@@ -823,7 +820,7 @@ async def gen_mission(ctx, carrier_name_search_term: str, commodity_search_term:
                     async with ctx.typing():
                         print("User used option n")
 
-                        ping_role_id = legacy_hauler_role() if legacy else hauler_role()
+                        ping_role_id = hauler_role()
                         await mission_temp_channel.send(f"<@&{ping_role_id}>: {mission_params.discord_text}")
 
                         embed = discord.Embed(title=f"Mission notification sent for {carrier_data.carrier_long_name}",

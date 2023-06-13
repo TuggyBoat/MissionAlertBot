@@ -66,7 +66,6 @@ PROD_FLAIR_MISSION_START = "d01e6808-9235-11eb-9cc0-0eb650439ee7"
 PROD_FLAIR_MISSION_STOP = "eea2d818-9235-11eb-b86f-0e50eec082f5"
 PROD_DISCORD_GUILD = 800080948716503040 # PTN Discord server
 PROD_TRADE_ALERTS_ID = 801798469189763073  # trade alerts channel ID for PTN main server
-PROD_LEGACY_ALERTS_ID = 1047113504332709938 # trade alerts channel ID for legacy trade alerts on the PTN main server
 PROD_WINE_ALERTS_LOADING_ID = 849249916676603944 # booze alerts channel ID for PTN main server [loading]
 PROD_WINE_ALERTS_UNLOADING_ID = 932918003639648306 # booze alerts channel ID for PTN main server [unloading]
 PROD_SUB_REDDIT = "PilotsTradeNetwork"  # subreddit for live
@@ -79,7 +78,6 @@ PROD_BOT_SPAM_CHANNEL = 801258393205604372 # Certain bot logging messages go her
 PROD_DEV_CHANNEL = 827656814911815702 # Development channel for MAB on live
 PROD_UPVOTE_EMOJI = 828287733227192403 # upvote emoji on live server
 PROD_HAULER_ROLE = 875313960834965544 # hauler role ID on live server
-PROD_LEGACY_HAULER__ROLE = 1047133548886364190 # legacy hauler role ID on live server
 PROD_CC_ROLE = 869340261057196072 # CC role on live server
 PROD_CC_CAT = 877107894452117544 # Community Carrier category on live server
 PROD_ADMIN_ROLE = 800091021852803072 # MAB Bot Admin role on live server (currently @Council)
@@ -102,7 +100,6 @@ TEST_FLAIR_MISSION_START = "3cbb1ab6-8e8e-11eb-93a1-0e0f446bc1b7"
 TEST_FLAIR_MISSION_STOP = "4242a2e2-8e8e-11eb-b443-0e664851dbff"
 TEST_DISCORD_GUILD = 818174236480897055 # test Discord server
 TEST_TRADE_ALERTS_ID = 843252609057423361  # trade alerts channel ID for PTN test server
-TEST_LEGACY_ALERTS_ID = 1047113662743183410 # trade alerts channel ID for legacy trade alerts on the PTN test server
 TEST_WINE_ALERTS_LOADING_ID = 870425638127943700 # booze alerts channel ID for PTN test server [loading]
 TEST_WINE_ALERTS_UNLOADING_ID = 870425638127943700 # booze alerts channel ID for PTN test server [unloading]
 TEST_SUB_REDDIT = "PTNBotTesting"  # subreddit for testing
@@ -115,7 +112,6 @@ TEST_BOT_SPAM_CHANNEL = 842525081858867211 # Bot logging messages on the test se
 TEST_DEV_CHANNEL = 1063765215457583164 # Development channel for MAB on test
 TEST_UPVOTE_EMOJI = 849388681382068225 # upvote emoji on test server
 TEST_HAULER_ROLE = 875439909102575647 # hauler role ID on test server
-TEST_LEGACY_HAULER__ROLE = 1047152762707787786 # legacy hauler role ID on test server
 TEST_CC_ROLE = 877220476827619399 # CC role on test server
 TEST_CC_CAT = 877108931699310592 # Community Carrier category on test server
 TEST_ADMIN_ROLE = 836367194979041351 # Bot Admin role on test server
@@ -246,9 +242,6 @@ def sub_reddit():
 def trade_alerts_channel():
   return PROD_TRADE_ALERTS_ID if _production else TEST_TRADE_ALERTS_ID
 
-def legacy_alerts_channel():
-  return PROD_LEGACY_ALERTS_ID if _production else TEST_LEGACY_ALERTS_ID
-
 def wine_alerts_loading_channel():
   return PROD_WINE_ALERTS_LOADING_ID if _production else TEST_WINE_ALERTS_LOADING_ID
 
@@ -281,9 +274,6 @@ def upvote_emoji():
 
 def hauler_role():
   return PROD_HAULER_ROLE if _production else TEST_HAULER_ROLE
-
-def legacy_hauler_role():
-  return PROD_LEGACY_HAULER__ROLE if _production else TEST_LEGACY_HAULER__ROLE
 
 def cc_role():
   return PROD_CC_ROLE if _production else TEST_CC_ROLE

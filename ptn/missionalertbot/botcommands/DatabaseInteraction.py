@@ -924,6 +924,7 @@ class DatabaseInteraction(commands.Cog):
 
         # notify user of success
         embed = discord.Embed(title="WEBHOOK ADDED",
+                              description="Remember, webhooks can be used by *anyone* to post *anything* and therefore **MUST** be kept secret from other users.",
                               color=constants.EMBED_COLOUR_OK)
         embed.add_field(name="Identifier", value=webhook_name, inline=False)
         embed.add_field(name="URL", value=webhook_url)
@@ -955,7 +956,8 @@ class DatabaseInteraction(commands.Cog):
             return await interaction.response.send_message(embed=embed, ephemeral=True)
         
         embed = discord.Embed(
-            description=f"Showing webhooks for <@{interaction.user.id}>",
+            description=f"Showing webhooks for <@{interaction.user.id}>"
+                         "\nRemember, webhooks can be used by *anyone* to post *anything* and therefore **MUST** be kept secret from other users.",
             color=constants.EMBED_COLOUR_OK
         )
         embed.set_thumbnail(url=interaction.user.display_avatar)

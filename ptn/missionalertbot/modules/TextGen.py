@@ -22,7 +22,6 @@ TEXT GEN FUNCTIONS
 def txt_create_discord(mission_params):
     discord_channel = f"<#{mission_params.mission_temp_channel_id}>" if mission_params.mission_temp_channel_id else f"#{mission_params.carrier_data.discord_channel}"
     discord_text = (
-        f"{'**◄ LEGACY UNIVERSE ►** : ' if mission_params.legacy else ''}"
         f"{'**★ EDMC-OFF MISSION! ★** : ' if mission_params.edmc_off else ''}"
         f"{discord_channel} {'load' if mission_params.mission_type == 'load' else 'unload'}ing "
         f"{mission_params.commodity_data.name} "
@@ -36,7 +35,6 @@ def txt_create_discord(mission_params):
 
 def txt_create_reddit_title(mission_params):
     reddit_title = (
-        f"{'◄ LEGACY UNIVERSE ► : ' if mission_params.legacy else ''}"
         f"P.T.N. TRADE MISSION: "
         f"P.T.N. News - Trade mission - {mission_params.carrier_data.carrier_long_name} {mission_params.carrier_data.carrier_identifier}" \
                    f" - {get_formatted_date_string()[0]}"
@@ -49,7 +47,6 @@ def txt_create_reddit_body(mission_params):
     if mission_params.mission_type == 'load':
         reddit_body = (
             f"    INCOMING WIDEBAND TRANSMISSION: P.T.N. CARRIER LOADING MISSION IN PROGRESS\n"
-            f"{'**◄ LEGACY UNIVERSE ►**' if mission_params.legacy else ''}"
             f"\n\n"
             f"**BUY FROM**: station **{mission_params.station.upper()}** ({mission_params.pads.upper()}-pads) in system **{mission_params.system.upper()}**\n\n**COMMODITY**: "
             f"{mission_params.commodity_data.name}\n\n&#x200B;\n\n**SELL TO**: Fleet Carrier **{mission_params.carrier_data.carrier_long_name} "
@@ -59,7 +56,6 @@ def txt_create_reddit_body(mission_params):
     else:
         reddit_body = (
             f"    INCOMING WIDEBAND TRANSMISSION: P.T.N. CARRIER UNLOADING MISSION IN PROGRESS\n"
-            f"{'**◄ LEGACY UNIVERSE ►** : ' if mission_params.legacy else ''}"
             f"\n\n"
             f"**BUY FROM**: Fleet Carrier **{mission_params.carrier_data.carrier_long_name} {mission_params.carrier_data.carrier_identifier}{mission_params.eta_text}**"
             f"\n\n**COMMODITY**: {mission_params.commodity_data.name}\n\n&#x200B;\n\n**SELL TO**: station "

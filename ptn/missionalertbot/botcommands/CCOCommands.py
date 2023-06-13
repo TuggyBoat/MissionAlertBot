@@ -28,13 +28,9 @@ CERTIFIED CARRIER OWNER COMMANDS
 carrier_image - CCO
 done - CCO/mission
 load - CCO/mission
-loadlegacy - CCO/mission
 loadrp - CCO/mission
-loadrplegacy - CCO/mission
 unload - CCO/mission
-unloadlegacy - CCO/mission
 unloadrp - CCO/mission
-unloadrplegacy - CCO/mission
 
 """
 
@@ -80,9 +76,8 @@ class CCOCommands(commands.Cog):
                 profit: Union[int, float], pads: str, demand: str, eta: str = None):
         rp = False
         mission_type = 'load'
-        legacy = False
         await gen_mission(ctx, carrier_name_search_term, commodity_search_term, system, station, profit, pads, demand,
-                        rp, mission_type, eta, legacy)
+                        rp, mission_type, eta)
 
 
     @commands.command(name="loadrp", help='Same as load command but prompts user to enter roleplay text\n'
@@ -95,46 +90,8 @@ class CCOCommands(commands.Cog):
                     profit: Union[int, float], pads: str, demand: str, eta: str = None):
         rp = True
         mission_type = 'load'
-        legacy = False
         await gen_mission(ctx, carrier_name_search_term, commodity_search_term, system, station, profit, pads, demand,
-                        rp, mission_type, eta, legacy)
-
-
-    # legacy load commands
-    @commands.command(name='loadlegacy', help='Generate details for a LEGACY loading mission and optionally broadcast.\n'
-                                '\n'
-                                'carrier_name_search_term should be a unique part of your carrier\'s name. (Use quotes if spaces are required)\n'
-                                'commodity_name_partial should be a unique part of any commodity\'s name.\n'
-                                'System and Station names should be enclosed in quotes if they contain spaces.\n'
-                                'Profit should be expressed as a simple number e.g. enter 10 for 10k/unit profit.\n'
-                                'Pad size should be expressed as L or M.\n'
-                                'Demand should be expressed as an absolute number e.g. 20k, 20,000, etc.\n'
-                                'ETA is optional and should be expressed as a number of minutes e.g. 15.\n'
-                                'Case is automatically corrected for all inputs.')
-    @commands.has_any_role(*[certcarrier_role(), trainee_role()])
-    @check_text_command_channel(mission_command_channel())
-    async def loadlegacy(self, ctx, carrier_name_search_term: str, commodity_search_term: str, system: str, station: str,
-                profit: Union[int, float], pads: str, demand: str, eta: str = None):
-        rp = False
-        mission_type = 'load'
-        legacy = True
-        await gen_mission(ctx, carrier_name_search_term, commodity_search_term, system, station, profit, pads, demand,
-                        rp, mission_type, eta, legacy)
-
-
-    @commands.command(name="loadrplegacy", help='Same as load command but prompts user to enter roleplay text\n'
-                                    'This is added to the Reddit comment as as a quote above the mission details\n'
-                                    'and sent to the carrier\'s Discord channel in quote format if those options are '
-                                    'chosen')
-    @commands.has_any_role(*[certcarrier_role(), trainee_role()])
-    @check_text_command_channel(mission_command_channel())
-    async def loadrplegacy(self, ctx, carrier_name_search_term: str, commodity_search_term: str, system: str, station: str,
-                    profit: Union[int, float], pads: str, demand: str, eta: str = None):
-        rp = True
-        mission_type = 'load'
-        legacy = True
-        await gen_mission(ctx, carrier_name_search_term, commodity_search_term, system, station, profit, pads, demand,
-                        rp, mission_type, eta, legacy)
+                        rp, mission_type, eta)
 
 
     # unload commands
@@ -154,9 +111,9 @@ class CCOCommands(commands.Cog):
                     profit: Union[int, float], pads: str, supply: str, eta: str = None):
         rp = False
         mission_type = 'unload'
-        legacy = False
+
         await gen_mission(ctx, carrier_name_search_term, commodity_search_term, system, station, profit, pads, supply, rp,
-                        mission_type, eta, legacy)
+                        mission_type, eta)
 
 
     @commands.command(name="unloadrp", help='Same as unload command but prompts user to enter roleplay text\n'
@@ -170,47 +127,9 @@ class CCOCommands(commands.Cog):
 
         rp = True
         mission_type = 'unload'
-        legacy = False
+
         await gen_mission(ctx, carrier_name_search_term, commodity_search_term, system, station, profit, pads, demand,
-                        rp, mission_type, eta, legacy)
-
-
-    # legacy unload commands
-    @commands.command(name='unloadlegacy', help='Generate details for a LEGACY unloading mission.\n'
-                                    '\n'
-                                    'carrier_name_search_term should be a unique part of your carrier\'s name. (Use quotes if spaces are required)\n'
-                                    'commodity_name_partial should be a unique part of any commodity\'s name.\n'
-                                    'System and Station names should be enclosed in quotes if they contain spaces.\n'
-                                    'Profit should be expressed as a simple number e.g. enter 10 for 10k/unit profit.\n'
-                                    'Pad size should be expressed as L or M.\n'
-                                    'Supply should be expressed as an absolute number e.g. 20k, 20,000, etc.\n'
-                                    'ETA is optional and should be expressed as a number of minutes e.g. 15.\n'
-                                    'Case is automatically corrected for all inputs.')
-    @commands.has_any_role(*[certcarrier_role(), trainee_role()])
-    @check_text_command_channel(mission_command_channel())
-    async def unloadlegacy(self, ctx, carrier_name_search_term: str, commodity_search_term: str, system: str, station: str,
-                    profit: Union[int, float], pads: str, supply: str, eta: str = None):
-        rp = False
-        mission_type = 'unload'
-        legacy = True
-        await gen_mission(ctx, carrier_name_search_term, commodity_search_term, system, station, profit, pads, supply, rp,
-                        mission_type, eta, legacy)
-
-
-    @commands.command(name="unloadrplegacy", help='Same as unload command but prompts user to enter roleplay text\n'
-                                    'This is added to the Reddit comment as as a quote above the mission details\n'
-                                    'and sent to the carrier\'s Discord channel in quote format if those options are '
-                                    'chosen')
-    @commands.has_any_role(*[certcarrier_role(), trainee_role()])
-    @check_text_command_channel(mission_command_channel())
-    async def unloadrplegacy(self, ctx, carrier_name_search_term: str, commodity_search_term: str, system: str, station: str,
-                    profit: Union[int, float], pads: str, demand: str, eta: str = None):
-        rp = True
-        mission_type = 'unload'
-        legacy = True
-        await gen_mission(ctx, carrier_name_search_term, commodity_search_term, system, station, profit, pads, demand,
-                        rp, mission_type, eta, legacy)
-
+                        rp, mission_type, eta)
 
 
     """

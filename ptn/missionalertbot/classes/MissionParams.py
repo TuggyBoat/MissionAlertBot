@@ -8,11 +8,11 @@ class MissionParams:
     is included below for the purpose of clarity.
     """
     def __init__(self, carrier_name_search_term, commodity_search_term, system, station, profit, pads, demand,
-                 eta=None, rp=None, mission_type=None, legacy=False, carrier_data=None, commodity_data=None,
+                 eta=None, rp=None, mission_type=None, carrier_data=None, commodity_data=None,
                  reddit_img_name=None, discord_img_name=None, edmc_off=False, eta_text=None, rp_text=None, timestamp=None,
                  reddit_title=None, reddit_body=None, reddit_post_id=None, reddit_post_url=None, reddit_comment_id=None,
                  reddit_comment_url=None, discord_text=None, discord_embeds=None, discord_alert_id=None, mission_temp_channel_id=None,
-                 webhook_msg_ids=[], webhook_urls=[], webhook_jump_urls=[]):
+                 webhook_msg_ids=[], webhook_urls=[], webhook_names=[], webhook_jump_urls=[]):
         self.carrier_name_search_term = carrier_name_search_term # the carrier name fragment to search for
         self.commodity_search_term = commodity_search_term # the commodity name fragment to search for
         self.system = system.upper() # the target system
@@ -24,7 +24,6 @@ class MissionParams:
         self.rp = rp # flag for whether the mission uses roleplay text TODO: switch to a modal triggered by button?
         self.eta_text = eta_text # ETA converted into a text string TODO: ETA is slated to be deprecated into a general addendum string
         self.mission_type = mission_type # whether the mission is loading or unloading
-        self.legacy = legacy # whether the mission is legacy or live
         self.edmc_off = edmc_off # whether the mission is EDMC off flagged
         self.carrier_data = carrier_data # carrier data class retrieved from db
         self.commodity_data = commodity_data # commodity data class retrieved from db
@@ -43,39 +42,40 @@ class MissionParams:
         self.discord_alert_id = discord_alert_id # the message ID of the Discord trade alerts entry
         self.mission_temp_channel_id = mission_temp_channel_id # the channel ID of the Discord carrier mission channel
         self.webhook_urls = webhook_urls # a list of the URLs for any webhooks used
+        self.webhook_names = webhook_names # identifiers for webhook URLs
         self.webhook_msg_ids = webhook_msg_ids # a list of the IDs of any messages sent via webhook
         self.webhook_jump_urls = webhook_jump_urls # webhook jump URL
 
     def print_values(self):
-        print(f"carrier_name_search_term: {self.carrier_name_search_term}")
-        print(f"commodity_search_term: {self.commodity_search_term}")
-        print(f"system: {self.system}")
-        print(f"station: {self.station}")
-        print(f"profit: {self.profit}")
-        print(f"pads: {self.pads}")
-        print(f"demand: {self.demand}")
-        print(f"eta: {self.eta}")
-        print(f"rp flag: {self.rp}")
-        print(f"eta_text: {self.eta_text}")
-        print(f"mission_type: {self.mission_type}")
-        print(f"legacy: {self.legacy}")
-        print(f"edmc_off: {self.edmc_off}")
-        print(f"carrier_data: {self.carrier_data}")
-        print(f"commodity_data: {self.commodity_data}")
-        print(f"reddit_img_name: {self.reddit_img_name}")
-        print(f"discord_img_name: {self.discord_img_name}")
-        print(f"rp_text: {self.rp_text}")
-        print(f"timestamp: {self.timestamp}")
-        print(f"reddit_title: {self.reddit_title}")
-        print(f"reddit_body: {self.reddit_body}")
-        print(f"reddit_post_id: {self.reddit_post_id}")
-        print(f"reddit_post_url: {self.reddit_post_url}")
-        print(f"reddit_comment_id: {self.reddit_comment_id}")
-        print(f"reddit_comment_url: {self.reddit_comment_url}")
-        print(f"discord_text: {self.discord_text}")
-        print(f"discord_alert_id: {self.discord_alert_id}")
-        print(f"mission_temp_channel_id: {self.mission_temp_channel_id}")
-        print(f"webhook_urls: {self.webhook_urls}")
-        print(f"webhook_msg_ids: {self.webhook_msg_ids}")
-        print(f"webhook_jump_urls: {self.webhook_jump_urls}")
-
+        try:
+            print(f"carrier_name_search_term: {self.carrier_name_search_term}")
+            print(f"commodity_search_term: {self.commodity_search_term}")
+            print(f"system: {self.system}")
+            print(f"station: {self.station}")
+            print(f"profit: {self.profit}")
+            print(f"pads: {self.pads}")
+            print(f"demand: {self.demand}")
+            print(f"eta: {self.eta}")
+            print(f"rp flag: {self.rp}")
+            print(f"eta_text: {self.eta_text}")
+            print(f"mission_type: {self.mission_type}")
+            print(f"edmc_off: {self.edmc_off}")
+            print(f"carrier_data: {self.carrier_data}")
+            print(f"commodity_data: {self.commodity_data}")
+            print(f"reddit_img_name: {self.reddit_img_name}")
+            print(f"discord_img_name: {self.discord_img_name}")
+            print(f"rp_text: {self.rp_text}")
+            print(f"timestamp: {self.timestamp}")
+            print(f"reddit_title: {self.reddit_title}")
+            print(f"reddit_body: {self.reddit_body}")
+            print(f"reddit_post_id: {self.reddit_post_id}")
+            print(f"reddit_post_url: {self.reddit_post_url}")
+            print(f"reddit_comment_id: {self.reddit_comment_id}")
+            print(f"reddit_comment_url: {self.reddit_comment_url}")
+            print(f"discord_text: {self.discord_text}")
+            print(f"discord_alert_id: {self.discord_alert_id}")
+            print(f"mission_temp_channel_id: {self.mission_temp_channel_id}")
+            print(f"webhook_urls: {self.webhook_urls}")
+            print(f"webhook_msg_ids: {self.webhook_msg_ids}")
+            print(f"webhook_jump_urls: {self.webhook_jump_urls}")
+        except: pass # for values which haven't been incorporated yet
