@@ -3,15 +3,11 @@ TextGen.py
 
 Functions to generate formatted texts for use by the bot.
 
-Dependencies: constants, DateString
+Dependencies: constants
 """
 
 # import local constants
 import ptn.missionalertbot.constants as constants
-
-# import local libraries
-from ptn.missionalertbot.modules.DateString import get_formatted_date_string
-
 
 
 """
@@ -34,9 +30,8 @@ def txt_create_discord(mission_params):
 
 def txt_create_reddit_title(mission_params):
     reddit_title = (
-        f"P.T.N. TRADE MISSION: "
-        f"P.T.N. News - Trade mission - {mission_params.carrier_data.carrier_long_name} {mission_params.carrier_data.carrier_identifier}" \
-                   f" - {get_formatted_date_string()[0]}"
+        f"{mission_params.carrier_data.carrier_long_name} {mission_params.carrier_data.carrier_identifier} {mission_params.mission_type}ing "
+        f"{mission_params.commodity_data.name.upper()} in {mission_params.system.upper()} for {mission_params.profit}K/TON PROFIT"
     )
     return reddit_title
 

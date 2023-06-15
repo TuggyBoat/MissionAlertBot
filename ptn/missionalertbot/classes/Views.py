@@ -26,9 +26,8 @@ from ptn.missionalertbot.modules.MissionCleaner import _cleanup_completed_missio
 
 # buttons for mission complete
 class MissionCompleteView(View):
-    def __init__(self, mission_data, comment):
+    def __init__(self, mission_data):
         self.mission_data = mission_data
-        self.comment = comment
         self.status_label = "Fully " + self.mission_data.mission_type + "ed"
         super().__init__()
         self.add_buttons()
@@ -42,25 +41,26 @@ class MissionCompleteView(View):
             print(f"{interaction.user.display_name} confirms mission complete")
 
             embed = discord.Embed(
-                title="Mission marked complete",
                 description=f"Mission marked as complete <:o7:{o7_emoji()}>",
                 color=constants.EMBED_COLOUR_OK
             )
             await interaction.response.edit_message(embed=embed, view=None)
 
-            reddit_complete_text = f"    INCOMING WIDEBAND TRANSMISSION: P.T.N. CARRIER MISSION UPDATE\n\n**" \
-                                f"{self.mission_data.carrier_name}** mission complete. o7 CMDRs!\n\n\n\n*Reported on " \
-                                f"PTN Discord by {interaction.user.display_name}*"
-            discord_complete_embed = discord.Embed(title=f"{self.mission_data.carrier_name} MISSION COMPLETE",
-                                                description=f"<@{interaction.user.id}> reports mission complete! **This mission channel will be removed in {(seconds_long())//60} minutes.**",
-                                                color=constants.EMBED_COLOUR_OK)
-            print("Sending to _cleanup_completed_mission")
-            desc_msg = f"> {self.comment}\n" if self.comment else ""
-            await _cleanup_completed_mission(interaction, self.mission_data, reddit_complete_text, discord_complete_embed, desc_msg)
+            try:
+                reddit_complete_text = f"    INCOMING WIDEBAND TRANSMISSION: P.T.N. CARRIER MISSION UPDATE\n\n**" \
+                                    f"{self.mission_data.carrier_name}** mission complete. o7 CMDRs!\n\n\n\n*Reported on " \
+                                    f"PTN Discord by {interaction.user.display_name}*"
+                discord_complete_embed = discord.Embed(title=f"{self.mission_data.carrier_name} MISSION COMPLETE",
+                                                    description=f"<@{interaction.user.id}> reports mission complete! **This mission channel will be removed in {(seconds_long())//60} minutes.**",
+                                                    color=constants.EMBED_COLOUR_OK)
+                print("Sending to _cleanup_completed_mission")
+                formatted_message = ""
+                await _cleanup_completed_mission(interaction, self.mission_data, reddit_complete_text, discord_complete_embed, formatted_message)
+            except Exception as e:
+                print(e)
 
         async def failed(interaction: discord.Interaction):
-            await interaction.response.send_modal(MissionFailedModal())
-            pass
+            await interaction.response.send_modal(MissionFailedModal(self.mission_data))
 
         async def cancel(interaction: discord.Interaction):
             embed = discord.Embed(
@@ -80,18 +80,39 @@ class MissionCompleteView(View):
 
 # Modal for Mission Failed on /mission_complete
 class MissionFailedModal(Modal):
-    def __init__(self, title = 'Mission failed confirmation', timeout = None) -> None:
+    def __init__(self, mission_data, title = 'Mission failed confirmation', timeout = None) -> None:
+        self.mission_data = mission_data
         super().__init__(title=title, timeout=timeout)
 
     reason = discord.ui.TextInput(
         label='Mission failed reason',
-        placeholder='Please give a short explanation for the carrier\'s owner.',
+        placeholder='Please give a short explanation as to why the mission cannot continue.',
         required=True,
         max_length=512,
     )
 
     async def on_submit(self, interaction: discord.Interaction):
-        pass # TODO: call cleanup with reddit and discord texts defined appropriately
+        print(f"{interaction.user.display_name} confirms mission unable to complete for reason: {self.reason}")
+        embed = discord.Embed(
+            description=f"Mission marked as unable to complete <:o7:{o7_emoji()}>",
+            color=constants.EMBED_COLOUR_OK
+        )
+        await interaction.response.edit_message(embed=embed, view=None)
+
+        try:
+            reddit_complete_text = f"    INCOMING WIDEBAND TRANSMISSION: P.T.N. CARRIER MISSION UPDATE\n\n**" \
+                                f"{self.mission_data.carrier_name}** mission concluded (unable to complete). o7 CMDRs.\n\n\n\n*Reported on " \
+                                f"PTN Discord by {interaction.user.display_name}*"
+            discord_complete_embed = discord.Embed(
+                title=f"{self.mission_data.carrier_name} MISSION CONCLUDED",
+                description=f"<@{interaction.user.id}> reports this mission **cannot be completed** and has thus concluded. Reason:\n> {self.reason}."
+                            f"\n\n**This mission channel will be removed in {(seconds_long())//60} minutes.**",
+                color=constants.EMBED_COLOUR_ERROR)
+            print("Sending to _cleanup_completed_mission")
+            formatted_message = f"> {self.reason}\n" if self.reason else ""
+            await _cleanup_completed_mission(interaction, self.mission_data, reddit_complete_text, discord_complete_embed, formatted_message)
+        except Exception as e:
+            print(e)
 
 
  # generic button for "Broadcast" function

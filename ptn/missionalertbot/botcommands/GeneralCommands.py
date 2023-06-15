@@ -183,6 +183,7 @@ class GeneralCommands(commands.Cog):
     @commands.command(name='sync', help='Synchronise bot interactions with server')
     @commands.has_any_role(*constants.any_elevated_role)
     async def sync(self, ctx):
+        print(f"Interaction sync called from {ctx.author.display_name}")
         async with ctx.typing():
             try:
                 bot.tree.copy_global_to(guild=constants.guild_obj)
@@ -208,8 +209,8 @@ class GeneralCommands(commands.Cog):
         # this global variable is set when the channel deletion function acquires its lock
         if deletion_in_progress:
             await ctx.send("Lock appears to be set from a channel deletion task underway. This usually takes ~10 seconds per channel."
-                        " Please make sure no mission channels are about to be deleted. Deletion occurs 15 minutes after `m.complete`"
-                        " or `m.done` or 2 minutes following using a mission generator command without generating a mission "
+                        " Please make sure no mission channels are about to be deleted. Deletion occurs 15 minutes after `/mission complete`"
+                        " or `/cco complete` or 2 minutes following using a mission generator command without generating a mission "
                         "(i.e. by error or user abort).")
 
         await ctx.send("Do you still want to proceed? **y**/**n**")
@@ -414,10 +415,8 @@ class GeneralCommands(commands.Cog):
 
 
     # a command for users to mark a carrier mission complete from within the carrier channel
-    # TODO: slashify with button prompts
     @mission_group.command(name='complete', description="Use in a carrier's channel to mark the current trade mission complete.")
-    @describe(comment='Optional: send a message to know why you used this command, e.g., if the price changed at the station!')
-    async def complete(self, interaction: discord.Interaction, *, comment: str = None):
+    async def complete(self, interaction: discord.Interaction):
 
         print(f"/mission complete called in {interaction.channel} by {interaction.user.display_name}")
 
@@ -449,33 +448,9 @@ class GeneralCommands(commands.Cog):
             color=constants.EMBED_COLOUR_QU
         )
 
-        view = MissionCompleteView(mission_data, comment) # buttons to add
+        view = MissionCompleteView(mission_data) # buttons to add
 
         await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
-
-        # TODO
-    """                # whoops lol actually no
-                print("User responded no")
-                embed = discord.Embed(description="OK, mission will remain listed as in-progress.",
-                                        color=constants.EMBED_COLOUR_OK)
-                await interaction.followup.send(embed=embed)
-                return
-            elif msg.content.lower() == "y":
-                # they said yes!
-                print("User responded yes")
-                reddit_complete_text = f"    INCOMING WIDEBAND TRANSMISSION: P.T.N. CARRIER MISSION UPDATE\n\n**" \
-                                    f"{mission_data.carrier_name}** mission complete. o7 CMDRs!\n\n\n\n*Reported on " \
-                                    f"PTN Discord by {interaction.user.display_name}*"
-                discord_complete_embed = discord.Embed(title=f"{mission_data.carrier_name} MISSION COMPLETE",
-                                                    description=f"<@{interaction.user.id}> reports mission complete! **This mission channel will be removed in {(seconds_long())//60} minutes.**",
-                                                    color=constants.EMBED_COLOUR_OK)
-                print("Sending to _cleanup_completed_mission")
-                desc_msg = f"> {comment}\n" if comment else ""
-                await _cleanup_completed_mission(interaction, mission_data, reddit_complete_text, discord_complete_embed, desc_msg)
-
-        except asyncio.TimeoutError:
-            embed = discord.Embed(description="No response, mission will remain listed as in-progress.")
-            await interaction.followup.send(embed=embed)"""
 
 
     # public command to nominate a user for CP

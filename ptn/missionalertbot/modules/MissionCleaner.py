@@ -34,25 +34,26 @@ MISSION COMPLETE & CLEANUP
 """
 
 # clean up a completed mission
-async def _cleanup_completed_mission(interaction, mission_data, reddit_complete_text, discord_complete_embed, desc_msg):
+async def _cleanup_completed_mission(interaction, mission_data, reddit_complete_text, discord_complete_embed, formatted_message):
+    async with interaction.channel.typing():
         print("called _cleanup_completed_mission")
 
         mission_params = mission_data.mission_params
 
         feedback_embed = discord.Embed(title=f"Mission complete for {mission_data.carrier_name}",
-                            description=f"{desc_msg}",
+                            description=f"{formatted_message}",
                             color=constants.EMBED_COLOUR_OK)
         feedback_embed.set_footer(text="Updated sent alerts and removed from mission list.")
 
         async with interaction.channel.typing():
             completed_mission_channel = bot.get_channel(mission_data.channel_id)
             mission_gen_channel = bot.get_channel(mission_command_channel())
-            if interaction.channel.id == mission_gen_channel.id: # tells us whether m.done was used or m.complete
+            if interaction.channel.id == mission_gen_channel.id: # tells us whether /cco complete was used or /mission complete
                 m_done = True
-                print("Processing mission complete by m.done")
+                print("Processing mission complete by /cco complete")
             else:
                 m_done = False
-                print("Processing mission complete by m.complete")
+                print("Processing mission complete by /mission complete")
 
             backup_database('missions')  # backup the missions database before going any further
 
@@ -119,28 +120,27 @@ async def _cleanup_completed_mission(interaction, mission_data, reddit_complete_
                             # edit the original message
                             print("Editing original webhook message...")
                             embed = discord.Embed(title="PTN TRADE MISSION COMPLETED",
-                                                  description=f"**{mission_params.carrier_data.carrier_long_name}** finished {mission_params.mission_type}ing "
-                                                              f"{mission_params.commodity_data.name} from **{mission_params.station}** in **{mission_params.system}**.",
-                                                  color=constants.EMBED_COLOUR_QU)
+                                                    description=f"**{mission_params.carrier_data.carrier_long_name}** finished {mission_params.mission_type}ing "
+                                                                f"{mission_params.commodity_data.name} from **{mission_params.station}** in **{mission_params.system}**.",
+                                                    color=constants.EMBED_COLOUR_QU)
                             embed.set_footer(text=f"Join {constants.DISCORD_INVITE_URL} for more trade opportunities.")
                             embed.set_thumbnail(url=ptn_logo_discord())
                             await webhook_msg.remove_attachments(webhook_msg.attachments)
                             await webhook_msg.edit(embed=embed)
 
-                            reason = f"\n\n{desc_msg}" if desc_msg else ""
+                            reason = f"\n\n{formatted_message}" if formatted_message else ""
 
                             print("Sending webhook update message...")
                             # send a new message to update the target channel
                             embed = discord.Embed(title="PTN TRADE MISSION COMPLETED",
-                                                  description=f"The mission {webhook_jump_url} posted at <t:{mission_params.timestamp}:f> (<t:{mission_params.timestamp}:R> "
-                                                              f"has been marked as completed on the [PTN Discord]({constants.DISCORD_INVITE_URL}).{reason}",
-                                                  color=constants.EMBED_COLOUR_OK)
+                                                    description=f"The mission {webhook_jump_url} posted at <t:{mission_params.timestamp}:f> (<t:{mission_params.timestamp}:R> "
+                                                                f"has been marked as completed on the [PTN Discord]({constants.DISCORD_INVITE_URL}).{reason}",
+                                                    color=constants.EMBED_COLOUR_OK)
                             await webhook.send(embed=embed, username='Pilots Trade Network', avatar_url=bot.user.avatar.url, wait=True)
 
                     except Exception as e:
                         print(f"Failed updating webhook message {webhook_jump_url} with URL {webhook_url}: {e}")
                         await feedback_embed.add_field(name="Error", value=f"Failed updating webhook message {webhook_jump_url} with URL {webhook_url}: {e}")
-
 
             # delete mission entry from db
             print("Remove from mission database...")
@@ -150,46 +150,50 @@ async def _cleanup_completed_mission(interaction, mission_data, reddit_complete_
             await clean_up_pins(completed_mission_channel)
 
             # command feedback
-            print("Send command feedback to user")
+            print("Log usage in bot spam")
             spamchannel = bot.get_channel(bot_spam_channel())
             embed = discord.Embed(title=f"Mission complete for {mission_data.carrier_name}",
                                 description=f"{interaction.user} marked the mission complete in #{interaction.channel.name}",
                                 color=constants.EMBED_COLOUR_OK)
             await spamchannel.send(embed=embed)
 
-            # notify owner if not command user
-            carrier_data = find_carrier(mission_data.carrier_name, CarrierDbFields.longname.name)
-            if not interaction.user.id == carrier_data.ownerid:
-                print("Notify carrier owner")
-                # notify in channel - not sure this is needed anymore, leaving out for now
-                # await interaction.channel.send(f"Notifying carrier owner: <@{carrier_data.ownerid}>")
+            # notify user in mission gen channel
+            print("Send feedback to user")
+            await interaction.edit_original_response(embed=feedback_embed)
 
-                # notify by DM
-                owner = await bot.fetch_user(carrier_data.ownerid)
-                #chnaged to if there is rp text not if it was m.done
-                if desc_msg != "":
-                    """
-                    desc_msg converts rp text received by m.done into a format that can be inserted directly into messages
-                    without having to change the message's format depending on whether it exists or not. This was primarily
-                    intended for CCOs to be able to send a message to their channel via the bot on mission completion.
+        # notify owner if not command user
+        carrier_data = find_carrier(mission_data.carrier_name, CarrierDbFields.longname.name)
+        if not interaction.user.id == carrier_data.ownerid:
+            print("Notify carrier owner")
+            # notify in channel - not sure this is needed anymore, leaving out for now
+            # await interaction.channel.send(f"Notifying carrier owner: <@{carrier_data.ownerid}>")
 
-                    Now it's pulling double-duty as a way for other CCOs to notify the owner why they used m.done on a
-                    mission that wasn't theirs. In this case it's still useful for that information to be sent to the channel
-                    (e.g. "Supply exhausted", "tick changed prices", etc)
+            # notify by DM
+            owner = await bot.fetch_user(carrier_data.ownerid)
 
-                    desc_msg is "" if received from empty rp argument, so reason converts it to None if empty and adds a line break.
-                    This can probably be reworked to be neater and use fewer than 3 separate variables for one short message in the future.
-                    """
-                    reason = f"\n{desc_msg}" if desc_msg else ""
-                    await owner.send(f"Ahoy CMDR! {interaction.user.display_name} has concluded the trade mission for your Fleet Carrier **{carrier_data.carrier_long_name}**. **Reason given**: {reason}\nIts mission channel will be removed in {seconds_long()//60} minutes unless a new mission is started.")
-                else:
-                    await owner.send(f"Ahoy CMDR! The trade mission for your Fleet Carrier **{carrier_data.carrier_long_name}** has been marked as complete by {interaction.user.display_name}. Its mission channel will be removed in {seconds_long()//60} minutes unless a new mission is started.")
+            if formatted_message != "":
+                """
+                formatted_message converts message text received by /cco complete into a format that can be inserted directly into messages
+                without having to change the message's format depending on whether it exists or not. This was primarily
+                intended for CCOs to be able to send a message to their channel via the bot on mission completion.
 
-        # remove channel
-        await mark_cleanup_channel(mission_data.channel_id, 1)
-        await remove_carrier_channel(mission_data.channel_id, seconds_long())
+                Now it's pulling double-duty as a way for other CCOs to notify the owner why they used /cco complete on a
+                mission that wasn't theirs. In this case it's still useful for that information to be sent to the channel
+                (e.g. "Supply exhausted", "tick changed prices", etc)
 
-        return
+                formatted_message is "" if received from empty argument, so reason converts it to None if empty and adds a line break.
+                This can probably be reworked to be neater and use fewer than 3 separate variables for one short message in the future.
+                """
+                reason = f"\n{formatted_message}" if formatted_message else ""
+                await owner.send(f"Ahoy CMDR! {interaction.user.display_name} has concluded the trade mission for your Fleet Carrier **{carrier_data.carrier_long_name}**. **Reason given**: {reason}\nIts mission channel will be removed in {seconds_long()//60} minutes unless a new mission is started.")
+            else:
+                await owner.send(f"Ahoy CMDR! The trade mission for your Fleet Carrier **{carrier_data.carrier_long_name}** has been marked as complete by {interaction.user.display_name}. Its mission channel will be removed in {seconds_long()//60} minutes unless a new mission is started.")
+
+    # remove channel
+    await mark_cleanup_channel(mission_data.channel_id, 1)
+    await remove_carrier_channel(mission_data.channel_id, seconds_long())
+
+    return
 
 
 async def remove_carrier_channel(completed_mission_channel_id, seconds):

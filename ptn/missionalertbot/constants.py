@@ -149,6 +149,17 @@ DISCORD_NAME_FONT = ImageFont.truetype(os.path.join(FONT_PATH, 'Exo/static/Exo-E
 DISCORD_ID_FONT = ImageFont.truetype(os.path.join(FONT_PATH, 'Exo/static/Exo-Medium.ttf'), 16)
 
 
+# a list of common commodities for autocomplete
+commodities_common = [
+    "Agronomic Treatment",
+    "Wine",
+    "Gold",
+    "Silver",
+    "Bertrandite",
+    "Indite",
+]
+
+
 # random gifs and images
 
 byebye_gifs = [
@@ -188,18 +199,20 @@ error_gifs = [
 current_month = strftime('%B')
 
 # logo URLs from website
-ptn_logo_dark_wtext_transparent = 'https://pilotstradenetwork.com/wp-content/uploads/2021/08/PTN_Dark_wText.png'
-ptn_logo_pride_dark_wtext_transparent = 'https://pilotstradenetwork.com/wp-content/uploads/2023/06/PTN_Pride_2022_transparent_wText.png'
+PTN_LOGO_DARK_TEXT_TRANSPARENT = 'https://pilotstradenetwork.com/wp-content/uploads/2021/08/PTN_Dark_wText.png'
+PTN_LOGO_PRIDE_TEXT_TRANSPARENT = 'https://pilotstradenetwork.com/wp-content/uploads/2023/06/PTN_Pride_2022_transparent_wText.png'
 
-ptn_logo_discord_wbackground = 'https://pilotstradenetwork.com/wp-content/uploads/2021/08/PTN_Discord_Icon.png'
-ptn_logo_pride_discord_wbackground = 'https://pilotstradenetwork.com/wp-content/uploads/2023/06/discord-logo-pride-2023-cropped.png'
+PTN_LOGO_DISCORD_BG = 'https://pilotstradenetwork.com/wp-content/uploads/2021/08/PTN_Discord_Icon.png'
+PTN_LOGO_DISCORD_BG_PRIDE = 'https://pilotstradenetwork.com/wp-content/uploads/2023/06/discord-logo-pride-2023-cropped.png'
 
 def ptn_logo_full():
-  return ptn_logo_pride_dark_wtext_transparent if current_month == 'June' else ptn_logo_dark_wtext_transparent
+  return PTN_LOGO_PRIDE_TEXT_TRANSPARENT if current_month == 'June' else PTN_LOGO_DARK_TEXT_TRANSPARENT
 
 def ptn_logo_discord():
-  return ptn_logo_pride_discord_wbackground if current_month == 'June' else ptn_logo_discord_wbackground
+  return PTN_LOGO_DISCORD_BG_PRIDE if current_month == 'June' else PTN_LOGO_DISCORD_BG
 
+DISCORD_ICON_BLUE = 'https://pilotstradenetwork.com/wp-content/uploads/2023/06/discord-mark-blue.png'
+WEBHOOK_ICON_PTN = 'https://pilotstradenetwork.com/wp-content/uploads/2023/06/webhooks-icon.png'
 
 # mission template filenames
 reddit_template = 'reddit_template.png'
