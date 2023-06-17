@@ -383,7 +383,6 @@ async def assign_carrier_image(interaction: discord.Interaction, lookname, origi
         # get the URL of the file we just sent so we can be massive fucking cheaters
         new_image_url = embed.image.url
 
-
         success_embed = discord.Embed(
             title=f"{carrier_data.carrier_long_name}",
             description="Mission image updated.",
