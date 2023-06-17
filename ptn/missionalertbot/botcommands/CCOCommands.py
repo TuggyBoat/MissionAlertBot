@@ -23,7 +23,7 @@ from ptn.missionalertbot.constants import bot, mission_command_channel, certcarr
 from ptn.missionalertbot.database.database import find_mission
 from ptn.missionalertbot.modules.helpers import on_app_command_error, check_text_command_channel, convert_str_to_float_or_int, check_command_channel, check_roles
 from ptn.missionalertbot.modules.ImageHandling import assign_carrier_image
-from ptn.missionalertbot.modules.MissionGenerator import gen_mission
+from ptn.missionalertbot.modules.MissionGenerator import gen_mission, confirm_send_mission_via_button
 from ptn.missionalertbot.modules.MissionCleaner import _cleanup_completed_mission
 
 
@@ -34,14 +34,15 @@ carrier_image - CCO
 done - alias of cco_complete
 complete - CCO/mission
 load - CCO/mission
-loadrp - CCO/mission
 unload - CCO/mission
-unloadrp - CCO/mission
 
 """
 
-async def cco_mission_complete(interaction, carrier, message):
+
+async def cco_mission_complete(interaction, carrier, is_complete, message):
     current_channel = interaction.channel
+
+    status = "complete" if is_complete else "concluded"
 
     print(f'Request received from {interaction.user.display_name} to mark the mission of {carrier} as done from channel: '
         f'{current_channel}')
@@ -61,13 +62,18 @@ async def cco_mission_complete(interaction, carrier, message):
         await interaction.response.send_message(embed=embed)
 
     # fill in some info for messages
-    formatted_message = f"> {message}\n" if message else ""
-    reddit_complete_text = f"    INCOMING WIDEBAND TRANSMISSION: P.T.N. CARRIER MISSION UPDATE\n\n**{mission_data.carrier_name}** mission complete. o7 CMDRs!\n\n{formatted_message}"
-    discord_complete_embed = discord.Embed(title=f"{mission_data.carrier_name} MISSION COMPLETE", description=f"{formatted_message}",
+    if not message == None:
+        discord_msg = f"<@{interaction.user.id}>: {message}"
+        reddit_msg = message
+    else:
+        discord_msg = ""
+        reddit_msg = ""
+    reddit_complete_text = f"    INCOMING WIDEBAND TRANSMISSION: P.T.N. CARRIER MISSION UPDATE\n\n**{mission_data.carrier_name}** mission {status}. o7 CMDRs!\n\n{reddit_msg}"
+    discord_complete_embed = discord.Embed(title=f"{mission_data.carrier_name} MISSION {status.upper()}", description=f"{discord_msg}",
                             color=constants.EMBED_COLOUR_OK)
     discord_complete_embed.set_footer(text=f"This mission channel will be removed in {seconds_long()//60} minutes.")
 
-    await _cleanup_completed_mission(interaction, mission_data, reddit_complete_text, discord_complete_embed, formatted_message)
+    await _cleanup_completed_mission(interaction, mission_data, reddit_complete_text, discord_complete_embed, message, is_complete)
 
     return
 
@@ -115,24 +121,26 @@ class CCOCommands(commands.Cog):
                 profit: str, pads: str, demand: str):
         mission_type = 'load'
 
-        embed = discord.Embed(
+        cp_embed = discord.Embed(
             title="COPY/PASTE TEXT FOR THIS COMMAND",
             description=f"```/cco load carrier:{carrier} commodity:{commodity} system:{system} station:{station}"
                         f" profit:{profit} pads:{pads} demand:{demand}```",
             color=constants.EMBED_COLOUR_QU
         )
 
-        await interaction.response.send_message(embed=embed)
+        await interaction.response.send_message(embed=cp_embed)
 
         # convert profit from STR to an INT or FLOAT
         profit = convert_str_to_float_or_int(profit)
 
         params_dict = dict(carrier_name_search_term = carrier, commodity_search_term = commodity, system = system, station = station,
-                           profit = profit, pads = pads, demand = demand, mission_type = mission_type)
+                           profit = profit, pads = pads, demand = demand, mission_type = mission_type, copypaste_embed = cp_embed)
 
         mission_params = MissionParams(params_dict)
 
-        await gen_mission(interaction, mission_params)
+        mission_params.print_values()
+
+        await confirm_send_mission_via_button(interaction, mission_params, cp_embed)
 
 
     # unload subcommand
@@ -152,24 +160,26 @@ class CCOCommands(commands.Cog):
                 profit: str, pads: str, supply: str):
         mission_type = 'unload'
 
-        embed = discord.Embed(
+        cp_embed = discord.Embed(
             title="COPY/PASTE TEXT FOR THIS COMMAND",
             description=f"```/cco unload carrier:{carrier} commodity:{commodity} system:{system} station:{station}"
                         f" profit:{profit} pads:{pads} supply:{supply}```",
             color=constants.EMBED_COLOUR_QU
         )
 
-        await interaction.response.send_message(embed=embed)
+        await interaction.response.send_message(embed=cp_embed)
 
         # convert profit from STR to an INT or FLOAT
         profit = convert_str_to_float_or_int(profit)
 
-        params_dict = dict(carrier = carrier, commodity = commodity, system = system, station = station,
-                           profit = profit, pads = pads, demand = supply, mission_type = mission_type)
+        params_dict = dict(carrier_name_search_term = carrier, commodity_search_term = commodity, system = system, station = station,
+                           profit = profit, pads = pads, demand = supply, mission_type = mission_type, copypaste_embed = cp_embed)
 
         mission_params = MissionParams(params_dict)
 
-        await gen_mission(interaction, mission_params)
+        mission_params.print_values()
+
+        await confirm_send_mission_via_button(interaction, mission_params, cp_embed)
 
 
     # autocomplete common commodities
@@ -189,6 +199,7 @@ class CCOCommands(commands.Cog):
         pads.append(app_commands.Choice(name="Large", value="L"))
         pads.append(app_commands.Choice(name="Medium", value="M"))
         return pads
+    
 
     """
     CCO mission complete command
@@ -198,16 +209,28 @@ class CCOCommands(commands.Cog):
     @describe(message='A message to send to the mission channel and carrier\'s owner')
     @check_roles([certcarrier_role(), trainee_role(), rescarrier_role()])
     @check_command_channel(mission_command_channel())
-    async def done(self, interaction: discord.Interaction, carrier: str, *, message: str = None):
-        await cco_mission_complete(interaction, carrier, message)
+    async def done(self, interaction: discord.Interaction, carrier: str, *, status: str = "Complete", message: str = None):
+        is_complete = True if not status == "Failed" else False
+        await cco_mission_complete(interaction, carrier, is_complete, message)
 
     # CCO command to quickly mark mission as complete, optionally send a reason
     @cco_group.command(name='complete', description='Marks a mission as complete for specified carrier.')
     @describe(message='A message to send to the mission channel and carrier\'s owner')
     @check_roles([certcarrier_role(), trainee_role(), rescarrier_role()])
     @check_command_channel(mission_command_channel())
-    async def complete(self, interaction: discord.Interaction, carrier: str, *, message: str = None):
-        await cco_mission_complete(interaction, carrier, message)
+    async def complete(self, interaction: discord.Interaction, carrier: str, *, status: str = "Complete", message: str = None):
+        is_complete = True if not status == "Failed" else False
+        await cco_mission_complete(interaction, carrier, is_complete, message)
+
+
+    # autocomplete mission status
+    @done.autocomplete("status")
+    @complete.autocomplete("status")
+    async def cco_complete_autocomplete(self, interaction: discord.Interaction, current: str):
+        is_complete = []
+        is_complete.append(app_commands.Choice(name="Complete", value="Complete"))
+        is_complete.append(app_commands.Choice(name="Failed", value="Failed"))
+        return is_complete
 
 
     """

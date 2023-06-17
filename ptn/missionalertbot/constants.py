@@ -79,6 +79,7 @@ PROD_DEV_CHANNEL = 827656814911815702 # Development channel for MAB on live
 PROD_UPVOTE_EMOJI = 828287733227192403 # upvote emoji on live server
 PROD_O7_EMOJI = 806138784294371368 # o7 emoji on live server
 PROD_HAULER_ROLE = 875313960834965544 # hauler role ID on live server
+PROD_WINELOADER_ROLE = 881809680765165578 # wine loader role on live
 PROD_CC_ROLE = 869340261057196072 # CC role on live server
 PROD_CC_CAT = 877107894452117544 # Community Carrier category on live server
 PROD_ADMIN_ROLE = 800091021852803072 # MAB Bot Admin role on live server (currently @Council)
@@ -114,6 +115,7 @@ TEST_DEV_CHANNEL = 1063765215457583164 # Development channel for MAB on test
 TEST_UPVOTE_EMOJI = 849388681382068225 # upvote emoji on test server
 TEST_O7_EMOJI = 903744117144698950 # o7 emoji on test server
 TEST_HAULER_ROLE = 875439909102575647 # hauler role ID on test server
+TEST_WINELOADER_ROLE = 1119189364522623068 # wine loader role on test
 TEST_CC_ROLE = 877220476827619399 # CC role on test server
 TEST_CC_CAT = 877108931699310592 # Community Carrier category on test server
 TEST_ADMIN_ROLE = 836367194979041351 # Bot Admin role on test server
@@ -152,11 +154,13 @@ DISCORD_ID_FONT = ImageFont.truetype(os.path.join(FONT_PATH, 'Exo/static/Exo-Med
 # a list of common commodities for autocomplete
 commodities_common = [
     "Agronomic Treatment",
-    "Wine",
-    "Gold",
-    "Silver",
+    "Bauxite",
     "Bertrandite",
+    "Gold",
     "Indite",
+    "Silver",
+    "Tritium",
+    "Wine"
 ]
 
 
@@ -166,7 +170,7 @@ byebye_gifs = [
     'https://media.tenor.com/gRgywxwuxb0AAAAd/explosion-gi-joe-a-real-american-hero.gif',
     'https://media.tenor.com/a7LMG-8ldlAAAAAC/ice-cube-bye-felicia.gif',
     'https://media.tenor.com/SqrZAbYtcq0AAAAC/madagscar-penguins.gif',
-    'https://media.tenor.com/ctCdr1R4ga4AAAAC/boom-explosion.gif',
+    'https://media.tenor.com/ctCdr1R4ga4AAAAC/boom-explosion.gif'
 ]
 
 boom_gifs = [
@@ -176,7 +180,7 @@ boom_gifs = [
     'https://media.tenor.com/v_d_Flu6pY0AAAAC/countdown-lastseconds.gif',
     'https://media.tenor.com/Ijf5y9BUgg8AAAAC/final-countdown-countdown.gif',
     'https://media.tenor.com/apADIQqKnSEAAAAC/self-destruct-mission-impossible.gif',
-    'https://media.tenor.com/ctCdr1R4ga4AAAAC/boom-explosion.gif',
+    'https://media.tenor.com/ctCdr1R4ga4AAAAC/boom-explosion.gif'
 ]
 
 hello_gifs = [
@@ -186,14 +190,14 @@ hello_gifs = [
     'https://media.tenor.com/iZPmuJ0KON8AAAAd/hello-there.gif', # toddler
     'https://media.tenor.com/KKvpO702avgAAAAC/hey-hay.gif', # rollerskates
     'https://media.tenor.com/pE2UP8CBBuwAAAAC/jim-carrey-funny.gif', # jim carrey
-    'https://media.tenor.com/-UiIDx_KNUUAAAAd/hi-friends-baby-goat.gif', # goat
+    'https://media.tenor.com/-UiIDx_KNUUAAAAd/hi-friends-baby-goat.gif' # goat
 ]
 
 error_gifs = [
     'https://tenor.com/view/beaker-fire-shit-omg-disaster-gif-4767835',
     'https://tenor.com/view/nothingtosee-disperse-casual-explosion-gif-4545906',
     'https://tenor.com/view/spongebob-patrick-panic-run-scream-gif-4656335',
-    'https://tenor.com/view/angry-panda-rage-mad-gif-11780191',
+    'https://tenor.com/view/angry-panda-rage-mad-gif-11780191'
 ]
 
 current_month = strftime('%B')
@@ -211,9 +215,6 @@ def ptn_logo_full():
 def ptn_logo_discord():
   return PTN_LOGO_DISCORD_BG_PRIDE if current_month == 'June' else PTN_LOGO_DISCORD_BG
 
-DISCORD_ICON_BLUE = 'https://pilotstradenetwork.com/wp-content/uploads/2023/06/discord-mark-blue.png'
-WEBHOOK_ICON_PTN = 'https://pilotstradenetwork.com/wp-content/uploads/2023/06/webhooks-icon.png'
-
 # mission template filenames
 reddit_template = 'reddit_template.png'
 reddit_template_pride = 'reddit_template_pride.png'
@@ -228,7 +229,13 @@ BLANKLINE_400PX = 'https://pilotstradenetwork.com/wp-content/uploads/2023/01/400
 ICON_BUY = 'https://pilotstradenetwork.com/wp-content/uploads/2023/05/Trade.png'
 ICON_SELL = 'https://pilotstradenetwork.com/wp-content/uploads/2023/06/Credit.png'
 ICON_DATA = 'https://pilotstradenetwork.com/wp-content/uploads/2023/06/Data.png'
-
+ICON_DISCORD_CIRCLE = 'https://pilotstradenetwork.com/wp-content/uploads/2023/06/discord-icon-in-circle.png'
+ICON_DISCORD_PING = 'https://pilotstradenetwork.com/wp-content/uploads/2023/06/discord-notification-dot-icon.png'
+ICON_REDDIT = 'https://pilotstradenetwork.com/wp-content/uploads/2023/06/reddit-logo.png'
+ICON_WEBHOOK_PTN = 'https://pilotstradenetwork.com/wp-content/uploads/2023/06/webhooks-icon.png'
+ICON_FC_LOADING = 'https://pilotstradenetwork.com/wp-content/uploads/2023/06/fc_loading_thick_sihmm.png'
+ICON_FC_UNLOADING = 'https://pilotstradenetwork.com/wp-content/uploads/2023/06/fc_unloading_thick_sihmm.png'
+ICON_EDMC_OFF = 'https://pilotstradenetwork.com/wp-content/uploads/2023/06/edmc_off_2.jpg'
 
 
 # discord direct invite URL
@@ -292,6 +299,9 @@ def o7_emoji():
 
 def hauler_role():
   return PROD_HAULER_ROLE if _production else TEST_HAULER_ROLE
+
+def wineloader_role():
+  return PROD_WINELOADER_ROLE if _production else TEST_WINELOADER_ROLE
 
 def cc_role():
   return PROD_CC_ROLE if _production else TEST_CC_ROLE

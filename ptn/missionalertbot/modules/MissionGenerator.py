@@ -5,8 +5,6 @@ Functions relating to mission generation, management, and clean-up.
 
 Dependencies: constants, database, helpers, Embeds, ImageHandling, MissionCleaner
 
-TODO: gen_mission.returnflag, gracefully exit if generation fails (remove posts etc)
-
 """
 # import libraries
 import aiohttp
@@ -21,6 +19,7 @@ from typing import Union
 import discord
 from discord import Webhook
 from discord.errors import HTTPException, Forbidden, NotFound
+from discord.ui import View, Modal
 
 # import local classes
 from ptn.missionalertbot.classes.MissionData import MissionData
@@ -29,7 +28,8 @@ from ptn.missionalertbot.classes.MissionParams import MissionParams
 # import local constants
 import ptn.missionalertbot.constants as constants
 from ptn.missionalertbot.constants import bot, wine_alerts_loading_channel, wine_alerts_unloading_channel, trade_alerts_channel, get_reddit, sub_reddit, \
-    reddit_flair_mission_start, seconds_short, sub_reddit, channel_upvotes, upvote_emoji, hauler_role, trade_cat, get_guild, get_overwrite_perms, ptn_logo_discord
+    reddit_flair_mission_start, seconds_short, sub_reddit, channel_upvotes, upvote_emoji, hauler_role, trade_cat, get_guild, get_overwrite_perms, ptn_logo_discord, \
+    wineloader_role, o7_emoji
 
 # import local modules
 from ptn.missionalertbot.database.database import backup_database, mission_db, missions_conn, find_carrier, mark_cleanup_channel, CarrierDbFields, \
@@ -52,6 +52,136 @@ class DiscordEmbeds:
         self.owner_text_embed = owner_text_embed
         self.webhook_info_embed = webhook_info_embed
 
+
+"""
+Mission generator views
+
+"""
+# select menu for mission generation
+# class MissionSendMenu(View):
+
+
+
+# buttons for mission generation
+class MissionSendView(View):
+    def __init__(self, mission_params, timeout=30):
+        self.mission_params = mission_params
+        super().__init__(timeout=timeout)
+
+    @discord.ui.button(label="Send All", style=discord.ButtonStyle.success, emoji="📢", custom_id="sendall")
+    async def send_mission_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        button.disabled=True
+        print(f"{interaction.user.display_name} is sending their mission to all available sources using default send button")
+
+        self.mission_params.sendflags = ['d', 'r', 'n']
+
+        if self.mission_params.webhook_names:
+            print("Found webhooks, adding webhook flag")
+            self.mission_params.sendflags.append('w')
+        
+        try: # there's probably a better way to do this using an if statement
+            self.clear_items()
+            await interaction.response.edit_message(embeds=[self.mission_params.copypaste_embed], view=self)
+        except Exception as e:
+            print(e)
+
+        print("Calling mission generator from Send Mission button")
+        await gen_mission(interaction, self.mission_params)
+
+    @discord.ui.button(label="Send EDMC-OFF", style=discord.ButtonStyle.primary, emoji="🤫", custom_id="edmcoff")
+    async def edmc_off_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        button.disabled=True
+        print(f"{interaction.user.display_name} is sending their mission via EDMC-OFF preset button")
+
+        self.mission_params.sendflags = ['d', 'e', 'n']
+
+        try: # there's probably a better way to do this using an if statement
+            self.clear_items()
+            await interaction.response.edit_message(embeds=[self.mission_params.copypaste_embed], view=self)
+        except Exception as e:
+            print(e)
+
+        print("Calling mission generator from Send Mission button")
+        await gen_mission(interaction, self.mission_params)
+
+    @discord.ui.button(label="Add/Change Message", style=discord.ButtonStyle.secondary, emoji="✍", custom_id="message")
+    async def message_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        print(f"{interaction.user.display_name} wants to add a message to their mission")
+    
+        await interaction.response.send_modal(AddMessageModal(self.mission_params, view=self))
+
+    @discord.ui.button(label="Cancel", style=discord.ButtonStyle.danger, emoji="✖", custom_id="cancel")
+    async def cancel_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        button.disabled=True
+
+        cancelled_embed = discord.Embed(
+            description="Mission send cancelled by user.",
+            color=constants.EMBED_COLOUR_ERROR
+        )
+
+        try:
+            self.clear_items()
+            await interaction.response.edit_message(embeds=[self.mission_params.copypaste_embed, cancelled_embed], view=self)
+        except Exception as e:
+            print(e)
+
+    async def on_timeout(self):
+        # return a message to the user that the interaction has timed out
+        timeout_embed = discord.Embed(
+            description="Timed out.",
+            color=constants.EMBED_COLOUR_ERROR
+        )
+
+        # remove buttons
+        self.clear_items()
+
+        if not self.mission_params.sendflags:
+            embeds = [self.mission_params.copypaste_embed, timeout_embed]
+        else:
+            embeds = [self.mission_params.copypaste_embed]
+        await self.message.edit(embeds=embeds, view=self)
+
+
+# modal for message button
+class AddMessageModal(Modal):
+    def __init__(self, mission_params, view, title = 'Add message to mission', timeout = None) -> None:
+        self.mission_params = mission_params
+        self.view = view
+        super().__init__(title=title, timeout=timeout)
+
+    message = discord.ui.TextInput(
+        label='Enter your message below.',
+        style=discord.TextStyle.long,
+        placeholder='Normal Discord markdown works, but mentions and custom emojis require full code.',
+        required=True,
+        max_length=4000,
+    )
+
+    async def on_submit(self, interaction: discord.Interaction):
+        print("Message submitted")
+        print(self.message.value)
+        self.mission_params.cco_message_text = self.message.value
+        """
+        While self.message returns the inputted text if printed, it is actually a class holding
+        all the attributes of the TextInput. View shows only the text the user inputted.
+
+        This is important because it is a weak instance and cannot be pickled with mission_params,
+        and we only want the value pickled anyway
+        """
+        print(self.mission_params.cco_message_text)
+        message_embed = discord.Embed(
+            title="Message added",
+            description=self.mission_params.cco_message_text,
+            color=constants.EMBED_COLOUR_RP
+        )
+
+        embeds = [self.mission_params.copypaste_embed, message_embed]
+
+        try:
+            await interaction.response.edit_message(embeds=embeds, view=self.view)
+
+        except Exception as e:
+            print(e)
 
 
 
@@ -80,7 +210,7 @@ async def return_discord_channel_embeds(mission_params):
     if mission_params.mission_type == 'load': # embeds for a loading mission
         buy_description=f"📌 Station: **{mission_params.station.upper()}**" \
                         f"\n🌟 System: **{mission_params.system.upper()}**" \
-                        f"\n📦 Commodity: **{mission_params.commodity_data.name.upper()}**"
+                        f"\n📦 Commodity: **{mission_params.commodity_name.upper()}**"
         
         buy_thumb = constants.ICON_BUY
 
@@ -97,7 +227,7 @@ async def return_discord_channel_embeds(mission_params):
         buy_description=f"🎯 Fleet Carrier: **{mission_params.carrier_data.carrier_long_name}**" \
                         f"\n🔢 Carrier ID: **{mission_params.carrier_data.carrier_identifier}**" \
                         f"\n🌟 System: **{mission_params.system.upper()}**" \
-                        f"\n📦 Commodity: **{mission_params.commodity_data.name.upper()}**"
+                        f"\n📦 Commodity: **{mission_params.commodity_name.upper()}**"
 
         buy_thumb = ptn_logo_discord()
 
@@ -182,15 +312,21 @@ async def return_discord_channel_embeds(mission_params):
 async def send_mission_to_discord(interaction, mission_params):
     print("User used option d, creating mission channel")
 
+    mission_params.discord_img_name = await create_carrier_discord_mission_image(mission_params)
+    mission_params.discord_text = txt_create_discord(mission_params)
+    print("Defined discord elements")
+
     mission_params.mission_temp_channel_id = await create_mission_temp_channel(interaction, mission_params.carrier_data.discord_channel, mission_params.carrier_data.ownerid, mission_params.carrier_data.carrier_short_name)
     mission_temp_channel = bot.get_channel(mission_params.mission_temp_channel_id)
+
+    # beyond this point we need to release channel lock if mission creation fails
 
     # Recreate this text since we know the channel id
     mission_params.discord_text = txt_create_discord(mission_params)
     message_send = await interaction.channel.send("**Sending to Discord...**")
     try:
         # send trade alert to trade alerts channel, or to wine alerts channel if loading wine
-        if mission_params.commodity_data.name.title() == "Wine":
+        if mission_params.commodity_name.title() == "Wine":
             if mission_params.mission_type == 'load':
                 channel = bot.get_channel(wine_alerts_loading_channel())
                 channelId = wine_alerts_loading_channel()
@@ -222,10 +358,12 @@ async def send_mission_to_discord(interaction, mission_params):
         print("Pinning sent message...")
         await pin_msg.pin()
         print("Feeding back to user...")
-        embed = discord.Embed(title=f"Discord trade alerts sent for {mission_params.carrier_data.carrier_long_name}",
-                            description=f"Check <#{channelId}> for trade alert and "
-                                        f"<#{mission_params.mission_temp_channel_id}> for image.",
-                            color=constants.EMBED_COLOUR_DISCORD)
+        embed = discord.Embed(
+            title=f"Discord trade alerts sent for {mission_params.carrier_data.carrier_long_name}",
+            description=f"Check <#{channelId}> for trade alert and "
+                        f"<#{mission_params.mission_temp_channel_id}> for image.",
+            color=constants.EMBED_COLOUR_DISCORD)
+        embed.set_thumbnail(url=constants.ICON_DISCORD_CIRCLE)
         await interaction.channel.send(embed=embed)
         await message_send.delete()
 
@@ -234,7 +372,7 @@ async def send_mission_to_discord(interaction, mission_params):
             embed = discord.Embed(title='PLEASE STOP ALL 3RD PARTY SOFTWARE: EDMC, EDDISCOVERY, ETC',
                     description=("Maximising our haulers' profits for this mission means keeping market data at this station"
                             " **a secret**! For this reason **please disable/exit all journal reporting plugins/programs**"
-                            " and leave them off until all missions at this location are complete. Thanks CMDRs!"),
+                           f" and leave them off until all missions at this location are complete. Thanks CMDRs! <:o7:{o7_emoji()}>"),
                     color=constants.EMBED_COLOUR_REDDIT)
             edmc_file_name = f'edmc_off_{random.randint(1,2)}.png'
             edmc_path = os.path.join(constants.EDMC_OFF_PATH, edmc_file_name)
@@ -244,8 +382,9 @@ async def send_mission_to_discord(interaction, mission_params):
             pin_edmc = await mission_temp_channel.send(file=edmc_file, embed=embed)
             await pin_edmc.pin()
 
-            embed = discord.Embed(title=f"EDMC OFF messages sent", description='External posts (Reddit, Webhooks) will be skipped',
+            embed = discord.Embed(title=f"EDMC OFF messages sent", description='External posts (Reddit, Webhooks) will be skipped.',
                         color=constants.EMBED_COLOUR_DISCORD)
+            embed.set_thumbnail(url=constants.ICON_EDMC_OFF)
             await interaction.channel.send(embed=embed)
 
             print('Reacting to #official-trade-alerts message with EDMC OFF')
@@ -263,13 +402,18 @@ async def send_mission_to_discord(interaction, mission_params):
 
 async def send_mission_to_subreddit(interaction, mission_params):
     print("User used option r")
-    # profit is a float, not an int.
+    # check profit is above 10k/ton minimum
     if float(mission_params.profit) < 10:
         print(f'Not posting the mission from {interaction.user} to reddit due to low profit margin <10k/t.')
-        await interaction.channel.send(f'Skipped Reddit posting due to profit margin of {mission_params.profit}k/t being below the PTN 10k/t '
-                    f'minimum. (Did you try to post a Wine load?)')
+        await interaction.channel.send(f'Skipped Reddit posting due to profit margin of {mission_params.profit}K/TON being below the PTN 10K/TON '
+                                       f'minimum. Did you try to send a Wine load?')
     else:
         message_send = await interaction.channel.send("**Sending to Reddit...**")
+
+        mission_params.reddit_title = txt_create_reddit_title(mission_params)
+        mission_params.reddit_body = txt_create_reddit_body(mission_params)
+        mission_params.reddit_img_name = await create_carrier_reddit_mission_image(mission_params)
+        print("Defined Reddit elements")
 
         try:
 
@@ -286,9 +430,11 @@ async def send_mission_to_subreddit(interaction, mission_params):
                 comment = await submission.reply(mission_params.reddit_body)
             mission_params.reddit_comment_url = comment.permalink
             mission_params.reddit_comment_id = comment.id
-            embed = discord.Embed(title=f"Reddit trade alert sent for {mission_params.carrier_data.carrier_long_name}",
-                                description=f"https://www.reddit.com{mission_params.reddit_post_url}",
-                                color=constants.EMBED_COLOUR_REDDIT)
+            embed = discord.Embed(
+                title=f"Reddit trade alert sent for {mission_params.carrier_data.carrier_long_name}",
+                description=f"https://www.reddit.com{mission_params.reddit_post_url}",
+                color=constants.EMBED_COLOUR_REDDIT)
+            embed.set_thumbnail(url=constants.ICON_REDDIT)
             await interaction.channel.send(embed=embed)
             await message_send.delete()
             embed = discord.Embed(title=f"{mission_params.carrier_data.carrier_long_name} REQUIRES YOUR UPDOOTS",
@@ -335,13 +481,29 @@ async def send_mission_to_webhook(interaction, mission_params):
 
             print(f"Sent webhook trade alert with ID {webhook_sent.id} for webhook URL {webhook_url}")
 
-            embed = discord.Embed(title=f"Webhook trade alert sent for {mission_params.carrier_data.carrier_long_name}:",
-                                  description=f"Sent to your webhook **{webhook_name}**: {webhook_sent.jump_url}",
-                                  color=constants.EMBED_COLOUR_DISCORD)
+            embed = discord.Embed(
+                title=f"Webhook trade alert sent for {mission_params.carrier_data.carrier_long_name}:",
+                description=f"Sent to your webhook **{webhook_name}**: {webhook_sent.jump_url}",
+                color=constants.EMBED_COLOUR_DISCORD)
+            embed.set_thumbnail(url=constants.ICON_WEBHOOK_PTN)
 
             await interaction.channel.send(embed=embed)
     
     await message_send.delete()
+
+
+async def notify_hauler_role(interaction, mission_params, mission_temp_channel):
+    print("User used option n")
+
+    ping_role_id = wineloader_role() if mission_params.commodity_name == 'Wine' else hauler_role()
+    await mission_temp_channel.send(f"<@&{ping_role_id}>: {mission_params.discord_text}")
+
+    embed = discord.Embed(
+        title=f"Mission notification sent for {mission_params.carrier_data.carrier_long_name}",
+        description=f"Pinged <@&{ping_role_id}> in <#{mission_params.mission_temp_channel_id}>.",
+        color=constants.EMBED_COLOUR_DISCORD)
+    embed.set_thumbnail(url=constants.ICON_DISCORD_PING)
+    await interaction.channel.send(embed=embed)
 
 
 async def send_mission_text_to_user(interaction, mission_params):
@@ -387,53 +549,93 @@ Mission generation
 The core of MAB: its mission generator
 
 """
+async def confirm_send_mission_via_button(interaction: discord.Interaction, mission_params, cp_embed):
+    # this function does initial checks and returns send options to the user
 
-# mission generator called by loading/unloading commands
-async def gen_mission(interaction, mission_params):
-    current_channel = interaction.channel
+    mission_params.returnflag = False
+    
+    await prepare_for_gen_mission(interaction, mission_params)
 
-    mission_params.print_values()
+    if mission_params.returnflag == False:
+        print("Problems found, mission gen will not proceed.")
+        return
 
-    print(f'Mission generation type: {mission_params.mission_type} requested by {interaction.user}. Request triggered from '
-        f'channel {current_channel}.')
+    if mission_params.returnflag == True:
+        print("All checks complete, mission generation can continue")
+
+        # check the details with the user
+        confirm_embed = discord.Embed(
+            title=f"{mission_params.mission_type.upper()}ING: {mission_params.carrier_data.carrier_long_name}",
+            description="Confirm details and send targets:",
+            color=constants.EMBED_COLOUR_QU
+        )
+        thumb_url = constants.ICON_FC_LOADING if mission_params.mission_type == 'load' else constants.ICON_FC_UNLOADING
+        confirm_embed.set_thumbnail(url=thumb_url)
+
+        confirm_embed.add_field(
+            name="Commodity", value=f"**{mission_params.commodity_name.upper()}**", inline=True
+        )
+        confirm_embed.add_field(
+            name="Profit", value=f"**{mission_params.profit}K/TON** x **{mission_params.demand.upper()}**", inline=True
+        )
+        confirm_embed.add_field(
+            name="System", value=f"**{mission_params.system}**", inline=True
+        )
+        confirm_embed.add_field(
+            name="Station", value=f"**{mission_params.station}** (**{mission_params.pads}**-PADS)", inline=True
+        )
+
+        webhook_embed = None
+
+        if mission_params.webhook_names:
+            desc_txt = ', '.join(mission_params.webhook_names)
+            webhook_embed = discord.Embed(
+                title="Webhooks found",
+                description=desc_txt,
+                color=constants.EMBED_COLOUR_DISCORD
+            )
+            webhook_embed.set_thumbnail(url=constants.ICON_WEBHOOK_PTN)
+
+        mission_params.sendflags = None # used to check for timeout status in View
+
+        view = MissionSendView(mission_params) # buttons to add
+
+        embeds = [cp_embed, webhook_embed, confirm_embed] if webhook_embed else [cp_embed, confirm_embed]
+
+        await interaction.edit_original_response(embeds=embeds, view=view)
+
+        view.message = await interaction.original_response()
+
+
+async def prepare_for_gen_mission(interaction: discord.Interaction, mission_params):
+
+    """
+    - check validity of inputs
+    - check if carrier data can be found
+    - check if carrier is on a mission
+    - return webhooks and commodity data
+    - check if carrier has a valid mission image
+    """
 
     if mission_params.pads not in ['M', 'L']:
         # In case a user provides some junk for pads size, gate it
         print(f'Exiting mission generation requested by {interaction.user} as pad size is invalid, provided: {mission_params.pads}')
         return await interaction.channel.send(f'Sorry, your pad size is not L or M. Provided: {mission_params.pads}. Mission generation cancelled.')
 
-
-    # check if commodity can be found, exit gracefully if not
-    # gen_mission.returnflag = False
-    commodity_data = await find_commodity(mission_params.commodity_search_term, interaction)
-    # if not gen_mission.returnflag:
-        #return # we've already given the user feedback on why there's a problem, we just want to quit gracefully now
-    if not commodity_data:
-        raise ValueError('Missing commodity data')
-    mission_params.commodity_data = commodity_data
-    
-    # check if the user has any webhooks
-    webhook_data = find_webhook_from_owner(interaction.user.id)
-    if webhook_data:
-        for webhook in webhook_data:
-            mission_params.webhook_urls.append(webhook.webhook_url)
-            mission_params.webhook_names.append(webhook.webhook_name)
-
     # check if the carrier can be found, exit gracefully if not
     carrier_data = find_carrier(mission_params.carrier_name_search_term, CarrierDbFields.longname.name)
-    if not carrier_data:
+    if not carrier_data:  # error condition
         return await interaction.channel.send(f"No carrier found for {mission_params.carrier_name_search_term}. You can use `/find` or `/owner` to search for carrier names.")
     mission_params.carrier_data = carrier_data
 
     # check carrier isn't already on a mission TODO change to ID lookup
     mission_data = find_mission(carrier_data.carrier_long_name, "carrier")
     if mission_data:
-        embed = discord.Embed(title="Error",
-                            description=f"{mission_data.carrier_name} is already on a mission, please "
-                                        f"use `/cco complete` to mark it complete before starting a new mission.",
-                            color=constants.EMBED_COLOUR_ERROR)
-        await interaction.channel.send(embed=embed)
-        return  # We want to stop here, so go exit out
+        embed = discord.Embed(
+            description=f"{mission_data.carrier_name} is already on a mission, please "
+                        f"use `/cco complete` to mark it complete before starting a new mission.",
+            color=constants.EMBED_COLOUR_ERROR)
+        return await interaction.channel.send(embed=embed) # error condition
 
     # check if the carrier has an associated image
     image_name = carrier_data.carrier_short_name + '.png'
@@ -442,6 +644,7 @@ async def gen_mission(interaction, mission_params):
         print("Carrier mission image found, checking size...")
         image = Image.open(image_path)
         image_is_good = image.size == (506, 285)
+        # all good, let's go
     else:
         image_is_good = False
     if not image_is_good:
@@ -460,159 +663,100 @@ async def gen_mission(interaction, mission_params):
         if not image_is_good:
             print("Still no good image, aborting")
             embed = discord.Embed(description="**ERROR**: You must have a valid mission image to continue.", color=constants.EMBED_COLOUR_ERROR)
-            await interaction.channel.send(embed=embed)
-            return
+            return await interaction.channel.send(embed=embed) # error condition
 
-    # TODO: This method is way too long, break it up into logical steps.
+    # define commodity
+    if mission_params.commodity_search_term in constants.commodities_common:
+        # the user typed in the name perfectly or used autocomplete so we don't need to bother querying the commodities db
+        mission_params.commodity_name = mission_params.commodity_search_term
+    else: # check if commodity can be found based on user's search term, exit gracefully if not
+        mission_params.returnflag = False 
+        await find_commodity(mission_params, interaction)
+        if not mission_params.returnflag:
+            return # we've already given the user feedback on why there's a problem, we just want to quit gracefully now
+        if not mission_params.commodity_name:  # error condition
+            raise ValueError('Missing commodity data')
+
+    # add any webhooks to mission_params
+    webhook_data = find_webhook_from_owner(interaction.user.id)
+    if webhook_data:
+        for webhook in webhook_data:
+            mission_params.webhook_urls.append(webhook.webhook_url)
+            mission_params.webhook_names.append(webhook.webhook_name)
+
+    # set returnflag and take all this information back to the user
+    mission_params.returnflag = True
+    return
 
 
+# mission generator called by loading/unloading commands
+async def gen_mission(interaction, mission_params):
+    # generate a timestamp for mission creation
+    mission_params.timestamp = get_formatted_date_string()[2]
+
+    current_channel = interaction.channel
+
+    mission_params.print_values()
+
+    print(f'Mission generation type: {mission_params.mission_type} requested by {interaction.user}. Request triggered from '
+        f'channel {current_channel}.')
 
     try: # this try/except pair is to try and ensure the channel lock is released if something breaks during mission gen
         # otherwise the bot freezes next time the lock is attempted
 
-        embed = discord.Embed(title="Generating and fetching mission alerts...", color=constants.EMBED_COLOUR_QU)
-        message_gen = await interaction.channel.send(embed=embed)
+        mission_params.edmc_off = True if "e" in mission_params.sendflags else False
 
-        def check_confirm(message):
-            # use all to verify that all the characters in the message content are present in the allowed list (dtrx).
-            # Anything outwith this grouping will cause all to fail. Use set to throw away any duplicate objects.
-            # not sure if the msg.content can ever be None, but lets gate it anyway
-            return message.content and message.author == interaction.user and message.channel == interaction.channel and \
-                all(character in check_characters for character in set(message.content.lower()))
+        if "x" in mission_params.sendflags:
+            async with interaction.channel.typing():
+                # immediately stop if there's an x anywhere in the message, even if there are other proper inputs
+                embed = discord.Embed(
+                    description="**Mission creation cancelled.**",
+                    color=constants.EMBED_COLOUR_ERROR
+                )
+                await interaction.channel.send(embed=embed)
+                print("User cancelled mission generation")
+                return
 
-        def check_rp(message):
-            return message.author == interaction.user and message.channel == interaction.channel
+        if "t" in mission_params.sendflags: # send full text to mission gen channel
+            async with interaction.channel.typing():
+                await send_mission_text_to_user(interaction, mission_params)
 
-        async def default_timeout_message(location):
-            await interaction.channel.send(f"**Mission generation cancelled (waiting too long for user input)** ({location})")
+        if "d" in mission_params.sendflags: # send to discord and save to mission database
+            async with interaction.channel.typing():
+                submit_mission, mission_temp_channel = await send_mission_to_discord(interaction, mission_params)
 
-
-        # gen_mission.returnflag = False
-        # mission_temp_channel_id = await create_mission_temp_channel(interaction, carrier_data.discord_channel, carrier_data.ownerid)
-        # mission_temp_channel = bot.get_channel(mission_temp_channel_id)
-        # # flag is set to True if mission channel creation is successful
-        # if not gen_mission.returnflag:
-        #     return # we've already notified the user
-
-        # beyond this point any exits need to release the channel lock
-
-        # Options that should create a mission db entry will change this to True
-        submit_mission = False
-
-        # generate the mission elements
-
-        mission_params.timestamp = get_formatted_date_string()[2]
-
-        mission_params.discord_img_name = await create_carrier_discord_mission_image(mission_params)
-        mission_params.discord_text = txt_create_discord(mission_params)
-        print("Defined discord elements")
-
-        mission_params.reddit_title = txt_create_reddit_title(mission_params)
-        mission_params.reddit_body = txt_create_reddit_body(mission_params)
-        mission_params.reddit_img_name = await create_carrier_reddit_mission_image(mission_params)
-        print("Defined Reddit elements")
-
-        # check they're happy with output and offer to send
-        embed = discord.Embed(title=f"Mission pending for {carrier_data.carrier_long_name}",
-                            color=constants.EMBED_COLOUR_OK)
-        embed.add_field(name="Mission type", value=f"{mission_params.mission_type.title()}ing", inline=True)
-        embed.add_field(name="Commodity", value=f"{mission_params.demand} of {commodity_data.name.title()} at {mission_params.profit}k/unit", inline=True)
-        embed.add_field(name="Location",
-                        value=f"{mission_params.station} station ({mission_params.pads}-pads) in system {mission_params.system}", inline=True)
-
-        message_pending = await interaction.channel.send(embed=embed)
-        await message_gen.delete()
-        print("Output check displayed")
-
-        embed = discord.Embed(title="Where would you like to send the alert?",
-                            description="- (**d**)iscord\n- (**r**)eddit\n- (**w**)ebhooks\n- (**t**)ext for copy/pasting\n\nInput (**x**) to cancel.\n\n"
-                            "Additional flags:\n- (**n**) to notify PTN Haulers by role ping\n- (**e**) to flag your mission as EDMC-OFF (this will disable external alert sending).",
-                            color=constants.EMBED_COLOUR_QU)
-        embed.set_footer(text="Enter all that apply, e.g. **drn** will send alerts to Discord and Reddit and notify PTN Haulers.")
-        message_confirm = await interaction.channel.send(embed=embed)
-        print("Prompted user for alert destination")
-
-        try:
-            check_characters = 'dertnwx'
-            msg = await bot.wait_for("message", check=check_confirm, timeout=30)
-            edmc_off = True if "e" in msg.content.lower() else False
-
-            if "x" in msg.content.lower():
+            if "r" in mission_params.sendflags and not mission_params.edmc_off: # send to subreddit
                 async with interaction.channel.typing():
-                    # immediately stop if there's an x anywhere in the message, even if there are other proper inputs
-                    message_cancelled = await interaction.channel.send("**Mission creation cancelled.**")
-                    await msg.delete()
-                    await message_confirm.delete()
-                    print("User cancelled mission generation")
-                    return
+                    await send_mission_to_subreddit(interaction, mission_params)
 
-            if "t" in msg.content.lower(): # send full text to mission gen channel
+            if "w" in mission_params.sendflags and "d" in mission_params.sendflags and not mission_params.edmc_off: # send to webhook
                 async with interaction.channel.typing():
-                    await send_mission_text_to_user(interaction, mission_params)
+                    await send_mission_to_webhook(interaction, mission_params)
 
-            if "d" in msg.content.lower(): # send to discord and save to mission database
+            if "n" in mission_params.sendflags and "d" in mission_params.sendflags: # notify haulers with role ping
                 async with interaction.channel.typing():
-                    submit_mission, mission_temp_channel = await send_mission_to_discord(interaction, mission_params)
+                    await notify_hauler_role(interaction, mission_params, mission_temp_channel)
 
-                if "r" in msg.content.lower() and not edmc_off: # send to subreddit
-                    async with interaction.channel.typing():
-                        await send_mission_to_subreddit(interaction, mission_params)
-
-                if "w" in msg.content.lower() and "d" in msg.content.lower() and not edmc_off: # send to webhook
-                    async with interaction.channel.typing():
-                        await send_mission_to_webhook(interaction, mission_params)
-
-                if "n" in msg.content.lower() and "d" in msg.content.lower(): # notify haulers with role ping
-                    async with interaction.channel.typing():
-                        print("User used option n")
-
-                        ping_role_id = hauler_role()
-                        await mission_temp_channel.send(f"<@&{ping_role_id}>: {mission_params.discord_text}")
-
-                        embed = discord.Embed(title=f"Mission notification sent for {carrier_data.carrier_long_name}",
-                                    description=f"Pinged <@&{ping_role_id}> in <#{mission_params.mission_temp_channel_id}>",
-                                    color=constants.EMBED_COLOUR_DISCORD)
-                        await interaction.channel.send(embed=embed)
-
-                if any(letter in msg.content.lower() for letter in ["r", "w"]) and edmc_off: # scold the user for being very silly
-                    embed = discord.Embed(
-                        title="EXTERNAL SENDS SKIPPED",
-                        description="Cannot send to Reddit or Webhooks as you flagged the mission as **EDMC-OFF**.",
-                        color=constants.EMBED_COLOUR_ERROR
-                    )
-                    embed.set_footer(text="You silly billy.")
-                    await interaction.channel.send(embed=embed)
-
-            else: # for mission gen to work and be stored in the database, the d option MUST be selected.
-                embed = discord.Embed(title="ERROR: Mission generation cancelled",
-                                      description="You must include the **d**iscord option to use role pings or send external alerts (Reddit, Webhooks).",
-                                      color=constants.EMBED_COLOUR_ERROR)
+            if any(letter in mission_params.sendflags for letter in ["r", "w"]) and mission_params.edmc_off: # scold the user for being very silly
+                embed = discord.Embed(
+                    title="EXTERNAL SENDS SKIPPED",
+                    description="Cannot send to Reddit or Webhooks as you flagged the mission as **EDMC-OFF**.",
+                    color=constants.EMBED_COLOUR_ERROR
+                )
+                embed.set_footer(text="You silly billy.")
                 await interaction.channel.send(embed=embed)
 
-        except asyncio.TimeoutError:
-            await default_timeout_message('notification_type_decision')
-            try:
-                if mission_params.mission_temp_channel_id:
-                    carrier_channel_lock.release()
-                    print("Channel lock released")
-            finally:
-                if mission_params.mission_temp_channel_id:
-                    await remove_carrier_channel(mission_params.mission_temp_channel_id, seconds_short)
-            return
+        else: # for mission gen to work and be stored in the database, the d option MUST be selected.
+            embed = discord.Embed(title="ERROR: Mission generation cancelled",
+                                    description="You must include the **d**iscord option to use role pings or send external alerts (Reddit, Webhooks).",
+                                    color=constants.EMBED_COLOUR_ERROR)
+            await interaction.channel.send(embed=embed)
 
         print("All options worked through, now clean up")
 
-        # now clear up by deleting the prompt message and user response
-        try:
-            await msg.delete()
-            await message_confirm.delete()
-        except Exception as e:
-            print(f"Error during clearup: {e}")
-            await interaction.channel.send(f"Oops, error detected: {e}\nAttempting to continue with mission gen.")
-
         if submit_mission:
             await mission_add(mission_params)
-            await mission_generation_complete(interaction, mission_params, message_pending)
+            await mission_generation_complete(interaction, mission_params)
         cleanup_temp_image_file(mission_params.discord_img_name)
         cleanup_temp_image_file(mission_params.reddit_img_name)
         if mission_params.mission_temp_channel_id:
@@ -620,10 +764,27 @@ async def gen_mission(interaction, mission_params):
 
         print("Reached end of mission generator")
         return
+
     except Exception as e:
-        await interaction.channel.send("Oh no! Something went wrong :( Mission generation aborted.")
-        await interaction.channel.send(e)
-        print("Something went wrong with mission generation :(")
+        mission_data = None
+        try:
+            mission_data = find_mission(mission_params.carrier_data.carrier_long_name, "carrier")
+            print("Mission data found, mission was added to the database before exception")
+        except:
+            print("No mission data found, mission was not added to database")
+
+        if mission_data:
+            text = "Mission **was** entered into the database. Use `/missions` or `/mission` in the carrier channel to check its details." \
+               "You can use `/cco complete` to close the mission if you need to re-generate it."
+        else:
+            text = "Mission was **not** entered into the database. It may require manual cleanup of channels etc."
+
+        embed = discord.Embed(
+            description=f"ERROR: {e}\n\n{text}",
+            color=constants.EMBED_COLOUR_ERROR
+        )
+        await interaction.channel.send(embed=embed)
+        print("Error on mission generation:")
         print(e)
         carrier_channel_lock.release()
         if mission_params.mission_temp_channel_id:
@@ -666,8 +827,6 @@ async def create_mission_temp_channel(interaction, discord_channel, owner_id, sh
         mission_temp_channel = await interaction.guild.create_text_channel(discord_channel, category=category, topic=topic)
         mission_temp_channel_id = mission_temp_channel.id
         print(f"Created {mission_temp_channel}")
-
-    print(f'Channels: {interaction.guild.channels}')
 
     if not mission_temp_channel:
         raise EnvironmentError(f'Could not create carrier channel {discord_channel}')
@@ -739,7 +898,7 @@ async def mission_add(mission_params):
     print("Called mission_add to write to database")
     mission_db.execute(''' INSERT INTO missions VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ''', (
         mission_params.carrier_data.carrier_long_name, mission_params.carrier_data.carrier_identifier, mission_params.mission_temp_channel_id,
-        mission_params.commodity_data.name.title(), mission_params.mission_type.lower(), mission_params.system.title(), mission_params.station.title(),
+        mission_params.commodity_name.title(), mission_params.mission_type.lower(), mission_params.system.title(), mission_params.station.title(),
         mission_params.profit, mission_params.pads.upper(), mission_params.demand, mission_params.cco_message_text, mission_params.reddit_post_id,
         mission_params.reddit_post_url, mission_params.reddit_comment_id, mission_params.reddit_comment_url, mission_params.discord_alert_id, pickled_mission_params
     ))
@@ -751,13 +910,12 @@ async def mission_add(mission_params):
     carriers_conn.commit()
 
     # now we can release the channel lock
-    if mission_params.mission_temp_channel_id:
-        carrier_channel_lock.release()
-        print("Channel lock released")
+    carrier_channel_lock.release()
+    print("Channel lock released")
     return
 
 
-async def mission_generation_complete(interaction, mission_params, message_pending):
+async def mission_generation_complete(interaction, mission_params):
 
     # fetch data we just committed back
 
@@ -784,6 +942,5 @@ async def mission_generation_complete(interaction, mission_params, message_pendi
     embed.set_footer(text="You can use /cco complete <carrier> to mark the mission complete.")
 
     await interaction.channel.send(embed=embed)
-    await message_pending.delete()
     print("Mission generation complete")
     return

@@ -13,11 +13,12 @@ class MissionParams:
         """
 
         if info_dict:
-            # Convert the sqlite3.Row object to a dictionary
+            # Convert input to a dictionary
             info_dict = dict(info_dict)
         else:
             info_dict = dict()
 
+        self.copypaste_embed = info_dict.get('copypaste_embed', None) # embed containing the copy/paste string for the command used
         self.carrier_name_search_term = info_dict.get('carrier_name_search_term', None) # the carrier name fragment to search for
         self.commodity_search_term = info_dict.get('commodity_search_term', None) # the commodity name fragment to search for
         self.system = info_dict.get('system', None).upper() # the target system
@@ -28,10 +29,10 @@ class MissionParams:
         self.mission_type = info_dict.get('mission_type', None) # whether the mission is loading or unloading
         self.edmc_off = info_dict.get('edmc_off', None) # whether the mission is EDMC off flagged
         self.carrier_data = info_dict.get('carrier_data', None) # carrier data class retrieved from db
-        self.commodity_data = info_dict.get('commodity_data', None) # commodity data class retrieved from db
+        self.commodity_name = info_dict.get('commodity_name', None) # commodity name
         self.reddit_img_name = info_dict.get('reddit_img_name', None) # the Reddit image file name
         self.discord_img_name = info_dict.get('discord_img_name', None) # the Discord image file name
-        self.cco_message_text = info_dict.get('cco_message_text', None) # roleplay text entered by user
+        self.cco_message_text = info_dict.get('cco_message_text', None) # message text entered by user
         self.timestamp = info_dict.get('timestamp', None) # the posix time the mission was generated
         self.reddit_title = info_dict.get('reddit_title', None) # title for the subreddit post
         self.reddit_body = info_dict.get('reddit_body', None) # body text for the top-level comment on the subreddit post
@@ -51,6 +52,7 @@ class MissionParams:
 
     def print_values(self):
         try:
+            print(f"copypaste_embed: {self.copypaste_embed}")
             print(f"carrier_name_search_term: {self.carrier_name_search_term}")
             print(f"commodity_search_term: {self.commodity_search_term}")
             print(f"system: {self.system}")

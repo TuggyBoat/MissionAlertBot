@@ -73,7 +73,7 @@ async def create_carrier_reddit_mission_image(mission_params):
     image_editable.text((46, 366), "FLEET CARRIER " + mission_params.carrier_data.carrier_identifier, (0, 217, 255), font=REG_FONT)
     image_editable.text((46, 382), mission_params.carrier_data.carrier_long_name, (0, 217, 255), font=NAME_FONT)
     image_editable.text((46, 439), "COMMODITY:", (255, 255, 255), font=FIELD_FONT)
-    image_editable.text((170, 439), mission_params.commodity_data.name.upper(), (255, 255, 255), font=NORMAL_FONT)
+    image_editable.text((170, 439), mission_params.commodity_name.upper(), (255, 255, 255), font=NORMAL_FONT)
     image_editable.text((46, 477), "SYSTEM:", (255, 255, 255), font=FIELD_FONT)
     image_editable.text((170, 477), mission_params.system.upper(), (255, 255, 255), font=NORMAL_FONT)
     image_editable.text((46, 514), "STATION:", (255, 255, 255), font=FIELD_FONT)

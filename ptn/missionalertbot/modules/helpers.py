@@ -79,7 +79,7 @@ async def checkroles_actual(ctx, permitted_role_ids):
                 embed=discord.Embed(description=f"**Permission denied**: You need the following role to use this command:\n{formatted_role_list}", color=constants.EMBED_COLOUR_ERROR)
             # hacky way to check whether we were sent an interaction object or a ctx object is to check attributes.
             # ctx has the author attribute, interaction does not, so we may as well use that since we already used it earlier
-            await ctx.channel.send(embed=embed) if hasattr(ctx, 'author') else await ctx.response.send_message(embed=embed, ephemeral=True)
+            await ctx.channel.send(embed=embed) if hasattr(ctx, 'author') else await ctx.channel.send(embed=embed, ephemeral=True)
     except Exception as e:
         print(e)
     return permission
@@ -202,8 +202,6 @@ async def _cc_create_channel(interaction, new_channel_name, cc_category):
     try:
         new_channel = await interaction.guild.create_text_channel(f"{new_channel_name}", category=cc_category)
         print(f"Created {new_channel}")
-
-        print(f'Channels: {interaction.guild.channels}')
 
         embed = discord.Embed(description=f"Created channel <#{new_channel.id}>.", color=constants.EMBED_COLOUR_OK)
         await interaction.response.send_message(embed=embed)

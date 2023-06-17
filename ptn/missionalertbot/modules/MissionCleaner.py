@@ -34,32 +34,26 @@ MISSION COMPLETE & CLEANUP
 """
 
 # clean up a completed mission
-async def _cleanup_completed_mission(interaction, mission_data, reddit_complete_text, discord_complete_embed, formatted_message):
+async def _cleanup_completed_mission(interaction, mission_data, reddit_complete_text, discord_complete_embed, message, is_complete):
     async with interaction.channel.typing():
         print("called _cleanup_completed_mission")
 
-        mission_params = mission_data.mission_params
+        status = "complete" if is_complete else "unable to complete"
 
-        feedback_embed = discord.Embed(title=f"Mission complete for {mission_data.carrier_name}",
-                            description=f"{formatted_message}",
-                            color=constants.EMBED_COLOUR_OK)
-        feedback_embed.set_footer(text="Updated sent alerts and removed from mission list.")
+        try: # for backwards compatibility with missions created before the new column was added
+            mission_params = mission_data.mission_params
+        except:
+            print("No mission_params found, mission created pre-2.1.0?")
 
         async with interaction.channel.typing():
             completed_mission_channel = bot.get_channel(mission_data.channel_id)
             mission_gen_channel = bot.get_channel(mission_command_channel())
-            if interaction.channel.id == mission_gen_channel.id: # tells us whether /cco complete was used or /mission complete
-                m_done = True
-                print("Processing mission complete by /cco complete")
-            else:
-                m_done = False
-                print("Processing mission complete by /mission complete")
 
             backup_database('missions')  # backup the missions database before going any further
 
             # delete Discord trade alert
             print("Delete Discord trade alert...")
-            if mission_data.discord_alert_id and mission_data.discord_alert_id != 'NULL':
+            if mission_data.discord_alert_id and mission_data.discord_alert_id:
                 try:  # try in case it's already been deleted, which doesn't matter to us in the slightest but we don't
                     # want it messing up the rest of the function
 
@@ -93,7 +87,7 @@ async def _cleanup_completed_mission(interaction, mission_data, reddit_complete_
 
             # add comment to Reddit post
             print("Add comment to Reddit post...")
-            if mission_data.reddit_post_id and mission_data.reddit_post_id != 'NULL':
+            if mission_data.reddit_post_id and mission_data.reddit_post_id:
                 try:  # try in case Reddit is down
                     reddit_post_id = mission_data.reddit_post_id
                     reddit = await get_reddit()
@@ -109,38 +103,41 @@ async def _cleanup_completed_mission(interaction, mission_data, reddit_complete_
 
             # update webhooks
             print("Update sent webhooks...")
-            if mission_params.webhook_urls and mission_params.webhook_msg_ids and mission_params.webhook_jump_urls:
-                for webhook_url, webhook_msg_id, webhook_jump_url in zip(mission_params.webhook_urls, mission_params.webhook_msg_ids, mission_params.webhook_jump_urls):
-                    try: 
-                        async with aiohttp.ClientSession() as session:
-                            print(f"Fetching webhook for {webhook_url} with jumpurl {webhook_jump_url} and ID {webhook_msg_id}")
-                            webhook = Webhook.from_url(webhook_url, session=session, client=bot)
-                            webhook_msg = await webhook.fetch_message(webhook_msg_id)
+            try: # wrapping this in try for now to enable backwards compatibility. TODO: remove the 'try' wrapper after 2.1.0
+                if mission_params.webhook_urls and mission_params.webhook_msg_ids and mission_params.webhook_jump_urls:
+                    for webhook_url, webhook_msg_id, webhook_jump_url in zip(mission_params.webhook_urls, mission_params.webhook_msg_ids, mission_params.webhook_jump_urls):
+                        try: 
+                            async with aiohttp.ClientSession() as session:
+                                print(f"Fetching webhook for {webhook_url} with jumpurl {webhook_jump_url} and ID {webhook_msg_id}")
+                                webhook = Webhook.from_url(webhook_url, session=session, client=bot)
+                                webhook_msg = await webhook.fetch_message(webhook_msg_id)
 
-                            # edit the original message
-                            print("Editing original webhook message...")
-                            embed = discord.Embed(title="PTN TRADE MISSION COMPLETED",
-                                                    description=f"**{mission_params.carrier_data.carrier_long_name}** finished {mission_params.mission_type}ing "
-                                                                f"{mission_params.commodity_data.name} from **{mission_params.station}** in **{mission_params.system}**.",
-                                                    color=constants.EMBED_COLOUR_QU)
-                            embed.set_footer(text=f"Join {constants.DISCORD_INVITE_URL} for more trade opportunities.")
-                            embed.set_thumbnail(url=ptn_logo_discord())
-                            await webhook_msg.remove_attachments(webhook_msg.attachments)
-                            await webhook_msg.edit(embed=embed)
+                                # edit the original message
+                                print("Editing original webhook message...")
+                                embed = discord.Embed(title="PTN TRADE MISSION CONCLUDED",
+                                                        description=f"**{mission_params.carrier_data.carrier_long_name}** finished {mission_params.mission_type}ing "
+                                                                    f"{mission_params.commodity_name} from **{mission_params.station}** in **{mission_params.system}**.",
+                                                        color=constants.EMBED_COLOUR_QU)
+                                embed.set_footer(text=f"Join {constants.DISCORD_INVITE_URL} for more trade opportunities.")
+                                embed.set_thumbnail(url=ptn_logo_discord())
+                                await webhook_msg.remove_attachments(webhook_msg.attachments)
+                                await webhook_msg.edit(embed=embed)
 
-                            reason = f"\n\n{formatted_message}" if formatted_message else ""
+                                reason = f"\n\n{message}" if not message == None else "" # TODO: change the reason to a separate embed or field
 
-                            print("Sending webhook update message...")
-                            # send a new message to update the target channel
-                            embed = discord.Embed(title="PTN TRADE MISSION COMPLETED",
-                                                    description=f"The mission {webhook_jump_url} posted at <t:{mission_params.timestamp}:f> (<t:{mission_params.timestamp}:R> "
-                                                                f"has been marked as completed on the [PTN Discord]({constants.DISCORD_INVITE_URL}).{reason}",
-                                                    color=constants.EMBED_COLOUR_OK)
-                            await webhook.send(embed=embed, username='Pilots Trade Network', avatar_url=bot.user.avatar.url, wait=True)
+                                print("Sending webhook update message...")
+                                # send a new message to update the target channel
+                                embed = discord.Embed(title="PTN TRADE MISSION CONCLUDED",
+                                                      description=f"The mission {webhook_jump_url} posted at <t:{mission_params.timestamp}:f> (<t:{mission_params.timestamp}:R>) "
+                                                                  f"has been marked as {status} on the [PTN Discord]({constants.DISCORD_INVITE_URL}).{reason}",
+                                                      color=constants.EMBED_COLOUR_OK)
+                                await webhook.send(embed=embed, username='Pilots Trade Network', avatar_url=bot.user.avatar.url, wait=True)
 
-                    except Exception as e:
-                        print(f"Failed updating webhook message {webhook_jump_url} with URL {webhook_url}: {e}")
-                        await feedback_embed.add_field(name="Error", value=f"Failed updating webhook message {webhook_jump_url} with URL {webhook_url}: {e}")
+                        except Exception as e:
+                            print(f"Failed updating webhook message {webhook_jump_url} with URL {webhook_url}: {e}")
+                            await feedback_embed.add_field(name="Error", value=f"Failed updating webhook message {webhook_jump_url} with URL {webhook_url}: {e}")
+            except: 
+                print("No mission_params found to define webhooks, pre-2.1.0 mission?")
 
             # delete mission entry from db
             print("Remove from mission database...")
@@ -152,14 +149,19 @@ async def _cleanup_completed_mission(interaction, mission_data, reddit_complete_
             # command feedback
             print("Log usage in bot spam")
             spamchannel = bot.get_channel(bot_spam_channel())
-            embed = discord.Embed(title=f"Mission complete for {mission_data.carrier_name}",
+            embed = discord.Embed(title=f"Mission {status} for {mission_data.carrier_name}",
                                 description=f"{interaction.user} marked the mission complete in #{interaction.channel.name}",
                                 color=constants.EMBED_COLOUR_OK)
             await spamchannel.send(embed=embed)
 
-            # notify user in mission gen channel
-            print("Send feedback to user")
-            await interaction.edit_original_response(embed=feedback_embed)
+            if interaction.channel.id == mission_gen_channel.id: # tells us whether /cco complete was used or /mission complete
+                print("Send feedback to the CCO")
+                feedback_embed = discord.Embed(
+                    title=f"Mission {status} for {mission_data.carrier_name}",
+                    color=constants.EMBED_COLOUR_OK)
+                feedback_embed.add_field(name="Explanation given", value=message, inline=True)
+                feedback_embed.set_footer(text="Updated sent alerts and removed from mission list.")
+                await interaction.edit_original_response(embed=feedback_embed)
 
         # notify owner if not command user
         carrier_data = find_carrier(mission_data.carrier_name, CarrierDbFields.longname.name)
@@ -171,23 +173,15 @@ async def _cleanup_completed_mission(interaction, mission_data, reddit_complete_
             # notify by DM
             owner = await bot.fetch_user(carrier_data.ownerid)
 
-            if formatted_message != "":
-                """
-                formatted_message converts message text received by /cco complete into a format that can be inserted directly into messages
-                without having to change the message's format depending on whether it exists or not. This was primarily
-                intended for CCOs to be able to send a message to their channel via the bot on mission completion.
-
-                Now it's pulling double-duty as a way for other CCOs to notify the owner why they used /cco complete on a
-                mission that wasn't theirs. In this case it's still useful for that information to be sent to the channel
-                (e.g. "Supply exhausted", "tick changed prices", etc)
-
-                formatted_message is "" if received from empty argument, so reason converts it to None if empty and adds a line break.
-                This can probably be reworked to be neater and use fewer than 3 separate variables for one short message in the future.
-                """
-                reason = f"\n{formatted_message}" if formatted_message else ""
-                await owner.send(f"Ahoy CMDR! {interaction.user.display_name} has concluded the trade mission for your Fleet Carrier **{carrier_data.carrier_long_name}**. **Reason given**: {reason}\nIts mission channel will be removed in {seconds_long()//60} minutes unless a new mission is started.")
-            else:
-                await owner.send(f"Ahoy CMDR! The trade mission for your Fleet Carrier **{carrier_data.carrier_long_name}** has been marked as complete by {interaction.user.display_name}. Its mission channel will be removed in {seconds_long()//60} minutes unless a new mission is started.")
+            dm_embed = discord.Embed(
+                title=f"{carrier_data.carrier_long_name} MISSION {status.upper()}",
+                description=f"Ahoy CMDR! {interaction.user.display_name} has concluded the trade mission for your Fleet Carrier **{carrier_data.carrier_long_name}**."
+                            f"Its mission channel will be removed in {seconds_long()//60} minutes unless a new mission is started.",
+                color=constants.EMBED_COLOUR_QU
+                )
+            if not message == None:
+                embed.add_field(name="Explanation given", value=message, inline=True)
+            await owner.send(embed=dm_embed)
 
     # remove channel
     await mark_cleanup_channel(mission_data.channel_id, 1)
@@ -232,7 +226,7 @@ async def remove_carrier_channel(completed_mission_channel_id, seconds):
             gif = random.choice(constants.boom_gifs)
             try:
                 await delchannel.send(gif)
-                await asyncio.sleep(5)
+                await asyncio.sleep(10)
                 await delchannel.delete()
                 print(f'Deleted {delchannel}')
                 await remove_channel_cleanup_entry(completed_mission_channel_id)

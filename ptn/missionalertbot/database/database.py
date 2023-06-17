@@ -28,7 +28,6 @@ from ptn.missionalertbot.constants import bot
 
 # local modules
 from ptn.missionalertbot.modules.DateString import get_formatted_date_string
-# from ptn.missionalertbot.modules.MissionGenerator import gen_mission # TODO: will this work for setting gen_missing.returnflag?
 
 
 # connect to sqlite carrier database
@@ -747,21 +746,21 @@ async def _is_carrier_channel(carrier_data):
 
 
 # function to search for a commodity by name or partial name
-async def find_commodity(commodity_search_term, interaction):
+async def find_commodity(mission_params, interaction):
     # TODO: Where do we get set up this database? it is searching for things, but what is the source of the data, do
     #  we update it periodically?
 
-    print(f'Searching for commodity against match "{commodity_search_term}" requested by {interaction.user.display_name}')
+    print(f'Searching for commodity against match "{mission_params.commodity_search_term}" requested by {interaction.user.display_name}')
 
     carrier_db.execute(
         f"SELECT * FROM commodities WHERE commodity LIKE (?)",
-        (f'%{commodity_search_term}%',))
+        (f'%{mission_params.commodity_search_term}%',))
 
     commodities = [Commodity(commodity) for commodity in carrier_db.fetchall()]
     commodity = None
     if not commodities:
         print('No commodities found for request')
-        await interaction.channel.send(f"No commodities found for {commodity_search_term}")
+        await interaction.channel.send(f"No commodities found for {mission_params.commodity_search_term}")
         # Did not find anything, short-circuit out of the next block
         return
     elif len(commodities) == 1:
@@ -771,15 +770,15 @@ async def find_commodity(commodity_search_term, interaction):
     elif len(commodities) > 3:
         # If we ever get into a scenario where more than 3 commodities can be found with the same search directly, then
         # we need to revisit this limit
-        print(f'More than 3 commodities found for: "{commodity_search_term}", {interaction.user.display_name} needs to search better.')
+        print(f'More than 3 commodities found for: "{mission_params.commodity_search_term}", {interaction.user.display_name} needs to search better.')
         await interaction.channel.send(f'Please narrow down your commodity search, we found {len(commodities)} matches for your '
-                       f'input choice: "{commodity_search_term}"')
+                       f'input choice: "{mission_params.commodity_search_term}"')
         return # Just return None here and let the calling method figure out what is needed to happen
     else:
-        print(f'Between 1 and 3 commodities found for: "{commodity_search_term}", asking {interaction.user.display_name} which they want.')
+        print(f'Between 1 and 3 commodities found for: "{mission_params.commodity_search_term}", asking {interaction.user.display_name} which they want.')
         # The database runs a partial match, in the case we have more than 1 ask the user which they want.
         # here we have less than 3, but more than 1 match
-        embed = discord.Embed(title=f"Multiple commodities found for input: {commodity_search_term}", color=constants.EMBED_COLOUR_OK)
+        embed = discord.Embed(title=f"Multiple commodities found for input: {mission_params.commodity_search_term}", color=constants.EMBED_COLOUR_OK)
 
         count = 0
         response = None  # just in case we try to do something before it is assigned, give it a value of None
@@ -808,7 +807,7 @@ async def find_commodity(commodity_search_term, interaction):
         if response:
             await response.delete()
     if commodity: # only if this is successful is returnflag set so mission gen will continue
-        # gen_mission.returnflag = True TODO
-        print(f"Commodity {commodity.name} avgsell {commodity.average_sell} avgbuy {commodity.average_buy} "
-              f"maxsell {commodity.max_sell} minbuy {commodity.min_buy} maxprofit {commodity.max_profit}")
-    return commodity
+        mission_params.returnflag = True
+        print(f"Found commodity {commodity.name}")
+        mission_params.commodity_name = commodity.name
+    return
