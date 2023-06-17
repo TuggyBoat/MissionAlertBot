@@ -166,22 +166,31 @@ async def _cleanup_completed_mission(interaction, mission_data, reddit_complete_
         # notify owner if not command user
         carrier_data = find_carrier(mission_data.carrier_name, CarrierDbFields.longname.name)
         if not interaction.user.id == carrier_data.ownerid:
-            print("Notify carrier owner")
-            # notify in channel - not sure this is needed anymore, leaving out for now
-            # await interaction.channel.send(f"Notifying carrier owner: <@{carrier_data.ownerid}>")
+            try:
+                print("Notify carrier owner")
+                # notify in channel - not sure this is needed anymore, leaving out for now
+                # await interaction.channel.send(f"Notifying carrier owner: <@{carrier_data.ownerid}>")
 
-            # notify by DM
-            owner = await bot.fetch_user(carrier_data.ownerid)
+                # notify by DM
+                owner = await bot.fetch_user(carrier_data.ownerid)
 
-            dm_embed = discord.Embed(
-                title=f"{carrier_data.carrier_long_name} MISSION {status.upper()}",
-                description=f"Ahoy CMDR! {interaction.user.display_name} has concluded the trade mission for your Fleet Carrier **{carrier_data.carrier_long_name}**."
-                            f"Its mission channel will be removed in {seconds_long()//60} minutes unless a new mission is started.",
-                color=constants.EMBED_COLOUR_QU
+                dm_embed = discord.Embed(
+                    title=f"{carrier_data.carrier_long_name} MISSION {status.upper()}",
+                    description=f"Ahoy CMDR! {interaction.user.display_name} has concluded the trade mission for your Fleet Carrier **{carrier_data.carrier_long_name}**."
+                                f"Its mission channel will be removed in {seconds_long()//60} minutes unless a new mission is started.",
+                    color=constants.EMBED_COLOUR_QU
+                    )
+                if not message == None:
+                    embed.add_field(name="Explanation given", value=message, inline=True)
+                await owner.send(embed=dm_embed)
+
+            except Exception as e: # in case the user can't be DMed
+                print(e)
+                embed = discord.Embed(
+                    description=f"Error sending mission complete DM to <@{carrier_data.ownerid}>: {e}",
+                    color=constants.EMBED_COLOUR_ERROR
                 )
-            if not message == None:
-                embed.add_field(name="Explanation given", value=message, inline=True)
-            await owner.send(embed=dm_embed)
+                spamchannel.send(embed=embed)
 
     # remove channel
     await mark_cleanup_channel(mission_data.channel_id, 1)

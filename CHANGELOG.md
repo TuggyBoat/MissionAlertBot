@@ -6,6 +6,7 @@ Refactoring:
 
 - Split `MissionGenerator.py` into `MissionGenerator.py` and `MissonCleaner.py`
 - Major changes to the internal structure of the mission generator
+    - Misison generation is now more resilient to errors and communicates better when something goes wrong
 - Added `Commodities.py` in preparation for adding a method to build the Commodities database from scratch
 - Many small changes here and there
 
@@ -22,13 +23,14 @@ Changed commands:
     - "rp text" is now referred to as "message", and is entered via button input
     - letter-based input for sends replaced with buttons
     - added icons for send status embeds
-    - new embed format for Discord
+    - completely new embed format for Discord
     - added ability to send via webhook
     - tweaks to Reddit format
 - `done` is now `/cco complete`. `/cco done` remains as an alias, for now
     - `/cco complete` now has optional parameters for whether the mission was `Completed` or `Failed`, with autocomplete, as well as for an explanation message
         - by default, status is assumed to be `Completed`
     - many small changes to how `/cco complete` reports
+- `carrier_image` is now `/cco carrier_image`
 - `m.complete` is now `/mission complete`
     - no more option to add a message as an argument
     - button menu asks user whether mission completed or cannot be completed

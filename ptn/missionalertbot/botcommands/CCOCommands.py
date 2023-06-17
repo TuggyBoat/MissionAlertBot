@@ -131,12 +131,14 @@ class CCOCommands(commands.Cog):
         await interaction.response.send_message(embed=cp_embed)
 
         # convert profit from STR to an INT or FLOAT
-        profit = convert_str_to_float_or_int(profit)
+        profit_convert = convert_str_to_float_or_int(profit)
 
         params_dict = dict(carrier_name_search_term = carrier, commodity_search_term = commodity, system = system, station = station,
-                           profit = profit, pads = pads, demand = demand, mission_type = mission_type, copypaste_embed = cp_embed)
+                           profit = profit_convert, pads = pads, demand = demand, mission_type = mission_type, copypaste_embed = cp_embed)
 
         mission_params = MissionParams(params_dict)
+
+        mission_params.profit_raw = profit
 
         mission_params.print_values()
 
@@ -170,12 +172,14 @@ class CCOCommands(commands.Cog):
         await interaction.response.send_message(embed=cp_embed)
 
         # convert profit from STR to an INT or FLOAT
-        profit = convert_str_to_float_or_int(profit)
+        profit_convert = convert_str_to_float_or_int(profit)
 
         params_dict = dict(carrier_name_search_term = carrier, commodity_search_term = commodity, system = system, station = station,
-                           profit = profit, pads = pads, demand = supply, mission_type = mission_type, copypaste_embed = cp_embed)
+                           profit = profit_convert, pads = pads, demand = supply, mission_type = mission_type, copypaste_embed = cp_embed)
 
         mission_params = MissionParams(params_dict)
+
+        mission_params.profit_raw = profit
 
         mission_params.print_values()
 
@@ -239,14 +243,13 @@ class CCOCommands(commands.Cog):
 
 
     # change FC background image
-    @commands.command(name='carrier_image', help='Change the background image for the specified carrier:\n\n'
-                                            'Use with carrier\'s name as argument to check the '
-                                            'carrier\'s image or begin upload of a new image.')
-    @commands.has_any_role(*[certcarrier_role(), trainee_role()])
-    @check_text_command_channel(mission_command_channel())
-    async def carrier_image(self, ctx, lookname):
-        print(f"{ctx.author} called m.carrier_image for {lookname}")
+    @cco_group.command(name='image', description='View, set, or change a carrier\'s background image.')
+    @describe(carrier='A unique fragment of the full name of the target Fleet Carrier')
+    @check_roles([certcarrier_role(), trainee_role(), rescarrier_role()])
+    @check_command_channel(mission_command_channel())
+    async def image(self, interaction: discord.Interaction, carrier: str):
+        print(f"{interaction.user.display_name} called m.carrier_image for {carrier}")
 
-        await assign_carrier_image(ctx, lookname)
+        await assign_carrier_image(interaction, carrier)
 
         return

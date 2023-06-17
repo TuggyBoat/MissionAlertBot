@@ -4,13 +4,14 @@ A Cog for commands that are primarily concerned with the bot's databases.
 """
 
 # import libraries
+import aiohttp
 import asyncio
 import copy
 import re
 
 # import discord.py
 import discord
-from discord import app_commands
+from discord import app_commands, Webhook
 from discord.ext import commands
 
 # local classes
@@ -878,6 +879,13 @@ class DatabaseInteraction(commands.Cog):
 
         spamchannel = bot.get_channel(bot_spam_channel())
 
+        embed = discord.Embed (
+            description="Validating...",
+            color=constants.EMBED_COLOUR_QU
+        )
+
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
         # first check the webhook URL and name aren't in the DB already
         print("Looking up existing webhook data...")
         webhook_data = find_webhook_from_owner(interaction.user.id)
@@ -889,7 +897,7 @@ class DatabaseInteraction(commands.Cog):
                         description=f"ERROR: You already have a webhook with that URL called \"{webhook.webhook_name}\": {webhook.webhook_url}",
                         color=constants.EMBED_COLOUR_ERROR
                     )
-                    await interaction.response.send_message(embed=embed, ephemeral=True)
+                    await interaction.edit_original_response(embed=embed)
                     return
 
                 elif webhook.webhook_name == webhook_name:
@@ -898,11 +906,41 @@ class DatabaseInteraction(commands.Cog):
                         description=f"ERROR: You already have a webhook called \"{webhook.webhook_name}\": {webhook.webhook_url}",
                         color=constants.EMBED_COLOUR_ERROR
                     )
-                    await interaction.response.send_message(embed=embed, ephemeral=True)
+                    await interaction.edit_original_response(embed=embed)
                     return
                 
                 else:
                     print("Webhook is not duplicate, proceeding")
+
+        # check the webhook is valid
+        try:
+            async with aiohttp.ClientSession() as session:
+                webhook = Webhook.from_url(webhook_url, session=session, client=bot)
+
+                embed = discord.Embed(
+                    description="Verifying webhook...",
+                    color=constants.EMBED_COLOUR_QU
+                )
+
+                webhook_sent = await webhook.send(embed=embed, username='Pilots Trade Network', avatar_url=bot.user.avatar.url, wait=True)
+
+                webhook_msg = await webhook.fetch_message(webhook_sent.id)
+
+                await webhook_msg.delete()
+
+        except Exception as e: # webhook could not be sent
+            embed = discord.Embed(
+                description=f"ERROR: {e}",
+                color=constants.EMBED_COLOUR_ERROR
+            )
+            embed.set_footer(text="Webhook could not be validated: unable to send message to webhook.")
+            # this is a fail condition, so we exit out
+            print(f"Webhook validation failed for {interaction.user.display_name}: {e}")
+            spamchannel_embed = discord.Embed(
+                description=f"<@{interaction.user.id}> failed adding webhook: {e}"
+            )
+            await spamchannel.send(embed=spamchannel_embed)
+            return await interaction.edit_original_response(embed=embed)
 
         # enter the webhook into the database
         try:
@@ -912,7 +950,7 @@ class DatabaseInteraction(commands.Cog):
                 description=f"ERROR: {e}",
                 color=constants.EMBED_COLOUR_ERROR
             )
-            await interaction.response.send_message(embed=embed, ephemeral=True)
+            await interaction.edit_original_response(embed=embed)
 
             # notify in bot_spam
             embed = discord.Embed(
@@ -929,7 +967,7 @@ class DatabaseInteraction(commands.Cog):
         embed.add_field(name="Identifier", value=webhook_name, inline=False)
         embed.add_field(name="URL", value=webhook_url)
         embed.set_thumbnail(url=interaction.user.display_avatar)
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+        await interaction.edit_original_response(embed=embed)
 
         # also tell bot-spam
         embed = discord.Embed(

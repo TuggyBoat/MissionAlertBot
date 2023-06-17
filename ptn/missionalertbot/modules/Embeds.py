@@ -39,16 +39,14 @@ async def _is_mission_active_embed(carrier_data):
     embed_colour = constants.EMBED_COLOUR_LOADING if mission_data.mission_type == 'load' else \
         constants.EMBED_COLOUR_UNLOADING
 
-    mission_description = ''
-    if mission_data.rp_text and mission_data.rp_text != 'NULL':
-        mission_description = f"> {mission_data.rp_text}"
+    mission_description = mission_data.rp_text if not mission_data.rp_text == None else ''
 
     embed = discord.Embed(title=f"{mission_data.mission_type.upper()}ING {mission_data.carrier_name} ({mission_data.carrier_identifier})",
                             description=mission_description, color=embed_colour)
 
     embed = _mission_summary_embed(mission_data, embed)
 
-    embed.set_footer(text="You can use m.complete if the mission is complete.")
+    embed.set_footer(text="You can use /mission complete if the mission is complete.")
     return embed
 
 

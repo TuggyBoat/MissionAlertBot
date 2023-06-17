@@ -135,20 +135,23 @@ def cleanup_temp_image_file(file_name):
 
 
 # function to assign or change a carrier image file
-async def assign_carrier_image(ctx, lookname):
+async def assign_carrier_image(interaction: discord.Interaction, lookname):
     print('assign_carrier_image called')
     carrier_data = find_carrier(lookname, CarrierDbFields.longname.name)
 
     # check carrier exists
     if not carrier_data:
-        await ctx.send(f"Sorry, no carrier found matching \"{lookname}\". Try using `/find` or `/owner`.")
+        embed = discord.Embed(
+            description=f"Sorry, no carrier found matching \"{lookname}\". Try using `/find` or `/owner`.",
+            color=constants.EMBED_COLOUR_ERROR
+        )
+        await interaction.response.send_message(embed=embed, ephemeral=True)
         return print(f"No carrier found for {lookname}")
 
     # define image requiremenets
     true_size = (506, 285)
     true_width, true_height = true_size
     true_aspect = true_width / true_height
-    legacy_message, noimage_message = False, False
 
     newimage_description = ("The mission image helps give your Fleet Carrier trade missions a distinct visual identity. "
                             " You only need to upload an image once. This will be inserted into the slot in the "
@@ -157,7 +160,7 @@ async def assign_carrier_image(ctx, lookname):
                             "**your Fleet Carrier**. You may also wish to add a **logo** or **emblem** for your Fleet "
                             "Carrier if you have one.\n"
                             "• Images will be cropped to 16:9 and resized to 506x285 if not already.\n"
-                            "• You can use `m.carrier_image <yourcarrier>` at any time to change your image.\n\n"
+                            "• You can use `/cco image` at any time to change your image.\n\n"
                             "**You can upload your image now to change it**.\n"
                             "Alternatively, input \"**x**\" to cancel, or \"**p**\" to use a random placeholder with PTN logo.\n\n"
                             "**You must have a valid image to generate a mission**.")
@@ -181,13 +184,19 @@ async def assign_carrier_image(ctx, lookname):
     except:
         file = None
 
+    embeds = []
+
     if file:
         # we found an existing image, so show it to the user
         print("Found image")
-        embed = discord.Embed(title=f"{carrier_data.carrier_long_name} MISSION IMAGE",
-                                color=constants.EMBED_COLOUR_QU)
-        embed.set_image(url="attachment://image.png")
-        await ctx.send(file=file, embed=embed)
+        image_found_embed = discord.Embed(
+            title=f"{carrier_data.carrier_long_name} MISSION IMAGE",
+            color=constants.EMBED_COLOUR_QU
+        )
+        image_found_embed.set_image(url="attachment://image.png")
+        embeds.append(image_found_embed)
+
+        await interaction.response.send_message(file=file, embeds=embeds)
         image_exists = True
 
 
@@ -204,51 +213,73 @@ async def assign_carrier_image(ctx, lookname):
 
     if valid_image:
         # an image exists and is the right size, user is not nagged to change it
-        embed = discord.Embed(title="Change carrier's mission image?",
+        valid_image_embed = discord.Embed(title="Change carrier's mission image?",
                                     description="If you want to replace this image you can upload the new image now. "
                                                 "Images will be automatically cropped to 16:9 and resized to 506x285.\n\n"
                                                 "**To continue without changing**:         Input \"**x**\" or wait 60 seconds\n"
                                                 "**To switch to a random PTN logo image**: Input \"**p**\"",
                                     color=constants.EMBED_COLOUR_QU)
+        embeds.append(valid_image_embed)
 
     elif not valid_image and not image_exists:
         # there's no mission image, prompt the user to upload one or use a PTN placeholder
         file = discord.File(os.path.join(constants.RESOURCE_PATH, mission_template_filename()), filename="image.png")
-        embed = discord.Embed(title=f"NO MISSION IMAGE FOUND",
-                                color=constants.EMBED_COLOUR_QU)
-        embed.set_image(url="attachment://image.png")
-        noimage_message = await ctx.send(file=file, embed=embed)
-        embed = discord.Embed(title="Upload a mission image",
-                            description=newimage_description, color=constants.EMBED_COLOUR_QU)
+        no_image_embed = discord.Embed(
+            title=f"NO MISSION IMAGE FOUND",
+            color=constants.EMBED_COLOUR_QU)
+        no_image_embed.set_image(url="attachment://image.png")
+
+        embeds.append(no_image_embed)
+
+        await interaction.response.send_message(file=file, embeds=no_image_embed)
+
+        no_image_embed_prompt = discord.Embed(
+            title="Upload a mission image",
+            description=newimage_description,
+            color=constants.EMBED_COLOUR_QU
+        )
+        
+        embeds.append(no_image_embed_prompt)
 
     elif not valid_image and image_exists:
         # there's an image but it's outdated, prompt them to change it
-        embed = discord.Embed(title="WARNING: LEGACY MISSION IMAGE DETECTED",
-                            description="The mission image format has changed. You must upload a new image to continue"
-                                                " to use the Mission Generator.",
-                                        color=constants.EMBED_COLOUR_ERROR)
-        legacy_message = await ctx.send(embed=embed)
-        embed = discord.Embed(title="Upload a mission image",
-                            description=newimage_description, color=constants.EMBED_COLOUR_QU)
+        image_not_valid_embed = discord.Embed(
+            title="WARNING: LEGACY MISSION IMAGE DETECTED",
+            description="The mission image format has changed. You must upload a new image to continue"
+                        " to use the Mission Generator.",
+            color=constants.EMBED_COLOUR_ERROR
+        )
 
-    # send the embed we created
-    message_upload_now = await ctx.send(embed=embed)
+        embeds.append(image_not_valid_embed)
+
+        await interaction.response.send_message(embeds=embeds)
+
+        image_not_valid_prompt_embed = discord.Embed(
+            title="Upload a mission image",
+            description=newimage_description,
+            color=constants.EMBED_COLOUR_QU
+        )
+
+        embeds.append(image_not_valid_prompt_embed)
+
+    # send the current embeds
+    await interaction.edit_original_response(embeds=embeds)
 
     # function to check user's response
     def check(message_to_check):
-        return message_to_check.author == ctx.author and message_to_check.channel == ctx.channel
+        return message_to_check.author == interaction.user and message_to_check.channel == interaction.channel
 
     try:
         # now we process the user's response
         message = await bot.wait_for("message", check=check, timeout=60)
         if message.content.lower() == "x": # user backed out without making changes
-            embed = discord.Embed(description="No changes made.",
-                                    color=constants.EMBED_COLOUR_OK)
-            await ctx.send(embed=embed)
+            embed = discord.Embed(
+                description="No changes made.",
+                color=constants.EMBED_COLOUR_OK
+            )
+            await interaction.followup.send(embed=embed)
             await message.delete()
-            await message_upload_now.delete()
-            if noimage_message:
-                await noimage_message.delete()
+            await interaction.delete_original_response()
             return
 
         elif message.content.lower() == "p": # user wants to use a placeholder image
@@ -289,8 +320,12 @@ async def assign_carrier_image(ctx, lookname):
                     image = Image.open(attachment.filename)
                 except Exception as e: # they uploaded something daft
                     print(e)
-                    await ctx.send("Sorry, I don't recognise that as an image file. Upload aborted.")
-                    return await message_upload_now.delete()
+                    embed = discord.Embed(
+                        description="ERROR: I don't recognise that as an image file. Upload aborted.",
+                        color=constants.EMBED_COLOUR_ERROR
+                    )
+                    await interaction.channel.send(embed=embed)
+                    return await interaction.delete_original_response()
 
                 # now we check the image dimensions and aspect ratio
                 upload_width, upload_height = image.size
@@ -344,18 +379,20 @@ async def assign_carrier_image(ctx, lookname):
         in_image.save(result_name.name)
 
         file = discord.File(result_name.name, filename="image.png")
-        embed = discord.Embed(title=f"{carrier_data.carrier_long_name}",
-                                description="Mission image updated.", color=constants.EMBED_COLOUR_OK)
+        embed = discord.Embed(
+            title=f"{carrier_data.carrier_long_name}",
+            description="Mission image updated.",
+            color=constants.EMBED_COLOUR_OK
+        )
         embed.set_image(url="attachment://image.png")
-        await ctx.send(file=file, embed=embed)
+        await interaction.channel.send(file=file, embed=embed)
         print("Sent result to user")
-        await message.delete()
-        await message_upload_now.delete()
-        if noimage_message:
-            await noimage_message.delete()
-        # only delete legacy warning if user uploaded valid new file
-        if legacy_message:
-            await legacy_message.delete()
+        try:
+            await message.delete()
+            await interaction.delete_original_response()
+        except Exception as e:
+            print(e)
+
         print("Tidied up our prompt messages")
 
         # cleanup the tempfile
@@ -363,11 +400,13 @@ async def assign_carrier_image(ctx, lookname):
         os.unlink(result_name.name)
         print("Removed the tempfile")
 
-        print(f"{ctx.author} updated carrier image for {carrier_data.carrier_long_name}")
+        print(f"{interaction.user.display_name} updated carrier image for {carrier_data.carrier_long_name}")
 
     except asyncio.TimeoutError:
-        embed = discord.Embed(description="No changes made (no response from user).",
-                                color=constants.EMBED_COLOUR_OK)
-        await ctx.send(embed=embed)
-        await message_upload_now.delete()
+        embed = discord.Embed(
+            description="No changes made (no response from user).",
+            color=constants.EMBED_COLOUR_OK
+        )
+        await interaction.channel.send(embed=embed)
+        await interaction.delete_original_response()
         return

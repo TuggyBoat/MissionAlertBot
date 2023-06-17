@@ -241,12 +241,14 @@ async def return_discord_channel_embeds(mission_params):
 
     # desc used by the local PTN additional info embed
     additional_info_description = f"💎 Carrier Owner: <@{mission_params.carrier_data.ownerid}>" \
-                                  f"\n🔤 Carrier information: 👆 </info:849040914948554766>" \
+                                  f"\n🔤 Carrier information: </info:849040914948554766>" \
                                   f"\n📊 Stock information: `;stock {mission_params.carrier_data.carrier_short_name}`\n\n"
 
     # desc used by the local PTN help embed
-    help_description = "✅ Use `m.complete` in this channel if the mission is completed, or unable to be completed (e.g. because of a station price change, or supply exhaustion)." \
-                       "\n\n💡 Need help? Here's our [complete guide to PTN trade missions](https://pilotstradenetwork.com/fleet-carrier-trade-missions/)."
+    if mission_params.edmc_off:
+        edmc_off_text = "\n\n🤫 This mission is flagged **EDMC-OFF**. Please disable/quit **all journal reporting apps** such as EDMC, EDDiscovery, etc."
+    help_description = "✅ Use `/mission complete` in this channel if the mission is completed, or unable to be completed (e.g. because of a station price change, or supply exhaustion)." \
+                      f"\n\n💡 Need help? Here's our [complete guide to PTN trade missions](https://pilotstradenetwork.com/fleet-carrier-trade-missions/).{edmc_off_text}"
 
     # desc used for sending cco_message_text
     owner_text_description = mission_params.cco_message_text
@@ -342,6 +344,30 @@ async def send_mission_to_discord(interaction, mission_params):
         trade_alert_msg = await channel.send(embed=embed)
         mission_params.discord_alert_id = trade_alert_msg.id
 
+        if mission_params.edmc_off: # add in EDMC OFF messages
+            print('Sending EDMC OFF messages to haulers')
+            embed = discord.Embed(title='PLEASE STOP ALL 3RD PARTY SOFTWARE: EDMC, EDDISCOVERY, ETC',
+                    description=("Maximising our haulers' profits for this mission means keeping market data at this station"
+                            " **a secret**! For this reason **please disable/exit all journal reporting plugins/programs**"
+                           f" and leave them off until all missions at this location are complete. Thanks CMDRs! <:o7:{o7_emoji()}>"),
+                    color=constants.EMBED_COLOUR_REDDIT)
+            edmc_file_name = f'edmc_off_{random.randint(1,2)}.png'
+            edmc_path = os.path.join(constants.EDMC_OFF_PATH, edmc_file_name)
+            edmc_file = discord.File(edmc_path, filename="image.png")
+
+            embed.set_image(url="attachment://image.png")
+            pin_edmc = await mission_temp_channel.send(file=edmc_file, embed=embed)
+            await pin_edmc.pin()
+
+            embed = discord.Embed(title=f"EDMC OFF messages sent", description='External posts (Reddit, Webhooks) will be skipped.',
+                        color=constants.EMBED_COLOUR_DISCORD)
+            embed.set_thumbnail(url=constants.ICON_EDMC_OFF)
+            await interaction.channel.send(embed=embed)
+
+            print('Reacting to #official-trade-alerts message with EDMC OFF')
+            for r in ["🇪","🇩","🇲","🇨","📴"]:
+                await trade_alert_msg.add_reaction(r)
+
         discord_file = discord.File(mission_params.discord_img_name, filename="image.png")
 
         print("Defining Discord embeds...")
@@ -367,30 +393,6 @@ async def send_mission_to_discord(interaction, mission_params):
         await interaction.channel.send(embed=embed)
         await message_send.delete()
 
-        if mission_params.edmc_off:
-            print('Sending EDMC OFF messages to haulers')
-            embed = discord.Embed(title='PLEASE STOP ALL 3RD PARTY SOFTWARE: EDMC, EDDISCOVERY, ETC',
-                    description=("Maximising our haulers' profits for this mission means keeping market data at this station"
-                            " **a secret**! For this reason **please disable/exit all journal reporting plugins/programs**"
-                           f" and leave them off until all missions at this location are complete. Thanks CMDRs! <:o7:{o7_emoji()}>"),
-                    color=constants.EMBED_COLOUR_REDDIT)
-            edmc_file_name = f'edmc_off_{random.randint(1,2)}.png'
-            edmc_path = os.path.join(constants.EDMC_OFF_PATH, edmc_file_name)
-            edmc_file = discord.File(edmc_path, filename="image.png")
-
-            embed.set_image(url="attachment://image.png")
-            pin_edmc = await mission_temp_channel.send(file=edmc_file, embed=embed)
-            await pin_edmc.pin()
-
-            embed = discord.Embed(title=f"EDMC OFF messages sent", description='External posts (Reddit, Webhooks) will be skipped.',
-                        color=constants.EMBED_COLOUR_DISCORD)
-            embed.set_thumbnail(url=constants.ICON_EDMC_OFF)
-            await interaction.channel.send(embed=embed)
-
-            print('Reacting to #official-trade-alerts message with EDMC OFF')
-            for r in ["🇪","🇩","🇲","🇨","📴"]:
-                await trade_alert_msg.add_reaction(r)
-
         submit_mission = True
 
         return submit_mission, mission_temp_channel
@@ -400,58 +402,87 @@ async def send_mission_to_discord(interaction, mission_params):
         await interaction.channel.send(f"Error sending to Discord: {e}\nAttempting to continue with mission gen...")
 
 
-async def send_mission_to_subreddit(interaction, mission_params):
-    print("User used option r")
+async def check_profit_margin_on_external_send(interaction, mission_params):
     # check profit is above 10k/ton minimum
     if float(mission_params.profit) < 10:
+        mission_params.returnflag = False
         print(f'Not posting the mission from {interaction.user} to reddit due to low profit margin <10k/t.')
-        await interaction.channel.send(f'Skipped Reddit posting due to profit margin of {mission_params.profit}K/TON being below the PTN 10K/TON '
-                                       f'minimum. Did you try to send a Wine load?')
+        embed = discord.Embed(
+            description=f"Skipped external send as {mission_params.profit}K/TON is below the PTN 10K/TON minimum profit margin."
+        )
+        embed.set_footer(text="Whoopsie-daisy.")
+        await interaction.channel.send(embed=embed)
     else:
-        message_send = await interaction.channel.send("**Sending to Reddit...**")
+        mission_params.returnflag = True
 
-        mission_params.reddit_title = txt_create_reddit_title(mission_params)
-        mission_params.reddit_body = txt_create_reddit_body(mission_params)
-        mission_params.reddit_img_name = await create_carrier_reddit_mission_image(mission_params)
-        print("Defined Reddit elements")
 
-        try:
+async def send_mission_to_subreddit(interaction, mission_params):
+    print("User used option r")
+    await check_profit_margin_on_external_send(interaction, mission_params)
 
-            # post to reddit
-            reddit = await get_reddit()
-            subreddit = await reddit.subreddit(sub_reddit())
-            submission = await subreddit.submit_image(mission_params.reddit_title, image_path=mission_params.reddit_img_name,
-                                                    flair_id=reddit_flair_mission_start)
-            mission_params.reddit_post_url = submission.permalink
-            mission_params.reddit_post_id = submission.id
-            if mission_params.cco_message_text:
-                comment = await submission.reply(f"> {mission_params.cco_message_text}\n\n&#x200B;\n\n{mission_params.reddit_body}")
-            else:
-                comment = await submission.reply(mission_params.reddit_body)
-            mission_params.reddit_comment_url = comment.permalink
-            mission_params.reddit_comment_id = comment.id
-            embed = discord.Embed(
-                title=f"Reddit trade alert sent for {mission_params.carrier_data.carrier_long_name}",
-                description=f"https://www.reddit.com{mission_params.reddit_post_url}",
-                color=constants.EMBED_COLOUR_REDDIT)
-            embed.set_thumbnail(url=constants.ICON_REDDIT)
-            await interaction.channel.send(embed=embed)
-            await message_send.delete()
-            embed = discord.Embed(title=f"{mission_params.carrier_data.carrier_long_name} REQUIRES YOUR UPDOOTS",
-                                description=f"https://www.reddit.com{mission_params.reddit_post_url}",
-                                color=constants.EMBED_COLOUR_REDDIT)
-            channel = bot.get_channel(channel_upvotes())
-            upvote_message = await channel.send(embed=embed)
-            emoji = bot.get_emoji(upvote_emoji())
-            await upvote_message.add_reaction(emoji)
-            return
-        except Exception as e:
-            print(f"Error posting to Reddit: {e}")
-            await interaction.channel.send(f"Error posting to Reddit: {e}\nAttempting to continue with rest of mission gen...")
+    if mission_params.returnflag == False:
+        return
+
+    else:
+        print("Profit OK, proceeding")
+
+    message_send = await interaction.channel.send("**Sending to Reddit...**")
+
+    mission_params.reddit_title = txt_create_reddit_title(mission_params)
+    mission_params.reddit_body = txt_create_reddit_body(mission_params)
+    mission_params.reddit_img_name = await create_carrier_reddit_mission_image(mission_params)
+    print("Defined Reddit elements")
+
+    try:
+
+        # post to reddit
+        reddit = await get_reddit()
+        subreddit = await reddit.subreddit(sub_reddit())
+        submission = await subreddit.submit_image(mission_params.reddit_title, image_path=mission_params.reddit_img_name,
+                                                flair_id=reddit_flair_mission_start)
+        mission_params.reddit_post_url = submission.permalink
+        mission_params.reddit_post_id = submission.id
+        if mission_params.cco_message_text:
+            comment = await submission.reply(f"> {mission_params.cco_message_text}\n\n&#x200B;\n\n{mission_params.reddit_body}")
+        else:
+            comment = await submission.reply(mission_params.reddit_body)
+        mission_params.reddit_comment_url = comment.permalink
+        mission_params.reddit_comment_id = comment.id
+        embed = discord.Embed(
+            title=f"Reddit trade alert sent for {mission_params.carrier_data.carrier_long_name}",
+            description=f"https://www.reddit.com{mission_params.reddit_post_url}",
+            color=constants.EMBED_COLOUR_REDDIT)
+        embed.set_thumbnail(url=constants.ICON_REDDIT)
+        await interaction.channel.send(embed=embed)
+        await message_send.delete()
+        embed = discord.Embed(title=f"{mission_params.carrier_data.carrier_long_name} REQUIRES YOUR UPDOOTS",
+                            description=f"https://www.reddit.com{mission_params.reddit_post_url}",
+                            color=constants.EMBED_COLOUR_REDDIT)
+        channel = bot.get_channel(channel_upvotes())
+        upvote_message = await channel.send(embed=embed)
+        emoji = bot.get_emoji(upvote_emoji())
+        await upvote_message.add_reaction(emoji)
+        return
+    except Exception as e:
+        print(f"Error posting to Reddit: {e}")
+        reddit_error_embed = discord.Embed(
+            description=f"ERROR: Could not send to Reddit. {e}",
+            color=constants.EMBED_COLOUR_ERROR
+        )
+        reddit_error_embed.set_footer(text="Attempting to continue with other sends.")
+        await interaction.channel.send(embed=reddit_error_embed)
 
 
 async def send_mission_to_webhook(interaction, mission_params):
     print("User used option w")
+
+    await check_profit_margin_on_external_send(interaction, mission_params)
+
+    if mission_params.returnflag == False:
+        return
+
+    else:
+        print("Profit OK, proceeding")
 
     message_send = await interaction.channel.send("**Sending to Webhooks...**")
 
@@ -461,33 +492,53 @@ async def send_mission_to_webhook(interaction, mission_params):
 
     if mission_params.cco_message_text: webhook_embeds.append(discord_embeds.owner_text_embed)
 
-    async with aiohttp.ClientSession() as session: # send messages to each webhook URL
-        for webhook_url, webhook_name in zip(mission_params.webhook_urls, mission_params.webhook_names):
-            print(f"Sending webhook to {webhook_url}")
-            # insert webhook URL
-            webhook = Webhook.from_url(webhook_url, session=session, client=bot)
+    try:
+        async with aiohttp.ClientSession() as session: # send messages to each webhook URL
+            for webhook_url, webhook_name in zip(mission_params.webhook_urls, mission_params.webhook_names):
+                try:
+                    print(f"Sending webhook to {webhook_url}")
+                    # insert webhook URL
+                    webhook = Webhook.from_url(webhook_url, session=session, client=bot)
 
-            discord_file = discord.File(mission_params.discord_img_name, filename="image.png")
+                    discord_file = discord.File(mission_params.discord_img_name, filename="image.png")
 
-            # send embeds and image to webhook
-            webhook_sent = await webhook.send(file=discord_file, embeds=webhook_embeds, username='Pilots Trade Network', avatar_url=bot.user.avatar.url, wait=True)
-            """
-            To return to the message later, we need its ID which is the .id attribute
-            By default, the object returned from webhook.send is only partial, which limits what we can do with it.
-            To access all its attributes and methods like a regular sent message, we first have to fetch it using its ID.
-            """
-            mission_params.webhook_msg_ids.append(webhook_sent.id) # add the message ID to our MissionParams
-            mission_params.webhook_jump_urls.append(webhook_sent.jump_url) # add the jump_url to our MissionParams for convenience
+                    # send embeds and image to webhook
+                    webhook_sent = await webhook.send(file=discord_file, embeds=webhook_embeds, username='Pilots Trade Network', avatar_url=bot.user.avatar.url, wait=True)
+                    """
+                    To return to the message later, we need its ID which is the .id attribute
+                    By default, the object returned from webhook.send is only partial, which limits what we can do with it.
+                    To access all its attributes and methods like a regular sent message, we first have to fetch it using its ID.
+                    """
+                    mission_params.webhook_msg_ids.append(webhook_sent.id) # add the message ID to our MissionParams
+                    mission_params.webhook_jump_urls.append(webhook_sent.jump_url) # add the jump_url to our MissionParams for convenience
 
-            print(f"Sent webhook trade alert with ID {webhook_sent.id} for webhook URL {webhook_url}")
+                    print(f"Sent webhook trade alert with ID {webhook_sent.id} for webhook URL {webhook_url}")
 
-            embed = discord.Embed(
-                title=f"Webhook trade alert sent for {mission_params.carrier_data.carrier_long_name}:",
-                description=f"Sent to your webhook **{webhook_name}**: {webhook_sent.jump_url}",
-                color=constants.EMBED_COLOUR_DISCORD)
-            embed.set_thumbnail(url=constants.ICON_WEBHOOK_PTN)
+                    embed = discord.Embed(
+                        title=f"Webhook trade alert sent for {mission_params.carrier_data.carrier_long_name}:",
+                        description=f"Sent to your webhook **{webhook_name}**: {webhook_sent.jump_url}",
+                        color=constants.EMBED_COLOUR_DISCORD)
+                    embed.set_thumbnail(url=constants.ICON_WEBHOOK_PTN)
 
-            await interaction.channel.send(embed=embed)
+                    await interaction.channel.send(embed=embed)
+
+                except Exception as e:
+                    print(f"Error sending webhooks: {e}")
+                    inloop_webhook_error_embed = discord.Embed(
+                        description=f"ERROR: Could not send to Webhook {webhook_name}. {e}",
+                        color=constants.EMBED_COLOUR_ERROR
+                    )
+                    inloop_webhook_error_embed.set_footer(text="Attempting to continue with other sends.")
+                    await interaction.channel.send(embed=inloop_webhook_error_embed)
+
+    except Exception as e:
+        print(f"Error sending webhooks: {e}")
+        webhook_error_embed = discord.Embed(
+            description=f"ERROR: Could not send to Webhooks. {e}",
+            color=constants.EMBED_COLOUR_ERROR
+        )
+        webhook_error_embed.set_footer(text="Attempting to continue with other sends.")
+        await interaction.channel.send(embed=webhook_error_embed)
     
     await message_send.delete()
 
@@ -617,25 +668,43 @@ async def prepare_for_gen_mission(interaction: discord.Interaction, mission_para
     - check if carrier has a valid mission image
     """
 
+    if not float(mission_params.profit):
+        profit_error_embed = discord.Embed(
+            description=f"ERROR: Profit must be a number (int or float), e.g. '10' or '4.5' but not 'ten' or 'lots' or '{mission_params.profit_raw}'.",
+            color=constants.EMBED_COLOUR_ERROR
+        )
+        profit_error_embed.set_footer(text="You complete banana.")
+        return await interaction.channel.send(embed=profit_error_embed)
+
     if mission_params.pads not in ['M', 'L']:
         # In case a user provides some junk for pads size, gate it
         print(f'Exiting mission generation requested by {interaction.user} as pad size is invalid, provided: {mission_params.pads}')
-        return await interaction.channel.send(f'Sorry, your pad size is not L or M. Provided: {mission_params.pads}. Mission generation cancelled.')
+        pads_error_embed = discord.Embed(
+            description=f"ERROR: Pads must be 'L' or 'M', or use autocomplete to select 'Large' or 'Medium'. '{mission_params.pads}' is right out.",
+            color=constants.EMBED_COLOUR_ERROR
+        )
+        pads_error_embed.set_footer(text="You silly goose.")
+        return await interaction.channel.send(embed=pads_error_embed)
 
     # check if the carrier can be found, exit gracefully if not
     carrier_data = find_carrier(mission_params.carrier_name_search_term, CarrierDbFields.longname.name)
     if not carrier_data:  # error condition
-        return await interaction.channel.send(f"No carrier found for {mission_params.carrier_name_search_term}. You can use `/find` or `/owner` to search for carrier names.")
+        carrier_error_embed = discord.Embed(
+            description=f"ERROR: No carrier found for '**{mission_params.carrier_name_search_term}**'. Use `/owner` to see a list of your carriers. If it's not in the list, ask an Admin to add it for you.",
+            color=constants.EMBED_COLOUR_ERROR
+        )
+        carrier_error_embed.set_footer(text="You silly sausage.")
+        return await interaction.channel.send(embed=carrier_error_embed)
     mission_params.carrier_data = carrier_data
 
     # check carrier isn't already on a mission TODO change to ID lookup
     mission_data = find_mission(carrier_data.carrier_long_name, "carrier")
     if mission_data:
-        embed = discord.Embed(
+        mission_error_embed = discord.Embed(
             description=f"{mission_data.carrier_name} is already on a mission, please "
                         f"use `/cco complete` to mark it complete before starting a new mission.",
             color=constants.EMBED_COLOUR_ERROR)
-        return await interaction.channel.send(embed=embed) # error condition
+        return await interaction.channel.send(embed=mission_error_embed) # error condition
 
     # check if the carrier has an associated image
     image_name = carrier_data.carrier_short_name + '.png'
@@ -930,9 +999,7 @@ async def mission_generation_complete(interaction, mission_params):
     embed_colour = constants.EMBED_COLOUR_LOADING if mission_data.mission_type == 'load' else \
         constants.EMBED_COLOUR_UNLOADING
 
-    mission_description = ''
-    if mission_data.rp_text and mission_data.rp_text != 'NULL':
-        mission_description = f"> {mission_data.rp_text}"
+    mission_description = mission_data.rp_text if not mission_data.rp_text == None else ''
 
     embed = discord.Embed(title=f"{mission_data.mission_type.upper()}ING {mission_data.carrier_name} ({mission_data.carrier_identifier})",
                             description=mission_description, color=embed_colour)

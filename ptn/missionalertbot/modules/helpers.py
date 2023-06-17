@@ -53,17 +53,14 @@ def getrole(ctx, id): # takes a Discord role ID and returns the role object
     role = discord.utils.get(ctx.guild.roles, id=id)
     return role
 
-async def checkroles_actual(ctx, permitted_role_ids):
+async def checkroles_actual(interaction: discord.Interaction, permitted_role_ids):
     try:
         """
         Check if the user has at least one of the permitted roles to run a command
         """
         print(f"checkroles called.")
-        try: # hacky way to make this work with both slash and normal commands
-            author_roles = ctx.author.roles
-        except: # slash commands use interaction instead of ctx and user instead of author
-            author_roles = ctx.user.roles
-        permitted_roles = [getrole(ctx, role) for role in permitted_role_ids]
+        author_roles = interaction.user.roles
+        permitted_roles = [getrole(interaction, role) for role in permitted_role_ids]
         print(author_roles)
         print(permitted_roles)
         permission = True if any(x in permitted_roles for x in author_roles) else False
@@ -79,15 +76,15 @@ async def checkroles_actual(ctx, permitted_role_ids):
                 embed=discord.Embed(description=f"**Permission denied**: You need the following role to use this command:\n{formatted_role_list}", color=constants.EMBED_COLOUR_ERROR)
             # hacky way to check whether we were sent an interaction object or a ctx object is to check attributes.
             # ctx has the author attribute, interaction does not, so we may as well use that since we already used it earlier
-            await ctx.channel.send(embed=embed) if hasattr(ctx, 'author') else await ctx.channel.send(embed=embed, ephemeral=True)
+            await interaction.response.send_message(embed=embed, ephemeral=True)
     except Exception as e:
         print(e)
     return permission
 
 
 def check_roles(permitted_role_ids):
-    async def checkroles(ctx): # TODO convert messages to custom error handler, make work with text commands
-        permission = await checkroles_actual(ctx, permitted_role_ids)
+    async def checkroles(interaction: discord.Interaction): # TODO convert messages to custom error handler, make work with text commands
+        permission = await checkroles_actual(interaction, permitted_role_ids)
         return permission
     return app_commands.check(checkroles)
 
