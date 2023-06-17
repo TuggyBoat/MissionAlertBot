@@ -17,7 +17,7 @@ import discord
 
 # import local constants
 import ptn.missionalertbot.constants as constants
-from ptn.missionalertbot.constants import bot, REG_FONT, NAME_FONT, TITLE_FONT, NORMAL_FONT, FIELD_FONT, DISCORD_NAME_FONT, DISCORD_ID_FONT, mission_template_filename
+from ptn.missionalertbot.constants import bot, REG_FONT, NAME_FONT, TITLE_FONT, NORMAL_FONT, FIELD_FONT, DISCORD_NAME_FONT, DISCORD_ID_FONT, mission_template_filename, bot_spam_channel
 
 # import local modules
 from ptn.missionalertbot.modules.DateString import get_formatted_date_string
@@ -135,7 +135,7 @@ def cleanup_temp_image_file(file_name):
 
 
 # function to assign or change a carrier image file
-async def assign_carrier_image(interaction: discord.Interaction, lookname):
+async def assign_carrier_image(interaction: discord.Interaction, lookname, original_embeds):
     print('assign_carrier_image called')
     carrier_data = find_carrier(lookname, CarrierDbFields.longname.name)
 
@@ -145,13 +145,15 @@ async def assign_carrier_image(interaction: discord.Interaction, lookname):
             description=f"Sorry, no carrier found matching \"{lookname}\". Try using `/find` or `/owner`.",
             color=constants.EMBED_COLOUR_ERROR
         )
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+        await interaction.channel.send(embed=embed)
         return print(f"No carrier found for {lookname}")
 
     # define image requiremenets
     true_size = (506, 285)
     true_width, true_height = true_size
     true_aspect = true_width / true_height
+    legacy_message, noimage_message, found_image_msg = False, False, False
 
     newimage_description = ("The mission image helps give your Fleet Carrier trade missions a distinct visual identity. "
                             " You only need to upload an image once. This will be inserted into the slot in the "
@@ -184,8 +186,6 @@ async def assign_carrier_image(interaction: discord.Interaction, lookname):
     except:
         file = None
 
-    embeds = []
-
     if file:
         # we found an existing image, so show it to the user
         print("Found image")
@@ -194,12 +194,9 @@ async def assign_carrier_image(interaction: discord.Interaction, lookname):
             color=constants.EMBED_COLOUR_QU
         )
         image_found_embed.set_image(url="attachment://image.png")
-        embeds.append(image_found_embed)
 
-        await interaction.response.send_message(file=file, embeds=embeds)
+        found_image_msg = await interaction.channel.send(file=file, embed=image_found_embed)
         image_exists = True
-
-
 
         # check if it's a legacy image - if it is, we want them to replace it
         print(f'opening {image_path} to check if it\'s a valid image')
@@ -213,57 +210,50 @@ async def assign_carrier_image(interaction: discord.Interaction, lookname):
 
     if valid_image:
         # an image exists and is the right size, user is not nagged to change it
-        valid_image_embed = discord.Embed(title="Change carrier's mission image?",
-                                    description="If you want to replace this image you can upload the new image now. "
-                                                "Images will be automatically cropped to 16:9 and resized to 506x285.\n\n"
-                                                "**To continue without changing**:         Input \"**x**\" or wait 60 seconds\n"
-                                                "**To switch to a random PTN logo image**: Input \"**p**\"",
-                                    color=constants.EMBED_COLOUR_QU)
-        embeds.append(valid_image_embed)
+        embed = discord.Embed(
+            title="Change carrier's mission image?",
+            description="If you want to replace this image you can upload the new image now. "
+                        "Images will be automatically cropped to 16:9 and resized to 506x285.\n\n"
+                        "**To continue without changing**:         Input \"**x**\" or wait 60 seconds\n"
+                        "**To switch to a random PTN logo image**: Input \"**p**\"",
+            color=constants.EMBED_COLOUR_QU
+        )
 
     elif not valid_image and not image_exists:
         # there's no mission image, prompt the user to upload one or use a PTN placeholder
         file = discord.File(os.path.join(constants.RESOURCE_PATH, mission_template_filename()), filename="image.png")
-        no_image_embed = discord.Embed(
+        embed = discord.Embed(
             title=f"NO MISSION IMAGE FOUND",
             color=constants.EMBED_COLOUR_QU)
-        no_image_embed.set_image(url="attachment://image.png")
+        embed.set_image(url="attachment://image.png")
 
-        embeds.append(no_image_embed)
+        noimage_message = await interaction.channel.send(file=file, embed=embed)
 
-        await interaction.response.send_message(file=file, embeds=no_image_embed)
-
-        no_image_embed_prompt = discord.Embed(
+        embed = discord.Embed(
             title="Upload a mission image",
             description=newimage_description,
             color=constants.EMBED_COLOUR_QU
         )
         
-        embeds.append(no_image_embed_prompt)
-
     elif not valid_image and image_exists:
         # there's an image but it's outdated, prompt them to change it
-        image_not_valid_embed = discord.Embed(
+        embed = discord.Embed(
             title="WARNING: LEGACY MISSION IMAGE DETECTED",
             description="The mission image format has changed. You must upload a new image to continue"
                         " to use the Mission Generator.",
             color=constants.EMBED_COLOUR_ERROR
         )
 
-        embeds.append(image_not_valid_embed)
+        legacy_message = await interaction.channel.send(embed=embed)
 
-        await interaction.response.send_message(embeds=embeds)
-
-        image_not_valid_prompt_embed = discord.Embed(
+        embed = discord.Embed(
             title="Upload a mission image",
             description=newimage_description,
             color=constants.EMBED_COLOUR_QU
         )
 
-        embeds.append(image_not_valid_prompt_embed)
-
-    # send the current embeds
-    await interaction.edit_original_response(embeds=embeds)
+    # send the embed we created
+    message_upload_now = await interaction.channel.send(embed=embed)
 
     # function to check user's response
     def check(message_to_check):
@@ -277,9 +267,11 @@ async def assign_carrier_image(interaction: discord.Interaction, lookname):
                 description="No changes made.",
                 color=constants.EMBED_COLOUR_OK
             )
-            await interaction.followup.send(embed=embed)
+            await interaction.channel.send(embed=embed)
             await message.delete()
-            await interaction.delete_original_response()
+            await message_upload_now.delete()
+            if noimage_message:
+                await noimage_message.delete()
             return
 
         elif message.content.lower() == "p": # user wants to use a placeholder image
@@ -325,7 +317,7 @@ async def assign_carrier_image(interaction: discord.Interaction, lookname):
                         color=constants.EMBED_COLOUR_ERROR
                     )
                     await interaction.channel.send(embed=embed)
-                    return await interaction.delete_original_response()
+                    return await message_upload_now.delete()
 
                 # now we check the image dimensions and aspect ratio
                 upload_width, upload_height = image.size
@@ -379,20 +371,40 @@ async def assign_carrier_image(interaction: discord.Interaction, lookname):
         in_image.save(result_name.name)
 
         file = discord.File(result_name.name, filename="image.png")
+
+        spamchannel = bot.get_channel(bot_spam_channel())
         embed = discord.Embed(
+            description=f"New mission image for {carrier_data.carrier_long_name} uploaded by <@{interaction.user.id}>.",
+            color=constants.EMBED_COLOUR_QU
+        )
+        embed.set_image(url="attachment://image.png")
+        spamchannel_message = await spamchannel.send(file=file, embed=embed)
+        embed = spamchannel_message.embeds[0]
+        # get the URL of the file we just sent so we can be massive fucking cheaters
+        new_image_url = embed.image.url
+
+
+        success_embed = discord.Embed(
             title=f"{carrier_data.carrier_long_name}",
             description="Mission image updated.",
             color=constants.EMBED_COLOUR_OK
         )
-        embed.set_image(url="attachment://image.png")
-        await interaction.channel.send(file=file, embed=embed)
-        print("Sent result to user")
-        try:
-            await message.delete()
-            await interaction.delete_original_response()
-        except Exception as e:
-            print(e)
+        success_embed.set_image(url=new_image_url)
 
+        # edit our success embed into the list of original embeds
+        embeds = []
+        embeds.extend(original_embeds)
+        embeds.append(success_embed)
+
+        await interaction.edit_original_response(embeds=embeds)
+        print("Sent result to user")
+
+        await message.delete()
+        await message_upload_now.delete()
+        if noimage_message: await noimage_message.delete()
+        if found_image_msg: await found_image_msg.delete()
+        # only delete legacy warning if user uploaded valid new file
+        if legacy_message: await legacy_message.delete()
         print("Tidied up our prompt messages")
 
         # cleanup the tempfile
@@ -401,6 +413,7 @@ async def assign_carrier_image(interaction: discord.Interaction, lookname):
         print("Removed the tempfile")
 
         print(f"{interaction.user.display_name} updated carrier image for {carrier_data.carrier_long_name}")
+        return success_embed
 
     except asyncio.TimeoutError:
         embed = discord.Embed(
@@ -408,5 +421,5 @@ async def assign_carrier_image(interaction: discord.Interaction, lookname):
             color=constants.EMBED_COLOUR_OK
         )
         await interaction.channel.send(embed=embed)
-        await interaction.delete_original_response()
+        await message_upload_now.delete()
         return

@@ -23,6 +23,7 @@ class MissionParams:
         self.commodity_search_term = info_dict.get('commodity_search_term', None) # the commodity name fragment to search for
         self.system = info_dict.get('system', None).upper() # the target system
         self.station = info_dict.get('station', None).upper() # target station
+        self.profit_raw = info_dict.get('profit_raw', None) # profit STR as entered by user
         self.profit = info_dict.get('profit', None) # profit as int or float
         self.pads = info_dict.get('pads', None).upper() # size of largest landing pad L or M
         self.demand = info_dict.get('demand', None) # total supply/demand for commodity
@@ -48,6 +49,7 @@ class MissionParams:
         self.webhook_names = info_dict.get('webhook_names', []) # identifiers for webhook URLs
         self.webhook_msg_ids = info_dict.get('webhook_msg_ids', []) # a list of the IDs of any messages sent via webhook
         self.webhook_jump_urls = info_dict.get('webhook_jump_urls', []) # webhook jump URL
+        self.original_message_embeds = info_dict.get('original_message_embeds', []) # embeds to attach to original response
 
 
     def print_values(self):
@@ -57,6 +59,7 @@ class MissionParams:
             print(f"commodity_search_term: {self.commodity_search_term}")
             print(f"system: {self.system}")
             print(f"station: {self.station}")
+            print(f"profit_raw: {self.profit_raw}")
             print(f"profit: {self.profit}")
             print(f"pads: {self.pads}")
             print(f"demand: {self.demand}")

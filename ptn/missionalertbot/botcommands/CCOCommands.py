@@ -3,11 +3,12 @@ Commands for use by CCOs
 
 """
 # import libraries
+import aiohttp
 from typing import Union
 
 # import discord.py
 import discord
-from discord import app_commands
+from discord import app_commands, Webhook
 from discord.app_commands import Group, command, describe
 from discord.ext import commands
 from discord.ext.commands import GroupCog
@@ -17,10 +18,10 @@ from ptn.missionalertbot.classes.MissionParams import MissionParams
 
 # import local constants
 import ptn.missionalertbot.constants as constants
-from ptn.missionalertbot.constants import bot, mission_command_channel, certcarrier_role, trainee_role, seconds_long, rescarrier_role, commodities_common
+from ptn.missionalertbot.constants import bot, mission_command_channel, certcarrier_role, trainee_role, seconds_long, rescarrier_role, commodities_common, bot_spam_channel
 
 # import local modules
-from ptn.missionalertbot.database.database import find_mission
+from ptn.missionalertbot.database.database import find_mission, find_webhook_from_owner, add_webhook_to_database, find_webhook_by_name, delete_webhook_by_name
 from ptn.missionalertbot.modules.helpers import on_app_command_error, check_text_command_channel, convert_str_to_float_or_int, check_command_channel, check_roles
 from ptn.missionalertbot.modules.ImageHandling import assign_carrier_image
 from ptn.missionalertbot.modules.MissionGenerator import gen_mission, confirm_send_mission_via_button
@@ -30,11 +31,14 @@ from ptn.missionalertbot.modules.MissionCleaner import _cleanup_completed_missio
 """
 CERTIFIED CARRIER OWNER COMMANDS
 
-carrier_image - CCO
-done - alias of cco_complete
-complete - CCO/mission
-load - CCO/mission
-unload - CCO/mission
+/cco complete - CCO/mission
+/cco done - alias of cco_complete
+/cco image - CCO
+/cco load - CCO/mission
+/cco unload - CCO/mission
+/cco webhook add - CCO/database
+/cco webhook delete - CCO/database
+/cco webhook view - CCO/database
 
 """
 
@@ -104,6 +108,8 @@ class CCOCommands(commands.Cog):
 
     cco_group = Group(name='cco', description='CCO commands')
 
+    webhook_group = Group(parent=cco_group, name='webhook', description='CCO webhook management')
+
     # load subcommand
     @cco_group.command(name='load', description='Generate a Fleet Carrier loading mission.')
     @describe(
@@ -133,16 +139,16 @@ class CCOCommands(commands.Cog):
         # convert profit from STR to an INT or FLOAT
         profit_convert = convert_str_to_float_or_int(profit)
 
-        params_dict = dict(carrier_name_search_term = carrier, commodity_search_term = commodity, system = system, station = station,
+        params_dict = dict(carrier_name_search_term = carrier, commodity_search_term = commodity, system = system, station = station, profit_raw = profit,
                            profit = profit_convert, pads = pads, demand = demand, mission_type = mission_type, copypaste_embed = cp_embed)
 
         mission_params = MissionParams(params_dict)
 
-        mission_params.profit_raw = profit
+        mission_params.original_message_embeds = [cp_embed]
 
         mission_params.print_values()
 
-        await confirm_send_mission_via_button(interaction, mission_params, cp_embed)
+        await confirm_send_mission_via_button(interaction, mission_params)
 
 
     # unload subcommand
@@ -174,16 +180,16 @@ class CCOCommands(commands.Cog):
         # convert profit from STR to an INT or FLOAT
         profit_convert = convert_str_to_float_or_int(profit)
 
-        params_dict = dict(carrier_name_search_term = carrier, commodity_search_term = commodity, system = system, station = station,
+        params_dict = dict(carrier_name_search_term = carrier, commodity_search_term = commodity, system = system, station = station, profit_raw = profit,
                            profit = profit_convert, pads = pads, demand = supply, mission_type = mission_type, copypaste_embed = cp_embed)
 
         mission_params = MissionParams(params_dict)
 
-        mission_params.profit_raw = profit
+        mission_params.original_message_embeds = [cp_embed]
 
         mission_params.print_values()
 
-        await confirm_send_mission_via_button(interaction, mission_params, cp_embed)
+        await confirm_send_mission_via_button(interaction, mission_params)
 
 
     # autocomplete common commodities
@@ -250,6 +256,194 @@ class CCOCommands(commands.Cog):
     async def image(self, interaction: discord.Interaction, carrier: str):
         print(f"{interaction.user.display_name} called m.carrier_image for {carrier}")
 
-        await assign_carrier_image(interaction, carrier)
+
+        embed = discord.Embed(
+            description="Searching for Fleet Carrier and image...",
+            color=constants.EMBED_COLOUR_QU
+        )
+
+        embeds = []
+
+        await interaction.response.send_message(embed=embed)
+
+        await assign_carrier_image(interaction, carrier, embeds)
+
+        return
+
+    """
+    Webhook management
+    """
+
+    # CCO command to add a webhook to their carriers
+    @webhook_group.command(name="add", description="Add a webhook to your library for sending mission alerts.")
+    @describe(webhook_url='The URL of your webhook.',
+              webhook_name='A short (preferably one-word) descriptor you can use to identify your webhook.')
+    @check_roles([certcarrier_role(), trainee_role()])
+    @check_command_channel(mission_command_channel())
+    async def webhook_add(self, interaction: discord.Interaction, webhook_url: str, webhook_name: str):
+        print(f"Called webhook add for {interaction.user.display_name}")
+
+        spamchannel = bot.get_channel(bot_spam_channel())
+
+        embed = discord.Embed (
+            description="Validating...",
+            color=constants.EMBED_COLOUR_QU
+        )
+
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+        # first check the webhook URL and name aren't in the DB already
+        print("Looking up existing webhook data...")
+        webhook_data = find_webhook_from_owner(interaction.user.id)
+        if webhook_data:
+            for webhook in webhook_data:
+                if webhook.webhook_url == webhook_url:
+                    print("Found duplicate webhook for URL")
+                    embed = discord.Embed(
+                        description=f"ERROR: You already have a webhook with that URL called \"{webhook.webhook_name}\": {webhook.webhook_url}",
+                        color=constants.EMBED_COLOUR_ERROR
+                    )
+                    await interaction.edit_original_response(embed=embed)
+                    return
+
+                elif webhook.webhook_name == webhook_name:
+                    print("Found duplicate webhook for name")
+                    embed = discord.Embed(
+                        description=f"ERROR: You already have a webhook called \"{webhook.webhook_name}\": {webhook.webhook_url}",
+                        color=constants.EMBED_COLOUR_ERROR
+                    )
+                    await interaction.edit_original_response(embed=embed)
+                    return
+                
+                else:
+                    print("Webhook is not duplicate, proceeding")
+
+        # check the webhook is valid
+        try:
+            async with aiohttp.ClientSession() as session:
+                webhook = Webhook.from_url(webhook_url, session=session, client=bot)
+
+                embed = discord.Embed(
+                    description="Verifying webhook...",
+                    color=constants.EMBED_COLOUR_QU
+                )
+
+                webhook_sent = await webhook.send(embed=embed, username='Pilots Trade Network', avatar_url=bot.user.avatar.url, wait=True)
+
+                webhook_msg = await webhook.fetch_message(webhook_sent.id)
+
+                await webhook_msg.delete()
+
+        except Exception as e: # webhook could not be sent
+            embed = discord.Embed(
+                description=f"ERROR: {e}",
+                color=constants.EMBED_COLOUR_ERROR
+            )
+            embed.set_footer(text="Webhook could not be validated: unable to send message to webhook.")
+            # this is a fail condition, so we exit out
+            print(f"Webhook validation failed for {interaction.user.display_name}: {e}")
+            spamchannel_embed = discord.Embed(
+                description=f"<@{interaction.user.id}> failed adding webhook: {e}"
+            )
+            await spamchannel.send(embed=spamchannel_embed)
+            return await interaction.edit_original_response(embed=embed)
+
+        # enter the webhook into the database
+        try:
+            await add_webhook_to_database(interaction.user.id, webhook_url, webhook_name)
+        except Exception as e:
+            embed = discord.Embed(
+                description=f"ERROR: {e}",
+                color=constants.EMBED_COLOUR_ERROR
+            )
+            await interaction.edit_original_response(embed=embed)
+
+            # notify in bot_spam
+            embed = discord.Embed(
+                description=f"Error on /webhook_add by {interaction.user}: {e}",
+                color=constants.EMBED_COLOUR_ERROR
+            )
+            await spamchannel.send(embed=embed)
+            return print(f"Error on /webhook_add by {interaction.user}: {e}")
+
+        # notify user of success
+        embed = discord.Embed(title="WEBHOOK ADDED",
+                              description="Remember, webhooks can be used by *anyone* to post *anything* and therefore **MUST** be kept secret from other users.",
+                              color=constants.EMBED_COLOUR_OK)
+        embed.add_field(name="Identifier", value=webhook_name, inline=False)
+        embed.add_field(name="URL", value=webhook_url)
+        embed.set_thumbnail(url=interaction.user.display_avatar)
+        await interaction.edit_original_response(embed=embed)
+
+        # also tell bot-spam
+        embed = discord.Embed(
+            description=f"<@{interaction.user.id}> added a webhook.",
+            color=constants.EMBED_COLOUR_QU
+        )
+        await spamchannel.send(embed=embed)
+        return print("/webhook_add complete")
+    
+
+    # command for a CCO to view all their webhooks
+    @webhook_group.command(name='view', description='Shows details of all your registered webhooks.')
+    @check_roles([certcarrier_role(), trainee_role()])
+    @check_command_channel(mission_command_channel())
+    async def webhooks_view(self, interaction: discord.Interaction):
+        print(f"webhook view called by {interaction.user.display_name}")
+
+        webhook_data = find_webhook_from_owner(interaction.user.id)
+        if not webhook_data: # no webhooks to show
+            embed = discord.Embed(
+                description=f"No webhooks found. You can add webhooks using `/cco webhook add`",
+                color=constants.EMBED_COLOUR_ERROR
+            )
+            return await interaction.response.send_message(embed=embed, ephemeral=True)
+        
+        embed = discord.Embed(
+            description=f"Showing webhooks for <@{interaction.user.id}>"
+                         "\nRemember, webhooks can be used by *anyone* to post *anything* and therefore **MUST** be kept secret from other users.",
+            color=constants.EMBED_COLOUR_OK
+        )
+        embed.set_thumbnail(url=interaction.user.display_avatar)
+
+        for webhook in webhook_data:
+            embed.add_field(name=webhook.webhook_name, value=webhook.webhook_url, inline=False)
+
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+
+    # command for a CCO to delete a webhook
+    @webhook_group.command(name="delete", description="Remove one of your webhooks from MAB's database.")
+    @describe(webhook_name='The name (identifier) of the webhook you wish to remove.')
+    @check_roles([certcarrier_role(), trainee_role()])
+    @check_command_channel(mission_command_channel())
+    async def webhook_delete(self, interaction: discord.Interaction, webhook_name: str):
+
+        print(f"{interaction.user.display_name} called webhook delete for {webhook_name}")
+
+        # find the webhook
+        webhook_data = find_webhook_by_name(interaction.user.id, webhook_name)
+
+        if webhook_data:
+            try:
+                await delete_webhook_by_name(interaction.user.id, webhook_name)
+                embed = discord.Embed(
+                    description=f"Webhook removed: **{webhook_data.webhook_name}**\n{webhook_data.webhook_url}",
+                    color=constants.EMBED_COLOUR_OK
+                )
+                await interaction.response.send_message(embed=embed, ephemeral=True)
+            except Exception as e:
+                embed = discord.Embed(
+                    description=f"ERROR: {e}",
+                    color=constants.EMBED_COLOUR_ERROR
+                )
+                await interaction.response.send_message(embed=embed, ephemeral=True)
+
+        else: # no webhook data found
+            embed = discord.Embed(
+                description=f"No webhook found matching {webhook_data.webhook_name}",
+                color=constants.EMBED_COLOUR_ERROR
+            )
+            await interaction.response.send_message(embed=embed, ephemeral=True)
 
         return

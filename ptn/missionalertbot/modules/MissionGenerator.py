@@ -13,7 +13,7 @@ import os
 import pickle
 from PIL import Image
 import random
-from typing import Union
+import typing
 
 # import discord.py
 import discord
@@ -64,7 +64,8 @@ Mission generator views
 
 # buttons for mission generation
 class MissionSendView(View):
-    def __init__(self, mission_params, timeout=30):
+    def __init__(self, mission_params, author: typing.Union[discord.Member, discord.User], timeout=30):
+        self.author = author
         self.mission_params = mission_params
         super().__init__(timeout=timeout)
 
@@ -81,7 +82,7 @@ class MissionSendView(View):
         
         try: # there's probably a better way to do this using an if statement
             self.clear_items()
-            await interaction.response.edit_message(embeds=[self.mission_params.copypaste_embed], view=self)
+            await interaction.response.edit_message(embeds=self.mission_params.original_message_embeds, view=self)
         except Exception as e:
             print(e)
 
@@ -97,7 +98,7 @@ class MissionSendView(View):
 
         try: # there's probably a better way to do this using an if statement
             self.clear_items()
-            await interaction.response.edit_message(embeds=[self.mission_params.copypaste_embed], view=self)
+            await interaction.response.edit_message(embeds=self.mission_params.original_message_embeds, view=self)
         except Exception as e:
             print(e)
 
@@ -121,9 +122,25 @@ class MissionSendView(View):
 
         try:
             self.clear_items()
-            await interaction.response.edit_message(embeds=[self.mission_params.copypaste_embed, cancelled_embed], view=self)
+            embeds = []
+            embeds.extend(self.mission_params.original_message_embeds)
+            embeds.append(cancelled_embed)
+            await interaction.response.edit_message(embeds=embeds, view=self) # mission gen ends here
         except Exception as e:
             print(e)
+
+    async def interaction_check(self, interaction: discord.Interaction): # only allow original command user to interact with buttons
+        if interaction.user.id == self.author.id:
+            return True
+        else:
+            embed = discord.Embed(
+                description="Only the command author may use these interactions.",
+                color=constants.EMBED_COLOUR_ERROR
+            )
+            embed.set_image(url='https://media1.tenor.com/images/939e397bf929b9768b24a8fa165301fe/tenor.gif?itemid=26077542')
+            embed.set_footer(text="Seriously, are you 4? 🙄")
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+            return False
 
     async def on_timeout(self):
         # return a message to the user that the interaction has timed out
@@ -136,10 +153,13 @@ class MissionSendView(View):
         self.clear_items()
 
         if not self.mission_params.sendflags:
-            embeds = [self.mission_params.copypaste_embed, timeout_embed]
+            embeds = []
+            embeds.extend(self.mission_params.original_message_embeds)
+            embeds.append(timeout_embed)
         else:
-            embeds = [self.mission_params.copypaste_embed]
-        await self.message.edit(embeds=embeds, view=self)
+            embeds = []
+            embeds.extend(self.mission_params.original_message_embeds)
+        await self.message.edit(embeds=embeds, view=self) # mission gen ends here
 
 
 # modal for message button
@@ -175,7 +195,9 @@ class AddMessageModal(Modal):
             color=constants.EMBED_COLOUR_RP
         )
 
-        embeds = [self.mission_params.copypaste_embed, message_embed]
+        embeds = []
+        embeds.extend(self.mission_params.original_message_embeds)
+        embeds.append(message_embed)
 
         try:
             await interaction.response.edit_message(embeds=embeds, view=self.view)
@@ -245,6 +267,7 @@ async def return_discord_channel_embeds(mission_params):
                                   f"\n📊 Stock information: `;stock {mission_params.carrier_data.carrier_short_name}`\n\n"
 
     # desc used by the local PTN help embed
+    edmc_off_text = ""
     if mission_params.edmc_off:
         edmc_off_text = "\n\n🤫 This mission is flagged **EDMC-OFF**. Please disable/quit **all journal reporting apps** such as EDMC, EDDiscovery, etc."
     help_description = "✅ Use `/mission complete` in this channel if the mission is completed, or unable to be completed (e.g. because of a station price change, or supply exhaustion)." \
@@ -600,7 +623,7 @@ Mission generation
 The core of MAB: its mission generator
 
 """
-async def confirm_send_mission_via_button(interaction: discord.Interaction, mission_params, cp_embed):
+async def confirm_send_mission_via_button(interaction: discord.Interaction, mission_params):
     # this function does initial checks and returns send options to the user
 
     mission_params.returnflag = False
@@ -649,10 +672,13 @@ async def confirm_send_mission_via_button(interaction: discord.Interaction, miss
 
         mission_params.sendflags = None # used to check for timeout status in View
 
-        view = MissionSendView(mission_params) # buttons to add
+        view = MissionSendView(mission_params, interaction.user) # buttons to add
 
-        embeds = [cp_embed, webhook_embed, confirm_embed] if webhook_embed else [cp_embed, confirm_embed]
-
+        embeds = []
+        embeds.extend(mission_params.original_message_embeds)
+        if webhook_embed: embeds.append(webhook_embed)
+        embeds.append(confirm_embed)
+        
         await interaction.edit_original_response(embeds=embeds, view=view)
 
         view.message = await interaction.original_response()
@@ -719,9 +745,16 @@ async def prepare_for_gen_mission(interaction: discord.Interaction, mission_para
     if not image_is_good:
         print(f"No valid carrier image found for {carrier_data.carrier_long_name}")
         # send the user to upload an image
-        embed = discord.Embed(description="**YOUR FLEET CARRIER MUST HAVE A VALID MISSION IMAGE TO CONTINUE**.", color=constants.EMBED_COLOUR_QU)
-        await interaction.channel.send(embed=embed)
-        await assign_carrier_image(interaction, carrier_data.carrier_long_name)
+        continue_embed = discord.Embed(description="**YOUR FLEET CARRIER MUST HAVE A VALID MISSION IMAGE TO CONTINUE**.", color=constants.EMBED_COLOUR_QU)
+
+        continue_embeds = []
+        continue_embeds.extend(mission_params.original_message_embeds)
+        continue_embeds.append(continue_embed)
+
+        await interaction.edit_original_response(embeds=continue_embeds)
+
+        success_embed = await assign_carrier_image(interaction, carrier_data.carrier_long_name, mission_params.original_message_embeds)
+        mission_params.original_message_embeds.append(success_embed)
         # OK, let's see if they fixed the problem. Once again we check the image exists and is the right size
         if os.path.isfile(image_path):
             print("Found an image file, checking size")

@@ -38,9 +38,9 @@ Changed commands:
 - `/mission` is now `/mission information`
 
 New commands:
-- `/webhook_add` - CCO only - used to add a webhook to that CCO's personal list
-- `/webhooks_view` - CCO only - shows their webhooks
-- `/webhook_remove` - CCO only - used to remove a webhook from their list
+- `/cco webhook add` - CCO only - used to add a webhook to that CCO's personal list
+- `/cco webhook view` - CCO only - shows their webhooks
+- `/cco webhook delete` - CCO only - used to remove a webhook from their list
 
 
 ## 2.0.0
