@@ -51,9 +51,11 @@ class MissionCompleteView(View):
                 reddit_complete_text = f"    INCOMING WIDEBAND TRANSMISSION: P.T.N. CARRIER MISSION UPDATE\n\n**" \
                                     f"{self.mission_data.carrier_name}** mission complete. o7 CMDRs!\n\n\n\n*Reported on " \
                                     f"PTN Discord by {interaction.user.display_name}*"
-                discord_complete_embed = discord.Embed(title=f"{self.mission_data.carrier_name} MISSION COMPLETE",
-                                                    description=f"<@{interaction.user.id}> reports mission complete! **This mission channel will be removed in {(seconds_long())//60} minutes.**",
-                                                    color=constants.EMBED_COLOUR_OK)
+                discord_complete_embed = discord.Embed(
+                    title=f"{self.mission_data.carrier_name} MISSION COMPLETE",
+                    description=f"<@{interaction.user.id}> reports mission complete! **This mission channel will be removed in {(seconds_long())//60} minutes.**",
+                    color=constants.EMBED_COLOUR_OK
+                )
                 print("Sending to _cleanup_completed_mission")
                 message = None
                 await _cleanup_completed_mission(interaction, self.mission_data, reddit_complete_text, discord_complete_embed, message, is_complete)
@@ -109,7 +111,8 @@ class MissionFailedModal(Modal):
                 title=f"{self.mission_data.carrier_name} MISSION CONCLUDED",
                 description=f"<@{interaction.user.id}> reports this mission **cannot be completed** and has thus concluded. Reason:\n> {self.reason}."
                             f"\n\n**This mission channel will be removed in {(seconds_long())//60} minutes.**",
-                color=constants.EMBED_COLOUR_ERROR)
+                color=constants.EMBED_COLOUR_ERROR
+            )
 
             print("Sending to _cleanup_completed_mission")
             await _cleanup_completed_mission(interaction, self.mission_data, reddit_complete_text, discord_complete_embed, self.reason, is_complete)

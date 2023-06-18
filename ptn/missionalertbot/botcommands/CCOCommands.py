@@ -21,11 +21,12 @@ import ptn.missionalertbot.constants as constants
 from ptn.missionalertbot.constants import bot, mission_command_channel, certcarrier_role, trainee_role, seconds_long, rescarrier_role, commodities_common, bot_spam_channel
 
 # import local modules
-from ptn.missionalertbot.database.database import find_mission, find_webhook_from_owner, add_webhook_to_database, find_webhook_by_name, delete_webhook_by_name
-from ptn.missionalertbot.modules.helpers import on_app_command_error, check_text_command_channel, convert_str_to_float_or_int, check_command_channel, check_roles
+from ptn.missionalertbot.database.database import find_mission, find_webhook_from_owner, add_webhook_to_database, find_webhook_by_name, delete_webhook_by_name, CarrierDbFields, find_carrier
+from ptn.missionalertbot.modules.helpers import on_app_command_error, convert_str_to_float_or_int, check_command_channel, check_roles
 from ptn.missionalertbot.modules.ImageHandling import assign_carrier_image
-from ptn.missionalertbot.modules.MissionGenerator import gen_mission, confirm_send_mission_via_button
+from ptn.missionalertbot.modules.MissionGenerator import confirm_send_mission_via_button
 from ptn.missionalertbot.modules.MissionCleaner import _cleanup_completed_mission
+from ptn.missionalertbot.modules.MissionEditor import edit_active_mission
 
 
 """
@@ -192,9 +193,83 @@ class CCOCommands(commands.Cog):
         await confirm_send_mission_via_button(interaction, mission_params)
 
 
+    @cco_group.command(name='edit', description='Enter the details you wish to change for a mission in progress.')
+    @describe(
+        carrier = "A unique fragment of the Fleet Carrier name you want to search for.",
+        commodity = "The commodity you want to unload.",
+        system = "The system your mission takes place in.",
+        station = "The station the Fleet Carrier is unloading to.",
+        profit = 'The profit offered in thousands of credits, e.g. for 10k credits per ton enter \'10\'',
+        pads = 'The size of the largest landing pad available at the station.',
+        supply_or_demand = 'The total amount of the commodity required.'
+        )
+    @check_roles([certcarrier_role(), trainee_role(), rescarrier_role()])
+    @check_command_channel(mission_command_channel())
+    async def edit(self, interaction: discord.Interaction, carrier: str, commodity: str = None, system: str = None, station: str = None,
+                profit: str = None, pads: str = None, supply_or_demand: str = None):
+        print(f"/cco edit called by {interaction.user.display_name}")
+        async with interaction.channel.typing():
+
+            if pads:
+                pads = pads.upper()
+
+            # find the target carrier
+            print("Looking for carrier data")
+            carrier_data = find_carrier(carrier, CarrierDbFields.longname.name)
+            if not carrier_data:
+                embed = discord.Embed(
+                    description=f"Error: no carrier found matching {carrier}.",
+                    color=constants.EMBED_COLOUR_ERROR
+                )
+                return await interaction.response.send_message(embed=embed)
+
+            # find mission data for carrier
+            mission_data = find_mission(carrier_data.carrier_long_name, 'Carrier')
+            if not mission_data:
+                embed = discord.Embed(
+                    description=f"Error: no active mission found for {carrier_data.carrier_long_name} ({carrier_data.carrier_identifier}).",
+                    color=constants.EMBED_COLOUR_ERROR
+                )
+                return await interaction.response.send_message(embed=embed)
+
+            # define the original mission_params
+            mission_params = mission_data.mission_params
+
+            print("defined original mission parameters")
+            mission_params.print_values()
+
+            # convert profit from STR to an INT or FLOAT
+            print("Processing profit")
+            if not profit == None:
+                profit_convert = convert_str_to_float_or_int(profit)
+            else:
+                profit_convert = None
+
+            def update_params(mission_params, **kwargs): # a function to update any values that aren't None
+                for attr, value in kwargs.items():
+                    if value is not None:
+                        mission_params.__dict__[attr] = value
+
+            # define the new mission_params
+            update_params(mission_params, carrier_name_search_term = carrier, commodity_search_term = commodity, system = system, station = station,
+                        profit_raw = profit, profit = profit_convert, pads = pads, demand = supply_or_demand)
+
+            print("Defined new_mission_params:")
+            mission_params.print_values()
+
+        await edit_active_mission(interaction, mission_params)
+
+        """
+        1. perform checks on profit, pads, commodity
+        2. edit original sends with new info
+
+        """
+        pass
+
     # autocomplete common commodities
     @load.autocomplete("commodity")
     @unload.autocomplete("commodity")
+    @edit.autocomplete("commodity")
     async def commodity_autocomplete(self, interaction: discord.Interaction, current: str):
         commodities = [] # define the list we will return
         for commodity in commodities_common: # iterate through our common commodities to append them as Choice options to our return list
@@ -204,6 +279,7 @@ class CCOCommands(commands.Cog):
     # autocomplete pads
     @load.autocomplete("pads")
     @unload.autocomplete("pads")
+    @edit.autocomplete("pads")
     async def commodity_autocomplete(self, interaction: discord.Interaction, current: str):
         pads = []
         pads.append(app_commands.Choice(name="Large", value="L"))

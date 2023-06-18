@@ -7,6 +7,7 @@ A Cog for commands that are primarily concerned with the bot's databases.
 import aiohttp
 import asyncio
 import copy
+import os
 import re
 
 # import discord.py
@@ -690,7 +691,9 @@ class DatabaseInteraction(commands.Cog):
             embed = discord.Embed(title=f"Welcome to {carrier_data.carrier_long_name} ({carrier_data.carrier_identifier})", color=constants.EMBED_COLOUR_OK)
             embed = _add_common_embed_fields(embed, carrier_data, interaction)
             carrier_owner_obj = bot.get_user(carrier_data.ownerid)
-            thumbnail_file = discord.File(f"images/{carrier_data.carrier_short_name}.png", filename="image.png")
+            image_name = carrier_data.carrier_short_name + '.png'
+            image_path = os.path.join(constants.IMAGE_PATH, image_name)
+            thumbnail_file = discord.File(image_path, filename="image.png")
             embed.set_thumbnail(url="attachment://image.png")
             embed.set_author(name=carrier_owner_obj.name, icon_url=carrier_owner_obj.display_avatar)
             interaction.user = carrier_owner_obj

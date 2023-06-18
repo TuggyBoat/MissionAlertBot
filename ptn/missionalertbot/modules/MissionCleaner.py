@@ -34,11 +34,12 @@ MISSION COMPLETE & CLEANUP
 """
 
 # clean up a completed mission
-async def _cleanup_completed_mission(interaction, mission_data, reddit_complete_text, discord_complete_embed, message, is_complete):
+async def _cleanup_completed_mission(interaction: discord.Interaction, mission_data, reddit_complete_text, discord_complete_embed: discord.Embed, message, is_complete):
     async with interaction.channel.typing():
         print("called _cleanup_completed_mission")
 
         status = "complete" if is_complete else "unable to complete"
+        thumb = constants.ICON_FC_COMPLETE if is_complete else constants.ICON_FC_EMPTY
 
         try: # for backwards compatibility with missions created before the new column was added
             mission_params = mission_data.mission_params
@@ -81,13 +82,14 @@ async def _cleanup_completed_mission(interaction, mission_data, reddit_complete_
                 # send Discord carrier channel updates
                 # try in case channel already deleted
                 try:
+                    discord_complete_embed.set_thumbnail(url=thumb)
                     await completed_mission_channel.send(embed=discord_complete_embed)
                 except:
                     print(f"Unable to send completion message for {mission_data.carrier_name}, maybe channel deleted?")
 
             # add comment to Reddit post
             print("Add comment to Reddit post...")
-            if mission_data.reddit_post_id and mission_data.reddit_post_id:
+            if mission_data.reddit_post_id:
                 try:  # try in case Reddit is down
                     reddit_post_id = mission_data.reddit_post_id
                     reddit = await get_reddit()
@@ -150,8 +152,9 @@ async def _cleanup_completed_mission(interaction, mission_data, reddit_complete_
             print("Log usage in bot spam")
             spamchannel = bot.get_channel(bot_spam_channel())
             embed = discord.Embed(title=f"Mission {status} for {mission_data.carrier_name}",
-                                description=f"{interaction.user} marked the mission complete in #{interaction.channel.name}",
+                                description=f"<@{interaction.user.id}> reported in <#{interaction.channel.id}> ({interaction.channel.name}).",
                                 color=constants.EMBED_COLOUR_OK)
+            embed.set_thumbnail(url=thumb)
             await spamchannel.send(embed=embed)
 
             if interaction.channel.id == mission_gen_channel.id: # tells us whether /cco complete was used or /mission complete
@@ -161,6 +164,7 @@ async def _cleanup_completed_mission(interaction, mission_data, reddit_complete_
                     color=constants.EMBED_COLOUR_OK)
                 feedback_embed.add_field(name="Explanation given", value=message, inline=True)
                 feedback_embed.set_footer(text="Updated sent alerts and removed from mission list.")
+                feedback_embed.set_thumbnail(url=thumb)
                 await interaction.edit_original_response(embed=feedback_embed)
 
         # notify owner if not command user
@@ -180,8 +184,9 @@ async def _cleanup_completed_mission(interaction, mission_data, reddit_complete_
                                 f"Its mission channel will be removed in {seconds_long()//60} minutes unless a new mission is started.",
                     color=constants.EMBED_COLOUR_QU
                     )
+                dm_embed.set_thumbnail(url=thumb)
                 if not message == None:
-                    embed.add_field(name="Explanation given", value=message, inline=True)
+                    dm_embed.add_field(name="Explanation given", value=message, inline=True)
                 await owner.send(embed=dm_embed)
 
             except Exception as e: # in case the user can't be DMed

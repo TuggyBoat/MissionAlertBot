@@ -44,7 +44,9 @@ class MissionParams:
         self.discord_text = info_dict.get('discord_text', None) # the text used for the trade alert sent to Discord
         self.discord_embeds = info_dict.get('discord_embeds', None) # embeds used for Discord channels/webhooks
         self.discord_alert_id = info_dict.get('discord_alert_id', None) # the message ID of the Discord trade alerts entry
+        self.discord_msg_id = info_dict.get('discord_msg_id', None) # ID of the message sent to the carrier channel
         self.mission_temp_channel_id = info_dict.get('mission_temp_channel_id', None) # the channel ID of the Discord carrier mission channel
+        self.notify_msg_id = info_dict.get('notify_msg_id', None) # ID of the message notifying haulers
         self.webhook_urls = info_dict.get('webhook_urls', []) # a list of the URLs for any webhooks used
         self.webhook_names = info_dict.get('webhook_names', []) # identifiers for webhook URLs
         self.webhook_msg_ids = info_dict.get('webhook_msg_ids', []) # a list of the IDs of any messages sent via webhook
@@ -79,7 +81,9 @@ class MissionParams:
             print(f"reddit_comment_url: {self.reddit_comment_url}")
             print(f"discord_text: {self.discord_text}")
             print(f"discord_alert_id: {self.discord_alert_id}")
+            print(f"discord_msg_id: {self.discord_msg_id}")
             print(f"mission_temp_channel_id: {self.mission_temp_channel_id}")
+            print(f"notify_msg_id: {self.notify_msg_id}")
             print(f"webhook_urls: {self.webhook_urls}")
             print(f"webhook_msg_ids: {self.webhook_msg_ids}")
             print(f"webhook_jump_urls: {self.webhook_jump_urls}")

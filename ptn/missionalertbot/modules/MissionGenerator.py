@@ -7,6 +7,7 @@ Dependencies: constants, database, helpers, Embeds, ImageHandling, MissionCleane
 
 """
 # import libraries
+from typing import List, Optional
 import aiohttp
 import asyncio
 import os
@@ -18,8 +19,9 @@ import typing
 # import discord.py
 import discord
 from discord import Webhook
+from discord.components import SelectOption
 from discord.errors import HTTPException, Forbidden, NotFound
-from discord.ui import View, Modal
+from discord.ui import View, Modal, Select
 
 # import local classes
 from ptn.missionalertbot.classes.MissionData import MissionData
@@ -29,7 +31,7 @@ from ptn.missionalertbot.classes.MissionParams import MissionParams
 import ptn.missionalertbot.constants as constants
 from ptn.missionalertbot.constants import bot, wine_alerts_loading_channel, wine_alerts_unloading_channel, trade_alerts_channel, get_reddit, sub_reddit, \
     reddit_flair_mission_start, seconds_short, sub_reddit, channel_upvotes, upvote_emoji, hauler_role, trade_cat, get_guild, get_overwrite_perms, ptn_logo_discord, \
-    wineloader_role, o7_emoji
+    wineloader_role, o7_emoji, bot_spam_channel
 
 # import local modules
 from ptn.missionalertbot.database.database import backup_database, mission_db, missions_conn, find_carrier, mark_cleanup_channel, CarrierDbFields, \
@@ -61,6 +63,111 @@ Mission generator views
 # class MissionSendMenu(View):
 
 
+# select menu for mission generation
+class MissionSendSelectMenu(Select):
+    def __init__(self, mission_params, author):
+        self.mission_params = mission_params
+        self.author = author
+        options=[
+            discord.SelectOption(label="Webhooks", emoji="🌐", description="Send mission to your webhooks."),
+            discord.SelectOption(label="Reddit", emoji=discord.PartialEmoji.from_str(f"<:upvote:{upvote_emoji()}>"), description="Send mission to the PTN subreddit."),
+            discord.SelectOption(label="Notify Haulers", emoji="🔔", description="Send a notification ping to the appropriate Hauler role."),
+            discord.SelectOption(label="EDMC-OFF", emoji="🤫", description="Flag the mission as EDMC-OFF: sends to PTN Discord only."),
+            discord.SelectOption(label="Discord Only", emoji="❌", description="None of the above: send only to the PTN Discord."),
+            discord.SelectOption(label="Return to menu", emoji="◀", description="Return to the main menu.")
+        ] 
+        super().__init__(placeholder="Select your options", max_values=3, min_values=1, options=options)
+
+    async def callback(self, interaction: discord.Interaction):
+        self.mission_params.sendflags = ['d']
+        if 'Return to menu' in self.values:
+            print("User wants to go back to the buttons")
+            try:
+                view = MissionSendView(self.mission_params, self.author)
+                await interaction.response.edit_message(embeds=self.mission_params.original_message_embeds, view=view)
+                # TODO we should add the message back for timeouts on the buttons
+                # view.message = await self.message does not work
+                return
+            except Exception as e:
+                print(e)
+                return
+
+        if 'Discord Only' in self.values:
+            print("User wants to send to Discord only")
+            try: 
+                await interaction.response.edit_message(embeds=self.mission_params.original_message_embeds, view=None)
+            except Exception as e:
+                print(e)
+            print("Calling mission generator from Send Mission select menu")
+            return await gen_mission(interaction, self.mission_params)
+
+        if 'Webhooks' in self.values:
+            print("Adding webhook send")
+            self.mission_params.sendflags.append('w')
+        
+        if 'Reddit' in self.values:
+            print("Adding Reddit send")
+            self.mission_params.sendflags.append('r')
+
+        if 'Notify Haulers' in self.values:
+            print("Adding hauler notify")
+            self.mission_params.sendflags.append('n')
+
+        if 'EDMC-OFF' in self.values:
+            print("Adding EDMC-OFF flag")
+            self.mission_params.sendflags.append('e')
+
+        try: 
+            await interaction.response.edit_message(embeds=self.mission_params.original_message_embeds, view=None)
+        except Exception as e:
+            print(e)
+
+        print("Calling mission generator from Send Mission select menu")
+        await gen_mission(interaction, self.mission_params)
+
+
+# select menu view for mission generation
+class MissionSendSelectMenuView(View):
+    def __init__(self, mission_params, author: typing.Union[discord.Member, discord.User], timeout=120):
+        self.author = author
+        self.mission_params = mission_params
+        super().__init__(timeout=timeout)
+        view = MissionSendSelectMenu(self.mission_params, self.author)
+        self.add_item(view)
+        
+
+    async def interaction_check(self, interaction: discord.Interaction): # only allow original command user to interact with buttons
+        if interaction.user.id == self.author.id:
+            return True
+        else:
+            embed = discord.Embed(
+                description="Only the command author may use these interactions.",
+                color=constants.EMBED_COLOUR_ERROR
+            )
+            embed.set_image(url='https://media1.tenor.com/images/939e397bf929b9768b24a8fa165301fe/tenor.gif?itemid=26077542')
+            embed.set_footer(text="Seriously, are you 4? 🙄")
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+            return False
+
+    async def on_timeout(self):
+        # return a message to the user that the interaction has timed out
+        timeout_embed = discord.Embed(
+            description="Timed out.",
+            color=constants.EMBED_COLOUR_ERROR
+        )
+
+        # remove buttons
+        self.clear_items()
+
+        if not self.mission_params.sendflags:
+            embeds = [self.mission_params.copypaste_embed, timeout_embed]
+        else:
+            embeds = [self.mission_params.copypaste_embed]
+        try:
+            await self.message.edit(embeds=embeds, view=self) # mission gen ends here
+        except Exception as e:
+            print(e)
+
 
 # buttons for mission generation
 class MissionSendView(View):
@@ -69,7 +176,7 @@ class MissionSendView(View):
         self.mission_params = mission_params
         super().__init__(timeout=timeout)
 
-    @discord.ui.button(label="Send All", style=discord.ButtonStyle.success, emoji="📢", custom_id="sendall")
+    @discord.ui.button(label="Send All", style=discord.ButtonStyle.success, emoji="📢", custom_id="sendall", row=1)
     async def send_mission_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         button.disabled=True
         print(f"{interaction.user.display_name} is sending their mission to all available sources using default send button")
@@ -89,7 +196,7 @@ class MissionSendView(View):
         print("Calling mission generator from Send Mission button")
         await gen_mission(interaction, self.mission_params)
 
-    @discord.ui.button(label="Send EDMC-OFF", style=discord.ButtonStyle.primary, emoji="🤫", custom_id="edmcoff")
+    @discord.ui.button(label="Send EDMC-OFF", style=discord.ButtonStyle.primary, emoji="🤫", custom_id="edmcoff", row=1)
     async def edmc_off_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         button.disabled=True
         print(f"{interaction.user.display_name} is sending their mission via EDMC-OFF preset button")
@@ -105,13 +212,7 @@ class MissionSendView(View):
         print("Calling mission generator from Send Mission button")
         await gen_mission(interaction, self.mission_params)
 
-    @discord.ui.button(label="Add/Change Message", style=discord.ButtonStyle.secondary, emoji="✍", custom_id="message")
-    async def message_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        print(f"{interaction.user.display_name} wants to add a message to their mission")
-    
-        await interaction.response.send_modal(AddMessageModal(self.mission_params, view=self))
-
-    @discord.ui.button(label="Cancel", style=discord.ButtonStyle.danger, emoji="✖", custom_id="cancel")
+    @discord.ui.button(label="Cancel", style=discord.ButtonStyle.danger, emoji="✖", custom_id="cancel", row=1)
     async def cancel_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         button.disabled=True
 
@@ -126,6 +227,34 @@ class MissionSendView(View):
             embeds.extend(self.mission_params.original_message_embeds)
             embeds.append(cancelled_embed)
             await interaction.response.edit_message(embeds=embeds, view=self) # mission gen ends here
+        except Exception as e:
+            print(e)
+
+    @discord.ui.button(label="Set Message", style=discord.ButtonStyle.secondary, emoji="✍", custom_id="message", row=2)
+    async def message_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        print(f"{interaction.user.display_name} wants to add a message to their mission")
+    
+        await interaction.response.send_modal(AddMessageModal(self.mission_params, view=self))
+
+    @discord.ui.button(label="Select Sends From Menu", style=discord.ButtonStyle.secondary, emoji="☑", custom_id="menu", row=2)
+    async def menu_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        print(f"{interaction.user.display_name} wants to use select menu")
+
+        try:
+            self.clear_items()
+            menuview = MissionSendSelectMenuView(self.mission_params, self.author)
+            embed = discord.Embed(
+                description="Mission will be sent to the PTN Discord as well as any options you select.",
+                color=constants.EMBED_COLOUR_QU
+            )
+            embeds = []
+            embeds.extend(self.mission_params.original_message_embeds)
+            embeds.append(embed)
+            await interaction.response.edit_message(embeds=embeds, view=menuview)
+
+            # add the message attribute to the view so it can be retrieved by on_timeout
+            menuview.message = await interaction.original_response()
+            # await interaction.response.edit_message(content="Hello", view=menuview)
         except Exception as e:
             print(e)
 
@@ -153,13 +282,13 @@ class MissionSendView(View):
         self.clear_items()
 
         if not self.mission_params.sendflags:
-            embeds = []
-            embeds.extend(self.mission_params.original_message_embeds)
-            embeds.append(timeout_embed)
+            embeds = [self.mission_params.copypaste_embed, timeout_embed]
         else:
-            embeds = []
-            embeds.extend(self.mission_params.original_message_embeds)
-        await self.message.edit(embeds=embeds, view=self) # mission gen ends here
+            embeds = [self.mission_params.copypaste_embed]
+        try:
+            await self.message.edit(embeds=embeds, view=self) # mission gen ends here
+        except Exception as e:
+            print(e)
 
 
 # modal for message button
@@ -211,6 +340,45 @@ class AddMessageModal(Modal):
 Mission generator helpers
 
 """
+
+async def validate_profit(interaction: discord.Interaction, mission_params):
+    if not float(mission_params.profit):
+        profit_error_embed = discord.Embed(
+            description=f"ERROR: Profit must be a number (int or float), e.g. '10' or '4.5' but not 'ten' or 'lots' or '{mission_params.profit_raw}'.",
+            color=constants.EMBED_COLOUR_ERROR
+        )
+        profit_error_embed.set_footer(text="You complete banana.")
+        mission_params.returnflag = False
+        return await interaction.channel.send(embed=profit_error_embed)
+
+
+async def validate_pads(interaction: discord.Interaction, mission_params):
+    if mission_params.pads not in ['M', 'L']:
+        # In case a user provides some junk for pads size, gate it
+        print(f'Exiting mission generation requested by {interaction.user} as pad size is invalid, provided: {mission_params.pads}')
+        pads_error_embed = discord.Embed(
+            description=f"ERROR: Pads must be 'L' or 'M', or use autocomplete to select 'Large' or 'Medium'. '{mission_params.pads}' is right out.",
+            color=constants.EMBED_COLOUR_ERROR
+        )
+        pads_error_embed.set_footer(text="You silly goose.")
+        mission_params.returnflag = False
+        return await interaction.channel.send(embed=pads_error_embed)
+
+
+async def define_commodity(interaction: discord.Interaction, mission_params):
+    # define commodity
+    if mission_params.commodity_search_term in constants.commodities_common:
+        # the user typed in the name perfectly or used autocomplete so we don't need to bother querying the commodities db
+        mission_params.commodity_name = mission_params.commodity_search_term
+    else: # check if commodity can be found based on user's search term, exit gracefully if not
+        mission_params.returnflag = False 
+        await find_commodity(mission_params, interaction)
+        if not mission_params.returnflag:
+            return # we've already given the user feedback on why there's a problem, we just want to quit gracefully now
+        if not mission_params.commodity_name:  # error condition
+            raise ValueError('Missing commodity data')
+
+
 async def return_discord_alert_embed(interaction, mission_params):
     if mission_params.mission_type == 'load':
         embed = discord.Embed(description=mission_params.discord_text, color=constants.EMBED_COLOUR_LOADING)
@@ -382,7 +550,7 @@ async def send_mission_to_discord(interaction, mission_params):
             pin_edmc = await mission_temp_channel.send(file=edmc_file, embed=embed)
             await pin_edmc.pin()
 
-            embed = discord.Embed(title=f"EDMC OFF messages sent", description='External posts (Reddit, Webhooks) will be skipped.',
+            embed = discord.Embed(title=f"EDMC OFF messages sent for {mission_params.carrier_data.carrier_long_name}", description='External posts (Reddit, Webhooks) will be skipped.',
                         color=constants.EMBED_COLOUR_DISCORD)
             embed.set_thumbnail(url=constants.ICON_EDMC_OFF)
             await interaction.channel.send(embed=embed)
@@ -390,6 +558,7 @@ async def send_mission_to_discord(interaction, mission_params):
             print('Reacting to #official-trade-alerts message with EDMC OFF')
             for r in ["🇪","🇩","🇲","🇨","📴"]:
                 await trade_alert_msg.add_reaction(r)
+        # --- end of EDMC-OFF section ---
 
         discord_file = discord.File(mission_params.discord_img_name, filename="image.png")
 
@@ -404,6 +573,7 @@ async def send_mission_to_discord(interaction, mission_params):
         print("Sending image and embeds...")
         # pin the carrier trade msg sent by the bot
         pin_msg = await mission_temp_channel.send(file=discord_file, embeds=send_embeds)
+        mission_params.discord_msg_id = pin_msg.id
         print("Pinning sent message...")
         await pin_msg.pin()
         print("Feeding back to user...")
@@ -570,7 +740,8 @@ async def notify_hauler_role(interaction, mission_params, mission_temp_channel):
     print("User used option n")
 
     ping_role_id = wineloader_role() if mission_params.commodity_name == 'Wine' else hauler_role()
-    await mission_temp_channel.send(f"<@&{ping_role_id}>: {mission_params.discord_text}")
+    notify_msg = await mission_temp_channel.send(f"<@&{ping_role_id}>: {mission_params.discord_text}")
+    mission_params.notify_msg_id = notify_msg.id
 
     embed = discord.Embed(
         title=f"Mission notification sent for {mission_params.carrier_data.carrier_long_name}",
@@ -640,47 +811,37 @@ async def confirm_send_mission_via_button(interaction: discord.Interaction, miss
         # check the details with the user
         confirm_embed = discord.Embed(
             title=f"{mission_params.mission_type.upper()}ING: {mission_params.carrier_data.carrier_long_name}",
-            description="Confirm details and send targets:",
+            description=f"Confirm mission details and choose send targets for {mission_params.carrier_data.carrier_long_name}.",
             color=constants.EMBED_COLOUR_QU
         )
         thumb_url = constants.ICON_FC_LOADING if mission_params.mission_type == 'load' else constants.ICON_FC_UNLOADING
         confirm_embed.set_thumbnail(url=thumb_url)
 
-        confirm_embed.add_field(
-            name="Commodity", value=f"**{mission_params.commodity_name.upper()}**", inline=True
-        )
-        confirm_embed.add_field(
-            name="Profit", value=f"**{mission_params.profit}K/TON** x **{mission_params.demand.upper()}**", inline=True
-        )
-        confirm_embed.add_field(
-            name="System", value=f"**{mission_params.system}**", inline=True
-        )
-        confirm_embed.add_field(
-            name="Station", value=f"**{mission_params.station}** (**{mission_params.pads}**-PADS)", inline=True
-        )
+        confirm_embed = _mission_summary_embed(mission_params, confirm_embed)
 
         webhook_embed = None
 
         if mission_params.webhook_names:
-            desc_txt = ', '.join(mission_params.webhook_names)
             webhook_embed = discord.Embed(
-                title="Webhooks found",
-                description=desc_txt,
+                title=f"Webhooks found for {interaction.user.display_name}",
+                description="- Webhooks are saved to your user ID and therefore shared between all your registered Fleet Carriers.\n" \
+                            "- Clicking `📢 Send All` or choosing the `🌐 Webhooks` option from the Send Menu will send to *all* webhooks registered to your user.",
                 color=constants.EMBED_COLOUR_DISCORD
             )
+            for webhook_name in mission_params.webhook_names:
+                webhook_embed.add_field(name="Webhook found", value=webhook_name)
             webhook_embed.set_thumbnail(url=constants.ICON_WEBHOOK_PTN)
 
         mission_params.sendflags = None # used to check for timeout status in View
 
+        if webhook_embed: mission_params.original_message_embeds.append(webhook_embed)
+        mission_params.original_message_embeds.append(confirm_embed)
+
         view = MissionSendView(mission_params, interaction.user) # buttons to add
 
-        embeds = []
-        embeds.extend(mission_params.original_message_embeds)
-        if webhook_embed: embeds.append(webhook_embed)
-        embeds.append(confirm_embed)
-        
-        await interaction.edit_original_response(embeds=embeds, view=view)
+        await interaction.edit_original_response(embeds=mission_params.original_message_embeds, view=view)
 
+        # add the message attribute to the view so it can be retrieved by on_timeout
         view.message = await interaction.original_response()
 
 
@@ -694,23 +855,11 @@ async def prepare_for_gen_mission(interaction: discord.Interaction, mission_para
     - check if carrier has a valid mission image
     """
 
-    if not float(mission_params.profit):
-        profit_error_embed = discord.Embed(
-            description=f"ERROR: Profit must be a number (int or float), e.g. '10' or '4.5' but not 'ten' or 'lots' or '{mission_params.profit_raw}'.",
-            color=constants.EMBED_COLOUR_ERROR
-        )
-        profit_error_embed.set_footer(text="You complete banana.")
-        return await interaction.channel.send(embed=profit_error_embed)
+    # validate profit
+    await validate_profit(interaction, mission_params)
 
-    if mission_params.pads not in ['M', 'L']:
-        # In case a user provides some junk for pads size, gate it
-        print(f'Exiting mission generation requested by {interaction.user} as pad size is invalid, provided: {mission_params.pads}')
-        pads_error_embed = discord.Embed(
-            description=f"ERROR: Pads must be 'L' or 'M', or use autocomplete to select 'Large' or 'Medium'. '{mission_params.pads}' is right out.",
-            color=constants.EMBED_COLOUR_ERROR
-        )
-        pads_error_embed.set_footer(text="You silly goose.")
-        return await interaction.channel.send(embed=pads_error_embed)
+    # validate pads
+    await validate_pads(interaction, mission_params)
 
     # check if the carrier can be found, exit gracefully if not
     carrier_data = find_carrier(mission_params.carrier_name_search_term, CarrierDbFields.longname.name)
@@ -768,16 +917,7 @@ async def prepare_for_gen_mission(interaction: discord.Interaction, mission_para
             return await interaction.channel.send(embed=embed) # error condition
 
     # define commodity
-    if mission_params.commodity_search_term in constants.commodities_common:
-        # the user typed in the name perfectly or used autocomplete so we don't need to bother querying the commodities db
-        mission_params.commodity_name = mission_params.commodity_search_term
-    else: # check if commodity can be found based on user's search term, exit gracefully if not
-        mission_params.returnflag = False 
-        await find_commodity(mission_params, interaction)
-        if not mission_params.returnflag:
-            return # we've already given the user feedback on why there's a problem, we just want to quit gracefully now
-        if not mission_params.commodity_name:  # error condition
-            raise ValueError('Missing commodity data')
+    await define_commodity(interaction, mission_params)
 
     # add any webhooks to mission_params
     webhook_data = find_webhook_from_owner(interaction.user.id)
@@ -792,7 +932,7 @@ async def prepare_for_gen_mission(interaction: discord.Interaction, mission_para
 
 
 # mission generator called by loading/unloading commands
-async def gen_mission(interaction, mission_params):
+async def gen_mission(interaction: discord.Interaction, mission_params):
     # generate a timestamp for mission creation
     mission_params.timestamp = get_formatted_date_string()[2]
 
@@ -803,8 +943,8 @@ async def gen_mission(interaction, mission_params):
     print(f'Mission generation type: {mission_params.mission_type} requested by {interaction.user}. Request triggered from '
         f'channel {current_channel}.')
 
-    try: # this try/except pair is to try and ensure the channel lock is released if something breaks during mission gen
-        # otherwise the bot freezes next time the lock is attempted
+    try: # this try/except block is to try and ensure the channel lock is released if something breaks during mission gen
+         # otherwise the bot freezes next time the lock is attempted
 
         mission_params.edmc_off = True if "e" in mission_params.sendflags else False
 
@@ -841,7 +981,7 @@ async def gen_mission(interaction, mission_params):
 
             if any(letter in mission_params.sendflags for letter in ["r", "w"]) and mission_params.edmc_off: # scold the user for being very silly
                 embed = discord.Embed(
-                    title="EXTERNAL SENDS SKIPPED",
+                    title=f"EXTERNAL SENDS SKIPPED FOR {mission_params.carrier_data.carrier_long_name}",
                     description="Cannot send to Reddit or Webhooks as you flagged the mission as **EDMC-OFF**.",
                     color=constants.EMBED_COLOUR_ERROR
                 )
@@ -888,7 +1028,22 @@ async def gen_mission(interaction, mission_params):
         await interaction.channel.send(embed=embed)
         print("Error on mission generation:")
         print(e)
-        carrier_channel_lock.release()
+
+        # notify bot spam
+        spamchannel = bot.get_channel(bot_spam_channel())
+
+        message = await interaction.original_response()
+
+        embed = discord.Embed(
+            description=f"Error on mission generation by <@{interaction.user.id}> at {message.jump_url}:\n\n{e}\n\n{text}",
+            color=constants.EMBED_COLOUR_ERROR
+        )
+        await spamchannel.send(embed=embed)
+
+        try:
+            carrier_channel_lock.release()
+        except Exception as e:
+            print(e)
         if mission_params.mission_temp_channel_id:
             await remove_carrier_channel(mission_params.mission_temp_channel_id, seconds_short)
 
@@ -992,9 +1147,13 @@ Mission database
 
 # add mission to DB, called from mission generator
 async def mission_add(mission_params):
+    print("Called mission_add")
     backup_database('missions')  # backup the missions database before going any further
 
     # pickle the mission_params
+    print("Pickle the params")
+    attrs = vars(mission_params)
+    print(attrs)
     pickled_mission_params = pickle.dumps(mission_params)
 
     print("Called mission_add to write to database")
@@ -1012,35 +1171,58 @@ async def mission_add(mission_params):
     carriers_conn.commit()
 
     # now we can release the channel lock
-    carrier_channel_lock.release()
-    print("Channel lock released")
+    try:
+        carrier_channel_lock.release()
+        print("Channel lock released")
+    except Exception as e:
+        print(e)
     return
 
 
-async def mission_generation_complete(interaction, mission_params):
+async def mission_generation_complete(interaction: discord.Interaction, mission_params):
+    print("reached mission_generation_complete")
 
     # fetch data we just committed back
 
-    mission_db.execute('''SELECT * FROM missions WHERE carrier LIKE (?)''',
-                        ('%' + mission_params.carrier_data.carrier_long_name + '%',))
-    print('DB command ran, go fetch the result')
-    mission_data = MissionData(mission_db.fetchone())
-    print(f'Found mission data: {mission_data}')
+    mission_data = find_mission(mission_params.carrier_data.carrier_long_name, 'carrier')
 
     # return result to user
 
-    embed_colour = constants.EMBED_COLOUR_LOADING if mission_data.mission_type == 'load' else \
-        constants.EMBED_COLOUR_UNLOADING
+    # define return embed colours/icons based on mission type
+    if mission_data.mission_type == 'load':
+        embed_colour = constants.EMBED_COLOUR_LOADING
+        thumbnail_url = constants.ICON_FC_LOADING
+    else:
+        embed_colour = constants.EMBED_COLOUR_UNLOADING
+        thumbnail_url = constants.ICON_FC_UNLOADING
 
-    mission_description = mission_data.rp_text if not mission_data.rp_text == None else ''
+    embed = discord.Embed(
+        title=f"{mission_data.mission_type.upper()}ING {mission_data.carrier_name} ({mission_data.carrier_identifier})",
+        description="Mission successfully entered into the missions database. You can use `/missions` to view a list of active missions" \
+                   f" or `/mission information` in <#{mission_data.channel_id}> to view its mission information from the database.",
+        color=embed_colour
+    )
+    embed.set_thumbnail(url=thumbnail_url)
 
-    embed = discord.Embed(title=f"{mission_data.mission_type.upper()}ING {mission_data.carrier_name} ({mission_data.carrier_identifier})",
-                            description=mission_description, color=embed_colour)
-
-    embed = _mission_summary_embed(mission_data, embed)
+    # update the embed with mission data fields
+    embed = _mission_summary_embed(mission_data.mission_params, embed)
 
     embed.set_footer(text="You can use /cco complete <carrier> to mark the mission complete.")
 
     await interaction.channel.send(embed=embed)
+
+    # notify bot spam
+    try:
+        spamchannel = bot.get_channel(bot_spam_channel())
+
+        message = await interaction.original_response()
+
+        embed = discord.Embed(
+            description=f"<@{interaction.user.id}> started or updated a mission for {mission_data.carrier_name} from <#{interaction.channel.id}>: {message.jump_url}",
+            color=constants.EMBED_COLOUR_QU
+        )
+        await spamchannel.send(embed=embed)
+    except Exception as e:
+        print(e)
     print("Mission generation complete")
     return

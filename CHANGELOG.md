@@ -9,6 +9,10 @@ Refactoring:
     - Misison generation is now more resilient to errors and communicates better when something goes wrong
 - Added `Commodities.py` in preparation for adding a method to build the Commodities database from scratch
 - Added custom errors for interaction role and channel checks, and called them via the global error handler
+- More errors handled elegantly
+- More helpful notifications to bot-spam
+- Many bot-spam messages converted to embeds
+- Many response messages converted to embeds
 - Many small changes here and there
 
 Removed commands:
@@ -19,11 +23,10 @@ Removed commands:
 Changed commands:
 - `load` and `unload` are now `/cco load` and `/cco unload` respectively
     - added describes to all parameters
-    - added autocomplete for common commodities
-    - added autocomplete for pad size
-    - ETA and RP text have been merged into the new "Message" feature
+    - added autocomplete for common commodities and pad size
+    - ETA and RP text have been merged into the new "Message" feature:
         - "Message" is entered via Modal and sent to Discord destinations in a separate embed
-    - letter-based input for sends replaced with buttons
+    - buttons or select menu options for sends, replacing chat letter entry
     - added icons for send status embeds
     - completely new embed format for Discord
     - added ability to send via webhook
@@ -43,6 +46,7 @@ New commands:
 - `/cco webhook add` - CCO only - used to add a webhook to that CCO's personal list
 - `/cco webhook view` - CCO only - shows their webhooks
 - `/cco webhook delete` - CCO only - used to remove a webhook from their list
+- `/cco edit` - CCO only - used to edit an in-progress mission. Presently only the original interaction parameters can be edited (i.e. the fields added via slash command). Editing message and mission type will be implemented in a future update.
 
 
 ## 2.0.0

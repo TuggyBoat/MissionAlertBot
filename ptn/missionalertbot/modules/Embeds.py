@@ -44,20 +44,26 @@ async def _is_mission_active_embed(carrier_data):
     embed = discord.Embed(title=f"{mission_data.mission_type.upper()}ING {mission_data.carrier_name} ({mission_data.carrier_identifier})",
                             description=mission_description, color=embed_colour)
 
-    embed = _mission_summary_embed(mission_data, embed)
+    embed = _mission_summary_embed(mission_data.mission_params, embed)
 
     embed.set_footer(text="You can use /mission complete if the mission is complete.")
     return embed
 
 
 # return an embed summarising a mission database entry
-def _mission_summary_embed(mission_data, embed):
-    embed.add_field(name="System", value=f"{mission_data.system.upper()}", inline=True)
-    embed.add_field(name="Station", value=f"{mission_data.station.upper()} ({mission_data.pad_size}-pads)",
-                    inline=True)
-    embed.add_field(name="Commodity", value=f"{mission_data.commodity.upper()}", inline=True)
-    embed.add_field(name="Quantity and profit",
-                    value=f"{mission_data.demand} units at {mission_data.profit}k profit per unit", inline=True)
+def _mission_summary_embed(mission_params, embed):
+    embed.add_field(
+        name="Commodity", value=f"**{mission_params.commodity_name.upper()}**", inline=True
+    )
+    embed.add_field(
+        name="Profit", value=f"**{mission_params.profit}K/TON** x **{mission_params.demand.upper()}**", inline=False
+    )
+    embed.add_field(
+        name="System", value=f"**{mission_params.system}**", inline=True
+    )
+    embed.add_field(
+        name="Station", value=f"**{mission_params.station}** (**{mission_params.pads}**-PADS)", inline=True
+    )
     return embed
 
 

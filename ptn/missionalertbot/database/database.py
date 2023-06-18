@@ -125,6 +125,7 @@ mission_db_lock = asyncio.Lock()
 
 # dump db to .sql file
 def dump_database_test(database_name):
+    print("Called dump_database_test")
     """
     Dumps the database object to a .sql text file while backing up the database. Used just to get something we can
     recreate the database from.  This will only store the last state and should periodically be committed to the repo
@@ -733,6 +734,83 @@ def find_mission(searchterm, searchfield):
         return mission_data
 
     return mission_data
+
+
+# carrier edit function
+async def _update_mission_in_database(mission_params):
+    print("Called _update_mission_in_database")
+    """
+    Updates the mission details in the database.
+
+    :param mission_params The new mission data to write
+    """
+    backup_database('missions')  # backup the carriers database before going any further
+
+    # TODO: Write to the database
+    print("Getting mission db lock...")
+    await mission_db_lock.acquire()
+
+    print("Pickling mission_params...")
+    pickled_mission_params = pickle.dumps(mission_params)
+
+    try:
+        data = (
+            mission_params.carrier_data.carrier_long_name,
+            mission_params.carrier_data.carrier_identifier,
+            mission_params.mission_temp_channel_id,
+            mission_params.commodity_name,
+            mission_params.mission_type,
+            mission_params.system,
+            mission_params.station,
+            mission_params.profit,
+            mission_params.pads,
+            mission_params.demand,
+            mission_params.cco_message_text,
+            mission_params.reddit_post_id,
+            mission_params.reddit_post_url,
+            mission_params.reddit_comment_id,
+            mission_params.reddit_comment_url,
+            mission_params.discord_alert_id,
+            pickled_mission_params,
+            mission_params.carrier_data.carrier_long_name
+        )
+        # Handy number to print out what the database connection is actually doing
+        missions_conn.set_trace_callback(print)
+
+        # define our SQL update statement
+        statement = """
+        UPDATE missions
+        SET carrier = ?,
+            cid = ?,
+            channelid = ?,
+            commodity = ?,
+            missiontype = ?,
+            system = ?,
+            station = ?,
+            profit = ?,
+            pad = ?,
+            demand = ?,
+            rp_text = ?,
+            reddit_post_id = ?,
+            reddit_post_url = ?,
+            reddit_comment_id = ?,
+            reddit_comment_url = ?,
+            discord_alert_id = ?,
+            mission_params = ?
+        WHERE carrier LIKE ?
+        """
+
+        print("Executing update...")
+        mission_db.execute(statement, data)
+        print("Committing...")
+        missions_conn.commit()
+    except Exception as e:
+        print(e)
+    finally:
+        print("Releasing mission_db lock")
+        mission_db_lock.release()
+        print("Completed _update_mission_in_database")
+        return
 
 
 # check if a carrier is for a registered PTN fleet carrier
