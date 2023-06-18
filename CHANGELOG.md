@@ -8,6 +8,7 @@ Refactoring:
 - Major changes to the internal structure of the mission generator
     - Misison generation is now more resilient to errors and communicates better when something goes wrong
 - Added `Commodities.py` in preparation for adding a method to build the Commodities database from scratch
+- Added custom errors for interaction role and channel checks, and called them via the global error handler
 - Many small changes here and there
 
 Removed commands:
@@ -20,7 +21,8 @@ Changed commands:
     - added describes to all parameters
     - added autocomplete for common commodities
     - added autocomplete for pad size
-    - "rp text" is now referred to as "message", and is entered via button input
+    - ETA and RP text have been merged into the new "Message" feature
+        - "Message" is entered via Modal and sent to Discord destinations in a separate embed
     - letter-based input for sends replaced with buttons
     - added icons for send status embeds
     - completely new embed format for Discord

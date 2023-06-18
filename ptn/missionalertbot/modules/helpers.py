@@ -16,7 +16,7 @@ import sys
 # import discord.py
 import discord
 from discord import Interaction, app_commands
-from discord.app_commands import AppCommandError
+from discord.app_commands import AppCommandError, CheckFailure
 from discord.errors import HTTPException, Forbidden, NotFound
 from discord.ext import commands
 
@@ -34,6 +34,20 @@ from ptn.missionalertbot.database.database import find_community_carrier, CCDbFi
 # channel lock
 carrier_channel_lock = asyncio.Lock()
 
+# custom errors
+class CommandChannelError(app_commands.CheckFailure): # channel check error
+    def __init__(self, permitted_channel):
+        self.permitted_channel = permitted_channel
+        super().__init__(permitted_channel, "Channel check error raised")
+    pass
+
+
+class CommandRoleError(app_commands.CheckFailure): # role check error
+    def __init__(self, permitted_roles, formatted_role_list):
+        self.permitted_roles = permitted_roles
+        self.formatted_role_list = formatted_role_list
+        super().__init__(permitted_roles, formatted_role_list, "Role check error raised")
+    pass
 
 """
 A primitive global error handler for all app commands (slash & ctx menus)
@@ -45,7 +59,43 @@ async def on_app_command_error(
     error: AppCommandError
 ):
     print(f"Error from {interaction.command.name} in {interaction.channel.name} called by {interaction.user.display_name}: {error}")
-    return await interaction.response.send_message(error, ephemeral=True)
+
+    try:
+        if isinstance(error, CommandChannelError):
+            print("Channel check error raised")
+            permitted_channel = error.args[0]
+            embed=discord.Embed(
+                description=f"Sorry, you can only run this command out of: <#{permitted_channel}>.",
+                color=constants.EMBED_COLOUR_ERROR
+            )
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+
+        elif isinstance(error, CommandRoleError):
+            print("Role check error raised")
+            permitted_roles = error.args[0]
+            formatted_role_list = error.args[1]
+            if len(permitted_roles)>1:
+                embed=discord.Embed(
+                    description=f"**Permission denied**: You need one of the following roles to use this command:\n{formatted_role_list}",
+                    color=constants.EMBED_COLOUR_ERROR
+                )
+            else:
+                embed=discord.Embed(
+                    description=f"**Permission denied**: You need the following role to use this command:\n{formatted_role_list}",
+                    color=constants.EMBED_COLOUR_ERROR
+                )
+            print("notify user")
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+
+        else:
+            print("Generic error message raised")
+            try:
+                await interaction.response.send_message(error, ephemeral=True)
+            except:
+                await interaction.followup.send(error, ephemeral=True)
+
+    except Exception as e:
+        print(f"An error occurred in the error handler (lol): {e}")
 
 
 # trio of helper functions to check a user's permission to run a command based on their roles, and return a helpful error if they don't have the correct role(s)
@@ -65,18 +115,7 @@ async def checkroles_actual(interaction: discord.Interaction, permitted_role_ids
         print(permitted_roles)
         permission = True if any(x in permitted_roles for x in author_roles) else False
         print(permission)
-        if not permission:
-            role_list = []
-            for role in permitted_role_ids:
-                role_list.append(f'<@&{role}> ')
-                formatted_role_list = " • ".join(role_list)
-            if len(permitted_roles)>1:
-                embed=discord.Embed(description=f"**Permission denied**: You need one of the following roles to use this command:\n{formatted_role_list}", color=constants.EMBED_COLOUR_ERROR)
-            else:
-                embed=discord.Embed(description=f"**Permission denied**: You need the following role to use this command:\n{formatted_role_list}", color=constants.EMBED_COLOUR_ERROR)
-            # hacky way to check whether we were sent an interaction object or a ctx object is to check attributes.
-            # ctx has the author attribute, interaction does not, so we may as well use that since we already used it earlier
-            await interaction.response.send_message(embed=embed, ephemeral=True)
+        return permission, permitted_roles
     except Exception as e:
         print(e)
     return permission
@@ -84,7 +123,18 @@ async def checkroles_actual(interaction: discord.Interaction, permitted_role_ids
 
 def check_roles(permitted_role_ids):
     async def checkroles(interaction: discord.Interaction): # TODO convert messages to custom error handler, make work with text commands
-        permission = await checkroles_actual(interaction, permitted_role_ids)
+        permission, permitted_roles = await checkroles_actual(interaction, permitted_role_ids)
+        print("Inherited permission from checkroles")
+        if not permission: # raise our custom error to notify the user gracefully
+            role_list = []
+            for role in permitted_role_ids:
+                role_list.append(f'<@&{role}> ')
+                formatted_role_list = " • ".join(role_list)
+            try:
+                raise CommandRoleError(permitted_roles, formatted_role_list)
+            except CommandRoleError as e:
+                print(e)
+                raise
         return permission
     return app_commands.check(checkroles)
 
@@ -98,12 +148,15 @@ def check_command_channel(permitted_channel):
         """
         Check if the channel the command was run in, matches the channel it can only be run from
         """
+        print("check_command_channel called")
         permitted = bot.get_channel(permitted_channel)
         if ctx.channel != permitted:
             # problem, wrong channel, no progress
-            embed=discord.Embed(description=f"Sorry, you can only run this command out of: <#{permitted_channel}>.", color=constants.EMBED_COLOUR_ERROR)
-            await ctx.response.send_message(embed=embed, ephemeral=True)
-            return False
+            try:
+                raise CommandChannelError(permitted_channel)
+            except CommandChannelError as e:
+                print(e)
+                raise
         else:
             return True
     return app_commands.check(check_channel)
