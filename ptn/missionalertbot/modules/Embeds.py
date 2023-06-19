@@ -56,7 +56,7 @@ def _mission_summary_embed(mission_params, embed):
         name="Commodity", value=f"**{mission_params.commodity_name.upper()}**", inline=True
     )
     embed.add_field(
-        name="Profit", value=f"**{mission_params.profit}K/TON** x **{mission_params.demand.upper()}**", inline=False
+        name="Profit", value=f"**{mission_params.profit}K/TON** x **{mission_params.demand}K**", inline=False
     )
     embed.add_field(
         name="System", value=f"**{mission_params.system}**", inline=True
@@ -75,7 +75,7 @@ def _format_missions_embed(mission_data_list, embed):
     for mission_data in mission_data_list:
         embed.add_field(name=f"{mission_data.carrier_name}", value=f"<#{mission_data.channel_id}>", inline=True)
         embed.add_field(name=f"{mission_data.commodity}",
-                        value=f"{mission_data.demand} at {mission_data.profit}k/unit", inline=True)
+                        value=f"{mission_data.demand}k at {mission_data.profit}k/unit", inline=True)
         embed.add_field(name=f"{mission_data.system.upper()} system",
                         value=f"{mission_data.station} ({mission_data.pad_size}-pads)", inline=True)
     return embed

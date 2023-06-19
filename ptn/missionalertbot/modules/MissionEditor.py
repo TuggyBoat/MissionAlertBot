@@ -16,8 +16,7 @@ from discord.ui import View, Modal
 
 # import local constants
 import ptn.missionalertbot.constants as constants
-from ptn.missionalertbot.constants import bot, trade_alerts_channel, bot_spam_channel, wine_alerts_loading_channel, wine_alerts_unloading_channel, get_reddit, \
-     sub_reddit, reddit_flair_mission_start, reddit_flair_mission_stop, channel_upvotes, upvote_emoji, wineloader_role, hauler_role
+from ptn.missionalertbot.constants import bot, bot_spam_channel, get_reddit, upvote_emoji, wineloader_role, hauler_role
 
 # import local modules
 from ptn.missionalertbot.database.database import _update_mission_in_database
@@ -106,7 +105,7 @@ class EditConfirmView(View):
             print(e)
 
 
-async def edit_active_mission(interaction: discord.Interaction, mission_params):
+async def edit_active_mission(interaction: discord.Interaction, mission_params, original_commodity):
     print("Called edit_active_mission")
     mission_params.returnflag = True
 
@@ -122,7 +121,17 @@ async def edit_active_mission(interaction: discord.Interaction, mission_params):
     print("Finding commodity")
     await define_commodity(interaction, mission_params)
 
+    print(original_commodity, mission_params.commodity_name)
+    if original_commodity != mission_params.commodity_name:
+        if original_commodity or mission_params.commodity_name == 'Wine': await commodity_wine_error(interaction, mission_params)
+
     if not mission_params.returnflag:
+        embed = discord.Embed(
+            description="Mission edit could not continue.",
+            color=constants.EMBED_COLOUR_ERROR
+        )
+        mission_params.edit_embed = embed
+        await interaction.response.send_message(embed=embed)
         return
 
     confirm_embed = discord.Embed(
@@ -157,11 +166,14 @@ async def edit_discord_alerts(interaction: discord.Interaction, mission_params):
             # find alerts channel
             if mission_params.commodity_name.title() == "Wine":
                 if mission_params.mission_type == 'load':
-                    alerts_channel = bot.get_channel(wine_alerts_loading_channel())
+                    alerts_channel = bot.get_channel(mission_params.channel_defs.wine_loading_channel_actual)
                 else:   # unloading block
-                    alerts_channel = bot.get_channel(wine_alerts_unloading_channel())
+                    alerts_channel = bot.get_channel(mission_params.channel_defs.wine_unloading_channel_actual)
             else:
-                alerts_channel = bot.get_channel(trade_alerts_channel())
+                alerts_channel = bot.get_channel(mission_params.channel_defs.alerts_channel_actual)
+
+            print(alerts_channel)
+            print(mission_params.discord_alert_id)
 
             # get message object from trade alerts
             print("Fetch alerts message from Discord by ID")
@@ -198,7 +210,7 @@ async def edit_discord_alerts(interaction: discord.Interaction, mission_params):
             if mission_params.cco_message_text is not None: send_embeds.append(discord_embeds.owner_text_embed)
 
             print("Editing message...")
-            await discord_channel_msg.edit(embeds=send_embeds)
+            await discord_channel_msg.edit(content=mission_params.discord_msg_content, embeds=send_embeds)
             if mission_params.notify_msg_id:
                 ping_role_id = wineloader_role() if mission_params.commodity_name == 'Wine' else hauler_role()
                 await discord_notify_msg.edit(content=f"<@&{ping_role_id}>: {mission_params.discord_text}")
@@ -278,9 +290,9 @@ async def update_reddit_post(interaction: discord.Interaction, mission_params):
             # post to reddit
             print("Sending new Reddit post")
             reddit = await get_reddit()
-            subreddit = await reddit.subreddit(sub_reddit())
+            subreddit = await reddit.subreddit(mission_params.channel_defs.sub_reddit_actual)
             submission = await subreddit.submit_image(mission_params.reddit_title, image_path=mission_params.reddit_img_name,
-                                                    flair_id=reddit_flair_mission_start)
+                                                    flair_id=mission_params.channel_defs.reddit_flair_in_progress)
             # save new mission_params
             print(f"Original post ID: {original_reddit_post_id}")
 
@@ -308,7 +320,7 @@ async def update_reddit_post(interaction: discord.Interaction, mission_params):
             embed = discord.Embed(title=f"{mission_params.carrier_data.carrier_long_name} REQUIRES YOUR UPDOOTS",
                                 description=f"https://www.reddit.com{mission_params.reddit_post_url}",
                                 color=constants.EMBED_COLOUR_REDDIT)
-            channel = bot.get_channel(channel_upvotes())
+            channel = bot.get_channel(mission_params.channel_defs.upvotes_channel_actual)
             upvote_message = await channel.send(embed=embed)
             emoji = bot.get_emoji(upvote_emoji())
             await upvote_message.add_reaction(emoji)
@@ -334,7 +346,7 @@ async def update_reddit_post(interaction: discord.Interaction, mission_params):
             await original_post.reply(reddit_edit_text)
             # mark original post as spoiler, change its flair
             print("Marking spoiler and setting flair")
-            await original_post.flair.select(reddit_flair_mission_stop())
+            await original_post.flair.select(flair_id=mission_params.channel_defs.reddit_flair_completed)
             await original_post.mod.spoiler()
         except Exception as e:
             embed=discord.Embed(description=f"Error sending comment to old Reddit post on mission update: {e}", color=constants.EMBED_COLOUR_ERROR)
@@ -353,3 +365,13 @@ async def update_mission_db(interaction: discord.Interaction, mission_params):
             embed=discord.Embed(description=f"Error updating mission database: {e}", color=constants.EMBED_COLOUR_ERROR)
             await spamchannel.send(embed=embed)
             await interaction.channel.send(embed=embed)
+
+
+async def commodity_wine_error(interaction: discord.Interaction, mission_params):
+    print("user tried to change commodity to or from wine")
+    embed = discord.Embed(
+        description="ERROR: Sorry, you cannot change commodity to or from Wine.",
+        color=constants.EMBED_COLOUR_ERROR
+    )
+    mission_params.returnflag = False
+    return await interaction.channel.send(embed=embed)

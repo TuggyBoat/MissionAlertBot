@@ -95,11 +95,12 @@ PROD_ARCHIVE_CAT = 1048957416781393970 # Archive category on live server
 PROD_SECONDS_SHORT = 120
 PROD_SECONDS_LONG = 900
 # Training mode - production
-PROD_TRAINING_CATEGORY = 1120269131476901938
-PROD_TRAINING_MISSION_COMMAND_CHANNEL = 1120269354949419030
-PROD_TRAINING_CHANNEL_UPVOTES = 1120269388742918165
-PROD_TRAINING_TRADE_ALERTS_ID = 1120269302436741190
-PROD_TRAINING_WINE_CHANNEL = 1120269435471667320
+PROD_TRAINING_CATEGORY = 1120269131476901938 # training mode category ID
+PROD_TRAINING_MISSION_COMMAND_CHANNEL = 1120269354949419030 # training mode mission gen channel ID
+PROD_TRAINING_CHANNEL_UPVOTES = 1120269388742918165 # training mode upvotes channel ID
+PROD_TRAINING_TRADE_ALERTS_ID = 1120269302436741190 # training mode trade alerts channel ID
+PROD_TRAINING_WINE_CHANNEL = 1120269435471667320 # training mode wine channel ID
+PROD_TRAINING_SUB_REDDIT = "PTNBotTesting" # subreddit used to send training posts
 
 # Testing variables
 
@@ -137,11 +138,12 @@ TEST_ARCHIVE_CAT = 877244591579992144 # Archive category on live server
 TEST_SECONDS_SHORT = 5
 TEST_SECONDS_LONG = 10
 # Training mode - test
-TEST_TRAINING_CATEGORY = 1120268080912810014
-TEST_TRAINING_MISSION_COMMAND_CHANNEL = 1120268484455174215
-TEST_TRAINING_CHANNEL_UPVOTES = 1120268580731240519
-TEST_TRAINING_TRADE_ALERTS_ID = 1120268308780957696
-TEST_TRAINING_WINE_CHANNEL = 1120268357447462962
+TEST_TRAINING_CATEGORY = 1120268080912810014 # training mode category ID
+TEST_TRAINING_MISSION_COMMAND_CHANNEL = 1120268484455174215 # training mode mission gen channel ID
+TEST_TRAINING_CHANNEL_UPVOTES = 1120268580731240519 # training mode upvotes channel ID
+TEST_TRAINING_TRADE_ALERTS_ID = 1120268308780957696 # training mode trade alerts channel ID
+TEST_TRAINING_WINE_CHANNEL = 1120268357447462962 # training mode wine channel ID
+TEST_TRAINING_SUB_REDDIT = "PTNBotTesting" # subreddit used to send training posts
 
 
 EMBED_COLOUR_LOADING = 0x00d9ff         # PTN faded blue
@@ -374,6 +376,18 @@ def training_alerts():
 
 def training_wine_alerts():
   return PROD_TRAINING_WINE_CHANNEL if _production else TEST_TRAINING_WINE_CHANNEL
+
+def training_sub_reddit():
+  return PROD_TRAINING_SUB_REDDIT if _production else TEST_TRAINING_SUB_REDDIT
+
+def training_reddit_in_progress():
+  return TEST_FLAIR_MISSION_START # presently using the testing subreddit for training purposes
+  
+def training_reddit_completed():
+  return TEST_FLAIR_MISSION_STOP # presently using the testing subreddit for training purposes
+
+
+
 
 
 any_elevated_role = [cc_role(), cmentor_role(), certcarrier_role(), rescarrier_role(), admin_role(), trainee_role(), dev_role()]

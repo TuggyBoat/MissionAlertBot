@@ -26,8 +26,9 @@ from ptn.missionalertbot.classes.CommunityCarrierData import CommunityCarrierDat
 # import local constants
 import ptn.missionalertbot.constants as constants
 from ptn.missionalertbot.constants import bot, cc_role, get_overwrite_perms, get_guild, bot_spam_channel, archive_cat, cc_cat, cmentor_role, admin_role, \
-    training_category, training_alerts, training_mission_command_channel, training_upvotes, training_wine_alerts, \
-    trade_cat, trade_alerts_channel, mission_command_channel, channel_upvotes, wine_alerts_loading_channel, wine_alerts_unloading_channel
+    training_category, training_alerts, training_mission_command_channel, training_upvotes, training_wine_alerts, training_sub_reddit, training_reddit_in_progress, training_reddit_completed, \
+    trade_cat, trade_alerts_channel, mission_command_channel, channel_upvotes, wine_alerts_loading_channel, wine_alerts_unloading_channel, sub_reddit, \
+    reddit_flair_mission_start, reddit_flair_mission_stop
 
 # import local modules
 from ptn.missionalertbot.database.database import find_community_carrier, CCDbFields, carrier_db, carrier_db_lock, carriers_conn, delete_community_carrier_from_db
@@ -628,23 +629,26 @@ def convert_str_to_float_or_int(element: any) -> bool: # this code turns a STR i
 
 # a class to hold channel definitions for training mode
 class ChannelDefs:
-    def __init__(self, category_actual, alerts_channel_actual, mission_command_channel_actual, upvotes_channel_actual, wine_loading_channel_actual, wine_unloading_channel_actual):
+    def __init__(self, category_actual, alerts_channel_actual, mission_command_channel_actual, upvotes_channel_actual, wine_loading_channel_actual, wine_unloading_channel_actual, sub_reddit_actual, reddit_flair_in_progress, reddit_flair_completed):
         self.category_actual = category_actual
         self.alerts_channel_actual = alerts_channel_actual
         self.mission_command_channel_actual = mission_command_channel_actual
         self.upvotes_channel_actual = upvotes_channel_actual
         self.wine_loading_channel_actual = wine_loading_channel_actual
         self.wine_unloading_channel_actual = wine_unloading_channel_actual
+        self.sub_reddit_actual = sub_reddit_actual
+        self.reddit_flair_in_progress = reddit_flair_in_progress
+        self.reddit_flair_completed = reddit_flair_completed
 
 # check whether CCO command is being used in training or live categories
 def check_training_mode(interaction: discord.Interaction):
     if interaction.channel.category.id == training_category():
         training = True
         print(f"Training mode detected for {interaction.command.name} in {interaction.channel.name} called by {interaction.user.display_name}")
-        channel_defs = ChannelDefs(training_category(), training_alerts(), training_mission_command_channel(), training_upvotes(), training_wine_alerts(), training_wine_alerts())
+        channel_defs = ChannelDefs(training_category(), training_alerts(), training_mission_command_channel(), training_upvotes(), training_wine_alerts(), training_wine_alerts(), training_sub_reddit(), training_reddit_in_progress(), training_reddit_completed())
     else:
         training = False
-        channel_defs = ChannelDefs(trade_cat(), trade_alerts_channel(), mission_command_channel(), channel_upvotes(), wine_alerts_loading_channel(), wine_alerts_unloading_channel())
+        channel_defs = ChannelDefs(trade_cat(), trade_alerts_channel(), mission_command_channel(), channel_upvotes(), wine_alerts_loading_channel(), wine_alerts_unloading_channel(), sub_reddit(), reddit_flair_mission_start(), reddit_flair_mission_stop())
 
     attrs = vars(channel_defs)
     print(attrs)

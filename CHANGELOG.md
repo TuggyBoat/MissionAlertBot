@@ -31,6 +31,7 @@ Changed commands:
     - completely new embed format for Discord
     - added ability to send via webhook
     - tweaks to Reddit format
+    - demand/supply is now entered as an int/float (i.e. without the "k"), and is subject to validation
 - `done` is now `/cco complete`. `/cco done` remains as an alias, for now
     - `/cco complete` now has optional parameters for whether the mission was `Completed` or `Failed`, with autocomplete, as well as for an explanation message
         - by default, status is assumed to be `Completed`
@@ -47,6 +48,7 @@ New commands:
 - `/cco webhook view` - CCO only - shows their webhooks
 - `/cco webhook delete` - CCO only - used to remove a webhook from their list
 - `/cco edit` - CCO only - used to edit an in-progress mission. Presently only the original interaction parameters can be edited (i.e. the fields added via slash command). Editing message and mission type will be implemented in a future update.
+- added **training mode** to `cco load` and `cco unload`. This will not affect webhooks but will send discord alerts to the new training channels, and reddit posts to the testing subreddit. Webhooks will be sent as normal, but it's expected trainees will add a training webhook anyway.
 
 
 ## 2.0.0

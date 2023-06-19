@@ -79,7 +79,7 @@ async def create_carrier_reddit_mission_image(mission_params):
     image_editable.text((46, 514), "STATION:", (255, 255, 255), font=FIELD_FONT)
     image_editable.text((170, 514), f"{mission_params.station.upper()} ({mission_params.pads.upper()} pads)", (255, 255, 255), font=NORMAL_FONT)
     image_editable.text((46, 552), "PROFIT:", (255, 255, 255), font=FIELD_FONT)
-    image_editable.text((170, 552), f"{mission_params.profit}k per unit, {mission_params.demand} units", (255, 255, 255), font=NORMAL_FONT)
+    image_editable.text((170, 552), f"{mission_params.profit}k per unit, {mission_params.demand}k units", (255, 255, 255), font=NORMAL_FONT)
 
     # Check if this will work fine, we might need to delete=False and clean it ourselves
     result_name = tempfile.NamedTemporaryFile(suffix='.png', delete=False)

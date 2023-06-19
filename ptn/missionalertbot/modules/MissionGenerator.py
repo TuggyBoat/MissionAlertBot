@@ -29,9 +29,8 @@ from ptn.missionalertbot.classes.MissionParams import MissionParams
 
 # import local constants
 import ptn.missionalertbot.constants as constants
-from ptn.missionalertbot.constants import bot, wine_alerts_loading_channel, wine_alerts_unloading_channel, trade_alerts_channel, get_reddit, sub_reddit, \
-    reddit_flair_mission_start, seconds_short, sub_reddit, channel_upvotes, upvote_emoji, hauler_role, trade_cat, get_guild, get_overwrite_perms, ptn_logo_discord, \
-    wineloader_role, o7_emoji, bot_spam_channel
+from ptn.missionalertbot.constants import bot, get_reddit, seconds_short, upvote_emoji, hauler_role, trainee_role, \
+    get_guild, get_overwrite_perms, ptn_logo_discord, wineloader_role, o7_emoji, bot_spam_channel
 
 # import local modules
 from ptn.missionalertbot.database.database import backup_database, mission_db, missions_conn, find_carrier, mark_cleanup_channel, CarrierDbFields, \
@@ -347,13 +346,13 @@ async def validate_profit(interaction: discord.Interaction, mission_params):
             description=f"ERROR: Profit must be a number (int or float), e.g. '10' or '4.5' but not 'ten' or 'lots' or '{mission_params.profit_raw}'.",
             color=constants.EMBED_COLOUR_ERROR
         )
-        profit_error_embed.set_footer(text="You complete banana.")
+        profit_error_embed.set_footer(text="You wonky banana.")
         mission_params.returnflag = False
         return await interaction.channel.send(embed=profit_error_embed)
 
 
 async def validate_pads(interaction: discord.Interaction, mission_params):
-    if mission_params.pads not in ['M', 'L']:
+    if mission_params.pads.upper() not in ['M', 'L']:
         # In case a user provides some junk for pads size, gate it
         print(f'Exiting mission generation requested by {interaction.user} as pad size is invalid, provided: {mission_params.pads}')
         pads_error_embed = discord.Embed(
@@ -363,6 +362,24 @@ async def validate_pads(interaction: discord.Interaction, mission_params):
         pads_error_embed.set_footer(text="You silly goose.")
         mission_params.returnflag = False
         return await interaction.channel.send(embed=pads_error_embed)
+    
+
+async def validate_supplydemand(interaction: discord.Interaction, mission_params):
+    if not float(mission_params.demand):
+        profit_error_embed = discord.Embed(
+            description=f"ERROR: Supply/demand must be a number (int or float), e.g. '20' or '16.5' but not 'twenty thousand' or 'loads' or '{mission_params.demand_raw}'.",
+            color=constants.EMBED_COLOUR_ERROR
+        )
+        profit_error_embed.set_footer(text="You adorable scamp.")
+        mission_params.returnflag = False
+    elif float(mission_params.demand) > 25:
+        profit_error_embed = discord.Embed(
+            description=f"ERROR: Supply/demand is expressed in thousands of tons (K), so cannot be higher than the maximum capacity of a Fleet Carrier (25K tons).",
+            color=constants.EMBED_COLOUR_ERROR
+        )
+        profit_error_embed.set_footer(text="You loveable bumpkin.")
+        mission_params.returnflag = False
+        return await interaction.channel.send(embed=profit_error_embed)
 
 
 async def define_commodity(interaction: discord.Interaction, mission_params):
@@ -389,6 +406,7 @@ async def return_discord_alert_embed(interaction, mission_params):
 
 
 async def return_discord_channel_embeds(mission_params):
+    print("Called return_discord_channel_embeds")
     # generates embeds used for the PTN carrier channel as well as any webhooks
 
     # define owner avatar
@@ -397,6 +415,7 @@ async def return_discord_channel_embeds(mission_params):
     owner_avatar = owner.display_avatar
 
     # define embed content
+    print("Define buy embed")
     if mission_params.mission_type == 'load': # embeds for a loading mission
         buy_description=f"📌 Station: **{mission_params.station.upper()}**" \
                         f"\n🌟 System: **{mission_params.system.upper()}**" \
@@ -407,7 +426,7 @@ async def return_discord_channel_embeds(mission_params):
         sell_description=f"🎯 Fleet Carrier: **{mission_params.carrier_data.carrier_long_name}**" \
                          f"\n🔢 Carrier ID: **{mission_params.carrier_data.carrier_identifier}**" \
                          f"\n💰 Profit: **{mission_params.profit}K PER TON**" \
-                         f"\n📥 Demand: **{mission_params.demand.upper()} TONS**"
+                         f"\n📥 Demand: **{mission_params.demand}K TONS**"
         
         sell_thumb = ptn_logo_discord()
 
@@ -423,17 +442,19 @@ async def return_discord_channel_embeds(mission_params):
 
         sell_description=f"📌 Station: **{mission_params.station.upper()}**" \
                          f"\n💰 Profit: **{mission_params.profit}K PER TON**" \
-                         f"\n📥 Demand: **{mission_params.demand.upper()} TONS**"
+                         f"\n📥 Demand: **{mission_params.demand}K TONS**"
         
         sell_thumb = constants.ICON_SELL
 
         embed_colour = constants.EMBED_COLOUR_UNLOADING
 
+    print("Define sell embed")
     # desc used by the local PTN additional info embed
     additional_info_description = f"💎 Carrier Owner: <@{mission_params.carrier_data.ownerid}>" \
                                   f"\n🔤 Carrier information: </info:849040914948554766>" \
                                   f"\n📊 Stock information: `;stock {mission_params.carrier_data.carrier_short_name}`\n\n"
 
+    print("Define help embed (local)")
     # desc used by the local PTN help embed
     edmc_off_text = ""
     if mission_params.edmc_off:
@@ -441,6 +462,7 @@ async def return_discord_channel_embeds(mission_params):
     help_description = "✅ Use `/mission complete` in this channel if the mission is completed, or unable to be completed (e.g. because of a station price change, or supply exhaustion)." \
                       f"\n\n💡 Need help? Here's our [complete guide to PTN trade missions](https://pilotstradenetwork.com/fleet-carrier-trade-missions/).{edmc_off_text}"
 
+    print("Define descs")
     # desc used for sending cco_message_text
     owner_text_description = mission_params.cco_message_text
 
@@ -449,6 +471,7 @@ async def return_discord_channel_embeds(mission_params):
                                f"\n🔤 [PTN Discord](https://discord.gg/ptn)" \
                                 "\n💡 [PTN trade mission guide](https://pilotstradenetwork.com/fleet-carrier-trade-missions/)"
 
+    print("Define embed objects")
     buy_embed = discord.Embed(
         title="BUY FROM",
         description=buy_description,
@@ -495,6 +518,7 @@ async def return_discord_channel_embeds(mission_params):
     webhook_info_embed.set_image(url=constants.BLANKLINE_400PX)
     webhook_info_embed.set_thumbnail(url=owner_avatar)
 
+    print("instantiate DiscordEmbeds class")
     discord_embeds = DiscordEmbeds(buy_embed, sell_embed, info_embed, help_embed, owner_text_embed, webhook_info_embed)
 
     mission_params.discord_embeds = discord_embeds
@@ -507,12 +531,15 @@ async def send_mission_to_discord(interaction, mission_params):
 
     mission_params.discord_img_name = await create_carrier_discord_mission_image(mission_params)
     mission_params.discord_text = txt_create_discord(mission_params)
+    if mission_params.edmc_off: mission_params.discord_msg_content = ":warning:    " \
+        ":regional_indicator_e: :regional_indicator_d: :regional_indicator_m:" \
+        " :regional_indicator_c: :shushing_face: :mobile_phone_off:    :warning:" 
     print("Defined discord elements")
 
-    mission_params.mission_temp_channel_id = await create_mission_temp_channel(interaction, mission_params.carrier_data.discord_channel, mission_params.carrier_data.ownerid, mission_params.carrier_data.carrier_short_name)
-    mission_temp_channel = bot.get_channel(mission_params.mission_temp_channel_id)
-
     # beyond this point we need to release channel lock if mission creation fails
+
+    mission_params.mission_temp_channel_id = await create_mission_temp_channel(interaction, mission_params)
+    mission_temp_channel = bot.get_channel(mission_params.mission_temp_channel_id)
 
     # Recreate this text since we know the channel id
     mission_params.discord_text = txt_create_discord(mission_params)
@@ -521,21 +548,35 @@ async def send_mission_to_discord(interaction, mission_params):
         # send trade alert to trade alerts channel, or to wine alerts channel if loading wine
         if mission_params.commodity_name.title() == "Wine":
             if mission_params.mission_type == 'load':
-                channel = bot.get_channel(wine_alerts_loading_channel())
-                channelId = wine_alerts_loading_channel()
+                alerts_channel = bot.get_channel(mission_params.channel_defs.wine_loading_channel_actual)
             else:   # unloading block
-                channel = bot.get_channel(wine_alerts_unloading_channel())
-                channelId = wine_alerts_unloading_channel()
+                alerts_channel = bot.get_channel(mission_params.channel_defs.wine_unloading_channel_actual)
         else:
-            channel = bot.get_channel(trade_alerts_channel())
-            channelId = trade_alerts_channel()
+            alerts_channel = bot.get_channel(mission_params.channel_defs.alerts_channel_actual)
 
         embed = await return_discord_alert_embed(interaction, mission_params)
 
-        trade_alert_msg = await channel.send(embed=embed)
+        trade_alert_msg = await alerts_channel.send(embed=embed)
         mission_params.discord_alert_id = trade_alert_msg.id
 
-        if mission_params.edmc_off: # add in EDMC OFF messages
+        discord_file = discord.File(mission_params.discord_img_name, filename="image.png")
+
+        print("Defining Discord embeds...")
+        discord_embeds = await return_discord_channel_embeds(mission_params)
+
+        send_embeds = [discord_embeds.buy_embed, discord_embeds.sell_embed, discord_embeds.info_embed, discord_embeds.help_embed]
+
+        print("Checking for cco_message_text status...")
+        if mission_params.cco_message_text is not None: send_embeds.append(discord_embeds.owner_text_embed)
+
+        print("Sending image and embeds...")
+        # pin the carrier trade msg sent by the bot
+        pin_msg = await mission_temp_channel.send(content=mission_params.discord_msg_content, file=discord_file, embeds=send_embeds)
+        mission_params.discord_msg_id = pin_msg.id
+        print("Pinning sent message...")
+        await pin_msg.pin()
+
+        if mission_params.edmc_off: # add in EDMC OFF embed
             print('Sending EDMC OFF messages to haulers')
             embed = discord.Embed(title='PLEASE STOP ALL 3RD PARTY SOFTWARE: EDMC, EDDISCOVERY, ETC',
                     description=("Maximising our haulers' profits for this mission means keeping market data at this station"
@@ -560,27 +601,11 @@ async def send_mission_to_discord(interaction, mission_params):
                 await trade_alert_msg.add_reaction(r)
         # --- end of EDMC-OFF section ---
 
-        discord_file = discord.File(mission_params.discord_img_name, filename="image.png")
-
-        print("Defining Discord embeds...")
-        discord_embeds = await return_discord_channel_embeds(mission_params)
-
-        send_embeds = [discord_embeds.buy_embed, discord_embeds.sell_embed, discord_embeds.info_embed, discord_embeds.help_embed]
-
-        print("Checking for cco_message_text status...")
-        if mission_params.cco_message_text is not None: send_embeds.append(discord_embeds.owner_text_embed)
-
-        print("Sending image and embeds...")
-        # pin the carrier trade msg sent by the bot
-        pin_msg = await mission_temp_channel.send(file=discord_file, embeds=send_embeds)
-        mission_params.discord_msg_id = pin_msg.id
-        print("Pinning sent message...")
-        await pin_msg.pin()
         print("Feeding back to user...")
         embed = discord.Embed(
             title=f"Discord trade alerts sent for {mission_params.carrier_data.carrier_long_name}",
-            description=f"Check <#{channelId}> for trade alert and "
-                        f"<#{mission_params.mission_temp_channel_id}> for image.",
+            description=f"Check <#{alerts_channel.id}> for trade alert and "
+                        f"<#{mission_params.mission_temp_channel_id}> for carrier channel alert.",
             color=constants.EMBED_COLOUR_DISCORD)
         embed.set_thumbnail(url=constants.ICON_DISCORD_CIRCLE)
         await interaction.channel.send(embed=embed)
@@ -605,6 +630,7 @@ async def check_profit_margin_on_external_send(interaction, mission_params):
         )
         embed.set_footer(text="Whoopsie-daisy.")
         await interaction.channel.send(embed=embed)
+        embed.set_thumbnail(url=constants.ICON_FC_EMPTY)
     else:
         mission_params.returnflag = True
 
@@ -630,9 +656,9 @@ async def send_mission_to_subreddit(interaction, mission_params):
 
         # post to reddit
         reddit = await get_reddit()
-        subreddit = await reddit.subreddit(sub_reddit())
+        subreddit = await reddit.subreddit(mission_params.channel_defs.sub_reddit_actual)
         submission = await subreddit.submit_image(mission_params.reddit_title, image_path=mission_params.reddit_img_name,
-                                                flair_id=reddit_flair_mission_start)
+                                                flair_id=mission_params.channel_defs.reddit_flair_in_progress)
         mission_params.reddit_post_url = submission.permalink
         mission_params.reddit_post_id = submission.id
         if mission_params.cco_message_text:
@@ -651,7 +677,7 @@ async def send_mission_to_subreddit(interaction, mission_params):
         embed = discord.Embed(title=f"{mission_params.carrier_data.carrier_long_name} REQUIRES YOUR UPDOOTS",
                             description=f"https://www.reddit.com{mission_params.reddit_post_url}",
                             color=constants.EMBED_COLOUR_REDDIT)
-        channel = bot.get_channel(channel_upvotes())
+        channel = bot.get_channel(mission_params.channel_defs.upvotes_channel_actual)
         upvote_message = await channel.send(embed=embed)
         emoji = bot.get_emoji(upvote_emoji())
         await upvote_message.add_reaction(emoji)
@@ -739,7 +765,10 @@ async def send_mission_to_webhook(interaction, mission_params):
 async def notify_hauler_role(interaction, mission_params, mission_temp_channel):
     print("User used option n")
 
-    ping_role_id = wineloader_role() if mission_params.commodity_name == 'Wine' else hauler_role()
+    if mission_params.training:
+        ping_role_id = trainee_role()
+    else:
+        ping_role_id = wineloader_role() if mission_params.commodity_name == 'Wine' else hauler_role()
     notify_msg = await mission_temp_channel.send(f"<@&{ping_role_id}>: {mission_params.discord_text}")
     mission_params.notify_msg_id = notify_msg.id
 
@@ -861,6 +890,9 @@ async def prepare_for_gen_mission(interaction: discord.Interaction, mission_para
     # validate pads
     await validate_pads(interaction, mission_params)
 
+    # validate supply/demand
+    await validate_supplydemand(interaction, mission_params)
+
     # check if the carrier can be found, exit gracefully if not
     carrier_data = find_carrier(mission_params.carrier_name_search_term, CarrierDbFields.longname.name)
     if not carrier_data:  # error condition
@@ -942,6 +974,9 @@ async def gen_mission(interaction: discord.Interaction, mission_params):
 
     print(f'Mission generation type: {mission_params.mission_type} requested by {interaction.user}. Request triggered from '
         f'channel {current_channel}.')
+    
+    if mission_params.training:
+        print("Training mode is active.")
 
     try: # this try/except block is to try and ensure the channel lock is released if something breaks during mission gen
          # otherwise the bot freezes next time the lock is attempted
@@ -1008,6 +1043,8 @@ async def gen_mission(interaction: discord.Interaction, mission_params):
         return
 
     except Exception as e:
+        print("Error on mission generation:")
+        print(e)
         mission_data = None
         try:
             mission_data = find_mission(mission_params.carrier_data.carrier_long_name, "carrier")
@@ -1026,8 +1063,6 @@ async def gen_mission(interaction: discord.Interaction, mission_params):
             color=constants.EMBED_COLOUR_ERROR
         )
         await interaction.channel.send(embed=embed)
-        print("Error on mission generation:")
-        print(e)
 
         # notify bot spam
         spamchannel = bot.get_channel(bot_spam_channel())
@@ -1048,12 +1083,12 @@ async def gen_mission(interaction: discord.Interaction, mission_params):
             await remove_carrier_channel(mission_params.mission_temp_channel_id, seconds_short)
 
 
-async def create_mission_temp_channel(interaction, discord_channel, owner_id, shortname):
+async def create_mission_temp_channel(interaction, mission_params):
     # create the carrier's channel for the mission
 
     # first check whether channel already exists
 
-    mission_temp_channel = discord.utils.get(interaction.guild.channels, name=discord_channel)
+    mission_temp_channel = discord.utils.get(interaction.guild.channels, name=mission_params.carrier_data.discord_channel)
 
     # we need to lock the channel to stop it being deleted mid process
     print("Waiting for Mission Generator channel lock...")
@@ -1078,15 +1113,15 @@ async def create_mission_temp_channel(interaction, discord_channel, owner_id, sh
     else:
         # channel does not exist, create it
 
-        topic = f"Use \";stock {shortname}\" to retrieve stock levels for this carrier."
+        topic = f"Use \";stock {mission_params.carrier_data.carrier_short_name}\" to retrieve stock levels for this carrier."
 
-        category = discord.utils.get(interaction.guild.categories, id=trade_cat())
-        mission_temp_channel = await interaction.guild.create_text_channel(discord_channel, category=category, topic=topic)
+        category = discord.utils.get(interaction.guild.categories, id=mission_params.channel_defs.category_actual)
+        mission_temp_channel = await interaction.guild.create_text_channel(mission_params.carrier_data.discord_channel, category=category, topic=topic)
         mission_temp_channel_id = mission_temp_channel.id
         print(f"Created {mission_temp_channel}")
 
     if not mission_temp_channel:
-        raise EnvironmentError(f'Could not create carrier channel {discord_channel}')
+        raise EnvironmentError(f'Could not create carrier channel {mission_params.carrier_data.discord_channel}')
 
     # we made it this far, we can change the returnflag
     gen_mission.returnflag = True
@@ -1094,10 +1129,10 @@ async def create_mission_temp_channel(interaction, discord_channel, owner_id, sh
     # find carrier owner as a user object
     guild = await get_guild()
     try:
-        member = await guild.fetch_member(owner_id)
+        member = await guild.fetch_member(mission_params.carrier_data.ownerid)
         print(f"Owner identified as {member.display_name}")
     except:
-        raise EnvironmentError(f'Could not find Discord user matching ID {owner_id}')
+        raise EnvironmentError(f'Could not find Discord user matching ID {mission_params.carrier_data.ownerid}')
 
     overwrite = await get_overwrite_perms()
 

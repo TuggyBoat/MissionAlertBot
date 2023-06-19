@@ -146,8 +146,10 @@ class CCOCommands(commands.Cog):
         # convert profit from STR to an INT or FLOAT
         profit_convert = convert_str_to_float_or_int(profit)
 
+        demand_convert = convert_str_to_float_or_int(demand)
+
         params_dict = dict(carrier_name_search_term = carrier, commodity_search_term = commodity, system = system, station = station, profit_raw = profit,
-                           profit = profit_convert, pads = pads, demand = demand, mission_type = mission_type, copypaste_embed = cp_embed, channel_defs = channel_defs)
+                           profit = profit_convert, pads = pads, demand_raw = demand, demand = demand_convert, mission_type = mission_type, copypaste_embed = cp_embed, channel_defs = channel_defs, training = training)
 
         mission_params = MissionParams(params_dict)
 
@@ -175,6 +177,8 @@ class CCOCommands(commands.Cog):
                 profit: str, pads: str, supply: str):
         mission_type = 'unload'
 
+        training, channel_defs = check_training_mode(interaction)
+
         cp_embed = discord.Embed(
             title="COPY/PASTE TEXT FOR THIS COMMAND",
             description=f"```/cco unload carrier:{carrier} commodity:{commodity} system:{system} station:{station}"
@@ -182,13 +186,18 @@ class CCOCommands(commands.Cog):
             color=constants.EMBED_COLOUR_QU
         )
 
+        if training:
+            cp_embed.set_footer(text="TRAINING MODE ACTIVE: ALL SENDS WILL GO TO TRAINING CHANNELS")
+
         await interaction.response.send_message(embed=cp_embed)
 
         # convert profit from STR to an INT or FLOAT
         profit_convert = convert_str_to_float_or_int(profit)
 
+        supply_convert = convert_str_to_float_or_int(supply)
+
         params_dict = dict(carrier_name_search_term = carrier, commodity_search_term = commodity, system = system, station = station, profit_raw = profit,
-                           profit = profit_convert, pads = pads, demand = supply, mission_type = mission_type, copypaste_embed = cp_embed)
+                           profit = profit_convert, pads = pads, demand_raw = supply, demand = supply_convert, mission_type = mission_type, copypaste_embed = cp_embed, channel_defs = channel_defs, training = training)
 
         mission_params = MissionParams(params_dict)
 
@@ -241,6 +250,8 @@ class CCOCommands(commands.Cog):
             # define the original mission_params
             mission_params = mission_data.mission_params
 
+            original_commodity = mission_params.commodity_name
+
             print("defined original mission parameters")
             mission_params.print_values()
 
@@ -263,7 +274,7 @@ class CCOCommands(commands.Cog):
             print("Defined new_mission_params:")
             mission_params.print_values()
 
-        await edit_active_mission(interaction, mission_params)
+        await edit_active_mission(interaction, mission_params, original_commodity)
 
         """
         1. perform checks on profit, pads, commodity

@@ -22,11 +22,11 @@ from ptn.missionalertbot.classes.MissionData import MissionData
 # import local constants
 import ptn.missionalertbot.constants as constants
 from ptn.missionalertbot.constants import bot, bot_spam_channel, wine_alerts_loading_channel, wine_alerts_unloading_channel, trade_alerts_channel, get_reddit, sub_reddit, \
-    reddit_flair_mission_stop, seconds_long, sub_reddit, mission_command_channel, ptn_logo_discord
+    reddit_flair_mission_stop, seconds_long, sub_reddit, mission_command_channel, ptn_logo_discord, reddit_flair_mission_start, channel_upvotes, trade_cat
 
 # import local modules
 from ptn.missionalertbot.database.database import remove_channel_cleanup_entry, backup_database, mission_db, missions_conn, find_carrier, mark_cleanup_channel, CarrierDbFields
-from ptn.missionalertbot.modules.helpers import lock_mission_channel, carrier_channel_lock, clean_up_pins
+from ptn.missionalertbot.modules.helpers import lock_mission_channel, carrier_channel_lock, clean_up_pins, ChannelDefs
 
 
 """
@@ -46,9 +46,24 @@ async def _cleanup_completed_mission(interaction: discord.Interaction, mission_d
         except:
             print("No mission_params found, mission created pre-2.1.0?")
 
+        if not mission_params:
+            # instantiate a fresh instance of mission params with just channel_defs for channel definitions
+            channel_defs = ChannelDefs(
+                trade_cat(),
+                trade_alerts_channel(),
+                mission_command_channel(),
+                channel_upvotes(),
+                wine_alerts_loading_channel(),
+                wine_alerts_unloading_channel(),
+                sub_reddit(),
+                reddit_flair_mission_start(),
+                reddit_flair_mission_stop()
+            )
+            mission_params.channel_defs = channel_defs
+
         async with interaction.channel.typing():
             completed_mission_channel = bot.get_channel(mission_data.channel_id)
-            mission_gen_channel = bot.get_channel(mission_command_channel())
+            mission_gen_channel = bot.get_channel(mission_params.channel_defs.mission_command_channel_actual)
 
             backup_database('missions')  # backup the missions database before going any further
 
@@ -61,11 +76,11 @@ async def _cleanup_completed_mission(interaction: discord.Interaction, mission_d
                     # first check if it's Wine, in which case it went to the booze cruise channel
                     if mission_data.commodity.title() == "Wine":
                         if mission_data.mission_type == 'load':
-                            alert_channel = bot.get_channel(wine_alerts_loading_channel())
+                            alert_channel = bot.get_channel(mission_params.channel_defs.wine_loading_channel_actual)
                         else:
-                            alert_channel = bot.get_channel(wine_alerts_unloading_channel())
+                            alert_channel = bot.get_channel(mission_params.channel_defs.wine_unloading_channel_actual)
                     else:
-                        alert_channel = bot.get_channel(trade_alerts_channel())
+                        alert_channel = bot.get_channel(mission_params.channel_defs.alerts_channel_actual)
 
                     discord_alert_id = mission_data.discord_alert_id
 
@@ -93,11 +108,11 @@ async def _cleanup_completed_mission(interaction: discord.Interaction, mission_d
                 try:  # try in case Reddit is down
                     reddit_post_id = mission_data.reddit_post_id
                     reddit = await get_reddit()
-                    await reddit.subreddit(sub_reddit())
+                    await reddit.subreddit(mission_params.channel_defs.sub_reddit_actual)
                     submission = await reddit.submission(reddit_post_id)
                     await submission.reply(reddit_complete_text)
                     # mark original post as spoiler, change its flair
-                    await submission.flair.select(reddit_flair_mission_stop())
+                    await submission.flair.select(mission_params.channel_defs.reddit_flair_completed)
                     await submission.mod.spoiler()
                 except:
                     feedback_embed.add_field(name="Error", value="Failed updating Reddit :(")
