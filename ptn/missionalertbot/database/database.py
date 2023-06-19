@@ -169,7 +169,10 @@ def backup_database(database_name):
 
     shutil.copy(db_path, backup_path)
     print(f'Backed up {database_name}.db at {dt_file_string}')
-    dump_database_test(database_name)
+    try:
+      dump_database_test(database_name)
+    except Exception as e:
+        print(e)
 
 
 # function to check if a given table exists in a given database

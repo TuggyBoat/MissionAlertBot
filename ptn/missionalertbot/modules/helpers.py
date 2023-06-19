@@ -139,18 +139,29 @@ def check_roles(permitted_role_ids):
     return app_commands.check(checkroles)
 
 
+# helper for channel permission check
+def getchannel(id):
+    channel = bot.get_channel(id)
+    return channel
+
+
 # decorator for interaction channel checks
 def check_command_channel(permitted_channel):
     """
-    Decorator used on an interaction to limit it to a specified channel
+    Decorator used on an interaction to limit it to specified channels
     """
     async def check_channel(ctx):
         """
-        Check if the channel the command was run in, matches the channel it can only be run from
+        Check if the channel the command was run from matches any permitted channels for that command
         """
         print("check_command_channel called")
-        permitted = bot.get_channel(permitted_channel)
-        if ctx.channel != permitted:
+        if isinstance(permitted_channel, list):
+            permitted_channels = [getchannel(id) for id in permitted_channel]
+        else:
+            permitted_channels = [getchannel(permitted_channel)]
+
+        permission = True if any(channel == ctx.channel for channel in permitted_channels) else False
+        if not permission:
             # problem, wrong channel, no progress
             try:
                 raise CommandChannelError(permitted_channel)
