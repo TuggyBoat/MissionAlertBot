@@ -840,10 +840,13 @@ async def find_commodity(mission_params, interaction):
     commodities = [Commodity(commodity) for commodity in carrier_db.fetchall()]
     commodity = None
     if not commodities:
+        mission_params.returnflag = False 
+        embed = discord.Embed(
+            description=f"ERROR: No commodities found for {mission_params.commodity_search_term}.",
+            color=constants.EMBED_COLOUR_ERROR
+        )
         print('No commodities found for request')
-        await interaction.channel.send(f"No commodities found for {mission_params.commodity_search_term}")
-        # Did not find anything, short-circuit out of the next block
-        return
+        return await interaction.channel.send(embed=embed) # error condition, return
     elif len(commodities) == 1:
         print('Single commodity found, returning that directly')
         # if only 1 match, just assign it directly
@@ -870,7 +873,7 @@ async def find_commodity(mission_params, interaction):
         embed.set_footer(text='Please select the commodity with 1, 2 or 3')
 
         def check(message):
-            return message.author == interaction.user.display_name and message.channel == interaction.channel and \
+            return message.author == interaction.user and message.channel == interaction.channel and \
                    len(message.content) == 1 and message.content.lower() in ["1", "2", "3"]
 
         message_confirm = await interaction.channel.send(embed=embed)
@@ -881,14 +884,14 @@ async def find_commodity(mission_params, interaction):
             index = int(response.content) - 1  # Users count from 1, computers count from 0
             commodity = commodities[index]
         except asyncio.TimeoutError:
+            mission_params.returnflag = False 
             await interaction.channel.send("Commodity selection timed out. Cancelling.")
             print('User failed to respond in time')
-            return
+            return # error condition, return
         await message_confirm.delete()
         if response:
             await response.delete()
     if commodity: # only if this is successful is returnflag set so mission gen will continue
-        mission_params.returnflag = True
         print(f"Found commodity {commodity.name}")
         mission_params.commodity_name = commodity.name
     return

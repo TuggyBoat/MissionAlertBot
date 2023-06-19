@@ -23,11 +23,11 @@ class MissionParams:
         self.copypaste_embed = info_dict.get('copypaste_embed', None) # embed containing the copy/paste string for the command used
         self.carrier_name_search_term = info_dict.get('carrier_name_search_term', None) # the carrier name fragment to search for
         self.commodity_search_term = info_dict.get('commodity_search_term', None) # the commodity name fragment to search for
-        self.system = info_dict.get('system', None).upper() # the target system
-        self.station = info_dict.get('station', None).upper() # target station
+        self.system = info_dict.get('system', None) # the target system
+        self.station = info_dict.get('station', None) # target station
         self.profit_raw = info_dict.get('profit_raw', None) # profit STR as entered by user
         self.profit = info_dict.get('profit', None) # profit as int or float
-        self.pads = info_dict.get('pads', None).upper() # size of largest landing pad L or M
+        self.pads = info_dict.get('pads', None) # size of largest landing pad L or M
         self.demand_raw = info_dict.get('demand_raw', None) # raw value entered for demand/supply
         self.demand = info_dict.get('demand', None) # demand as int or float
         self.mission_type = info_dict.get('mission_type', None) # whether the mission is loading or unloading

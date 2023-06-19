@@ -341,9 +341,10 @@ Mission generator helpers
 """
 
 async def validate_profit(interaction: discord.Interaction, mission_params):
+    print("Validating profit")
     if not float(mission_params.profit):
         profit_error_embed = discord.Embed(
-            description=f"ERROR: Profit must be a number (int or float), e.g. '10' or '4.5' but not 'ten' or 'lots' or '{mission_params.profit_raw}'.",
+            description=f"ERROR: Profit must be a number (int or float), e.g. `10` or `4.5` but not `ten` or `lots` or `{mission_params.profit_raw}`.",
             color=constants.EMBED_COLOUR_ERROR
         )
         profit_error_embed.set_footer(text="You wonky banana.")
@@ -352,26 +353,31 @@ async def validate_profit(interaction: discord.Interaction, mission_params):
 
 
 async def validate_pads(interaction: discord.Interaction, mission_params):
+    print("Validating pads")
     if mission_params.pads.upper() not in ['M', 'L']:
         # In case a user provides some junk for pads size, gate it
         print(f'Exiting mission generation requested by {interaction.user} as pad size is invalid, provided: {mission_params.pads}')
         pads_error_embed = discord.Embed(
-            description=f"ERROR: Pads must be 'L' or 'M', or use autocomplete to select 'Large' or 'Medium'. '{mission_params.pads}' is right out.",
+            description=f"ERROR: Pads must be `L` or `M`, or use autocomplete to select `Large` or `Medium`. `{mission_params.pads}` is right out.",
             color=constants.EMBED_COLOUR_ERROR
         )
         pads_error_embed.set_footer(text="You silly goose.")
+        print(f"Set returnflag {mission_params.returnflag}")
         mission_params.returnflag = False
         return await interaction.channel.send(embed=pads_error_embed)
     
 
 async def validate_supplydemand(interaction: discord.Interaction, mission_params):
+    print("Validating supply/demand")
     if not float(mission_params.demand):
         profit_error_embed = discord.Embed(
-            description=f"ERROR: Supply/demand must be a number (int or float), e.g. '20' or '16.5' but not 'twenty thousand' or 'loads' or '{mission_params.demand_raw}'.",
+            description=f"ERROR: Supply/demand must be a number (int or float), e.g. `20` or `16.5` but not `twenty thousand` or `loads` or `{mission_params.demand_raw}`.",
             color=constants.EMBED_COLOUR_ERROR
         )
         profit_error_embed.set_footer(text="You adorable scamp.")
         mission_params.returnflag = False
+        print(f"Set returnflag {mission_params.returnflag}")
+        return await interaction.channel.send(embed=profit_error_embed)
     elif float(mission_params.demand) > 25:
         profit_error_embed = discord.Embed(
             description=f"ERROR: Supply/demand is expressed in thousands of tons (K), so cannot be higher than the maximum capacity of a Fleet Carrier (25K tons).",
@@ -379,7 +385,10 @@ async def validate_supplydemand(interaction: discord.Interaction, mission_params
         )
         profit_error_embed.set_footer(text="You loveable bumpkin.")
         mission_params.returnflag = False
+        print(f"Set returnflag {mission_params.returnflag}")
         return await interaction.channel.send(embed=profit_error_embed)
+    else:
+        return
 
 
 async def define_commodity(interaction: discord.Interaction, mission_params):
@@ -388,7 +397,6 @@ async def define_commodity(interaction: discord.Interaction, mission_params):
         # the user typed in the name perfectly or used autocomplete so we don't need to bother querying the commodities db
         mission_params.commodity_name = mission_params.commodity_search_term
     else: # check if commodity can be found based on user's search term, exit gracefully if not
-        mission_params.returnflag = False 
         await find_commodity(mission_params, interaction)
         if not mission_params.returnflag:
             return # we've already given the user feedback on why there's a problem, we just want to quit gracefully now
@@ -826,7 +834,7 @@ The core of MAB: its mission generator
 async def confirm_send_mission_via_button(interaction: discord.Interaction, mission_params):
     # this function does initial checks and returns send options to the user
 
-    mission_params.returnflag = False
+    mission_params.returnflag = True # set the returnflag to true, any errors will change it to false
     
     await prepare_for_gen_mission(interaction, mission_params)
 
@@ -892,6 +900,7 @@ async def prepare_for_gen_mission(interaction: discord.Interaction, mission_para
 
     # validate supply/demand
     await validate_supplydemand(interaction, mission_params)
+    print(f"Returnflag status: {mission_params.returnflag}")
 
     # check if the carrier can be found, exit gracefully if not
     carrier_data = find_carrier(mission_params.carrier_name_search_term, CarrierDbFields.longname.name)
@@ -901,8 +910,10 @@ async def prepare_for_gen_mission(interaction: discord.Interaction, mission_para
             color=constants.EMBED_COLOUR_ERROR
         )
         carrier_error_embed.set_footer(text="You silly sausage.")
+        mission_params.returnflag = False
         return await interaction.channel.send(embed=carrier_error_embed)
     mission_params.carrier_data = carrier_data
+    print(f"Returnflag status: {mission_params.returnflag}")
 
     # check carrier isn't already on a mission TODO change to ID lookup
     mission_data = find_mission(carrier_data.carrier_long_name, "carrier")
@@ -911,7 +922,9 @@ async def prepare_for_gen_mission(interaction: discord.Interaction, mission_para
             description=f"{mission_data.carrier_name} is already on a mission, please "
                         f"use `/cco complete` to mark it complete before starting a new mission.",
             color=constants.EMBED_COLOUR_ERROR)
+        mission_params.returnflag = False
         return await interaction.channel.send(embed=mission_error_embed) # error condition
+    print(f"Returnflag status: {mission_params.returnflag}")
 
     # check if the carrier has an associated image
     image_name = carrier_data.carrier_short_name + '.png'
@@ -946,10 +959,13 @@ async def prepare_for_gen_mission(interaction: discord.Interaction, mission_para
         if not image_is_good:
             print("Still no good image, aborting")
             embed = discord.Embed(description="**ERROR**: You must have a valid mission image to continue.", color=constants.EMBED_COLOUR_ERROR)
+            mission_params.returnflag = False
             return await interaction.channel.send(embed=embed) # error condition
+    print(f"image check returnflag status: {mission_params.returnflag}")
 
     # define commodity
     await define_commodity(interaction, mission_params)
+    print(f"define_commodity returnflag status: {mission_params.returnflag}")
 
     # add any webhooks to mission_params
     webhook_data = find_webhook_from_owner(interaction.user.id)
@@ -958,8 +974,8 @@ async def prepare_for_gen_mission(interaction: discord.Interaction, mission_para
             mission_params.webhook_urls.append(webhook.webhook_url)
             mission_params.webhook_names.append(webhook.webhook_name)
 
-    # set returnflag and take all this information back to the user
-    mission_params.returnflag = True
+    print(f"Returnflag status: {mission_params.returnflag}")
+
     return
 
 

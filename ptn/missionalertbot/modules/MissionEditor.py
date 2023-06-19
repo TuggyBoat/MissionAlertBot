@@ -65,6 +65,7 @@ class EditConfirmView(View):
             description="Mission update cancelled by user.",
             color=constants.EMBED_COLOUR_ERROR
         )
+        self.mission_params.edit_embed = cancelled_embed
 
         try:
             self.clear_items()
@@ -123,7 +124,10 @@ async def edit_active_mission(interaction: discord.Interaction, mission_params, 
 
     print(original_commodity, mission_params.commodity_name)
     if original_commodity != mission_params.commodity_name:
-        if original_commodity or mission_params.commodity_name == 'Wine': await commodity_wine_error(interaction, mission_params)
+        if original_commodity == 'Wine': await commodity_wine_error(interaction, mission_params)
+        elif mission_params.commodity_name == 'Wine': await commodity_wine_error(interaction, mission_params)
+        else:
+            print("Not wine, not problem 👍")
 
     if not mission_params.returnflag:
         embed = discord.Embed(
@@ -346,7 +350,7 @@ async def update_reddit_post(interaction: discord.Interaction, mission_params):
             await original_post.reply(reddit_edit_text)
             # mark original post as spoiler, change its flair
             print("Marking spoiler and setting flair")
-            await original_post.flair.select(flair_id=mission_params.channel_defs.reddit_flair_completed)
+            await original_post.flair.select(mission_params.channel_defs.reddit_flair_completed)
             await original_post.mod.spoiler()
         except Exception as e:
             embed=discord.Embed(description=f"Error sending comment to old Reddit post on mission update: {e}", color=constants.EMBED_COLOUR_ERROR)

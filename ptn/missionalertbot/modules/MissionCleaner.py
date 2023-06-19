@@ -18,6 +18,7 @@ from discord.errors import Forbidden, NotFound
 
 # import local classes
 from ptn.missionalertbot.classes.MissionData import MissionData
+from ptn.missionalertbot.classes.MissionParams import MissionParams
 
 # import local constants
 import ptn.missionalertbot.constants as constants
@@ -40,13 +41,16 @@ async def _cleanup_completed_mission(interaction: discord.Interaction, mission_d
 
         status = "complete" if is_complete else "unable to complete"
         thumb = constants.ICON_FC_COMPLETE if is_complete else constants.ICON_FC_EMPTY
+        print(status)
 
         try: # for backwards compatibility with missions created before the new column was added
             mission_params = mission_data.mission_params
+            print("Found mission_params")
         except:
             print("No mission_params found, mission created pre-2.1.0?")
 
         if not mission_params:
+            print("instantiating mission_params with channel defs")
             # instantiate a fresh instance of mission params with just channel_defs for channel definitions
             channel_defs = ChannelDefs(
                 trade_cat(),
@@ -59,7 +63,7 @@ async def _cleanup_completed_mission(interaction: discord.Interaction, mission_d
                 reddit_flair_mission_start(),
                 reddit_flair_mission_stop()
             )
-            mission_params.channel_defs = channel_defs
+            mission_params = MissionParams(dict(channel_defs = channel_defs))
 
         async with interaction.channel.typing():
             completed_mission_channel = bot.get_channel(mission_data.channel_id)
