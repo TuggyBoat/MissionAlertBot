@@ -18,11 +18,12 @@ from ptn.missionalertbot.classes.MissionParams import MissionParams
 
 # import local constants
 import ptn.missionalertbot.constants as constants
-from ptn.missionalertbot.constants import bot, mission_command_channel, certcarrier_role, trainee_role, seconds_long, rescarrier_role, commodities_common, bot_spam_channel
+from ptn.missionalertbot.constants import bot, mission_command_channel, certcarrier_role, trainee_role, seconds_long, rescarrier_role, commodities_common, bot_spam_channel, \
+    training_mission_command_channel
 
 # import local modules
 from ptn.missionalertbot.database.database import find_mission, find_webhook_from_owner, add_webhook_to_database, find_webhook_by_name, delete_webhook_by_name, CarrierDbFields, find_carrier
-from ptn.missionalertbot.modules.helpers import on_app_command_error, convert_str_to_float_or_int, check_command_channel, check_roles
+from ptn.missionalertbot.modules.helpers import on_app_command_error, convert_str_to_float_or_int, check_command_channel, check_roles, check_training_mode
 from ptn.missionalertbot.modules.ImageHandling import assign_carrier_image
 from ptn.missionalertbot.modules.MissionGenerator import confirm_send_mission_via_button
 from ptn.missionalertbot.modules.MissionCleaner import _cleanup_completed_mission
@@ -123,10 +124,12 @@ class CCOCommands(commands.Cog):
         demand = 'The total demand for the commodity on the Fleet Carrier.'
         )
     @check_roles([certcarrier_role(), trainee_role(), rescarrier_role()])
-    @check_command_channel(mission_command_channel())
+    @check_command_channel([mission_command_channel(), training_mission_command_channel()])
     async def load(self, interaction: discord.Interaction, carrier: str, commodity: str, system: str, station: str,
                 profit: str, pads: str, demand: str):
         mission_type = 'load'
+
+        training, channel_defs = check_training_mode(interaction)
 
         cp_embed = discord.Embed(
             title="COPY/PASTE TEXT FOR THIS COMMAND",
@@ -135,13 +138,16 @@ class CCOCommands(commands.Cog):
             color=constants.EMBED_COLOUR_QU
         )
 
+        if training:
+            cp_embed.set_footer(text="TRAINING MODE ACTIVE: ALL SENDS WILL GO TO TRAINING CHANNELS")
+
         await interaction.response.send_message(embed=cp_embed)
 
         # convert profit from STR to an INT or FLOAT
         profit_convert = convert_str_to_float_or_int(profit)
 
         params_dict = dict(carrier_name_search_term = carrier, commodity_search_term = commodity, system = system, station = station, profit_raw = profit,
-                           profit = profit_convert, pads = pads, demand = demand, mission_type = mission_type, copypaste_embed = cp_embed)
+                           profit = profit_convert, pads = pads, demand = demand, mission_type = mission_type, copypaste_embed = cp_embed, channel_defs = channel_defs)
 
         mission_params = MissionParams(params_dict)
 
@@ -164,7 +170,7 @@ class CCOCommands(commands.Cog):
         supply = 'The total amount of the commodity available to buy on the Fleet Carrier.'
         )
     @check_roles([certcarrier_role(), trainee_role(), rescarrier_role()])
-    @check_command_channel(mission_command_channel())
+    @check_command_channel([mission_command_channel(), training_mission_command_channel()])
     async def unload(self, interaction: discord.Interaction, carrier: str, commodity: str, system: str, station: str,
                 profit: str, pads: str, supply: str):
         mission_type = 'unload'
@@ -204,7 +210,7 @@ class CCOCommands(commands.Cog):
         supply_or_demand = 'The total amount of the commodity required.'
         )
     @check_roles([certcarrier_role(), trainee_role(), rescarrier_role()])
-    @check_command_channel(mission_command_channel())
+    @check_command_channel([mission_command_channel(), training_mission_command_channel()])
     async def edit(self, interaction: discord.Interaction, carrier: str, commodity: str = None, system: str = None, station: str = None,
                 profit: str = None, pads: str = None, supply_or_demand: str = None):
         print(f"/cco edit called by {interaction.user.display_name}")
@@ -294,7 +300,7 @@ class CCOCommands(commands.Cog):
     @cco_group.command(name='done', description='Alias for /cco complete.')
     @describe(message='A message to send to the mission channel and carrier\'s owner')
     @check_roles([certcarrier_role(), trainee_role(), rescarrier_role()])
-    @check_command_channel(mission_command_channel())
+    @check_command_channel([mission_command_channel(), training_mission_command_channel()])
     async def done(self, interaction: discord.Interaction, carrier: str, *, status: str = "Complete", message: str = None):
         is_complete = True if not status == "Failed" else False
         await cco_mission_complete(interaction, carrier, is_complete, message)
@@ -303,7 +309,7 @@ class CCOCommands(commands.Cog):
     @cco_group.command(name='complete', description='Marks a mission as complete for specified carrier.')
     @describe(message='A message to send to the mission channel and carrier\'s owner')
     @check_roles([certcarrier_role(), trainee_role(), rescarrier_role()])
-    @check_command_channel(mission_command_channel())
+    @check_command_channel([mission_command_channel(), training_mission_command_channel()])
     async def complete(self, interaction: discord.Interaction, carrier: str, *, status: str = "Complete", message: str = None):
         is_complete = True if not status == "Failed" else False
         await cco_mission_complete(interaction, carrier, is_complete, message)
@@ -328,7 +334,7 @@ class CCOCommands(commands.Cog):
     @cco_group.command(name='image', description='View, set, or change a carrier\'s background image.')
     @describe(carrier='A unique fragment of the full name of the target Fleet Carrier')
     @check_roles([certcarrier_role(), trainee_role(), rescarrier_role()])
-    @check_command_channel(mission_command_channel())
+    @check_command_channel([mission_command_channel(), training_mission_command_channel()])
     async def image(self, interaction: discord.Interaction, carrier: str):
         print(f"{interaction.user.display_name} called m.carrier_image for {carrier}")
 
@@ -355,7 +361,7 @@ class CCOCommands(commands.Cog):
     @describe(webhook_url='The URL of your webhook.',
               webhook_name='A short (preferably one-word) descriptor you can use to identify your webhook.')
     @check_roles([certcarrier_role(), trainee_role()])
-    @check_command_channel(mission_command_channel())
+    @check_command_channel([mission_command_channel(), training_mission_command_channel()])
     async def webhook_add(self, interaction: discord.Interaction, webhook_url: str, webhook_name: str):
         print(f"Called webhook add for {interaction.user.display_name}")
 
@@ -463,7 +469,7 @@ class CCOCommands(commands.Cog):
     # command for a CCO to view all their webhooks
     @webhook_group.command(name='view', description='Shows details of all your registered webhooks.')
     @check_roles([certcarrier_role(), trainee_role()])
-    @check_command_channel(mission_command_channel())
+    @check_command_channel([mission_command_channel(), training_mission_command_channel()])
     async def webhooks_view(self, interaction: discord.Interaction):
         print(f"webhook view called by {interaction.user.display_name}")
 
@@ -492,7 +498,7 @@ class CCOCommands(commands.Cog):
     @webhook_group.command(name="delete", description="Remove one of your webhooks from MAB's database.")
     @describe(webhook_name='The name (identifier) of the webhook you wish to remove.')
     @check_roles([certcarrier_role(), trainee_role()])
-    @check_command_channel(mission_command_channel())
+    @check_command_channel([mission_command_channel(), training_mission_command_channel()])
     async def webhook_delete(self, interaction: discord.Interaction, webhook_name: str):
 
         print(f"{interaction.user.display_name} called webhook delete for {webhook_name}")

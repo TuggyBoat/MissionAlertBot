@@ -25,7 +25,9 @@ from ptn.missionalertbot.classes.CommunityCarrierData import CommunityCarrierDat
 
 # import local constants
 import ptn.missionalertbot.constants as constants
-from ptn.missionalertbot.constants import bot, cc_role, get_overwrite_perms, get_guild, bot_spam_channel, archive_cat, cc_cat, cmentor_role, admin_role
+from ptn.missionalertbot.constants import bot, cc_role, get_overwrite_perms, get_guild, bot_spam_channel, archive_cat, cc_cat, cmentor_role, admin_role, \
+    training_category, training_alerts, training_mission_command_channel, training_upvotes, training_wine_alerts, \
+    trade_cat, trade_alerts_channel, mission_command_channel, channel_upvotes, wine_alerts_loading_channel, wine_alerts_unloading_channel
 
 # import local modules
 from ptn.missionalertbot.database.database import find_community_carrier, CCDbFields, carrier_db, carrier_db_lock, carriers_conn, delete_community_carrier_from_db
@@ -36,9 +38,10 @@ carrier_channel_lock = asyncio.Lock()
 
 # custom errors
 class CommandChannelError(app_commands.CheckFailure): # channel check error
-    def __init__(self, permitted_channel):
+    def __init__(self, permitted_channel, formatted_channel_list):
         self.permitted_channel = permitted_channel
-        super().__init__(permitted_channel, "Channel check error raised")
+        self.formatted_channel_list = formatted_channel_list
+        super().__init__(permitted_channel, formatted_channel_list, "Channel check error raised")
     pass
 
 
@@ -63,9 +66,10 @@ async def on_app_command_error(
     try:
         if isinstance(error, CommandChannelError):
             print("Channel check error raised")
-            permitted_channel = error.args[0]
+            formatted_channel_list = error.args[1]
+
             embed=discord.Embed(
-                description=f"Sorry, you can only run this command out of: <#{permitted_channel}>.",
+                description=f"Sorry, you can only run this command out of: {formatted_channel_list}",
                 color=constants.EMBED_COLOUR_ERROR
             )
             await interaction.response.send_message(embed=embed, ephemeral=True)
@@ -160,11 +164,16 @@ def check_command_channel(permitted_channel):
         else:
             permitted_channels = [getchannel(permitted_channel)]
 
+        channel_list = []
+        for channel in permitted_channels:
+            channel_list.append(f'<#{channel.id}>')
+        formatted_channel_list = " • ".join(channel_list)
+
         permission = True if any(channel == ctx.channel for channel in permitted_channels) else False
         if not permission:
             # problem, wrong channel, no progress
             try:
-                raise CommandChannelError(permitted_channel)
+                raise CommandChannelError(permitted_channel, formatted_channel_list)
             except CommandChannelError as e:
                 print(e)
                 raise
@@ -615,6 +624,32 @@ def convert_str_to_float_or_int(element: any) -> bool: # this code turns a STR i
     except ValueError:
         print(f"We can't float {element}")
         return False
+
+
+# a class to hold channel definitions for training mode
+class ChannelDefs:
+    def __init__(self, category_actual, alerts_channel_actual, mission_command_channel_actual, upvotes_channel_actual, wine_loading_channel_actual, wine_unloading_channel_actual):
+        self.category_actual = category_actual
+        self.alerts_channel_actual = alerts_channel_actual
+        self.mission_command_channel_actual = mission_command_channel_actual
+        self.upvotes_channel_actual = upvotes_channel_actual
+        self.wine_loading_channel_actual = wine_loading_channel_actual
+        self.wine_unloading_channel_actual = wine_unloading_channel_actual
+
+# check whether CCO command is being used in training or live categories
+def check_training_mode(interaction: discord.Interaction):
+    if interaction.channel.category.id == training_category():
+        training = True
+        print(f"Training mode detected for {interaction.command.name} in {interaction.channel.name} called by {interaction.user.display_name}")
+        channel_defs = ChannelDefs(training_category(), training_alerts(), training_mission_command_channel(), training_upvotes(), training_wine_alerts(), training_wine_alerts())
+    else:
+        training = False
+        channel_defs = ChannelDefs(trade_cat(), trade_alerts_channel(), mission_command_channel(), channel_upvotes(), wine_alerts_loading_channel(), wine_alerts_unloading_channel())
+
+    attrs = vars(channel_defs)
+    print(attrs)
+
+    return training, channel_defs
 
 
 # presently unused

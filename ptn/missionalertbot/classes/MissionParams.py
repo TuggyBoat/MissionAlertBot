@@ -18,6 +18,7 @@ class MissionParams:
         else:
             info_dict = dict()
 
+        self.channel_defs = info_dict.get('channel_defs', None) # defines channels used by mission generator
         self.copypaste_embed = info_dict.get('copypaste_embed', None) # embed containing the copy/paste string for the command used
         self.carrier_name_search_term = info_dict.get('carrier_name_search_term', None) # the carrier name fragment to search for
         self.commodity_search_term = info_dict.get('commodity_search_term', None) # the commodity name fragment to search for
@@ -56,6 +57,7 @@ class MissionParams:
 
     def print_values(self):
         try:
+            print(f"channel_defs: {self.channel_defs}")
             print(f"copypaste_embed: {self.copypaste_embed}")
             print(f"carrier_name_search_term: {self.carrier_name_search_term}")
             print(f"commodity_search_term: {self.commodity_search_term}")
