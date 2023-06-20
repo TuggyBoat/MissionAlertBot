@@ -203,6 +203,7 @@ class GeneralCommands(commands.Cog):
         if not carrier_channel_lock.locked():
             return await ctx.send("Channel lock is not set.")
 
+        """
         await ctx.send("Make sure nobody is using the Mission Generator before proceeding.")
         global deletion_in_progress
 
@@ -213,29 +214,30 @@ class GeneralCommands(commands.Cog):
                         " or `/cco complete` or 2 minutes following using a mission generator command without generating a mission "
                         "(i.e. by error or user abort).")
 
-        await ctx.send("Do you still want to proceed? **y**/**n**")
+            await ctx.send("Do you still want to proceed? **y**/**n**")
 
-        def check(message):
-            return message.author == ctx.author and message.channel == ctx.channel and \
-                                        message.content.lower() in ["y", "n"]
+            def check(message):
+                return message.author == ctx.author and message.channel == ctx.channel and \
+                                            message.content.lower() in ["y", "n"]
 
-        try:
-            msg = await bot.wait_for("message", check=check, timeout=30)
-            if msg.content.lower() == "n":
-                await ctx.send("Manual lock release aborted.")
-                print("User cancelled manual unlock command.")
+            try:
+                msg = await bot.wait_for("message", check=check, timeout=30)
+                if msg.content.lower() == "n":
+                    await ctx.send("Manual lock release aborted.")
+                    print("User cancelled manual unlock command.")
+                    return
+                elif msg.content.lower() == "y":
+                    print("User wants to manually release channel lock.")
+
+            except asyncio.TimeoutError:
+                await ctx.send("**Cancelled**: no response.")
                 return
-            elif msg.content.lower() == "y":
-                print("User wants to manually release channel lock.")
-
-        except asyncio.TimeoutError:
-            await ctx.send("**Cancelled**: no response.")
-            return
+        """
 
         await ctx.send("OK. Releasing channel lock.")
         carrier_channel_lock.release()
 
-        deletion_in_progress = False
+        # deletion_in_progress = False
         print("Channel lock manually released.")
 
 

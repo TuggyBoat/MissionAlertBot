@@ -43,6 +43,7 @@ Changed commands:
     - button menu asks user whether mission completed or cannot be completed
     - clicking unable to complete prompts user for an explanation message
 - `/mission` is now `/mission information`
+- `m.unlock_override` deletion check temporarily disabled.
 
 New commands:
 - `/cco webhook add` - CCO only - used to add a webhook to that CCO's personal list
@@ -54,6 +55,7 @@ New commands:
 
 Other:
 - When channel deletion is in its final 10 second countdown, a notice will appear in the mission-generator to warn that deletion is in progress and the channel lock is acquired. It is strongly advised not to attempt to "send" missions during this brief window. The message is removed once the lock is released.
+- Automatically update PTN logos used by the bot during June.
 
 
 ## 2.0.0
