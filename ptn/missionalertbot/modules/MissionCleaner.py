@@ -245,20 +245,24 @@ async def remove_carrier_channel(completed_mission_channel_id, seconds):
         mission_gen_channel = bot.get_channel(mission_command_channel())
         print(mission_gen_channel.name, mission_gen_channel.id)
 
-        async with mission_gen_channel.typing():
-            hammertime = get_final_delete_hammertime()
-            print("Warning mission gen channel")
-            embed = discord.Embed (
-                title=":warning: Channel lock engaged for channel cleanup :warning:",
-                description=f"Deletion {hammertime} of <#{completed_mission_channel_id}>, please do **NOT** try to send any missions during this time.",
-                color=constants.EMBED_COLOUR_RP
-            )
-            print("Sending warning message to mission gen")
-            warning = await mission_gen_channel.send(embed=embed)
+        hammertime = get_final_delete_hammertime()
+        print("Warning mission gen channel")
+        embed = discord.Embed (
+            title=":warning: Channel lock engaged for channel cleanup :warning:",
+            description=f"Deletion {hammertime} of <#{completed_mission_channel_id}>, please do **NOT** try to send any missions during this time.",
+            color=constants.EMBED_COLOUR_RP
+        )
+        print("Sending warning message to mission gen")
+        warning = await mission_gen_channel.send(embed=embed)
 
+        async with mission_gen_channel.typing():
+
+            """
             # this is clunky but we want to know if a channel lock is because it's about to be deleted
+            
             global deletion_in_progress
             deletion_in_progress = True
+            """
 
             # check whether channel is in-use for a new mission
             mission_db.execute(f"SELECT * FROM missions WHERE "
@@ -285,11 +289,16 @@ async def remove_carrier_channel(completed_mission_channel_id, seconds):
                     print("Channel appears to have been deleted by someone else, we'll just continue on.")
                     await spamchannel.send(f"Channel {delchannel} could not be deleted because it doesn't exist.")
     finally:
-        # now release the channel lock
-        carrier_channel_lock.release()
-        deletion_in_progress = False
-        print("Channel lock released")
+        try:
+            # now release the channel lock
+            print("Releasing channel lock...")
+            carrier_channel_lock.release()
+            # deletion_in_progress = False
+            print("Channel lock released")
+        except Exception as e:
+            print(e)
         try: 
+            print("Deleting warning message, if exists")
             await warning.delete()
         except Exception as e:
             print(e)
