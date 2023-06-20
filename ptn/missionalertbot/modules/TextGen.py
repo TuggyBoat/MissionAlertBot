@@ -3,15 +3,11 @@ TextGen.py
 
 Functions to generate formatted texts for use by the bot.
 
-Dependencies: constants, DateString
+Dependencies: constants
 """
 
 # import local constants
 import ptn.missionalertbot.constants as constants
-
-# import local libraries
-from ptn.missionalertbot.modules.DateString import get_formatted_date_string
-
 
 
 """
@@ -19,51 +15,48 @@ TEXT GEN FUNCTIONS
 """
 
 
-def txt_create_discord(carrier_data, mission_type, commodity, station, system, profit, pads, demand, eta_text, mission_temp_channel_id, edmc_off, legacy):
-    discord_channel = f"<#{mission_temp_channel_id}>" if mission_temp_channel_id else f"#{carrier_data.discord_channel}"
+def txt_create_discord(mission_params):
+    discord_channel = f"<#{mission_params.mission_temp_channel_id}>" if mission_params.mission_temp_channel_id else f"#{mission_params.carrier_data.discord_channel}"
     discord_text = (
-        f"{'**◄ LEGACY UNIVERSE ►** : ' if legacy else ''}"
-        f"{'**★ EDMC-OFF MISSION! ★** : ' if edmc_off else ''}"
-        f"{discord_channel} {'load' if mission_type == 'load' else 'unload'}ing "
-        f"{commodity.name} "
-        f"{'from' if mission_type == 'load' else 'to'} **{station.upper()}** station in system "
-        f"**{system.upper()}** : {profit}k per unit profit : "
-        f"{demand} {'demand' if mission_type == 'load' else 'supply'} : {pads.upper()}-pads"
-        f".{eta_text}"
+        f"{'**★ EDMC-OFF MISSION! ★** : ' if mission_params.edmc_off else ''}"
+        f"{discord_channel} {'load' if mission_params.mission_type == 'load' else 'unload'}ing "
+        f"{mission_params.commodity_name} "
+        f"{'from' if mission_params.mission_type == 'load' else 'to'} **{mission_params.station.upper()}** station in system "
+        f"**{mission_params.system.upper()}** : {mission_params.profit}k per unit profit : "
+        f"{mission_params.demand}k {'demand' if mission_params.mission_type == 'load' else 'supply'} : {mission_params.pads.upper()}-pads."
     )
+    print("Defined discord trade alert text")
     return discord_text
 
 
-def txt_create_reddit_title(carrier_data, legacy):
+def txt_create_reddit_title(mission_params):
     reddit_title = (
-        f"{'◄ LEGACY UNIVERSE ► : ' if legacy else ''}"
-        f"P.T.N. TRADE MISSION: "
-        f"P.T.N. News - Trade mission - {carrier_data.carrier_long_name} {carrier_data.carrier_identifier}" \
-                   f" - {get_formatted_date_string()[0]}"
+        f"{mission_params.carrier_data.carrier_long_name} {mission_params.carrier_data.carrier_identifier} {mission_params.mission_type}ing "
+        f"{mission_params.commodity_name.upper()} in {mission_params.system.upper()} for {mission_params.profit}K/TON PROFIT"
     )
+    print("Defined reddit title text")
     return reddit_title
 
 
-def txt_create_reddit_body(carrier_data, mission_type, commodity, station, system, profit, pads, demand, eta_text, legacy):
+def txt_create_reddit_body(mission_params):
 
-    if mission_type == 'load':
+    if mission_params.mission_type == 'load':
         reddit_body = (
             f"    INCOMING WIDEBAND TRANSMISSION: P.T.N. CARRIER LOADING MISSION IN PROGRESS\n"
-            f"{'**◄ LEGACY UNIVERSE ►**' if legacy else ''}"
             f"\n\n"
-            f"**BUY FROM**: station **{station.upper()}** ({pads.upper()}-pads) in system **{system.upper()}**\n\n**COMMODITY**: "
-            f"{commodity.name}\n\n&#x200B;\n\n**SELL TO**: Fleet Carrier **{carrier_data.carrier_long_name} "
-            f"{carrier_data.carrier_identifier}{eta_text}**\n\n**PROFIT**: {profit}k/unit : {demand} "
+            f"**BUY FROM**: station **{mission_params.station.upper()}** ({mission_params.pads.upper()}-pads) in system **{mission_params.system.upper()}**\n\n**COMMODITY**: "
+            f"{mission_params.commodity_name}\n\n&#x200B;\n\n**SELL TO**: Fleet Carrier **{mission_params.carrier_data.carrier_long_name} "
+            f"{mission_params.carrier_data.carrier_identifier}**\n\n**PROFIT**: {mission_params.profit}k/unit : {mission_params.demand}k "
             f"demand\n\n\n\n[Join us on Discord]({constants.REDDIT_DISCORD_LINK_URL}) for "
-            f"mission updates and discussion, channel **#{carrier_data.discord_channel}**.")
+            f"mission updates and discussion, channel **#{mission_params.carrier_data.discord_channel}**.")
     else:
         reddit_body = (
             f"    INCOMING WIDEBAND TRANSMISSION: P.T.N. CARRIER UNLOADING MISSION IN PROGRESS\n"
-            f"{'**◄ LEGACY UNIVERSE ►** : ' if legacy else ''}"
             f"\n\n"
-            f"**BUY FROM**: Fleet Carrier **{carrier_data.carrier_long_name} {carrier_data.carrier_identifier}{eta_text}**"
-            f"\n\n**COMMODITY**: {commodity.name}\n\n&#x200B;\n\n**SELL TO**: station "
-            f"**{station.upper()}** ({pads.upper()}-pads) in system **{system.upper()}**\n\n**PROFIT**: {profit}k/unit "
-            f": {demand} supply\n\n\n\n[Join us on Discord]({constants.REDDIT_DISCORD_LINK_URL}) for mission updates"
-            f" and discussion, channel **#{carrier_data.discord_channel}**.")
+            f"**BUY FROM**: Fleet Carrier **{mission_params.carrier_data.carrier_long_name} {mission_params.carrier_data.carrier_identifier}**"
+            f"\n\n**COMMODITY**: {mission_params.commodity_name}\n\n&#x200B;\n\n**SELL TO**: station "
+            f"**{mission_params.station.upper()}** ({mission_params.pads.upper()}-pads) in system **{mission_params.system.upper()}**\n\n**PROFIT**: {mission_params.profit}k/unit "
+            f": {mission_params.demand}k supply\n\n\n\n[Join us on Discord]({constants.REDDIT_DISCORD_LINK_URL}) for mission updates"
+            f" and discussion, channel **#{mission_params.carrier_data.discord_channel}**.")
+    print("Defined reddit comment text")
     return reddit_body

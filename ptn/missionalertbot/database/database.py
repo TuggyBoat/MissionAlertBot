@@ -10,6 +10,7 @@ import asyncio
 import shutil
 import enum
 import discord
+import pickle
 from datetime import datetime
 from datetime import timezone
 
@@ -19,6 +20,7 @@ from ptn.missionalertbot.classes.Commodity import Commodity
 from ptn.missionalertbot.classes.MissionData import MissionData
 from ptn.missionalertbot.classes.CommunityCarrierData import CommunityCarrierData
 from ptn.missionalertbot.classes.NomineesData import NomineesData
+from ptn.missionalertbot.classes.WebhookData import WebhookData
 
 # local constants
 import ptn.missionalertbot.constants as constants
@@ -26,7 +28,6 @@ from ptn.missionalertbot.constants import bot
 
 # local modules
 from ptn.missionalertbot.modules.DateString import get_formatted_date_string
-# from ptn.missionalertbot.modules.MissionGenerator import gen_mission # TODO: will this work for setting gen_missing.returnflag?
 
 
 # connect to sqlite carrier database
@@ -48,6 +49,15 @@ carriers_table_create = '''
     )
     '''
 carriers_table_columns = ['p_ID', 'shortname', 'longname', 'cid', 'discordchannel', 'channelid', 'ownerid', 'lasttrade']
+
+webhooks_table_create = '''
+    CREATE TABLE webhooks(
+        webhook_owner_id INT NOT NULL,
+        webhook_url TEXT NOT NULL,
+        webhook_name TEXT NOT NULL
+    )
+    '''
+webhooks_table_columns = ['webhook_owner_id', 'webhook_url', 'webhook_name']
 
 community_carriers_table_create = '''
     CREATE TABLE community_carriers(
@@ -91,12 +101,13 @@ missions_table_create = '''
         "reddit_post_url"	TEXT,
         "reddit_comment_id"	TEXT,
         "reddit_comment_url"	TEXT,
-        "discord_alert_id"	INT
+        "discord_alert_id"	INT,
+        "mission_params"    BLOB
     )
     '''
 missions_tables_columns = ['carrier', 'cid', 'channelid', 'commodity', 'missiontype', 'system', 'station',\
     'profit', 'pad', 'demand', 'rp_text', 'reddit_post_id', 'reddit_post_url', 'reddit_comment_id',\
-    'reddit_comment_url', 'discord_alert_id', 'is_complete']
+    'reddit_comment_url', 'discord_alert_id', 'mission_params']
 
 channel_cleanup_table_create = '''
     CREATE TABLE channel_cleanup(
@@ -114,6 +125,7 @@ mission_db_lock = asyncio.Lock()
 
 # dump db to .sql file
 def dump_database_test(database_name):
+    print("Called dump_database_test")
     """
     Dumps the database object to a .sql text file while backing up the database. Used just to get something we can
     recreate the database from.  This will only store the last state and should periodically be committed to the repo
@@ -157,7 +169,10 @@ def backup_database(database_name):
 
     shutil.copy(db_path, backup_path)
     print(f'Backed up {database_name}.db at {dt_file_string}')
-    dump_database_test(database_name)
+    try:
+      dump_database_test(database_name)
+    except Exception as e:
+        print(e)
 
 
 # function to check if a given table exists in a given database
@@ -286,6 +301,7 @@ def build_database_on_startup():
     #       create (str): sql create statement for table
     database_table_map = {
         'carriers' : {'obj': carrier_db, 'create': carriers_table_create},
+        'webhooks' : {'obj': carrier_db, 'create': webhooks_table_create},
         'community_carriers': {'obj': carrier_db, 'create': community_carriers_table_create},
         'nominees': {'obj': carrier_db, 'create': nominees_table_create},
         'missions': {'obj': mission_db, 'create': missions_table_create},
@@ -326,6 +342,14 @@ def build_database_on_startup():
             'conn': carriers_conn,
             'create': community_carriers_table_create
         },
+        'mission_params': {
+            'db_name': 'missions',
+            'table': 'missions',
+            'obj': mission_db,
+            'columns': missions_tables_columns,
+            'conn': missions_conn,
+            'create': missions_table_create
+        }
     }
 
     for column_name in new_column_map:
@@ -421,6 +445,23 @@ async def add_carrier_to_database(short_name, long_name, carrier_id, channel, ch
         carrier_db_lock.release()
 
 
+# add a webhook to the database
+async def add_webhook_to_database(owner_id, webhook_url, webhook_name):
+    print("Called add_webhook_to_database")
+    await carrier_db_lock.acquire()
+    print("Carrier DB locked.")
+    try:
+        carrier_db.execute(''' INSERT INTO webhooks VALUES(?, ?, ?) ''',
+                        (owner_id, webhook_url, webhook_name))
+        carriers_conn.commit()
+        print(f"Successfully added webhook {webhook_url} to database for {owner_id} with name {webhook_name}")
+    except Exception as e:
+        print(e)
+    finally:
+        carrier_db_lock.release()
+        print("Carrier DB unlocked.")
+
+
 # carrier edit function
 async def _update_carrier_details_in_database(carrier_data, original_name):
     """
@@ -474,6 +515,19 @@ async def delete_carrier_from_db(p_id):
         print('Unable to backup image file, perhaps it never existed?')
 
     return
+
+
+# function to remove a webhook
+async def delete_webhook_by_name(userid, webhook_name):
+    print(f"Attempting to delete {userid} {webhook_name} match.")
+    try:
+        await carrier_db_lock.acquire()
+        query = f"DELETE FROM webhooks WHERE webhook_owner_id = ? AND webhook_name = ?"
+        carrier_db.execute(query, (userid, webhook_name))
+        carriers_conn.commit()
+        return print("Deleted")
+    finally:
+        carrier_db_lock.release()
 
 
 # function to remove a community carrier
@@ -565,6 +619,44 @@ def find_carriers_mult(searchterm, searchfield):
     return carrier_data
 
 
+def find_webhook_from_owner(ownerid):
+    """
+    Returns owner ID, webhook URL and webhook name matching the nominee's user ID
+
+    :param int ownerid: The user id to match
+    :returns: A list of webhook data objects
+    :rtype: list[WebhookData]
+    """
+    carrier_db.execute(f"SELECT * FROM webhooks WHERE "
+                       f"webhook_owner_id = {ownerid} ")
+    webhook_data = [WebhookData(webhooks) for webhooks in carrier_db.fetchall()]
+    for webhooks in webhook_data:
+        print(f"{webhooks.webhook_owner_id} owns {webhooks.webhook_url} called {webhooks.webhook_name}"
+              f" called from find_webhook_from_owner.")
+
+    return webhook_data
+
+
+def find_webhook_by_name(ownerid, name): # TODO: why doesn't this work?
+    print("Called find_webhook_by_name")
+    """
+    Returns owner ID, webhook URL and webhook name matching the nominee's user ID
+
+    :param int ownerid: The user id to match
+    :param str name: The webhook name to match
+    :returns: A webhook data object
+    """
+    try:
+        query = f"SELECT * FROM webhooks WHERE webhook_owner_id = ? AND webhook_name = ?"
+        carrier_db.execute(query, (ownerid, name))
+        webhook_data = WebhookData(carrier_db.fetchone())
+        print(f"Found {webhook_data}")
+        return webhook_data
+    except Exception as e:
+        print(e)
+        return
+
+
 def find_community_carrier(searchterm, searchfield):
     """
     Returns channel owner and role matching the ownerid
@@ -634,7 +726,94 @@ def find_mission(searchterm, searchfield):
                         (f'%{searchterm}%',))
     mission_data = MissionData(mission_db.fetchone())
     print(f'Found mission data: {mission_data}')
+
+    # unpickle the mission_params object if it exists
+    if mission_data.mission_params:
+        print("Found mission_params, enumerating...")
+        mission_data.mission_params = pickle.loads(mission_data.mission_params)
+        mission_data.mission_params.print_values()
+    else:
+        print("No mission_params found")
+        return mission_data
+
     return mission_data
+
+
+# carrier edit function
+async def _update_mission_in_database(mission_params):
+    print("Called _update_mission_in_database")
+    """
+    Updates the mission details in the database.
+
+    :param mission_params The new mission data to write
+    """
+    backup_database('missions')  # backup the carriers database before going any further
+
+    # TODO: Write to the database
+    print("Getting mission db lock...")
+    await mission_db_lock.acquire()
+
+    print("Pickling mission_params...")
+    pickled_mission_params = pickle.dumps(mission_params)
+
+    try:
+        data = (
+            mission_params.carrier_data.carrier_long_name,
+            mission_params.carrier_data.carrier_identifier,
+            mission_params.mission_temp_channel_id,
+            mission_params.commodity_name,
+            mission_params.mission_type,
+            mission_params.system,
+            mission_params.station,
+            mission_params.profit,
+            mission_params.pads,
+            mission_params.demand,
+            mission_params.cco_message_text,
+            mission_params.reddit_post_id,
+            mission_params.reddit_post_url,
+            mission_params.reddit_comment_id,
+            mission_params.reddit_comment_url,
+            mission_params.discord_alert_id,
+            pickled_mission_params,
+            mission_params.carrier_data.carrier_long_name
+        )
+        # Handy number to print out what the database connection is actually doing
+        missions_conn.set_trace_callback(print)
+
+        # define our SQL update statement
+        statement = """
+        UPDATE missions
+        SET carrier = ?,
+            cid = ?,
+            channelid = ?,
+            commodity = ?,
+            missiontype = ?,
+            system = ?,
+            station = ?,
+            profit = ?,
+            pad = ?,
+            demand = ?,
+            rp_text = ?,
+            reddit_post_id = ?,
+            reddit_post_url = ?,
+            reddit_comment_id = ?,
+            reddit_comment_url = ?,
+            discord_alert_id = ?,
+            mission_params = ?
+        WHERE carrier LIKE ?
+        """
+
+        print("Executing update...")
+        mission_db.execute(statement, data)
+        print("Committing...")
+        missions_conn.commit()
+    except Exception as e:
+        print(e)
+    finally:
+        print("Releasing mission_db lock")
+        mission_db_lock.release()
+        print("Completed _update_mission_in_database")
+        return
 
 
 # check if a carrier is for a registered PTN fleet carrier
@@ -648,23 +827,26 @@ async def _is_carrier_channel(carrier_data):
 
 
 # function to search for a commodity by name or partial name
-async def find_commodity(commodity_search_term, ctx):
+async def find_commodity(mission_params, interaction):
     # TODO: Where do we get set up this database? it is searching for things, but what is the source of the data, do
     #  we update it periodically?
 
-    print(f'Searching for commodity against match "{commodity_search_term}" requested by {ctx.author}')
+    print(f'Searching for commodity against match "{mission_params.commodity_search_term}" requested by {interaction.user.display_name}')
 
     carrier_db.execute(
         f"SELECT * FROM commodities WHERE commodity LIKE (?)",
-        (f'%{commodity_search_term}%',))
+        (f'%{mission_params.commodity_search_term}%',))
 
     commodities = [Commodity(commodity) for commodity in carrier_db.fetchall()]
     commodity = None
     if not commodities:
+        mission_params.returnflag = False 
+        embed = discord.Embed(
+            description=f"ERROR: No commodities found for {mission_params.commodity_search_term}.",
+            color=constants.EMBED_COLOUR_ERROR
+        )
         print('No commodities found for request')
-        await ctx.send(f"No commodities found for {commodity_search_term}")
-        # Did not find anything, short-circuit out of the next block
-        return
+        return await interaction.channel.send(embed=embed) # error condition, return
     elif len(commodities) == 1:
         print('Single commodity found, returning that directly')
         # if only 1 match, just assign it directly
@@ -672,15 +854,15 @@ async def find_commodity(commodity_search_term, ctx):
     elif len(commodities) > 3:
         # If we ever get into a scenario where more than 3 commodities can be found with the same search directly, then
         # we need to revisit this limit
-        print(f'More than 3 commodities found for: "{commodity_search_term}", {ctx.author} needs to search better.')
-        await ctx.send(f'Please narrow down your commodity search, we found {len(commodities)} matches for your '
-                       f'input choice: "{commodity_search_term}"')
+        print(f'More than 3 commodities found for: "{mission_params.commodity_search_term}", {interaction.user.display_name} needs to search better.')
+        await interaction.channel.send(f'Please narrow down your commodity search, we found {len(commodities)} matches for your '
+                       f'input choice: "{mission_params.commodity_search_term}"')
         return # Just return None here and let the calling method figure out what is needed to happen
     else:
-        print(f'Between 1 and 3 commodities found for: "{commodity_search_term}", asking {ctx.author} which they want.')
+        print(f'Between 1 and 3 commodities found for: "{mission_params.commodity_search_term}", asking {interaction.user.display_name} which they want.')
         # The database runs a partial match, in the case we have more than 1 ask the user which they want.
         # here we have less than 3, but more than 1 match
-        embed = discord.Embed(title=f"Multiple commodities found for input: {commodity_search_term}", color=constants.EMBED_COLOUR_OK)
+        embed = discord.Embed(title=f"Multiple commodities found for input: {mission_params.commodity_search_term}", color=constants.EMBED_COLOUR_OK)
 
         count = 0
         response = None  # just in case we try to do something before it is assigned, give it a value of None
@@ -691,25 +873,25 @@ async def find_commodity(commodity_search_term, ctx):
         embed.set_footer(text='Please select the commodity with 1, 2 or 3')
 
         def check(message):
-            return message.author == ctx.author and message.channel == ctx.channel and \
+            return message.author == interaction.user and message.channel == interaction.channel and \
                    len(message.content) == 1 and message.content.lower() in ["1", "2", "3"]
 
-        message_confirm = await ctx.send(embed=embed)
+        message_confirm = await interaction.channel.send(embed=embed)
         try:
             # Wait on the user input, this might be better by using a reaction?
             response = await bot.wait_for("message", check=check, timeout=15)
-            print(f'{ctx.author} responded with: "{response.content}", type: {type(response.content)}.')
+            print(f'{interaction.user.display_name} responded with: "{response.content}", type: {type(response.content)}.')
             index = int(response.content) - 1  # Users count from 1, computers count from 0
             commodity = commodities[index]
         except asyncio.TimeoutError:
-            await ctx.send("Commodity selection timed out. Cancelling.")
+            mission_params.returnflag = False 
+            await interaction.channel.send("Commodity selection timed out. Cancelling.")
             print('User failed to respond in time')
-            return
+            return # error condition, return
         await message_confirm.delete()
         if response:
             await response.delete()
     if commodity: # only if this is successful is returnflag set so mission gen will continue
-        # gen_mission.returnflag = True TODO
-        print(f"Commodity {commodity.name} avgsell {commodity.average_sell} avgbuy {commodity.average_buy} "
-              f"maxsell {commodity.max_sell} minbuy {commodity.min_buy} maxprofit {commodity.max_profit}")
-    return commodity
+        print(f"Found commodity {commodity.name}")
+        mission_params.commodity_name = commodity.name
+    return
