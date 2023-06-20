@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.1.1
+
+- Removed channel_cleanup table from missions.db and related code
+
+
 ## 2.1.0
 
 Refactoring:
