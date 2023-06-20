@@ -1155,6 +1155,7 @@ async def gen_mission(interaction: discord.Interaction, mission_params):
         await spamchannel.send(embed=embed)
 
         try:
+            print("Releasing channel lock...")
             carrier_channel_lock.release()
         except Exception as e:
             print(e)
@@ -1295,6 +1296,12 @@ async def mission_add(mission_params):
 
 async def mission_generation_complete(interaction: discord.Interaction, mission_params):
     print("reached mission_generation_complete")
+
+    try:
+        print("Making sure channel lock isn't engaged")
+        carrier_channel_lock.release()
+    except Exception as e:
+        print(e)
 
     # fetch data we just committed back
 
