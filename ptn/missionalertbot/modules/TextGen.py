@@ -25,6 +25,7 @@ def txt_create_discord(mission_params):
         f"**{mission_params.system.upper()}** : {mission_params.profit}k per unit profit : "
         f"{mission_params.demand}k {'demand' if mission_params.mission_type == 'load' else 'supply'} : {mission_params.pads.upper()}-pads."
     )
+    print("Defined discord trade alert text")
     return discord_text
 
 
@@ -33,6 +34,7 @@ def txt_create_reddit_title(mission_params):
         f"{mission_params.carrier_data.carrier_long_name} {mission_params.carrier_data.carrier_identifier} {mission_params.mission_type}ing "
         f"{mission_params.commodity_name.upper()} in {mission_params.system.upper()} for {mission_params.profit}K/TON PROFIT"
     )
+    print("Defined reddit title text")
     return reddit_title
 
 
@@ -56,4 +58,5 @@ def txt_create_reddit_body(mission_params):
             f"**{mission_params.station.upper()}** ({mission_params.pads.upper()}-pads) in system **{mission_params.system.upper()}**\n\n**PROFIT**: {mission_params.profit}k/unit "
             f": {mission_params.demand}k supply\n\n\n\n[Join us on Discord]({constants.REDDIT_DISCORD_LINK_URL}) for mission updates"
             f" and discussion, channel **#{mission_params.carrier_data.discord_channel}**.")
+    print("Defined reddit comment text")
     return reddit_body

@@ -92,8 +92,9 @@ PROD_DEV_ROLE = 812988180210909214 # Developer role ID on live
 PROD_MOD_ROLE = 813814494563401780 # Mod role ID on Live
 PROD_TRADE_CAT = 801558838414409738 # Trade Carrier category on live server
 PROD_ARCHIVE_CAT = 1048957416781393970 # Archive category on live server
-PROD_SECONDS_SHORT = 120
-PROD_SECONDS_LONG = 900
+PROD_SECONDS_VERY_SHORT = 10 # time between channel deletion trigger and actual deletion
+PROD_SECONDS_SHORT = 120 # time before calling channel cleanup on failed mission gen
+PROD_SECONDS_LONG = 900 # time before calling channel cleanup on successful mission closure
 # Training mode - production
 PROD_TRAINING_CATEGORY = 1120269131476901938 # training mode category ID
 PROD_TRAINING_MISSION_COMMAND_CHANNEL = 1120269354949419030 # training mode mission gen channel ID
@@ -135,8 +136,9 @@ TEST_CPILLAR_ROLE = 903289927184314388 # Community Pillar role on test server
 TEST_DEV_ROLE = 1048913812163678278 # Dev role ID on test
 TEST_TRADE_CAT = 876569219259580436 # Trade Carrier category on live server
 TEST_ARCHIVE_CAT = 877244591579992144 # Archive category on live server
-TEST_SECONDS_SHORT = 5
-TEST_SECONDS_LONG = 10
+TEST_SECONDS_VERY_SHORT = 10 # time between channel deletion trigger and actual deletion
+TEST_SECONDS_SHORT = 5 # time before calling channel cleanup on failed mission gen
+TEST_SECONDS_LONG = 10 # time before calling channel cleanup on successful mission closure
 # Training mode - test
 TEST_TRAINING_CATEGORY = 1120268080912810014 # training mode category ID
 TEST_TRAINING_MISSION_COMMAND_CHANNEL = 1120268484455174215 # training mode mission gen channel ID
@@ -355,6 +357,9 @@ def trade_cat():
 
 def archive_cat():
   return PROD_ARCHIVE_CAT if _production else TEST_ARCHIVE_CAT
+
+def seconds_very_short():
+  return PROD_SECONDS_VERY_SHORT if _production else TEST_SECONDS_VERY_SHORT
 
 def seconds_short():
   return PROD_SECONDS_SHORT if _production else TEST_SECONDS_SHORT

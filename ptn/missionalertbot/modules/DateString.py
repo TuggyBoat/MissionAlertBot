@@ -1,13 +1,16 @@
 """
 Module to return formatted date strings.
 
-Depends on: none
+Depends on: constants
 """
 
 # import libraries
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 import time
+
+# import local constants
+from ptn.missionalertbot.constants import seconds_long, seconds_short, seconds_very_short
 
 
 # get date and time
@@ -30,3 +33,15 @@ def get_formatted_date_string():
     print(f"Current time string: {current_time_string}")
 
     return elite_time_string, current_time_string, posix_time_string
+
+def get_mission_delete_hammertime():
+    posix_time_string = get_formatted_date_string()[2]
+    posix_time_string = posix_time_string + seconds_long() + seconds_very_short()
+    hammertime = f"<t:{posix_time_string}:R>"
+    return hammertime
+
+def get_final_delete_hammertime():
+    posix_time_string = get_formatted_date_string()[2]
+    posix_time_string = posix_time_string + seconds_short()
+    hammertime = f"<t:{posix_time_string}:R>"
+    return hammertime

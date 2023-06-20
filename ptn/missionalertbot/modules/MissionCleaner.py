@@ -27,6 +27,7 @@ from ptn.missionalertbot.constants import bot, bot_spam_channel, wine_alerts_loa
 
 # import local modules
 from ptn.missionalertbot.database.database import remove_channel_cleanup_entry, backup_database, mission_db, missions_conn, find_carrier, mark_cleanup_channel, CarrierDbFields
+from ptn.missionalertbot.modules.DateString import get_final_delete_hammertime
 from ptn.missionalertbot.modules.helpers import lock_mission_channel, carrier_channel_lock, clean_up_pins, ChannelDefs
 
 
@@ -241,39 +242,53 @@ async def remove_carrier_channel(completed_mission_channel_id, seconds):
             print(f"No channel lock available for {delchannel}")
             return await spamchannel.send(f"<@211891698551226368> WARNING: No channel lock available on {delchannel} after 120 seconds. Deletion aborted.")
 
-        # this is clunky but we want to know if a channel lock is because it's about to be deleted
-        global deletion_in_progress
-        deletion_in_progress = True
+        mission_gen_channel = bot.get_channel(mission_command_channel())
+        print(mission_gen_channel.name, mission_gen_channel.id)
 
-        # check whether channel is in-use for a new mission
-        mission_db.execute(f"SELECT * FROM missions WHERE "
-                        f"channelid = {completed_mission_channel_id}")
-        mission_data = MissionData(mission_db.fetchone())
-        print(f'Mission data from remove_carrier_channel: {mission_data}')
+        async with mission_gen_channel.typing():
+            hammertime = get_final_delete_hammertime()
+            print("Warning mission gen channel")
+            embed = discord.Embed (
+                title=":warning: Channel lock engaged for channel cleanup :warning:",
+                description=f"Deletion {hammertime} of <#{completed_mission_channel_id}>, please do **NOT** try to send any missions during this time.",
+                color=constants.EMBED_COLOUR_RP
+            )
+            warning = await mission_gen_channel.send(embed=embed)
 
-        if mission_data:
-            # abort abort abort
-            print(f'New mission underway in this channel, aborting removal')
-        else:
-            # delete channel after a parting gift
-            gif = random.choice(constants.boom_gifs)
-            try:
-                await delchannel.send(gif)
-                await asyncio.sleep(10)
-                await delchannel.delete()
-                print(f'Deleted {delchannel}')
-                await remove_channel_cleanup_entry(completed_mission_channel_id)
+            # this is clunky but we want to know if a channel lock is because it's about to be deleted
+            global deletion_in_progress
+            deletion_in_progress = True
 
-            except Forbidden:
-                raise EnvironmentError(f"Could not delete {delchannel}, reason: Bot does not have permission.")
-            except NotFound:
-                print("Channel appears to have been deleted by someone else, we'll just continue on.")
-                await spamchannel.send(f"Channel {delchannel} could not be deleted because it doesn't exist.")
+            # check whether channel is in-use for a new mission
+            mission_db.execute(f"SELECT * FROM missions WHERE "
+                            f"channelid = {completed_mission_channel_id}")
+            mission_data = MissionData(mission_db.fetchone())
+            print(f'Mission data from remove_carrier_channel: {mission_data}')
+
+            if mission_data:
+                # abort abort abort
+                print(f'New mission underway in this channel, aborting removal')
+            else:
+                # delete channel after a parting gift
+                gif = random.choice(constants.boom_gifs)
+                try:
+                    await delchannel.send(gif)
+                    await asyncio.sleep(seconds)
+                    await delchannel.delete()
+                    print(f'Deleted {delchannel}')
+                    await remove_channel_cleanup_entry(completed_mission_channel_id)
+
+                except Forbidden:
+                    raise EnvironmentError(f"Could not delete {delchannel}, reason: Bot does not have permission.")
+                except NotFound:
+                    print("Channel appears to have been deleted by someone else, we'll just continue on.")
+                    await spamchannel.send(f"Channel {delchannel} could not be deleted because it doesn't exist.")
     finally:
         # now release the channel lock
         carrier_channel_lock.release()
         deletion_in_progress = False
         print("Channel lock released")
+        if warning: await warning.delete()
         return
 
 

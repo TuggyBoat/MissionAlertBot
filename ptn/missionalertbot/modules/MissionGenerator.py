@@ -73,12 +73,13 @@ class MissionSendSelectMenu(Select):
             discord.SelectOption(label="Notify Haulers", emoji="🔔", description="Send a notification ping to the appropriate Hauler role."),
             discord.SelectOption(label="EDMC-OFF", emoji="🤫", description="Flag the mission as EDMC-OFF: sends to PTN Discord only."),
             discord.SelectOption(label="Discord Only", emoji="❌", description="None of the above: send only to the PTN Discord."),
+            discord.SelectOption(label="Copy-Paste Text", emoji="📃", description="Create texts for copy/pasting."),
             discord.SelectOption(label="Return to menu", emoji="◀", description="Return to the main menu.")
         ] 
-        super().__init__(placeholder="Select your options", max_values=3, min_values=1, options=options)
+        super().__init__(placeholder="Select your options", max_values=4, min_values=1, options=options)
 
     async def callback(self, interaction: discord.Interaction):
-        self.mission_params.sendflags = ['d']
+        self.mission_params.sendflags = []
         if 'Return to menu' in self.values:
             print("User wants to go back to the buttons")
             try:
@@ -92,6 +93,7 @@ class MissionSendSelectMenu(Select):
                 return
 
         if 'Discord Only' in self.values:
+            if not 'd' in self.mission_params.sendflags: self.mission_params.sendflags.append('d')
             print("User wants to send to Discord only")
             try: 
                 await interaction.response.edit_message(embeds=self.mission_params.original_message_embeds, view=None)
@@ -102,19 +104,27 @@ class MissionSendSelectMenu(Select):
 
         if 'Webhooks' in self.values:
             print("Adding webhook send")
+            if not 'd' in self.mission_params.sendflags: self.mission_params.sendflags.append('d')
             self.mission_params.sendflags.append('w')
         
         if 'Reddit' in self.values:
             print("Adding Reddit send")
+            if not 'd' in self.mission_params.sendflags: self.mission_params.sendflags.append('d')
             self.mission_params.sendflags.append('r')
 
         if 'Notify Haulers' in self.values:
             print("Adding hauler notify")
+            if not 'd' in self.mission_params.sendflags: self.mission_params.sendflags.append('d')
             self.mission_params.sendflags.append('n')
 
         if 'EDMC-OFF' in self.values:
             print("Adding EDMC-OFF flag")
+            if not 'd' in self.mission_params.sendflags: self.mission_params.sendflags.append('d')
             self.mission_params.sendflags.append('e')
+
+        if 'Copy-Paste Text' in self.values:
+            print("Adding textgen")
+            self.mission_params.sendflags.append('t')
 
         try: 
             await interaction.response.edit_message(embeds=self.mission_params.original_message_embeds, view=None)
@@ -340,6 +350,13 @@ Mission generator helpers
 
 """
 
+async def define_reddit_texts(mission_params):
+    mission_params.reddit_title = txt_create_reddit_title(mission_params)
+    mission_params.reddit_body = txt_create_reddit_body(mission_params)
+    mission_params.reddit_img_name = await create_carrier_reddit_mission_image(mission_params)
+    print("Defined Reddit elements")
+
+
 async def validate_profit(interaction: discord.Interaction, mission_params):
     print("Validating profit")
     if not float(mission_params.profit):
@@ -538,7 +555,9 @@ async def send_mission_to_discord(interaction, mission_params):
     print("User used option d, creating mission channel")
 
     mission_params.discord_img_name = await create_carrier_discord_mission_image(mission_params)
-    mission_params.discord_text = txt_create_discord(mission_params)
+    if not mission_params.discord_text:
+        discord_text = txt_create_discord(mission_params)
+        mission_params.discord_text = discord_text
     if mission_params.edmc_off: mission_params.discord_msg_content = ":warning:    " \
         ":regional_indicator_e: :regional_indicator_d: :regional_indicator_m:" \
         " :regional_indicator_c: :shushing_face: :mobile_phone_off:    :warning:" 
@@ -655,10 +674,7 @@ async def send_mission_to_subreddit(interaction, mission_params):
 
     message_send = await interaction.channel.send("**Sending to Reddit...**")
 
-    mission_params.reddit_title = txt_create_reddit_title(mission_params)
-    mission_params.reddit_body = txt_create_reddit_body(mission_params)
-    mission_params.reddit_img_name = await create_carrier_reddit_mission_image(mission_params)
-    print("Defined Reddit elements")
+    if not mission_params.reddit_title: await define_reddit_texts(mission_params)
 
     try:
 
@@ -790,29 +806,59 @@ async def notify_hauler_role(interaction, mission_params, mission_temp_channel):
 
 async def send_mission_text_to_user(interaction, mission_params):
     print("User used option t")
-    embed = discord.Embed(title="Trade Alert (Discord)", description=f"`{mission_params.discord_text}`",
-                        color=constants.EMBED_COLOUR_DISCORD)
+
+    if not mission_params.reddit_title: await define_reddit_texts(mission_params)
+    if not mission_params.discord_text:
+        discord_text = txt_create_discord(mission_params)
+        mission_params.discord_text = discord_text
+
+    embed = discord.Embed(
+        title="Trade Alert (Discord)",
+        description=f"```{mission_params.discord_text}```",
+        color=constants.EMBED_COLOUR_DISCORD
+    )
+
     await interaction.channel.send(embed=embed)
     if mission_params.cco_message_text:
-        embed = discord.Embed(title="Roleplay Text (Discord)", description=f"`>>> {mission_params.cco_message_text}`",
-                            color=constants.EMBED_COLOUR_DISCORD)
+        embed = discord.Embed(
+            title="Message text (raw)",
+            description=mission_params.cco_message_text,
+            color=constants.EMBED_COLOUR_RP
+        )
         await interaction.channel.send(embed=embed)
 
-    embed = discord.Embed(title="Reddit Post Title", description=f"`{mission_params.reddit_title}`",
-                        color=constants.EMBED_COLOUR_REDDIT)
+    embed = discord.Embed(
+        title="Reddit Post Title",
+        description=f"`{mission_params.reddit_title}`",
+        color=constants.EMBED_COLOUR_REDDIT
+    )
+
     await interaction.channel.send(embed=embed)
+
     if mission_params.cco_message_text:
-        embed = discord.Embed(title="Reddit Post Body - PASTE INTO MARKDOWN MODE",
-                            description=f"```> {mission_params.cco_message_text}\n\n{mission_params.reddit_body}```",
-                            color=constants.EMBED_COLOUR_REDDIT)
+        embed = discord.Embed(
+            title="Reddit Post Body - PASTE INTO MARKDOWN MODE",
+            description=f"```> {mission_params.cco_message_text}\n\n&#x200B;\n\n{mission_params.reddit_body}```",
+            color=constants.EMBED_COLOUR_REDDIT
+        )
     else:
-        embed = discord.Embed(title="Reddit Post Body - PASTE INTO MARKDOWN MODE",
-                            description=f"```{mission_params.reddit_body}```", color=constants.EMBED_COLOUR_REDDIT)
+        embed = discord.Embed(
+            title="Reddit Post Body - PASTE INTO MARKDOWN MODE",
+            description=f"```{mission_params.reddit_body}```",
+            color=constants.EMBED_COLOUR_REDDIT
+        )
     embed.set_footer(text="**REMEMBER TO USE MARKDOWN MODE WHEN PASTING TEXT TO REDDIT.**")
     await interaction.channel.send(embed=embed)
-    await interaction.channel.send(file=discord.File(mission_params.reddit_img_name))
 
-    embed = discord.Embed(title=f"Alert Generation Complete for {mission_params.carrier_data.carrier_long_name}",
+    file = discord.File(mission_params.reddit_img_name, filename="image.png")
+    embed = discord.Embed(
+        title="Image with mission details",
+        color=constants.EMBED_COLOUR_REDDIT
+    )
+    embed.set_image(url="attachment://image.png")
+    await interaction.channel.send(file=file, embed=embed)
+
+    embed = discord.Embed(title=f"Text Generation Complete for {mission_params.carrier_data.carrier_long_name}",
                         description="Paste Reddit content into **MARKDOWN MODE** in the editor. You can swap "
                                     "back to Fancy Pants afterwards and make any changes/additions or embed "
                                     "the image.\n\nBest practice for Reddit is an image post with a top level"
@@ -822,6 +868,8 @@ async def send_mission_text_to_user(interaction, mission_params):
                                     "image showing and add a comment to inform.",
                         color=constants.EMBED_COLOUR_OK)
     await interaction.channel.send(embed=embed)
+    print("E")
+
     return
 
 
@@ -1013,6 +1061,10 @@ async def gen_mission(interaction: discord.Interaction, mission_params):
         if "t" in mission_params.sendflags: # send full text to mission gen channel
             async with interaction.channel.typing():
                 await send_mission_text_to_user(interaction, mission_params)
+            if not "d" in mission_params.sendflags: # skip the rest of mission gen as sending to Discord is required
+                print("No discord send option selected, ending here")
+                cleanup_temp_image_file(mission_params.reddit_img_name)
+                return
 
         if "d" in mission_params.sendflags: # send to discord and save to mission database
             async with interaction.channel.typing():

@@ -19,10 +19,11 @@ from ptn.missionalertbot.classes.MissionParams import MissionParams
 # import local constants
 import ptn.missionalertbot.constants as constants
 from ptn.missionalertbot.constants import bot, mission_command_channel, certcarrier_role, trainee_role, seconds_long, rescarrier_role, commodities_common, bot_spam_channel, \
-    training_mission_command_channel
+    training_mission_command_channel, seconds_very_short
 
 # import local modules
 from ptn.missionalertbot.database.database import find_mission, find_webhook_from_owner, add_webhook_to_database, find_webhook_by_name, delete_webhook_by_name, CarrierDbFields, find_carrier
+from ptn.missionalertbot.modules.DateString import get_mission_delete_hammertime
 from ptn.missionalertbot.modules.helpers import on_app_command_error, convert_str_to_float_or_int, check_command_channel, check_roles, check_training_mode
 from ptn.missionalertbot.modules.ImageHandling import assign_carrier_image
 from ptn.missionalertbot.modules.MissionGenerator import confirm_send_mission_via_button
@@ -68,6 +69,7 @@ async def cco_mission_complete(interaction, carrier, is_complete, message):
         await interaction.response.send_message(embed=embed)
 
     # fill in some info for messages
+    hammertime = get_mission_delete_hammertime()
     if not message == None:
         discord_msg = f"<@{interaction.user.id}>: {message}"
         reddit_msg = message
@@ -75,9 +77,11 @@ async def cco_mission_complete(interaction, carrier, is_complete, message):
         discord_msg = ""
         reddit_msg = ""
     reddit_complete_text = f"    INCOMING WIDEBAND TRANSMISSION: P.T.N. CARRIER MISSION UPDATE\n\n**{mission_data.carrier_name}** mission {status}. o7 CMDRs!\n\n{reddit_msg}"
-    discord_complete_embed = discord.Embed(title=f"{mission_data.carrier_name} MISSION {status.upper()}", description=f"{discord_msg}",
-                            color=constants.EMBED_COLOUR_OK)
-    discord_complete_embed.set_footer(text=f"This mission channel will be removed in {seconds_long()//60} minutes.")
+    discord_complete_embed = discord.Embed(
+        title=f"{mission_data.carrier_name} MISSION {status.upper()}",
+        description=f"{discord_msg}\n\nThis mission channel will be removed {hammertime}",
+        color=constants.EMBED_COLOUR_OK
+    )
 
     await _cleanup_completed_mission(interaction, mission_data, reddit_complete_text, discord_complete_embed, message, is_complete)
 

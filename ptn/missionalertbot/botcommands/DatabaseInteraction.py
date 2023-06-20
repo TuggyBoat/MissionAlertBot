@@ -18,7 +18,7 @@ from discord.ext import commands
 # local classes
 from ptn.missionalertbot.classes.CommunityCarrierData import CommunityCarrierData
 from ptn.missionalertbot.classes.NomineesData import NomineesData
-from ptn.missionalertbot.classes.Views import db_delete_View, BroadcastView, CarrierEditView
+from ptn.missionalertbot.classes.Views import db_delete_View, BroadcastView, CarrierEditView, MissionDeleteView
 
 # local constants
 import ptn.missionalertbot.constants as constants
@@ -27,8 +27,7 @@ from ptn.missionalertbot.constants import bot, cmentor_role, admin_role, cteam_b
 
 # local modules
 from ptn.missionalertbot.database.database import find_nominee_with_id, carrier_db, CarrierDbFields, CarrierData, find_carrier, backup_database, \
-     add_carrier_to_database, find_carriers_mult, find_commodity, find_community_carrier, CCDbFields, find_webhook_from_owner, add_webhook_to_database, \
-     delete_webhook_by_name, find_webhook_by_name
+     add_carrier_to_database, find_carriers_mult, find_commodity, find_community_carrier, CCDbFields, find_mission
 from ptn.missionalertbot.modules.helpers import on_app_command_error, check_roles, check_command_channel, _regex_alphanumeric_with_hyphens
 from ptn.missionalertbot.modules.Embeds import _add_common_embed_fields, _configure_all_carrier_detail_embed
 
@@ -866,3 +865,33 @@ class DatabaseInteraction(commands.Cog):
                 return
         else:
             await ctx.send(f"No Community Carrier registered to {owner.display_name}")
+
+
+    # manually delete a mission from the database
+    @app_commands.command(name='admin_delete_mission', description='Manually remove a mission from the database.')
+    @app_commands.describe(carrier='Carrier name to search for in the missions database.')
+    @check_roles([admin_role()])
+    @check_command_channel(bot_command_channel())
+    async def admin_delete_mission(self, interaction: discord.Interaction, carrier: str):
+        print(f"admin_delete_mission called by {interaction.user.display_name} ({interaction.user.id})")
+        mission_data = find_mission(carrier, "carrier")
+        if not mission_data:
+            embed = discord.Embed(
+                description=f"**ERROR**: no trade missions found for carriers matching \"**{carrier}\"**.",
+                color=constants.EMBED_COLOUR_ERROR
+            )
+            return await interaction.response.send_message(embed=embed, ephemeral=True)
+        else:
+            embed = discord.Embed(
+                description=f"Please confirm you want to delete the mission for {mission_data.carrier_name}. "\
+                    "This should only be done if `/mission complete` and `/cco complete` will not work. " \
+                    "Deleting a mission this way **will** require manual cleanup of any remaining mission elements.",
+                    color=constants.EMBED_COLOUR_QU
+            )
+
+            view=MissionDeleteView(mission_data, interaction.user)
+
+            await interaction.response.send_message(embed=embed, view=view)
+
+            view.message = await interaction.original_response()
+

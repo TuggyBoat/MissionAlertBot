@@ -15,13 +15,93 @@ from discord.ui import View, Modal
 
 # import local constants
 import ptn.missionalertbot.constants as constants
-from ptn.missionalertbot.constants import seconds_long, o7_emoji
+from ptn.missionalertbot.constants import seconds_long, o7_emoji, bot_spam_channel, bot
 
 # import local modules
-from ptn.missionalertbot.database.database import delete_nominee_from_db, delete_carrier_from_db, _update_carrier_details_in_database, find_carrier, CarrierDbFields
+from ptn.missionalertbot.database.database import delete_nominee_from_db, delete_carrier_from_db, _update_carrier_details_in_database, find_carrier, CarrierDbFields, mission_db, missions_conn
+from ptn.missionalertbot.modules.DateString import get_mission_delete_hammertime
 from ptn.missionalertbot.modules.Embeds import _configure_all_carrier_detail_embed, _generate_cc_notice_embed
 from ptn.missionalertbot.modules.helpers import _remove_cc_manager
 from ptn.missionalertbot.modules.MissionCleaner import _cleanup_completed_mission
+
+
+# buttons for mission manual delete
+class MissionDeleteView(View):
+    def __init__(self, mission_data, author, timeout=30):
+        self.mission_data = mission_data
+        self.author = author
+        super().__init__(timeout=timeout)
+
+    @discord.ui.button(label="Delete", style=discord.ButtonStyle.danger, emoji="⚠", custom_id="delete")
+    async def delete_button_callback(self, interaction, button):
+        spamchannel = bot.get_channel(bot_spam_channel())
+        print(f"Trying manual mission delete for {self.mission_data.carrier_name}")
+        try:
+            mission_db.execute(f'''DELETE FROM missions WHERE carrier LIKE (?)''', ('%' + self.mission_data.carrier_name + '%',))
+            missions_conn.commit()
+            embed = discord.Embed(
+                description=f"Deleted mission for {self.mission_data.carrier_name}.",
+                color=constants.EMBED_COLOUR_OK
+            )
+            await interaction.response.edit_message(embed=embed, view=None)
+
+            # notify bot spam
+            embed = discord.Embed(
+                description=f"<@{interaction.user.id}> used /admin_delete_mission for {self.mission_data.carrier_name}.",
+                color=constants.EMBED_COLOUR_QU
+            )
+            await spamchannel.send(embed=embed)
+
+        except Exception as e:
+            print(f"Error deleting mission: {e}")
+            embed = discord.Embed(
+                description=f"Error deleting mission for {self.mission_data.carrier_name}: {e}",
+                color=constants.EMBED_COLOUR_ERROR
+            )
+            await interaction.response.edit_message(embed=embed, view=None)
+
+            # notify bot spam
+            embed = discord.Embed(
+                description=f"<@{interaction.user.id}> used /admin_delete_mission for {self.mission_data.carrier_name}.",
+                color=constants.EMBED_COLOUR_QU
+            )
+            await spamchannel.send(embed=embed)
+
+    @discord.ui.button(label='Cancel', style=discord.ButtonStyle.success, emoji="❌", custom_id='cancel')
+    async def cancel_button_callback(self, interaction, button):
+        embed = discord.Embed(
+            description="Cancelled.",
+            color=constants.EMBED_COLOUR_OK
+        )
+        return await interaction.response.edit_message(embed=embed, view=None)
+
+    async def interaction_check(self, interaction: discord.Interaction): # only allow original command user to interact with buttons
+        if interaction.user.id == self.author.id:
+            return True
+        else:
+            embed = discord.Embed(
+                description="Only the command author may use these interactions.",
+                color=constants.EMBED_COLOUR_ERROR
+            )
+            embed.set_image(url='https://media1.tenor.com/images/939e397bf929b9768b24a8fa165301fe/tenor.gif?itemid=26077542')
+            embed.set_footer(text="Seriously, are you 4? 🙄")
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+            return False
+
+    async def on_timeout(self):
+        # return a message to the user that the interaction has timed out
+        timeout_embed = discord.Embed(
+            description="Timed out.",
+            color=constants.EMBED_COLOUR_ERROR
+        )
+
+        # remove buttons
+        self.clear_items()
+
+        try:
+            await self.message.edit(embed=timeout_embed, view=self) # mission gen ends here
+        except Exception as e:
+            print(e)
 
 
 # buttons for mission complete
@@ -48,12 +128,13 @@ class MissionCompleteView(View):
             await interaction.response.edit_message(embed=embed, view=None)
 
             try:
+                hammertime = get_mission_delete_hammertime()
                 reddit_complete_text = f"    INCOMING WIDEBAND TRANSMISSION: P.T.N. CARRIER MISSION UPDATE\n\n**" \
                                     f"{self.mission_data.carrier_name}** mission complete. o7 CMDRs!\n\n\n\n*Reported on " \
                                     f"PTN Discord by {interaction.user.display_name}*"
                 discord_complete_embed = discord.Embed(
                     title=f"{self.mission_data.carrier_name} MISSION COMPLETE",
-                    description=f"<@{interaction.user.id}> reports mission complete! **This mission channel will be removed in {(seconds_long())//60} minutes.**",
+                    description=f"<@{interaction.user.id}> reports mission complete! **This mission channel will be removed {hammertime}**",
                     color=constants.EMBED_COLOUR_OK
                 )
                 print("Sending to _cleanup_completed_mission")
