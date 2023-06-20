@@ -122,9 +122,10 @@ class GeneralCommands(commands.Cog):
         # define our background tasks
         reddit_task = asyncio.create_task(_monitor_reddit_comments())
         # Check if any trade channels were not deleted before bot restart/stop
-        cleanup_channels = await get_trade_channels_on_startup()
+        # TODO: re-do
+        """cleanup_channels = await get_trade_channels_on_startup()
         for channel in cleanup_channels:
-            asyncio.create_task(cleanup_trade_channel(channel))
+            asyncio.create_task(cleanup_trade_channel(channel))"""
         # start the lasttrade_cron loop.
         await lasttrade_cron.start()
         # start monitoring reddit comments

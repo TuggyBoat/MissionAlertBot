@@ -15,7 +15,7 @@ from ptn.missionalertbot.constants import seconds_long, seconds_short, seconds_v
 
 # get date and time
 def get_formatted_date_string():
-    print("Called get_formattted_date_string")
+    print("Called get_formatted_date_string")
     """
     Returns a tuple of the Elite Dangerous Time and the current real world time.
 
