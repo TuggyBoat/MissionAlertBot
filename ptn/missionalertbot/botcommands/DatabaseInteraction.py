@@ -883,8 +883,8 @@ class DatabaseInteraction(commands.Cog):
             return await interaction.response.send_message(embed=embed, ephemeral=True)
         else:
             embed = discord.Embed(
-                description=f"Please confirm you want to delete the mission for {mission_data.carrier_name}. "\
-                    "This should only be done if `/mission complete` and `/cco complete` will not work. " \
+                description=f"Please confirm you want to delete the mission for **{mission_data.carrier_name}**. "\
+                    "This should **only** be done if `/mission complete` and `/cco complete` will not work. " \
                     "Deleting a mission this way **will** require manual cleanup of any remaining mission elements.",
                     color=constants.EMBED_COLOUR_QU
             )

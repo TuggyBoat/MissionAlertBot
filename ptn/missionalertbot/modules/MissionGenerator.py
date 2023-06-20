@@ -190,11 +190,14 @@ class MissionSendView(View):
         button.disabled=True
         print(f"{interaction.user.display_name} is sending their mission to all available sources using default send button")
 
-        self.mission_params.sendflags = ['d', 'r', 'n']
+        if self.mission_params.commodity_name == 'Wine': # for wine, just send to Discord, profit margins are too small for externals and we don't ping
+            self.mission_params.sendflags = ['d']
+        else:
+            self.mission_params.sendflags = ['d', 'r', 'n']
 
-        if self.mission_params.webhook_names:
-            print("Found webhooks, adding webhook flag")
-            self.mission_params.sendflags.append('w')
+            if self.mission_params.webhook_names:
+                print("Found webhooks, adding webhook flag")
+                self.mission_params.sendflags.append('w')
         
         try: # there's probably a better way to do this using an if statement
             self.clear_items()
@@ -656,8 +659,8 @@ async def check_profit_margin_on_external_send(interaction, mission_params):
             description=f"Skipped external send as {mission_params.profit}K/TON is below the PTN 10K/TON minimum profit margin."
         )
         embed.set_footer(text="Whoopsie-daisy.")
-        await interaction.channel.send(embed=embed)
         embed.set_thumbnail(url=constants.ICON_FC_EMPTY)
+        await interaction.channel.send(embed=embed)
     else:
         mission_params.returnflag = True
 
@@ -788,6 +791,14 @@ async def send_mission_to_webhook(interaction, mission_params):
 
 async def notify_hauler_role(interaction, mission_params, mission_temp_channel):
     print("User used option n")
+
+    if mission_params.commodity_name == 'Wine':
+        embed = discord.Embed(
+            description=f"Skipped hauler ping for Wine load."
+        )
+        embed.set_footer(text="As our glorious tipsy overlords, the Sommeliers, have decreed o7")
+        embed.set_thumbnail(url=constants.ICON_FC_EMPTY)
+        await interaction.channel.send(embed=embed)
 
     if mission_params.training:
         ping_role_id = trainee_role()
