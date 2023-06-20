@@ -109,13 +109,7 @@ missions_tables_columns = ['carrier', 'cid', 'channelid', 'commodity', 'missiont
     'profit', 'pad', 'demand', 'rp_text', 'reddit_post_id', 'reddit_post_url', 'reddit_comment_id',\
     'reddit_comment_url', 'discord_alert_id', 'mission_params']
 
-channel_cleanup_table_create = '''
-    CREATE TABLE channel_cleanup(
-        "channelid" INT NOT NULL UNIQUE,
-        "is_complete" BOOLEAN DEFAULT 0
-    )
-'''
-channel_cleanup_columns = ['channelid', 'is_complete']
+channel_cleanup_table_delete = "DROP TABLE IF EXISTS channel_cleanup"
 
 
 # We need some locks while we wait on the DB queries
@@ -304,8 +298,7 @@ def build_database_on_startup():
         'webhooks' : {'obj': carrier_db, 'create': webhooks_table_create},
         'community_carriers': {'obj': carrier_db, 'create': community_carriers_table_create},
         'nominees': {'obj': carrier_db, 'create': nominees_table_create},
-        'missions': {'obj': mission_db, 'create': missions_table_create},
-        'channel_cleanup': {'obj': mission_db, 'create': channel_cleanup_table_create}
+        'missions': {'obj': mission_db, 'create': missions_table_create}
     }
 
     # check database exists, create from scratch if needed
@@ -359,6 +352,14 @@ def build_database_on_startup():
         else:
             print(f'{column_name} exists, do nothing')
 
+    # remove channel cleanup table
+    try:
+        print("Removing cleanup table if it exists")
+        mission_db.execute(channel_cleanup_table_delete)
+        missions_conn.commit()
+    except Exception as e:
+        print(e)
+
 
 """
 MISSION CLEANUP FUNCTIONS
@@ -367,39 +368,13 @@ A group of functions added by Skiedude to handle clean-up of missions which were
 
 """
 
-async def mark_cleanup_channel(mission_channel_id, status):
-    """
-    Create or update entry in the channel_cleanup table
-    """
-    insert_stmt = f"""
-        INSERT INTO channel_cleanup
-        (channelid, is_complete)
-        VALUES({mission_channel_id}, {status})
-        ON CONFLICT(channelid)
-        DO UPDATE SET is_complete = {status};
-        """
-    mission_db.execute(insert_stmt)
-    missions_conn.commit()
-    return
-
-
-async def remove_channel_cleanup_entry(mission_channel_id):
-    """
-    Remove entry from channel_cleanup after successful channel deletion
-    """
-    mission_db.execute(f"DELETE FROM channel_cleanup WHERE channelid = {mission_channel_id}")
-    missions_conn.commit()
-    return
-
 
 async def get_trade_channels_on_startup():
     """
     This function is called on bot.on_ready() to clean up any channels
     that had their timer lost during bot stop/restart
     """
-    print('Checking for trade channels that were not cleaned up before bot restart')
-    mission_db.execute('SELECT * FROM channel_cleanup WHERE is_complete = 1')
-    return mission_db.fetchall()
+    # TODO re-do
 
 
 """

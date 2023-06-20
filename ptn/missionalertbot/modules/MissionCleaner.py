@@ -26,7 +26,7 @@ from ptn.missionalertbot.constants import bot, bot_spam_channel, wine_alerts_loa
     reddit_flair_mission_stop, seconds_long, sub_reddit, mission_command_channel, ptn_logo_discord, reddit_flair_mission_start, channel_upvotes, trade_cat
 
 # import local modules
-from ptn.missionalertbot.database.database import remove_channel_cleanup_entry, backup_database, mission_db, missions_conn, find_carrier, mark_cleanup_channel, CarrierDbFields
+from ptn.missionalertbot.database.database import backup_database, mission_db, missions_conn, find_carrier, CarrierDbFields
 from ptn.missionalertbot.modules.DateString import get_final_delete_hammertime
 from ptn.missionalertbot.modules.helpers import lock_mission_channel, carrier_channel_lock, clean_up_pins, ChannelDefs
 
@@ -218,7 +218,6 @@ async def _cleanup_completed_mission(interaction: discord.Interaction, mission_d
                 spamchannel.send(embed=embed)
 
     # remove channel
-    await mark_cleanup_channel(mission_data.channel_id, 1)
     await remove_carrier_channel(mission_data.channel_id, seconds_long())
 
     return
@@ -274,6 +273,7 @@ async def remove_carrier_channel(completed_mission_channel_id, seconds):
                 # abort abort abort
                 print(f'New mission underway in this channel, aborting removal')
             else:
+                print(f"Proceeding with channel deletion for {delchannel.name}")
                 # delete channel after a parting gift
                 gif = random.choice(constants.boom_gifs)
                 try:
@@ -281,7 +281,6 @@ async def remove_carrier_channel(completed_mission_channel_id, seconds):
                     await asyncio.sleep(seconds)
                     await delchannel.delete()
                     print(f'Deleted {delchannel}')
-                    await remove_channel_cleanup_entry(completed_mission_channel_id)
 
                 except Forbidden:
                     raise EnvironmentError(f"Could not delete {delchannel}, reason: Bot does not have permission.")

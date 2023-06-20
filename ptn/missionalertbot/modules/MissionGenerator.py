@@ -33,7 +33,7 @@ from ptn.missionalertbot.constants import bot, get_reddit, seconds_short, upvote
     get_guild, get_overwrite_perms, ptn_logo_discord, wineloader_role, o7_emoji, bot_spam_channel
 
 # import local modules
-from ptn.missionalertbot.database.database import backup_database, mission_db, missions_conn, find_carrier, mark_cleanup_channel, CarrierDbFields, \
+from ptn.missionalertbot.database.database import backup_database, mission_db, missions_conn, find_carrier, CarrierDbFields, \
     find_commodity, find_mission, carrier_db, carriers_conn, find_webhook_from_owner
 from ptn.missionalertbot.modules.DateString import get_formatted_date_string
 from ptn.missionalertbot.modules.Embeds import _mission_summary_embed
@@ -1115,8 +1115,6 @@ async def gen_mission(interaction: discord.Interaction, mission_params):
             await mission_generation_complete(interaction, mission_params)
         cleanup_temp_image_file(mission_params.discord_img_name)
         cleanup_temp_image_file(mission_params.reddit_img_name)
-        if mission_params.mission_temp_channel_id:
-            await mark_cleanup_channel(mission_params.mission_temp_channel_id, 0)
 
         print("Reached end of mission generator")
         return
