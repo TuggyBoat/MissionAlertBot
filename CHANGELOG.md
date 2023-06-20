@@ -1,5 +1,58 @@
 # Changelog
 
+## 2.1.0
+
+Refactoring:
+
+- Split `MissionGenerator.py` into `MissionGenerator.py` and `MissonCleaner.py`
+- Major changes to the internal structure of the mission generator
+    - Misison generation is now more resilient to errors and communicates better when something goes wrong
+- Added `Commodities.py` in preparation for adding a method to build the Commodities database from scratch
+- Added custom errors for interaction role and channel checks, and called them via the global error handler
+- More errors handled elegantly
+- More helpful notifications to bot-spam
+- Many bot-spam messages converted to embeds
+- Many response messages converted to embeds
+- Many small changes here and there
+
+Removed commands:
+- `loadlegacy`, `unloadlegacy` have been removed
+- legacy support has been removed
+- `loadrp`, `unloadrp` have been removed
+
+Changed commands:
+- `load` and `unload` are now `/cco load` and `/cco unload` respectively
+    - added describes to all parameters
+    - added autocomplete for common commodities and pad size
+    - ETA and RP text have been merged into the new "Message" feature:
+        - "Message" is entered via Modal and sent to Discord destinations in a separate embed
+    - buttons or select menu options for sends, replacing chat letter entry
+        - note **you can SCROLL the select menu** to reveal additional options
+    - added icons for send status embeds
+    - completely new embed format for Discord
+    - added ability to send via webhook
+    - tweaks to Reddit format
+    - demand/supply is now entered as an int/float (i.e. without the "k"), and is subject to validation
+- `done` is now `/cco complete`. `/cco done` remains as an alias, for now
+    - `/cco complete` now has optional parameters for whether the mission was `Completed` or `Failed`, with autocomplete, as well as for an explanation message
+        - by default, status is assumed to be `Completed`
+    - many small changes to how `/cco complete` reports
+- `carrier_image` is now `/cco carrier_image`
+- `m.complete` is now `/mission complete`
+    - no more option to add a message as an argument
+    - button menu asks user whether mission completed or cannot be completed
+    - clicking unable to complete prompts user for an explanation message
+- `/mission` is now `/mission information`
+
+New commands:
+- `/cco webhook add` - CCO only - used to add a webhook to that CCO's personal list
+- `/cco webhook view` - CCO only - shows their webhooks
+- `/cco webhook delete` - CCO only - used to remove a webhook from their list
+- `/cco edit` - CCO only - used to edit an in-progress mission. Presently only the original interaction parameters can be edited (i.e. the fields added via slash command). Editing message and mission type will be implemented in a future update.
+- `/admin_delete_mission` - Admin only - used to manually remove a mission from the database (without cleanup). Intended for unresolvable error situations only.
+- added **training mode** to `cco load` and `cco unload`. This will not affect webhooks but will send discord alerts to the new training channels, and reddit posts to the testing subreddit. Webhooks will be sent as normal, but it's expected trainees will add a training webhook anyway.
+
+
 ## 2.0.0
 
 Refactoring:

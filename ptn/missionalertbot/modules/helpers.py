@@ -16,7 +16,7 @@ import sys
 # import discord.py
 import discord
 from discord import Interaction, app_commands
-from discord.app_commands import AppCommandError
+from discord.app_commands import AppCommandError, CheckFailure
 from discord.errors import HTTPException, Forbidden, NotFound
 from discord.ext import commands
 
@@ -25,7 +25,10 @@ from ptn.missionalertbot.classes.CommunityCarrierData import CommunityCarrierDat
 
 # import local constants
 import ptn.missionalertbot.constants as constants
-from ptn.missionalertbot.constants import bot, cc_role, get_overwrite_perms, get_guild, bot_spam_channel, archive_cat, cc_cat, cmentor_role, admin_role
+from ptn.missionalertbot.constants import bot, cc_role, get_overwrite_perms, get_guild, bot_spam_channel, archive_cat, cc_cat, cmentor_role, admin_role, \
+    training_category, training_alerts, training_mission_command_channel, training_upvotes, training_wine_alerts, training_sub_reddit, training_reddit_in_progress, training_reddit_completed, \
+    trade_cat, trade_alerts_channel, mission_command_channel, channel_upvotes, wine_alerts_loading_channel, wine_alerts_unloading_channel, sub_reddit, \
+    reddit_flair_mission_start, reddit_flair_mission_stop
 
 # import local modules
 from ptn.missionalertbot.database.database import find_community_carrier, CCDbFields, carrier_db, carrier_db_lock, carriers_conn, delete_community_carrier_from_db
@@ -34,6 +37,21 @@ from ptn.missionalertbot.database.database import find_community_carrier, CCDbFi
 # channel lock
 carrier_channel_lock = asyncio.Lock()
 
+# custom errors
+class CommandChannelError(app_commands.CheckFailure): # channel check error
+    def __init__(self, permitted_channel, formatted_channel_list):
+        self.permitted_channel = permitted_channel
+        self.formatted_channel_list = formatted_channel_list
+        super().__init__(permitted_channel, formatted_channel_list, "Channel check error raised")
+    pass
+
+
+class CommandRoleError(app_commands.CheckFailure): # role check error
+    def __init__(self, permitted_roles, formatted_role_list):
+        self.permitted_roles = permitted_roles
+        self.formatted_role_list = formatted_role_list
+        super().__init__(permitted_roles, formatted_role_list, "Role check error raised")
+    pass
 
 """
 A primitive global error handler for all app commands (slash & ctx menus)
@@ -45,7 +63,44 @@ async def on_app_command_error(
     error: AppCommandError
 ):
     print(f"Error from {interaction.command.name} in {interaction.channel.name} called by {interaction.user.display_name}: {error}")
-    return await interaction.response.send_message(error, ephemeral=True)
+
+    try:
+        if isinstance(error, CommandChannelError):
+            print("Channel check error raised")
+            formatted_channel_list = error.args[1]
+
+            embed=discord.Embed(
+                description=f"Sorry, you can only run this command out of: {formatted_channel_list}",
+                color=constants.EMBED_COLOUR_ERROR
+            )
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+
+        elif isinstance(error, CommandRoleError):
+            print("Role check error raised")
+            permitted_roles = error.args[0]
+            formatted_role_list = error.args[1]
+            if len(permitted_roles)>1:
+                embed=discord.Embed(
+                    description=f"**Permission denied**: You need one of the following roles to use this command:\n{formatted_role_list}",
+                    color=constants.EMBED_COLOUR_ERROR
+                )
+            else:
+                embed=discord.Embed(
+                    description=f"**Permission denied**: You need the following role to use this command:\n{formatted_role_list}",
+                    color=constants.EMBED_COLOUR_ERROR
+                )
+            print("notify user")
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+
+        else:
+            print("Generic error message raised")
+            try:
+                await interaction.response.send_message(error, ephemeral=True)
+            except:
+                await interaction.followup.send(error, ephemeral=True)
+
+    except Exception as e:
+        print(f"An error occurred in the error handler (lol): {e}")
 
 
 # trio of helper functions to check a user's permission to run a command based on their roles, and return a helpful error if they don't have the correct role(s)
@@ -53,60 +108,76 @@ def getrole(ctx, id): # takes a Discord role ID and returns the role object
     role = discord.utils.get(ctx.guild.roles, id=id)
     return role
 
-async def checkroles_actual(ctx, permitted_role_ids):
+async def checkroles_actual(interaction: discord.Interaction, permitted_role_ids):
     try:
         """
         Check if the user has at least one of the permitted roles to run a command
         """
         print(f"checkroles called.")
-        try: # hacky way to make this work with both slash and normal commands
-            author_roles = ctx.author.roles
-        except: # slash commands use interaction instead of ctx and user instead of author
-            author_roles = ctx.user.roles
-        permitted_roles = [getrole(ctx, role) for role in permitted_role_ids]
+        author_roles = interaction.user.roles
+        permitted_roles = [getrole(interaction, role) for role in permitted_role_ids]
         print(author_roles)
         print(permitted_roles)
         permission = True if any(x in permitted_roles for x in author_roles) else False
         print(permission)
-        if not permission:
-            role_list = []
-            for role in permitted_role_ids:
-                role_list.append(f'<@&{role}> ')
-                formatted_role_list = " • ".join(role_list)
-            if len(permitted_roles)>1:
-                embed=discord.Embed(description=f"**Permission denied**: You need one of the following roles to use this command:\n{formatted_role_list}", color=constants.EMBED_COLOUR_ERROR)
-            else:
-                embed=discord.Embed(description=f"**Permission denied**: You need the following role to use this command:\n{formatted_role_list}", color=constants.EMBED_COLOUR_ERROR)
-            # hacky way to check whether we were sent an interaction object or a ctx object is to check attributes.
-            # ctx has the author attribute, interaction does not, so we may as well use that since we already used it earlier
-            await ctx.channel.send(embed=embed) if hasattr(ctx, 'author') else await ctx.response.send_message(embed=embed, ephemeral=True)
+        return permission, permitted_roles
     except Exception as e:
         print(e)
     return permission
 
 
 def check_roles(permitted_role_ids):
-    async def checkroles(ctx): # TODO convert messages to custom error handler, make work with text commands
-        permission = await checkroles_actual(ctx, permitted_role_ids)
+    async def checkroles(interaction: discord.Interaction): # TODO convert messages to custom error handler, make work with text commands
+        permission, permitted_roles = await checkroles_actual(interaction, permitted_role_ids)
+        print("Inherited permission from checkroles")
+        if not permission: # raise our custom error to notify the user gracefully
+            role_list = []
+            for role in permitted_role_ids:
+                role_list.append(f'<@&{role}> ')
+                formatted_role_list = " • ".join(role_list)
+            try:
+                raise CommandRoleError(permitted_roles, formatted_role_list)
+            except CommandRoleError as e:
+                print(e)
+                raise
         return permission
     return app_commands.check(checkroles)
+
+
+# helper for channel permission check
+def getchannel(id):
+    channel = bot.get_channel(id)
+    return channel
 
 
 # decorator for interaction channel checks
 def check_command_channel(permitted_channel):
     """
-    Decorator used on an interaction to limit it to a specified channel
+    Decorator used on an interaction to limit it to specified channels
     """
     async def check_channel(ctx):
         """
-        Check if the channel the command was run in, matches the channel it can only be run from
+        Check if the channel the command was run from matches any permitted channels for that command
         """
-        permitted = bot.get_channel(permitted_channel)
-        if ctx.channel != permitted:
+        print("check_command_channel called")
+        if isinstance(permitted_channel, list):
+            permitted_channels = [getchannel(id) for id in permitted_channel]
+        else:
+            permitted_channels = [getchannel(permitted_channel)]
+
+        channel_list = []
+        for channel in permitted_channels:
+            channel_list.append(f'<#{channel.id}>')
+        formatted_channel_list = " • ".join(channel_list)
+
+        permission = True if any(channel == ctx.channel for channel in permitted_channels) else False
+        if not permission:
             # problem, wrong channel, no progress
-            embed=discord.Embed(description=f"Sorry, you can only run this command out of: <#{permitted_channel}>.", color=constants.EMBED_COLOUR_ERROR)
-            await ctx.response.send_message(embed=embed, ephemeral=True)
-            return False
+            try:
+                raise CommandChannelError(permitted_channel, formatted_channel_list)
+            except CommandChannelError as e:
+                print(e)
+                raise
         else:
             return True
     return app_commands.check(check_channel)
@@ -202,8 +273,6 @@ async def _cc_create_channel(interaction, new_channel_name, cc_category):
     try:
         new_channel = await interaction.guild.create_text_channel(f"{new_channel_name}", category=cc_category)
         print(f"Created {new_channel}")
-
-        print(f'Channels: {interaction.guild.channels}')
 
         embed = discord.Embed(description=f"Created channel <#{new_channel.id}>.", color=constants.EMBED_COLOUR_OK)
         await interaction.response.send_message(embed=embed)
@@ -537,6 +606,54 @@ async def _send_notice_channel_check(interaction):
         print("Channel user is not command user")
         if not await checkroles_actual(interaction, [cmentor_role(), admin_role()]): return
     return community_carrier
+
+
+# helper function to convert a STR into an INT or FLOAT
+def convert_str_to_float_or_int(element: any) -> bool: # this code turns a STR into a FLOAT or INT based on value
+    if element is None: 
+        return False
+    try:
+        value = float(element)
+        print(f"We can float {value}")
+        if value.is_integer():
+            value = int(value)
+            print(f"{value} is an integer")
+            return value
+        else:
+            print(f"{value} is not an integer")
+            return value
+    except ValueError:
+        print(f"We can't float {element}")
+        return False
+
+
+# a class to hold channel definitions for training mode
+class ChannelDefs:
+    def __init__(self, category_actual, alerts_channel_actual, mission_command_channel_actual, upvotes_channel_actual, wine_loading_channel_actual, wine_unloading_channel_actual, sub_reddit_actual, reddit_flair_in_progress, reddit_flair_completed):
+        self.category_actual = category_actual
+        self.alerts_channel_actual = alerts_channel_actual
+        self.mission_command_channel_actual = mission_command_channel_actual
+        self.upvotes_channel_actual = upvotes_channel_actual
+        self.wine_loading_channel_actual = wine_loading_channel_actual
+        self.wine_unloading_channel_actual = wine_unloading_channel_actual
+        self.sub_reddit_actual = sub_reddit_actual
+        self.reddit_flair_in_progress = reddit_flair_in_progress
+        self.reddit_flair_completed = reddit_flair_completed
+
+# check whether CCO command is being used in training or live categories
+def check_training_mode(interaction: discord.Interaction):
+    if interaction.channel.category.id == training_category():
+        training = True
+        print(f"Training mode detected for {interaction.command.name} in {interaction.channel.name} called by {interaction.user.display_name}")
+        channel_defs = ChannelDefs(training_category(), training_alerts(), training_mission_command_channel(), training_upvotes(), training_wine_alerts(), training_wine_alerts(), training_sub_reddit(), training_reddit_in_progress(), training_reddit_completed())
+    else:
+        training = False
+        channel_defs = ChannelDefs(trade_cat(), trade_alerts_channel(), mission_command_channel(), channel_upvotes(), wine_alerts_loading_channel(), wine_alerts_unloading_channel(), sub_reddit(), reddit_flair_mission_start(), reddit_flair_mission_stop())
+
+    attrs = vars(channel_defs)
+    print(attrs)
+
+    return training, channel_defs
 
 
 # presently unused

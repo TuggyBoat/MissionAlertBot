@@ -42,6 +42,6 @@ async def missionalertbot():
 
 if __name__ == '__main__':
     """
-    If running via `python ptn/missionalertbot/appliction.py
+    If running via `python ptn/missionalertbot/application.py
     """
     run()

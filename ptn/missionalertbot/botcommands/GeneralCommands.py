@@ -10,11 +10,13 @@ import random
 
 # discord.py
 import discord
+from discord.app_commands import Group, describe
 from discord.ext import commands
 from discord import app_commands
 
 # local classes
 from ptn.missionalertbot.classes.MissionData import MissionData
+from ptn.missionalertbot.classes.Views import MissionCompleteView
 
 # local constants
 from ptn.missionalertbot._metadata import __version__
@@ -28,7 +30,7 @@ from ptn.missionalertbot.database.database import get_trade_channels_on_startup,
 from ptn.missionalertbot.modules.Embeds import _is_mission_active_embed, _format_missions_embed
 from ptn.missionalertbot.modules.helpers import bot_exit, carrier_channel_lock, check_roles, check_command_channel, on_app_command_error
 from ptn.missionalertbot.modules.BackgroundTasks import lasttrade_cron, _monitor_reddit_comments
-from ptn.missionalertbot.modules.MissionGenerator import _cleanup_completed_mission, cleanup_trade_channel
+from ptn.missionalertbot.modules.MissionCleaner import cleanup_trade_channel
 
 
 """
@@ -181,6 +183,7 @@ class GeneralCommands(commands.Cog):
     @commands.command(name='sync', help='Synchronise bot interactions with server')
     @commands.has_any_role(*constants.any_elevated_role)
     async def sync(self, ctx):
+        print(f"Interaction sync called from {ctx.author.display_name}")
         async with ctx.typing():
             try:
                 bot.tree.copy_global_to(guild=constants.guild_obj)
@@ -206,8 +209,8 @@ class GeneralCommands(commands.Cog):
         # this global variable is set when the channel deletion function acquires its lock
         if deletion_in_progress:
             await ctx.send("Lock appears to be set from a channel deletion task underway. This usually takes ~10 seconds per channel."
-                        " Please make sure no mission channels are about to be deleted. Deletion occurs 15 minutes after `m.complete`"
-                        " or `m.done` or 2 minutes following using a mission generator command without generating a mission "
+                        " Please make sure no mission channels are about to be deleted. Deletion occurs 15 minutes after `/mission complete`"
+                        " or `/cco complete` or 2 minutes following using a mission generator command without generating a mission "
                         "(i.e. by error or user abort).")
 
         await ctx.send("Do you still want to proceed? **y**/**n**")
@@ -295,11 +298,23 @@ class GeneralCommands(commands.Cog):
 
         await ctx.send(embed=embed)
         return
-    
-    # mission slash command - private, non spammy
-    @app_commands.command(name="mission",
-        description="Private command: Use in a Fleet Carrier's channel to display its current mission.")
-    async def _mission(self, interaction: discord.Interaction):
+
+
+    @commands.command(name='complete', help="Deprecated, do not use.")
+    async def mcomplete(self, ctx):
+        embed = discord.Embed(
+            description="Deprecated. Please use `/mission complete` instead!",
+            color=constants.EMBED_COLOUR_ERROR
+        )
+        embed.set_image(url='https://pilotstradenetwork.com/wp-content/uploads/2023/06/hm-upgrades.gif')
+        await ctx.send(embed=embed)
+
+
+    mission_group = Group(name='mission', description='Private command: Use in a Fleet Carrier\'s channel to display its current mission')
+
+    # mission information slash command - private, non spammy
+    @mission_group.command(name="information", description="Private command: Use in a Fleet Carrier's channel to display its current mission.")
+    async def information(self, interaction: discord.Interaction):
 
         print(f"{interaction.user} asked for active mission in <#{interaction.channel}> (used /mission)")
 
@@ -314,7 +329,6 @@ class GeneralCommands(commands.Cog):
 
         await interaction.response.send_message(embed=embed, ephemeral=True)
         return
-
 
     # list all active carrier trade missions from DB
     @commands.command(name='issions', help='List all active trade missions.')
@@ -411,72 +425,42 @@ class GeneralCommands(commands.Cog):
 
 
     # a command for users to mark a carrier mission complete from within the carrier channel
-    # TODO: slashify with button prompts
-    @commands.command(name='complete', help="Use in a carrier's channel to mark the current trade mission complete.")
-    async def complete(self, ctx, *, comment: str = None):
+    @mission_group.command(name='complete', description="Use in a carrier's channel to mark the current trade mission complete.")
+    async def complete(self, interaction: discord.Interaction):
 
-        print(f"m.complete called in {ctx.channel} by {ctx.author}")
+        print(f"/mission complete called in {interaction.channel} by {interaction.user.display_name}")
 
         # look for a match for the channel name in the carrier DB
         print("Looking for carrier by channel name match")
-        carrier_data = find_carrier(ctx.channel.name, "discordchannel")
+        carrier_data = find_carrier(interaction.channel.name, "discordchannel")
         if not carrier_data:
             # if there's no channel match, return an error
             embed = discord.Embed(description="**You need to be in a carrier's channel to mark its mission as complete.**",
                                 color=constants.EMBED_COLOUR_ERROR)
-            await ctx.send(embed=embed)
+            await interaction.response.send_message(embed=embed, ephemeral=True)
             return
 
         # now look to see if the carrier is on an active mission
         print("Looking for mission by channel ID match")
-        mission_data = find_mission(ctx.channel.id, "channelid")
+        mission_data = find_mission(interaction.channel.id, "channelid")
         if not mission_data:
             # if there's no result, return an error
-            embed = discord.Embed(description=f"**{carrier_data.carrier_long_name} doesn't seem to be on a trade "
+            embed = discord.Embed(
+                description=f"**{carrier_data.carrier_long_name} doesn't seem to be on a trade "
                                                 f"mission right now.**",
-                                    color=constants.EMBED_COLOUR_ERROR)
-            return await ctx.send(embed=embed)
-
+                color=constants.EMBED_COLOUR_ERROR)
+            return await interaction.response.send_message(embed=embed, ephemeral=True)
 
         # user is in correct channel and carrier is on a mission, so check whether user is sure they want to proceed
-        print("Send user confirm prompt")
+
         embed = discord.Embed(
-            description=f"Please confirm that **{mission_data.carrier_name}** has been fully "
-                        f"{mission_data.mission_type}ed : **y** / **n**",
-            color=constants.EMBED_COLOUR_QU)
-        # embed.set_footer(text="For other issues (e.g. station price changes) please @ the Carrier Owner
-        # directly.")
-        await ctx.send(embed=embed)
+            description=f"Please confirm status of **{mission_data.carrier_name}**:",
+            color=constants.EMBED_COLOUR_QU
+        )
 
-        def check(message):
-            return message.author == ctx.author and message.channel == ctx.channel and \
-                    message.content.lower() in ["y", "n"]
+        view = MissionCompleteView(mission_data) # buttons to add
 
-        try:
-            msg = await bot.wait_for("message", check=check, timeout=30)
-            if msg.content.lower() == "n":
-                # whoops lol actually no
-                print("User responded no")
-                embed = discord.Embed(description="OK, mission will remain listed as in-progress.",
-                                        color=constants.EMBED_COLOUR_OK)
-                await ctx.send(embed=embed)
-                return
-            elif msg.content.lower() == "y":
-                # they said yes!
-                print("User responded yes")
-                reddit_complete_text = f"    INCOMING WIDEBAND TRANSMISSION: P.T.N. CARRIER MISSION UPDATE\n\n**" \
-                                    f"{mission_data.carrier_name}** mission complete. o7 CMDRs!\n\n\n\n*Reported on " \
-                                    f"PTN Discord by {ctx.author.display_name}*"
-                discord_complete_embed = discord.Embed(title=f"{mission_data.carrier_name} MISSION COMPLETE",
-                                                    description=f"<@{ctx.author.id}> reports mission complete! **This mission channel will be removed in {(seconds_long())//60} minutes.**",
-                                                    color=constants.EMBED_COLOUR_OK)
-                print("Sending to _cleanup_completed_mission")
-                desc_msg = f"> {comment}\n" if comment else ""
-                await _cleanup_completed_mission(ctx, mission_data, reddit_complete_text, discord_complete_embed, desc_msg)
-
-        except asyncio.TimeoutError:
-            embed = discord.Embed(description="No response, mission will remain listed as in-progress.")
-            await ctx.send(embed=embed)
+        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
 
     # public command to nominate a user for CP
