@@ -487,7 +487,7 @@ async def return_discord_channel_embeds(mission_params):
     edmc_off_text = ""
     if mission_params.edmc_off:
         edmc_off_text = "\n\n🤫 This mission is flagged **EDMC-OFF**. Please disable/quit **all journal reporting apps** such as EDMC, EDDiscovery, etc."
-    help_description = "✅ Use `/mission complete` in this channel if the mission is completed, or unable to be completed (e.g. because of a station price change, or supply exhaustion)." \
+    help_description = "✅ Use </mission complete:849040914948554764> in this channel if the mission is completed, or unable to be completed (e.g. because of a station price change, or supply exhaustion)." \
                       f"\n\n💡 Need help? Here's our [complete guide to PTN trade missions](https://pilotstradenetwork.com/fleet-carrier-trade-missions/).{edmc_off_text}"
 
     print("Define descs")
