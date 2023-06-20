@@ -92,9 +92,9 @@ PROD_DEV_ROLE = 812988180210909214 # Developer role ID on live
 PROD_MOD_ROLE = 813814494563401780 # Mod role ID on Live
 PROD_TRADE_CAT = 801558838414409738 # Trade Carrier category on live server
 PROD_ARCHIVE_CAT = 1048957416781393970 # Archive category on live server
-PROD_SECONDS_VERY_SHORT = 5 # time between channel deletion trigger and actual deletion (10)
+PROD_SECONDS_VERY_SHORT = 10 # time between channel deletion trigger and actual deletion (10)
 PROD_SECONDS_SHORT = 120 # time before calling channel cleanup on failed mission gen (120)
-PROD_SECONDS_LONG = 5 # time before calling channel cleanup on successful mission closure (900)
+PROD_SECONDS_LONG = 900 # time before calling channel cleanup on successful mission closure (900)
 # Training mode - production
 PROD_TRAINING_CATEGORY = 1120269131476901938 # training mode category ID
 PROD_TRAINING_MISSION_COMMAND_CHANNEL = 1120269354949419030 # training mode mission gen channel ID
