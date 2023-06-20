@@ -300,6 +300,16 @@ class GeneralCommands(commands.Cog):
         return
 
 
+    @commands.command(name='complete', help="Deprecated, do not use.")
+    async def mcomplete(self, ctx):
+        embed = discord.Embed(
+            description="Deprecated. Please use `/mission complete` instead!",
+            color=constants.EMBED_COLOUR_ERROR
+        )
+        embed.set_image(url='https://pilotstradenetwork.com/wp-content/uploads/2023/06/hm-upgrades.gif')
+        await ctx.send(embed=embed)
+
+
     mission_group = Group(name='mission', description='Private command: Use in a Fleet Carrier\'s channel to display its current mission')
 
     # mission information slash command - private, non spammy
