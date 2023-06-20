@@ -253,6 +253,7 @@ async def remove_carrier_channel(completed_mission_channel_id, seconds):
                 description=f"Deletion {hammertime} of <#{completed_mission_channel_id}>, please do **NOT** try to send any missions during this time.",
                 color=constants.EMBED_COLOUR_RP
             )
+            print("Sending warning message to mission gen")
             warning = await mission_gen_channel.send(embed=embed)
 
             # this is clunky but we want to know if a channel lock is because it's about to be deleted
@@ -288,7 +289,10 @@ async def remove_carrier_channel(completed_mission_channel_id, seconds):
         carrier_channel_lock.release()
         deletion_in_progress = False
         print("Channel lock released")
-        if warning: await warning.delete()
+        try: 
+            await warning.delete()
+        except Exception as e:
+            print(e)
         return
 
 
