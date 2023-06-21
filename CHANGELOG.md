@@ -3,6 +3,7 @@
 ## 2.1.1
 
 - Removed channel_cleanup table from missions.db and related code
+- Fixed incorrect timer for final channel deletion
 
 
 ## 2.1.0
