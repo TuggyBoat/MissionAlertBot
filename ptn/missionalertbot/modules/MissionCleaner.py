@@ -238,7 +238,7 @@ async def remove_carrier_channel(completed_mission_channel_id, seconds): # secon
         try:
             await asyncio.wait_for(lock_mission_channel(delchannel.name), timeout=120)
             embed = discord.Embed(
-                description=f"🔒 Lock acquired for `{delchannel.name})` (<#{delchannel.id}>) pending automatic deletion following conclusion of {seconds} timer.>",
+                description=f"🔒 Lock acquired for `{delchannel.name}` (<#{delchannel.id}>) pending automatic deletion following conclusion of {seconds}-second timer.",
                 color=constants.EMBED_COLOUR_QU
             )
             spamchannel = bot.get_channel(bot_spam_channel())
@@ -300,7 +300,7 @@ async def remove_carrier_channel(completed_mission_channel_id, seconds): # secon
             await unlock_mission_channel(delchannel.name)
             print("Channel lock released")
             embed = discord.Embed(
-                description=f"🔓 Released lock for `{delchannel.name}` (<#{delchannel.id}>) ",
+                description=f"🔓 Released lock for `{delchannel.name}`(<#{delchannel.id}>) ",
                 color=constants.EMBED_COLOUR_OK
             )
             await spamchannel.send(embed=embed)
