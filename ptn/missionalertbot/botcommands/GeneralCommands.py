@@ -22,15 +22,15 @@ from ptn.missionalertbot.classes.Views import MissionCompleteView
 from ptn.missionalertbot._metadata import __version__
 import ptn.missionalertbot.constants as constants
 from ptn.missionalertbot.constants import bot, bot_command_channel, bot_dev_channel, cmentor_role, certcarrier_role, \
-    admin_role, dev_role, trade_alerts_channel, seconds_long, mod_role, cpillar_role, bot_spam_channel
+    admin_role, dev_role, trade_alerts_channel, mod_role, cpillar_role, bot_spam_channel
 
 # local modules
-from ptn.missionalertbot.database.database import get_trade_channels_on_startup, backup_database, find_carrier, find_mission, _is_carrier_channel, \
+from ptn.missionalertbot.database.database import backup_database, find_carrier, find_mission, _is_carrier_channel, \
     mission_db, carrier_db, carrier_db_lock, carriers_conn, find_nominator_with_id, delete_nominee_by_nominator, find_community_carrier, CCDbFields
 from ptn.missionalertbot.modules.Embeds import _is_mission_active_embed, _format_missions_embed
 from ptn.missionalertbot.modules.helpers import bot_exit, check_roles, check_command_channel, on_app_command_error, unlock_mission_channel
 from ptn.missionalertbot.modules.BackgroundTasks import lasttrade_cron, _monitor_reddit_comments
-from ptn.missionalertbot.modules.MissionCleaner import cleanup_trade_channel
+from ptn.missionalertbot.modules.MissionCleaner import check_trade_channels_on_startup
 
 
 """
@@ -122,10 +122,7 @@ class GeneralCommands(commands.Cog):
         # define our background tasks
         reddit_task = asyncio.create_task(_monitor_reddit_comments())
         # Check if any trade channels were not deleted before bot restart/stop
-        # TODO: re-do
-        """cleanup_channels = await get_trade_channels_on_startup()
-        for channel in cleanup_channels:
-            asyncio.create_task(cleanup_trade_channel(channel))"""
+        await check_trade_channels_on_startup()
         # start the lasttrade_cron loop.
         await lasttrade_cron.start()
         # start monitoring reddit comments
