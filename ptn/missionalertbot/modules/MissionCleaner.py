@@ -23,7 +23,7 @@ from ptn.missionalertbot.classes.MissionParams import MissionParams
 # import local constants
 import ptn.missionalertbot.constants as constants
 from ptn.missionalertbot.constants import bot, bot_spam_channel, wine_alerts_loading_channel, wine_alerts_unloading_channel, trade_alerts_channel, get_reddit, sub_reddit, \
-    reddit_flair_mission_stop, seconds_long, sub_reddit, mission_command_channel, ptn_logo_discord, reddit_flair_mission_start, channel_upvotes, trade_cat
+    reddit_flair_mission_stop, seconds_long, sub_reddit, mission_command_channel, ptn_logo_discord, reddit_flair_mission_start, channel_upvotes, trade_cat, seconds_very_short
 
 # import local modules
 from ptn.missionalertbot.database.database import backup_database, mission_db, missions_conn, find_carrier, CarrierDbFields
@@ -200,7 +200,7 @@ async def _cleanup_completed_mission(interaction: discord.Interaction, mission_d
 
                 dm_embed = discord.Embed(
                     title=f"{carrier_data.carrier_long_name} MISSION {status.upper()}",
-                    description=f"Ahoy CMDR! {interaction.user.display_name} has concluded the trade mission for your Fleet Carrier **{carrier_data.carrier_long_name}**."
+                    description=f"Ahoy CMDR! {interaction.user.display_name} has concluded the trade mission for your Fleet Carrier **{carrier_data.carrier_long_name}**. "
                                 f"Its mission channel will be removed in {seconds_long()//60} minutes unless a new mission is started.",
                     color=constants.EMBED_COLOUR_QU
                     )
@@ -218,12 +218,12 @@ async def _cleanup_completed_mission(interaction: discord.Interaction, mission_d
                 spamchannel.send(embed=embed)
 
     # remove channel
-    await remove_carrier_channel(mission_data.channel_id, seconds_long())
+    await remove_carrier_channel(mission_data.channel_id)
 
     return
 
 
-async def remove_carrier_channel(completed_mission_channel_id, seconds):
+async def remove_carrier_channel(completed_mission_channel_id, seconds): # seconds is either 900 or 120 depending on scenario
     # get channel ID to remove
     delchannel = bot.get_channel(completed_mission_channel_id)
     spamchannel = bot.get_channel(bot_spam_channel())
@@ -278,7 +278,7 @@ async def remove_carrier_channel(completed_mission_channel_id, seconds):
                 gif = random.choice(constants.boom_gifs)
                 try:
                     await delchannel.send(gif)
-                    await asyncio.sleep(seconds)
+                    await asyncio.sleep(seconds_very_short())
                     await delchannel.delete()
                     print(f'Deleted {delchannel}')
 

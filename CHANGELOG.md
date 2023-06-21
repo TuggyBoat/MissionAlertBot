@@ -42,7 +42,7 @@ Changed commands:
     - `/cco complete` now has optional parameters for whether the mission was `Completed` or `Failed`, with autocomplete, as well as for an explanation message
         - by default, status is assumed to be `Completed`
     - many small changes to how `/cco complete` reports
-- `carrier_image` is now `/cco carrier_image`
+- `carrier_image` is now `/cco image`
 - `m.complete` is now `/mission complete`
     - no more option to add a message as an argument
     - button menu asks user whether mission completed or cannot be completed
@@ -56,7 +56,7 @@ New commands:
 - `/cco webhook delete` - CCO only - used to remove a webhook from their list
 - `/cco edit` - CCO only - used to edit an in-progress mission. Presently only the original interaction parameters can be edited (i.e. the fields added via slash command). Editing message and mission type will be implemented in a future update.
 - `/admin_delete_mission` - Admin only - used to manually remove a mission from the database (without cleanup). Intended for unresolvable error situations only.
-- added **training mode** to `cco load` and `cco unload`. This will not affect webhooks but will send discord alerts to the new training channels, and reddit posts to the testing subreddit. Webhooks will be sent as normal, but it's expected trainees will add a training webhook anyway.
+- added **training mode** to `/cco load` and `/cco unload`. This will not affect webhooks but will send discord alerts to the new training channels, and reddit posts to the testing subreddit. Webhooks will be sent as normal, but it's expected trainees will add a training webhook anyway.
 
 Other:
 - When channel deletion is in its final 10 second countdown, a notice will appear in the mission-generator to warn that deletion is in progress and the channel lock is acquired. It is strongly advised not to attempt to "send" missions during this brief window. The message is removed once the lock is released.
