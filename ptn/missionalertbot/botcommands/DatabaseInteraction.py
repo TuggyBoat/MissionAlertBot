@@ -889,7 +889,7 @@ class DatabaseInteraction(commands.Cog):
                     color=constants.EMBED_COLOUR_QU
             )
 
-            view=MissionDeleteView(mission_data, interaction.user)
+            view=MissionDeleteView(mission_data, interaction.user, embed)
 
             await interaction.response.send_message(embed=embed, view=view)
 

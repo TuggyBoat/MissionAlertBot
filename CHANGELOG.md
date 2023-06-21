@@ -1,9 +1,15 @@
 # Changelog
 
+## 2.1.2
+
+- [#505](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/505) Added dynamic channel locks
+- #504 Redesigned `m.unlock_override`, is now `/admin_release_channel_lock` and takes channel lock name as parameter
+
+
 ## 2.1.1
 
 - Removed channel_cleanup table from missions.db and related code
-- Fixed incorrect timer for final channel deletion
+- [#508](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/508) Fixed incorrect timer for final channel deletion
 
 
 ## 2.1.0

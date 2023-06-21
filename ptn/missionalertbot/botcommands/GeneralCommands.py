@@ -28,7 +28,7 @@ from ptn.missionalertbot.constants import bot, bot_command_channel, bot_dev_chan
 from ptn.missionalertbot.database.database import get_trade_channels_on_startup, backup_database, find_carrier, find_mission, _is_carrier_channel, \
     mission_db, carrier_db, carrier_db_lock, carriers_conn, find_nominator_with_id, delete_nominee_by_nominator, find_community_carrier, CCDbFields
 from ptn.missionalertbot.modules.Embeds import _is_mission_active_embed, _format_missions_embed
-from ptn.missionalertbot.modules.helpers import bot_exit, carrier_channel_lock, check_roles, check_command_channel, on_app_command_error
+from ptn.missionalertbot.modules.helpers import bot_exit, check_roles, check_command_channel, on_app_command_error, unlock_mission_channel
 from ptn.missionalertbot.modules.BackgroundTasks import lasttrade_cron, _monitor_reddit_comments
 from ptn.missionalertbot.modules.MissionCleaner import cleanup_trade_channel
 
@@ -196,50 +196,30 @@ class GeneralCommands(commands.Cog):
                 return await ctx.send(f"Failed to sync bot tree: {e}")
 
 
-    @commands.command(name='unlock_override', help='Unlock the channel lock manually after Sheriff Benguin breaks it.')
+    @app_commands.command(name='admin_release_channel_lock', description='Manually release a designated channel lock object.')
+    @app_commands.describe(channelname='The exact name of the channel as it appears in the settings dialog e.g. ptn-starscape-olympus')
     @check_roles([admin_role(), dev_role()])
-    async def unlock_override(self, ctx):
+    @check_command_channel(bot_command_channel())
+    async def admin_release_channel_lock(self, interaction: discord.Interaction, channelname: str):
 
-        print(f"{ctx.author} called manual channel_lock release in {ctx.channel}")
-        if not carrier_channel_lock.locked():
-            return await ctx.send("Channel lock is not set.")
+        print(f"{interaction.user.name} called manual channel_lock release in {interaction.channel.name}")
+        try:
+            await unlock_mission_channel(channelname)
+            print("Channel lock released")
+            embed = discord.Embed(
+                description=f"🔓 Released lock for `{channelname}`",
+                color=constants.EMBED_COLOUR_OK
+            )
+            spamchannel = bot.get_channel(bot_spam_channel())
+            await spamchannel.send(embed=embed)
 
-        """
-        await ctx.send("Make sure nobody is using the Mission Generator before proceeding.")
-        global deletion_in_progress
-
-        # this global variable is set when the channel deletion function acquires its lock
-        if deletion_in_progress:
-            await ctx.send("Lock appears to be set from a channel deletion task underway. This usually takes ~10 seconds per channel."
-                        " Please make sure no mission channels are about to be deleted. Deletion occurs 15 minutes after `/mission complete`"
-                        " or `/cco complete` or 2 minutes following using a mission generator command without generating a mission "
-                        "(i.e. by error or user abort).")
-
-            await ctx.send("Do you still want to proceed? **y**/**n**")
-
-            def check(message):
-                return message.author == ctx.author and message.channel == ctx.channel and \
-                                            message.content.lower() in ["y", "n"]
-
-            try:
-                msg = await bot.wait_for("message", check=check, timeout=30)
-                if msg.content.lower() == "n":
-                    await ctx.send("Manual lock release aborted.")
-                    print("User cancelled manual unlock command.")
-                    return
-                elif msg.content.lower() == "y":
-                    print("User wants to manually release channel lock.")
-
-            except asyncio.TimeoutError:
-                await ctx.send("**Cancelled**: no response.")
-                return
-        """
-
-        await ctx.send("OK. Releasing channel lock.")
-        carrier_channel_lock.release()
-
-        # deletion_in_progress = False
-        print("Channel lock manually released.")
+            await interaction.response.send_message(embed=embed)
+        except Exception as e:
+            embed = discord.Embed(
+                description=f"❌ Could not release lock for `{channelname}`: {e}",
+                color=constants.EMBED_COLOUR_ERROR
+            )
+            await interaction.response.send_message(embed=embed)
 
 
     # a command to check the cron status for Fleet Reserve status
