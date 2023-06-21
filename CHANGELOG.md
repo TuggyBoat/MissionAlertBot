@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.1.3
+
+- [#507](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/507) Re-implemented startup check for orphaned mission channels
+- Logging to bot-spam of trade channel deletions
+
+
 ## 2.1.2
 
 - [#505](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/505) Added dynamic channel locks
