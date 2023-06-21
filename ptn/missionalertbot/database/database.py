@@ -362,22 +362,6 @@ def build_database_on_startup():
 
 
 """
-MISSION CLEANUP FUNCTIONS
-
-A group of functions added by Skiedude to handle clean-up of missions which were marked complete before a bot restart.
-
-"""
-
-
-async def get_trade_channels_on_startup():
-    """
-    This function is called on bot.on_ready() to clean up any channels
-    that had their timer lost during bot stop/restart
-    """
-    # TODO re-do
-
-
-"""
 DATABASE SEARCH FUNCTIONS
 """
 

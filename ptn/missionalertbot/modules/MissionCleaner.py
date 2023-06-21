@@ -287,7 +287,11 @@ async def remove_carrier_channel(completed_mission_channel_id, seconds): # secon
                     await asyncio.sleep(seconds_very_short())
                     await delchannel.delete()
                     print(f'Deleted {delchannel}')
-
+                    embed = discord.Embed(
+                        description=f":put_litter_in_its_place: Deleted expired mission channel {delchannel.name}.",
+                        color=constants.EMBED_COLOUR_OK
+                    )
+                    await spamchannel.send(embed=embed)
                 except Forbidden:
                     raise EnvironmentError(f"Could not delete {delchannel}, reason: Bot does not have permission.")
                 except NotFound:
@@ -314,11 +318,40 @@ async def remove_carrier_channel(completed_mission_channel_id, seconds): # secon
         return
 
 
-async def cleanup_trade_channel(channel):
+async def check_trade_channels_on_startup():
     """
     This function is called on bot.on_ready() to clean up any channels
     that had their timer lost during bot stop/restart
     """
-    print(f"Sending channel {channel['channelid']} for removal")
-    await remove_carrier_channel(channel['channelid'], seconds_long())
-    return
+    # get all active channel IDs
+    print("Fetching active mission channels from DB...")
+    mission_db.execute("SELECT channelid FROM missions")
+    rows = mission_db.fetchall()
+    trade_category = bot.get_channel(trade_cat())
+    active_channel_ids = [row['channelid'] for row in rows]
+
+    # get trade category as channel object
+    trade_category = bot.get_channel(trade_cat())
+
+    spamchannel = bot.get_channel(bot_spam_channel())
+
+    print(f"Checking against extant channels in {trade_category.name}...")
+
+    # Create a list to store the channel deletion tasks
+    deletion_tasks = []
+
+    for channel in trade_category.channels:
+        if channel.id not in active_channel_ids:
+            embed = discord.Embed(
+                description=f"🧹 Startup: {channel.name} <#{channel.id}> appears orphaned, marking for cleanup.",
+                color=constants.EMBED_COLOUR_QU
+            )
+            await spamchannel.send(embed=embed)
+            print(f"{channel.name} appears orphaned, marking for cleanup")
+            # Append the channel deletion task to the list without awaiting it
+            deletion_task = remove_carrier_channel(channel.id, seconds_long())
+            deletion_tasks.append(deletion_task)
+
+    # Wait for all deletion tasks to complete concurrently
+    await asyncio.gather(*deletion_tasks)
+    print("Complete.")
