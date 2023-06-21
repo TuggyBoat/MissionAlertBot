@@ -28,7 +28,7 @@ from ptn.missionalertbot.constants import bot, bot_spam_channel, wine_alerts_loa
 # import local modules
 from ptn.missionalertbot.database.database import backup_database, mission_db, missions_conn, find_carrier, CarrierDbFields
 from ptn.missionalertbot.modules.DateString import get_final_delete_hammertime
-from ptn.missionalertbot.modules.helpers import lock_mission_channel, carrier_channel_lock, clean_up_pins, ChannelDefs
+from ptn.missionalertbot.modules.helpers import lock_mission_channel, unlock_mission_channel, clean_up_pins, ChannelDefs
 
 
 """
@@ -218,7 +218,7 @@ async def _cleanup_completed_mission(interaction: discord.Interaction, mission_d
                 spamchannel.send(embed=embed)
 
     # remove channel
-    await remove_carrier_channel(mission_data.channel_id)
+    await remove_carrier_channel(mission_data.channel_id, seconds_long())
 
     return
 
@@ -236,7 +236,13 @@ async def remove_carrier_channel(completed_mission_channel_id, seconds): # secon
     try:
         # try to acquire a channel lock, if unsuccessful after a period of time, abort and throw up an error
         try:
-            await asyncio.wait_for(lock_mission_channel(), timeout=120)
+            await asyncio.wait_for(lock_mission_channel(delchannel.name), timeout=120)
+            embed = discord.Embed(
+                description=f"🔒 Lock acquired for `{delchannel.name})` (<#{delchannel.id}>) pending automatic deletion following conclusion of {seconds} timer.>",
+                color=constants.EMBED_COLOUR_QU
+            )
+            spamchannel = bot.get_channel(bot_spam_channel())
+            await spamchannel.send(embed=embed)
         except asyncio.TimeoutError:
             print(f"No channel lock available for {delchannel}")
             return await spamchannel.send(f"<@211891698551226368> WARNING: No channel lock available on {delchannel} after 120 seconds. Deletion aborted.")
@@ -291,9 +297,13 @@ async def remove_carrier_channel(completed_mission_channel_id, seconds): # secon
         try:
             # now release the channel lock
             print("Releasing channel lock...")
-            carrier_channel_lock.release()
-            # deletion_in_progress = False
+            await unlock_mission_channel(delchannel.name)
             print("Channel lock released")
+            embed = discord.Embed(
+                description=f"🔓 Released lock for `{delchannel.name}` (<#{delchannel.id}>) ",
+                color=constants.EMBED_COLOUR_OK
+            )
+            await spamchannel.send(embed=embed)
         except Exception as e:
             print(e)
         try: 

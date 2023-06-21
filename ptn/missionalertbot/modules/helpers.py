@@ -34,9 +34,6 @@ from ptn.missionalertbot.constants import bot, cc_role, get_overwrite_perms, get
 from ptn.missionalertbot.database.database import find_community_carrier, CCDbFields, carrier_db, carrier_db_lock, carriers_conn, delete_community_carrier_from_db
 
 
-# channel lock
-carrier_channel_lock = asyncio.Lock()
-
 # custom errors
 class CommandChannelError(app_commands.CheckFailure): # channel check error
     def __init__(self, permitted_channel, formatted_channel_list):
@@ -202,11 +199,26 @@ def check_text_command_channel(permitted_channel):
             return True
     return commands.check(check_text_channel)
 
+channel_locks = {} # define dictionary for channel lock/unlock names
 
-async def lock_mission_channel():
-    print("Attempting channel lock...")
-    await carrier_channel_lock.acquire()
-    print("Channel lock acquired.")
+async def lock_mission_channel(channel):
+    print(f"Attempting channel lock for {channel}...")
+    # Create a lock if it doesn't exist for the given fruit
+    if channel not in channel_locks:
+        channel_locks[channel] = asyncio.Lock()
+
+    lock = channel_locks[channel]
+    await lock.acquire()
+    print(f"Channel lock acquired for {channel}.")
+
+
+async def unlock_mission_channel(channel):
+    print(f"Attempting to release channel lock for {channel}...")
+    if channel in channel_locks:
+        lock = channel_locks[channel]
+        lock.release()
+        del channel_locks[channel]
+    print(f"Channel lock released for {channel}.")
 
 
 # function to stop and quit

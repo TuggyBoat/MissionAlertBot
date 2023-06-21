@@ -27,9 +27,10 @@ from ptn.missionalertbot.modules.MissionCleaner import _cleanup_completed_missio
 
 # buttons for mission manual delete
 class MissionDeleteView(View):
-    def __init__(self, mission_data, author, timeout=30):
+    def __init__(self, mission_data, author, embed, timeout=30):
         self.mission_data = mission_data
         self.author = author
+        self.original_embed = embed
         super().__init__(timeout=timeout)
 
     @discord.ui.button(label="Delete", style=discord.ButtonStyle.danger, emoji="⚠", custom_id="delete")
@@ -98,8 +99,10 @@ class MissionDeleteView(View):
         # remove buttons
         self.clear_items()
 
+        embeds = [self.original_embed, timeout_embed]
+
         try:
-            await self.message.edit(embed=timeout_embed, view=self) # mission gen ends here
+            await self.message.edit(embeds=embeds, view=self) # mission gen ends here
         except Exception as e:
             print(e)
 
