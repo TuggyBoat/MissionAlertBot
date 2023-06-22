@@ -28,7 +28,7 @@ from ptn.missionalertbot.constants import bot, bot_spam_channel, wine_alerts_loa
 # import local modules
 from ptn.missionalertbot.database.database import backup_database, mission_db, missions_conn, find_carrier, CarrierDbFields
 from ptn.missionalertbot.modules.DateString import get_final_delete_hammertime
-from ptn.missionalertbot.modules.helpers import lock_mission_channel, unlock_mission_channel, clean_up_pins, ChannelDefs
+from ptn.missionalertbot.modules.helpers import lock_mission_channel, unlock_mission_channel, clean_up_pins, ChannelDefs, check_mission_channel_lock
 
 
 """
@@ -254,7 +254,7 @@ async def remove_carrier_channel(completed_mission_channel_id, seconds): # secon
         print("Warning mission gen channel")
         embed = discord.Embed (
             title=":warning: Channel lock engaged for channel cleanup :warning:",
-            description=f"Deletion {hammertime} of <#{completed_mission_channel_id}>, please do **NOT** try to send any missions during this time.",
+            description=f"Deletion {hammertime} of <#{completed_mission_channel_id}>, channel will be temporarily locked.",
             color=constants.EMBED_COLOUR_RP
         )
         print("Sending warning message to mission gen")
@@ -301,13 +301,15 @@ async def remove_carrier_channel(completed_mission_channel_id, seconds): # secon
         try:
             # now release the channel lock
             print("Releasing channel lock...")
-            await unlock_mission_channel(delchannel.name)
-            print("Channel lock released")
-            embed = discord.Embed(
-                description=f"🔓 Released lock for `{delchannel.name}`(<#{delchannel.id}>) ",
-                color=constants.EMBED_COLOUR_OK
-            )
-            await spamchannel.send(embed=embed)
+            locked = check_mission_channel_lock(delchannel.name)
+            if locked:
+                await unlock_mission_channel(delchannel.name)
+                print("Channel lock released")
+                embed = discord.Embed(
+                    description=f"🔓 Released lock for `{delchannel.name}` (<#{delchannel.id}>) ",
+                    color=constants.EMBED_COLOUR_OK
+                )
+                await spamchannel.send(embed=embed)
         except Exception as e:
             print(e)
         try: 
