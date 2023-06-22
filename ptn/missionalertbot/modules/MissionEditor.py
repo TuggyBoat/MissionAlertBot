@@ -27,8 +27,9 @@ from ptn.missionalertbot.modules.TextGen import txt_create_discord, txt_create_r
 
 
 class EditConfirmView(View):
-    def __init__(self, mission_params, original_type, author: typing.Union[discord.Member, discord.User], timeout=30):
+    def __init__(self, mission_params, original_type, confirm_embed, author: typing.Union[discord.Member, discord.User], timeout=30):
         self.spamchannel = bot.get_channel(bot_spam_channel())
+        self.confirm_embed = confirm_embed
         self.author = author
         self.original_type = original_type
         self.mission_params = mission_params
@@ -73,6 +74,53 @@ class EditConfirmView(View):
         except Exception as e:
             print(e)
 
+    @discord.ui.button(label="Set Message", style=discord.ButtonStyle.secondary, emoji="✍", custom_id="message", row=2)
+    async def message_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        print(f"{interaction.user.display_name} wants to add a message to their mission")
+    
+        await interaction.response.send_modal(AddMessageModal(self.mission_params, self.confirm_embed, view=self))
+
+    @discord.ui.button(label="Remove Message", style=discord.ButtonStyle.secondary, emoji="🗑", custom_id="remove", row=2)
+    async def remove_message_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        print(f"{interaction.user.display_name} wants to remopve their existing mission message")
+        button.disabled=True
+        print("Define empty embeds list")
+        embeds = []
+        print(embeds)
+        try:
+            embeds.append(self.confirm_embed)
+        except Exception as e:
+            print(e)
+
+        try:
+            if self.mission_params.cco_message_text:
+                print(f"Message found: {self.mission_params.cco_message_text}")
+                embed = discord.Embed(
+                    title="Message will be removed:",
+                    description=self.mission_params.cco_message_text,
+                    color=constants.EMBED_COLOUR_RP
+                )
+                print("Defining new feedback embeds")
+
+                embeds.append(embed)
+                await interaction.response.edit_message(embeds=embeds)
+                print("Set mission message to none")
+                self.mission_params.cco_message_text = None
+
+            else:
+                print("No message found to remove")
+                embed = discord.Embed(
+                    description="No mission message found.",
+                    color=constants.EMBED_COLOUR_ERROR
+                )
+
+                embeds.append(embed)
+                await interaction.response.edit_message(embeds=embeds)
+
+        except Exception as e:
+            print(e)
+
+
     async def interaction_check(self, interaction: discord.Interaction): # only allow original command user to interact with buttons
         if interaction.user.id == self.author.id:
             return True
@@ -102,6 +150,51 @@ class EditConfirmView(View):
             embed = self.mission_params.edit_embed
         try:
             await self.message.edit(embed=embed, view=self) # mission gen ends here
+        except Exception as e:
+            print(e)
+
+
+# modal for message button
+class AddMessageModal(Modal):
+    def __init__(self, mission_params, confirm_embed, view, title = 'Add message to mission', timeout = None) -> None:
+        self.confirm_embed = confirm_embed
+        self.mission_params = mission_params
+        self.view = view
+        super().__init__(title=title, timeout=timeout)
+
+    message = discord.ui.TextInput(
+        label='Enter your message below.',
+        style=discord.TextStyle.long,
+        placeholder='Normal Discord markdown works, but mentions and custom emojis require full code.',
+        required=True,
+        max_length=4000,
+    )
+
+    async def on_submit(self, interaction: discord.Interaction):
+        print("Message submitted")
+        print(self.message.value)
+        self.mission_params.cco_message_text = self.message.value
+        """
+        While self.message returns the inputted text if printed, it is actually a class holding
+        all the attributes of the TextInput. View shows only the text the user inputted.
+
+        This is important because it is a weak instance and cannot be pickled with mission_params,
+        and we only want the value pickled anyway
+        """
+        print(self.mission_params.cco_message_text)
+        message_embed = discord.Embed(
+            title="Message added",
+            description=self.mission_params.cco_message_text,
+            color=constants.EMBED_COLOUR_RP
+        )
+
+        embeds = []
+        embeds.append(self.confirm_embed)
+        embeds.append(message_embed)
+
+        try:
+            await interaction.response.edit_message(embeds=embeds, view=self.view)
+
         except Exception as e:
             print(e)
 
@@ -150,7 +243,7 @@ async def edit_active_mission(interaction: discord.Interaction, mission_params, 
 
     mission_params.edit_embed = None
 
-    view = EditConfirmView(mission_params, original_type, interaction.user) # confirm/cancel buttons
+    view = EditConfirmView(mission_params, original_type, confirm_embed, interaction.user) # confirm/cancel buttons
 
     await interaction.response.send_message(embed=confirm_embed, view=view)
 
