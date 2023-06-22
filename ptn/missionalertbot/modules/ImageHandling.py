@@ -100,6 +100,7 @@ async def create_carrier_discord_mission_image(mission_params):
     image_editable = ImageDraw.Draw(discord_template)
 
     mission_action = 'LOADING: ' if mission_params.mission_type == 'load' else 'UNLOADING: '
+    print(mission_action)
 
     image_editable.text((17, 283), mission_action + mission_params.carrier_data.carrier_long_name, (0, 217, 255), font=DISCORD_NAME_FONT)
     image_editable.text((17, 315), "FLEET CARRIER " + mission_params.carrier_data.carrier_identifier, (0, 217, 255), font=DISCORD_ID_FONT)

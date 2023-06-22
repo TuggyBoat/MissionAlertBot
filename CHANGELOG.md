@@ -3,6 +3,12 @@
 ## 2.1.4
 
 - [#521](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/521) `Pads` parameter will be vastly more forgiving of acceptable input (`/cco load`, `/cco unload`, `/cco edit`)
+- [#523](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/523) The channel removal timer for `/mission complete` "Failed" now uses hammertime.
+- [#520](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/520) Channel unlocks will now check if the lock is acquired before attempting to release.
+- [#524](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/524) Webhook mission image will now change if mission type is changed with `/cco edit`.
+ - also made image replacement method more resilient to Discord being fucking weird
+- temp images used during `/cco edit` are now properly cleaned up afterwards
+
 
 ## 2.1.3
 
