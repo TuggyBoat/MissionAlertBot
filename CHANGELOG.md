@@ -4,6 +4,7 @@
 
 - [#507](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/507) Re-implemented startup check for orphaned mission channels
 - Logging to bot-spam of trade channel deletions
+- [#516](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/516) Increased view timeouts to 5 minutes from 30 seconds (button view) and 2 minutes (select view) respectively
 
 
 ## 2.1.2

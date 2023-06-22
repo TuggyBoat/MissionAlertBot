@@ -20,17 +20,17 @@ from ptn.missionalertbot.constants import bot, bot_spam_channel, get_reddit, upv
 
 # import local modules
 from ptn.missionalertbot.database.database import _update_mission_in_database
-from ptn.missionalertbot.modules.ImageHandling import create_carrier_reddit_mission_image
+from ptn.missionalertbot.modules.ImageHandling import create_carrier_reddit_mission_image, create_carrier_discord_mission_image
 from ptn.missionalertbot.modules.MissionGenerator import validate_pads, validate_profit, define_commodity, return_discord_alert_embed, return_discord_channel_embeds, \
     _mission_summary_embed, mission_generation_complete
 from ptn.missionalertbot.modules.TextGen import txt_create_discord, txt_create_reddit_title, txt_create_reddit_body
 
-spamchannel = bot.get_channel(bot_spam_channel())
-
 
 class EditConfirmView(View):
-    def __init__(self, mission_params, author: typing.Union[discord.Member, discord.User], timeout=30):
+    def __init__(self, mission_params, original_type, author: typing.Union[discord.Member, discord.User], timeout=30):
+        self.spamchannel = bot.get_channel(bot_spam_channel())
         self.author = author
+        self.original_type = original_type
         self.mission_params = mission_params
         super().__init__(timeout=timeout)
 
@@ -50,10 +50,10 @@ class EditConfirmView(View):
         except Exception as e:
             print(e)
 
-        await edit_discord_alerts(interaction, self.mission_params)
-        await update_webhooks(interaction, self.mission_params)
-        await update_reddit_post(interaction, self.mission_params)
-        await update_mission_db(interaction, self.mission_params)
+        await edit_discord_alerts(interaction, self.mission_params, self.spamchannel, self.original_type)
+        await update_webhooks(interaction, self.mission_params, self.spamchannel)
+        await update_reddit_post(interaction, self.mission_params, self.spamchannel)
+        await update_mission_db(interaction, self.mission_params, self.spamchannel)
 
         await mission_generation_complete(interaction, self.mission_params)
 
@@ -106,7 +106,7 @@ class EditConfirmView(View):
             print(e)
 
 
-async def edit_active_mission(interaction: discord.Interaction, mission_params, original_commodity):
+async def edit_active_mission(interaction: discord.Interaction, mission_params, original_commodity, original_type):
     print("Called edit_active_mission")
     mission_params.returnflag = True
 
@@ -150,7 +150,7 @@ async def edit_active_mission(interaction: discord.Interaction, mission_params, 
 
     mission_params.edit_embed = None
 
-    view = EditConfirmView(mission_params, interaction.user) # confirm/cancel buttons
+    view = EditConfirmView(mission_params, original_type, interaction.user) # confirm/cancel buttons
 
     await interaction.response.send_message(embed=confirm_embed, view=view)
 
@@ -163,8 +163,9 @@ async def edit_active_mission(interaction: discord.Interaction, mission_params, 
 
 
 
-async def edit_discord_alerts(interaction: discord.Interaction, mission_params):
+async def edit_discord_alerts(interaction: discord.Interaction, mission_params, spamchannel, original_type):
     print("Updating Discord alert...")
+
     async with interaction.channel.typing():
         try:
             # find alerts channel
@@ -190,7 +191,7 @@ async def edit_discord_alerts(interaction: discord.Interaction, mission_params):
 
             # edit in new trade alert message
             try:
-                print("edit alert message")
+                print("Edit alert message")
                 await discord_alert_msg.edit(embed=embed)
             except Exception as e:
                 print(e)
@@ -205,7 +206,7 @@ async def edit_discord_alerts(interaction: discord.Interaction, mission_params):
                 discord_notify_msg = await carrier_channel.fetch_message(mission_params.notify_msg_id)
 
             # get new channel embeds from Mission Generator
-            print("get new channel embeds from Mission Generator")
+            print("Get new channel embeds from Mission Generator")
             discord_embeds = await return_discord_channel_embeds(mission_params) # this function saves embeds to mission_params too
 
             send_embeds = [discord_embeds.buy_embed, discord_embeds.sell_embed, discord_embeds.info_embed, discord_embeds.help_embed]
@@ -213,7 +214,25 @@ async def edit_discord_alerts(interaction: discord.Interaction, mission_params):
             print("Checking for cco_message_text status...")
             if mission_params.cco_message_text is not None: send_embeds.append(discord_embeds.owner_text_embed)
 
-            print("Editing message...")
+            print("Checking mission_type status...")
+            if original_type != mission_params.mission_type:
+                try:
+                    print("Removing old image...")
+                    await discord_channel_msg.remove_attachments(*discord_channel_msg.attachments)
+                    print("Type changed, creating new image")
+                    mission_params.discord_img_name = await create_carrier_discord_mission_image(mission_params)
+
+                    file = discord.File(mission_params.discord_img_name, filename="image.png")
+                    print(file)
+
+                    print("Uploading new image...")
+                    await discord_channel_msg.add_files(file)
+
+                except Exception as e:
+                    print(e)
+
+            # mission type hasn't changed so we don't need all the faff with image changing
+            print("Editing Discord channel message...")
             await discord_channel_msg.edit(content=mission_params.discord_msg_content, embeds=send_embeds)
             if mission_params.notify_msg_id:
                 ping_role_id = wineloader_role() if mission_params.commodity_name == 'Wine' else hauler_role()
@@ -223,7 +242,7 @@ async def edit_discord_alerts(interaction: discord.Interaction, mission_params):
             print(e)
 
         try:
-            updated_message = discord_channel_msg.edit(embeds=send_embeds)
+            updated_message = await discord_channel_msg.edit(embeds=send_embeds)
             print("Feeding back to user...")
             embed = discord.Embed(
                 title=f"Discord trade alerts updated for {mission_params.carrier_data.carrier_long_name}",
@@ -239,7 +258,7 @@ async def edit_discord_alerts(interaction: discord.Interaction, mission_params):
             await spamchannel.send(embed=embed)
 
 
-async def update_webhooks(interaction: discord.Interaction, mission_params):
+async def update_webhooks(interaction: discord.Interaction, mission_params, spamchannel):
     print("Updating webhooks...")
     async with interaction.channel.typing():
         if mission_params.webhook_urls and mission_params.webhook_msg_ids and mission_params.webhook_jump_urls:
@@ -276,7 +295,7 @@ async def update_webhooks(interaction: discord.Interaction, mission_params):
                     await spamchannel.send(embed=embed)
 
 
-async def update_reddit_post(interaction: discord.Interaction, mission_params):
+async def update_reddit_post(interaction: discord.Interaction, mission_params, spamchannel):
     print("Updating Reddit post")
     async with interaction.channel.typing():
         if not mission_params.reddit_post_id:
@@ -360,7 +379,7 @@ async def update_reddit_post(interaction: discord.Interaction, mission_params):
             await spamchannel.send(embed=embed)
 
 
-async def update_mission_db(interaction: discord.Interaction, mission_params):
+async def update_mission_db(interaction: discord.Interaction, mission_params, spamchannel):
     print("Attemping to update database")
     async with interaction.channel.typing():
         try:
