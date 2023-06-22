@@ -137,7 +137,7 @@ class MissionSendSelectMenu(Select):
 
 # select menu view for mission generation
 class MissionSendSelectMenuView(View):
-    def __init__(self, mission_params, author: typing.Union[discord.Member, discord.User], timeout=120):
+    def __init__(self, mission_params, author: typing.Union[discord.Member, discord.User], timeout=300):
         self.author = author
         self.mission_params = mission_params
         super().__init__(timeout=timeout)
@@ -160,6 +160,7 @@ class MissionSendSelectMenuView(View):
 
     async def on_timeout(self):
         # return a message to the user that the interaction has timed out
+        print("Select View timed out")
         timeout_embed = discord.Embed(
             description="Timed out.",
             color=constants.EMBED_COLOUR_ERROR
@@ -180,7 +181,7 @@ class MissionSendSelectMenuView(View):
 
 # buttons for mission generation
 class MissionSendView(View):
-    def __init__(self, mission_params, author: typing.Union[discord.Member, discord.User], timeout=30):
+    def __init__(self, mission_params, author: typing.Union[discord.Member, discord.User], timeout=300):
         self.author = author
         self.mission_params = mission_params
         super().__init__(timeout=timeout)
@@ -229,6 +230,7 @@ class MissionSendView(View):
 
     @discord.ui.button(label="Cancel", style=discord.ButtonStyle.danger, emoji="✖", custom_id="cancel", row=1)
     async def cancel_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        print("Mission gen cancelled by user")
         button.disabled=True
 
         cancelled_embed = discord.Embed(
@@ -288,6 +290,7 @@ class MissionSendView(View):
 
     async def on_timeout(self):
         # return a message to the user that the interaction has timed out
+        print("Button View timed out")
         timeout_embed = discord.Embed(
             description="Timed out.",
             color=constants.EMBED_COLOUR_ERROR

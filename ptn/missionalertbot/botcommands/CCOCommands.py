@@ -220,12 +220,17 @@ class CCOCommands(commands.Cog):
         station = "The station the Fleet Carrier is unloading to.",
         profit = 'The profit offered in thousands of credits, e.g. for 10k credits per ton enter \'10\'',
         pads = 'The size of the largest landing pad available at the station.',
-        supply_or_demand = 'The total amount of the commodity required.'
+        supply_or_demand = 'The total amount of the commodity required.',
+        mission_type='Whether the mission is Loading or Unloading.'
         )
     @check_roles([certcarrier_role(), trainee_role(), rescarrier_role()])
     @check_command_channel([mission_command_channel(), training_mission_command_channel()])
+    @app_commands.choices(mission_type=[
+        discord.app_commands.Choice(name='Loading', value='load'),
+        discord.app_commands.Choice(name='Unloading', value='unload')
+    ])
     async def edit(self, interaction: discord.Interaction, carrier: str, commodity: str = None, system: str = None, station: str = None,
-                profit: str = None, pads: str = None, supply_or_demand: str = None):
+                profit: str = None, pads: str = None, supply_or_demand: str = None, mission_type: str = None ):
         print(f"/cco edit called by {interaction.user.display_name}")
         async with interaction.channel.typing():
 
@@ -255,6 +260,7 @@ class CCOCommands(commands.Cog):
             mission_params = mission_data.mission_params
 
             original_commodity = mission_params.commodity_name
+            original_type = mission_params.mission_type
 
             print("defined original mission parameters")
             mission_params.print_values()
@@ -273,12 +279,12 @@ class CCOCommands(commands.Cog):
 
             # define the new mission_params
             update_params(mission_params, carrier_name_search_term = carrier, commodity_search_term = commodity, system = system, station = station,
-                        profit_raw = profit, profit = profit_convert, pads = pads, demand = supply_or_demand)
+                        profit_raw = profit, profit = profit_convert, pads = pads, demand = supply_or_demand, mission_type = mission_type)
 
             print("Defined new_mission_params:")
             mission_params.print_values()
 
-        await edit_active_mission(interaction, mission_params, original_commodity)
+        await edit_active_mission(interaction, mission_params, original_commodity, original_type)
 
         """
         1. perform checks on profit, pads, commodity
