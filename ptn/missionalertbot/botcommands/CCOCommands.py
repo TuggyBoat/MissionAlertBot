@@ -133,6 +133,8 @@ class CCOCommands(commands.Cog):
                 profit: str, pads: str, demand: str):
         mission_type = 'load'
 
+        pads = 'L' if 'l' in pads.lower() else 'M'
+
         training, channel_defs = check_training_mode(interaction)
 
         cp_embed = discord.Embed(
@@ -180,6 +182,8 @@ class CCOCommands(commands.Cog):
     async def unload(self, interaction: discord.Interaction, carrier: str, commodity: str, system: str, station: str,
                 profit: str, pads: str, supply: str):
         mission_type = 'unload'
+
+        pads = 'L' if 'l' in pads.lower() else 'M'
 
         training, channel_defs = check_training_mode(interaction)
 
@@ -235,7 +239,7 @@ class CCOCommands(commands.Cog):
         async with interaction.channel.typing():
 
             if pads:
-                pads = pads.upper()
+                pads = 'L' if 'l' in pads.lower() else 'M'
 
             # find the target carrier
             print("Looking for carrier data")
