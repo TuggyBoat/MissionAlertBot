@@ -27,7 +27,7 @@ from ptn.missionalertbot.modules.TextGen import txt_create_discord, txt_create_r
 
 
 class EditConfirmView(View):
-    def __init__(self, mission_params, original_type, confirm_embed, author: typing.Union[discord.Member, discord.User], timeout=30):
+    def __init__(self, mission_params, original_type, confirm_embed, author: typing.Union[discord.Member, discord.User], timeout=300):
         self.spamchannel = bot.get_channel(bot_spam_channel())
         self.confirm_embed = confirm_embed
         self.author = author
@@ -120,7 +120,6 @@ class EditConfirmView(View):
         except Exception as e:
             print(e)
 
-
     async def interaction_check(self, interaction: discord.Interaction): # only allow original command user to interact with buttons
         if interaction.user.id == self.author.id:
             return True
@@ -135,6 +134,7 @@ class EditConfirmView(View):
             return False
 
     async def on_timeout(self):
+        print("Mission edit view timed out")
         # return a message to the user that the interaction has timed out
         timeout_embed = discord.Embed(
             description="Timed out.",
