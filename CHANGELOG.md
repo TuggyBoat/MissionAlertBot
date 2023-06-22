@@ -3,7 +3,7 @@
 ## 2.1.3
 
 - [#507](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/507) Re-implemented startup check for orphaned mission channels
-- Logging to bot-spam of trade channel deletions
+- Added logging to bot-spam of trade channel deletions
 - [#516](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/516) Increased view timeouts to 5 minutes from 30 seconds (button view) and 2 minutes (select view) respectively
 - [#517](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/517) Mission type (loading/unload) and mission message can now be edited with `/cco edit`
 
