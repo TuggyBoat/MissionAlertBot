@@ -7,6 +7,7 @@ Dependencies: constants, database, ImageHandling, TextGen, MissionGenerator
 """
 # import libraries
 import aiohttp
+import asyncio
 import typing
 
 # import discord.py
@@ -22,7 +23,7 @@ from ptn.missionalertbot.constants import bot, bot_spam_channel, get_reddit, upv
 from ptn.missionalertbot.database.database import _update_mission_in_database
 from ptn.missionalertbot.modules.ImageHandling import create_carrier_reddit_mission_image, create_carrier_discord_mission_image
 from ptn.missionalertbot.modules.MissionGenerator import validate_pads, validate_profit, define_commodity, return_discord_alert_embed, return_discord_channel_embeds, \
-    _mission_summary_embed, mission_generation_complete
+    _mission_summary_embed, mission_generation_complete, cleanup_temp_image_file
 from ptn.missionalertbot.modules.TextGen import txt_create_discord, txt_create_reddit_title, txt_create_reddit_body
 
 
@@ -52,9 +53,16 @@ class EditConfirmView(View):
             print(e)
 
         await edit_discord_alerts(interaction, self.mission_params, self.spamchannel, self.original_type)
-        await update_webhooks(interaction, self.mission_params, self.spamchannel)
+        await update_webhooks(interaction, self.mission_params, self.spamchannel, self.original_type)
         await update_reddit_post(interaction, self.mission_params, self.spamchannel)
         await update_mission_db(interaction, self.mission_params, self.spamchannel)
+
+        try:
+            print("Calling cleanup for temp files")
+            cleanup_temp_image_file(self.mission_params.discord_img_name)
+            cleanup_temp_image_file(self.mission_params.reddit_img_name)
+        except Exception as e:
+            print(e)
 
         await mission_generation_complete(interaction, self.mission_params)
 
@@ -307,29 +315,31 @@ async def edit_discord_alerts(interaction: discord.Interaction, mission_params, 
             print("Checking for cco_message_text status...")
             if mission_params.cco_message_text is not None: send_embeds.append(discord_embeds.owner_text_embed)
 
+            if mission_params.notify_msg_id:
+                ping_role_id = wineloader_role() if mission_params.commodity_name == 'Wine' else hauler_role()
+                await discord_notify_msg.edit(content=f"<@&{ping_role_id}>: {mission_params.discord_text}")
+
             print("Checking mission_type status...")
             if original_type != mission_params.mission_type:
                 try:
-                    print("Removing old image...")
-                    await discord_channel_msg.remove_attachments(*discord_channel_msg.attachments)
-                    print("Type changed, creating new image")
+                    print(f"Type changed to {mission_params.mission_type} (from {original_type}), creating new image")
                     mission_params.discord_img_name = await create_carrier_discord_mission_image(mission_params)
 
                     file = discord.File(mission_params.discord_img_name, filename="image.png")
                     print(file)
 
                     print("Uploading new image...")
-                    await discord_channel_msg.add_files(file)
+                    # await discord_channel_msg.add_files(file)
+
+                    print("Editing Discord channel message...")
+                    await discord_channel_msg.edit(content=mission_params.discord_msg_content, embeds=send_embeds, attachments=[file])
 
                 except Exception as e:
                     print(e)
 
-            # mission type hasn't changed so we don't need all the faff with image changing
-            print("Editing Discord channel message...")
-            await discord_channel_msg.edit(content=mission_params.discord_msg_content, embeds=send_embeds)
-            if mission_params.notify_msg_id:
-                ping_role_id = wineloader_role() if mission_params.commodity_name == 'Wine' else hauler_role()
-                await discord_notify_msg.edit(content=f"<@&{ping_role_id}>: {mission_params.discord_text}")
+            else:
+                print("Editing Discord channel message...")
+                await discord_channel_msg.edit(content=mission_params.discord_msg_content, embeds=send_embeds)
 
         except Exception as e:
             print(e)
@@ -351,7 +361,7 @@ async def edit_discord_alerts(interaction: discord.Interaction, mission_params, 
             await spamchannel.send(embed=embed)
 
 
-async def update_webhooks(interaction: discord.Interaction, mission_params, spamchannel):
+async def update_webhooks(interaction: discord.Interaction, mission_params, spamchannel, original_type):
     print("Updating webhooks...")
     async with interaction.channel.typing():
         if mission_params.webhook_urls and mission_params.webhook_msg_ids and mission_params.webhook_jump_urls:
@@ -370,8 +380,28 @@ async def update_webhooks(interaction: discord.Interaction, mission_params, spam
                         print("Fetching webhook message object")
                         webhook_msg = await webhook.fetch_message(webhook_msg_id)
 
-                        print("Editing webhook message...")
-                        await webhook_msg.edit(embeds=webhook_embeds)
+                        if original_type != mission_params.mission_type:
+                            # type has changed, need to change image too
+                            try:
+                                print(f"Type changed to {mission_params.mission_type} (from {original_type}), creating new image")
+                                mission_params.discord_img_name = await create_carrier_discord_mission_image(mission_params)
+
+                                file = discord.File(mission_params.discord_img_name, filename="image.png")
+                                print(file)
+
+                                print("Uploading new image...")
+                                # await discord_channel_msg.add_files(file)
+
+                                print("Editing Discord channel message...")
+                                await webhook_msg.edit(embeds=webhook_embeds, attachments=[file])
+                            
+                            except Exception as e:
+                                print(e)
+
+                        else:
+                            # don't need to change image
+                            print("Editing webhook message...")
+                            await webhook_msg.edit(embeds=webhook_embeds)
 
                         print("Feeding back to user...")
                         embed = discord.Embed(

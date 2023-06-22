@@ -28,7 +28,7 @@ from ptn.missionalertbot.constants import bot, bot_command_channel, bot_dev_chan
 from ptn.missionalertbot.database.database import backup_database, find_carrier, find_mission, _is_carrier_channel, \
     mission_db, carrier_db, carrier_db_lock, carriers_conn, find_nominator_with_id, delete_nominee_by_nominator, find_community_carrier, CCDbFields
 from ptn.missionalertbot.modules.Embeds import _is_mission_active_embed, _format_missions_embed
-from ptn.missionalertbot.modules.helpers import bot_exit, check_roles, check_command_channel, on_app_command_error, unlock_mission_channel
+from ptn.missionalertbot.modules.helpers import bot_exit, check_roles, check_command_channel, on_app_command_error, unlock_mission_channel, lock_mission_channel, check_mission_channel_lock
 from ptn.missionalertbot.modules.BackgroundTasks import lasttrade_cron, _monitor_reddit_comments
 from ptn.missionalertbot.modules.MissionCleaner import check_trade_channels_on_startup
 
@@ -193,30 +193,76 @@ class GeneralCommands(commands.Cog):
                 return await ctx.send(f"Failed to sync bot tree: {e}")
 
 
+    # manually release a channel lock
     @app_commands.command(name='admin_release_channel_lock', description='Manually release a designated channel lock object.')
     @app_commands.describe(channelname='The exact name of the channel as it appears in the settings dialog e.g. ptn-starscape-olympus')
     @check_roles([admin_role(), dev_role()])
     @check_command_channel(bot_command_channel())
     async def admin_release_channel_lock(self, interaction: discord.Interaction, channelname: str):
-
         print(f"{interaction.user.name} called manual channel_lock release in {interaction.channel.name}")
-        try:
-            await unlock_mission_channel(channelname)
-            print("Channel lock released")
-            embed = discord.Embed(
-                description=f"🔓 Released lock for `{channelname}`",
-                color=constants.EMBED_COLOUR_OK
-            )
-            spamchannel = bot.get_channel(bot_spam_channel())
-            await spamchannel.send(embed=embed)
 
-            await interaction.response.send_message(embed=embed)
-        except Exception as e:
+        locked = check_mission_channel_lock(channelname)
+
+        if not locked:
             embed = discord.Embed(
-                description=f"❌ Could not release lock for `{channelname}`: {e}",
+                description=f"No lock found for `{channelname}`.",
                 color=constants.EMBED_COLOUR_ERROR
             )
-            await interaction.response.send_message(embed=embed)
+
+        else:
+            try:
+                await unlock_mission_channel(channelname)
+                print("Channel lock released")
+                embed = discord.Embed(
+                    description=f"🔓🔑 Forced release of channel lock for `{channelname}`",
+                    color=constants.EMBED_COLOUR_OK
+                )
+                spamchannel = bot.get_channel(bot_spam_channel())
+                await spamchannel.send(embed=embed)
+
+                await interaction.response.send_message(embed=embed)
+            except Exception as e:
+                embed = discord.Embed(
+                    description=f"❌ Could not release lock for `{channelname}`: {e}",
+                    color=constants.EMBED_COLOUR_ERROR
+                )
+                await interaction.response.send_message(embed=embed)
+
+
+    # manually acquire a channel lock
+    @app_commands.command(name='admin_acquire_channel_lock', description='Manually acquire a designated channel lock object. WARNING: DO NOT USE.')
+    @app_commands.describe(channelname='The exact name of the channel as it appears in the settings dialog e.g. ptn-starscape-olympus')
+    @check_roles([admin_role(), dev_role()])
+    @check_command_channel(bot_command_channel())
+    async def admin_acquire_channel_lock(self, interaction: discord.Interaction, channelname: str):
+        print(f"{interaction.user.name} called manual channel_lock acquisition in {interaction.channel.name}")
+
+        locked = check_mission_channel_lock(channelname)
+
+        if locked:
+            embed = discord.Embed(
+                description=f"🔒 `{channelname}` lock is already acquired. Check <#{bot_spam_channel()}> for details.",
+                color=constants.EMBED_COLOUR_ERROR
+            )
+
+        else:
+            try:
+                await lock_mission_channel(channelname)
+                print("Channel lock acquired")
+                embed = discord.Embed(
+                    description=f"🔐 Acquired forced lock for `{channelname}`. `/admin_release_channel_lock {channelname}` **MUST** be used for the mission channel to become available to <@{bot.user.id}>",
+                    color=constants.EMBED_COLOUR_OK
+                )
+                spamchannel = bot.get_channel(bot_spam_channel())
+                await spamchannel.send(embed=embed)
+
+                await interaction.response.send_message(embed=embed)
+            except Exception as e:
+                embed = discord.Embed(
+                    description=f"❌ Could not acquire lock for `{channelname}`: {e}",
+                    color=constants.EMBED_COLOUR_ERROR
+                )
+                await interaction.response.send_message(embed=embed)
 
 
     # a command to check the cron status for Fleet Reserve status

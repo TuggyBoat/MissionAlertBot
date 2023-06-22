@@ -137,7 +137,7 @@ class MissionCompleteView(View):
                                     f"PTN Discord by {interaction.user.display_name}*"
                 discord_complete_embed = discord.Embed(
                     title=f"{self.mission_data.carrier_name} MISSION COMPLETE",
-                    description=f"<@{interaction.user.id}> reports mission complete! **This mission channel will be removed {hammertime}**",
+                    description=f"<@{interaction.user.id}> reports mission complete! This mission channel will be removed {hammertime}",
                     color=constants.EMBED_COLOUR_OK
                 )
                 print("Sending to _cleanup_completed_mission")
@@ -188,13 +188,14 @@ class MissionFailedModal(Modal):
         await interaction.response.edit_message(embed=embed, view=None)
 
         try:
+            hammertime = get_mission_delete_hammertime()
             reddit_complete_text = f"    INCOMING WIDEBAND TRANSMISSION: P.T.N. CARRIER MISSION UPDATE\n\n**" \
                                 f"{self.mission_data.carrier_name}** mission concluded (unable to complete). o7 CMDRs.\n\n\n\n*Reported on " \
                                 f"PTN Discord by {interaction.user.display_name}*"
             discord_complete_embed = discord.Embed(
                 title=f"{self.mission_data.carrier_name} MISSION CONCLUDED",
-                description=f"<@{interaction.user.id}> reports this mission **cannot be completed** and has thus concluded. Reason:\n> {self.reason}."
-                            f"\n\n**This mission channel will be removed in {(seconds_long())//60} minutes.**",
+                description=f"<@{interaction.user.id}> reports this mission **cannot be completed** and has thus concluded. Reason:\n\n> {self.reason}."
+                            f"\n\nThis mission channel will be removed {hammertime}",
                 color=constants.EMBED_COLOUR_ERROR
             )
 

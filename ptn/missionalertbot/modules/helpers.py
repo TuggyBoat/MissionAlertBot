@@ -221,6 +221,16 @@ async def unlock_mission_channel(channel):
     print(f"Channel lock released for {channel}.")
 
 
+def check_mission_channel_lock(channel):
+    print(f"Checking status of channel lock for {channel}...")
+    if channel in channel_locks:
+        print(f"{channel} is locked.")
+        return True
+    else:
+        print(f"{channel} is not locked.")
+        return False
+
+
 # function to stop and quit
 def bot_exit():
     sys.exit("User requested exit.")

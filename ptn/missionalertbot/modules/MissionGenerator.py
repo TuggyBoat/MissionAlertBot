@@ -37,7 +37,7 @@ from ptn.missionalertbot.database.database import backup_database, mission_db, m
     find_commodity, find_mission, carrier_db, carriers_conn, find_webhook_from_owner
 from ptn.missionalertbot.modules.DateString import get_formatted_date_string
 from ptn.missionalertbot.modules.Embeds import _mission_summary_embed
-from ptn.missionalertbot.modules.helpers import lock_mission_channel, unlock_mission_channel
+from ptn.missionalertbot.modules.helpers import lock_mission_channel, unlock_mission_channel, check_mission_channel_lock
 from ptn.missionalertbot.modules.ImageHandling import assign_carrier_image, create_carrier_reddit_mission_image, create_carrier_discord_mission_image
 from ptn.missionalertbot.modules.MissionCleaner import remove_carrier_channel
 from ptn.missionalertbot.modules.TextGen import txt_create_discord, txt_create_reddit_body, txt_create_reddit_title
@@ -1119,8 +1119,12 @@ async def gen_mission(interaction: discord.Interaction, mission_params):
         if submit_mission:
             await mission_add(mission_params)
             await mission_generation_complete(interaction, mission_params)
-        cleanup_temp_image_file(mission_params.discord_img_name)
-        cleanup_temp_image_file(mission_params.reddit_img_name)
+        try:
+            print("Calling cleanup for temp files")
+            cleanup_temp_image_file(mission_params.discord_img_name)
+            cleanup_temp_image_file(mission_params.reddit_img_name)
+        except Exception as e:
+            print(e)
 
         print("Reached end of mission generator")
         return
@@ -1160,13 +1164,15 @@ async def gen_mission(interaction: discord.Interaction, mission_params):
 
         try:
             print("Releasing channel lock...")
-            await unlock_mission_channel(mission_temp_channel.name)
-            print("Channel lock released")
-            embed = discord.Embed(
-                description=f"🔓 Released lock for `{mission_temp_channel.name}` (<#{mission_temp_channel.id}>)",
-                color=constants.EMBED_COLOUR_OK
-            )
-            await spamchannel.send(embed=embed)
+            locked = check_mission_channel_lock(mission_params.carrier_data.discord_channel)
+            if locked:
+                await unlock_mission_channel(mission_temp_channel.name)
+                print("Channel lock released")
+                embed = discord.Embed(
+                    description=f"🔓 Released lock for `{mission_temp_channel.name}` (<#{mission_temp_channel.id}>) because of error in mission generation.",
+                    color=constants.EMBED_COLOUR_OK
+                )
+                await spamchannel.send(embed=embed)
         except Exception as e:
             print(e)
         if mission_params.mission_temp_channel_id:
@@ -1318,13 +1324,15 @@ async def mission_add(mission_params):
 
     # now we can release the channel lock
     try:
-        await unlock_mission_channel(mission_params.carrier_data.discord_channel)
-        print("Channel lock released")
-        embed = discord.Embed(
-            description=f"🔓 Released lock for `{mission_params.carrier_data.discord_channel}`",
-            color=constants.EMBED_COLOUR_OK
-        )
-        await spamchannel.send(embed=embed)
+        locked = check_mission_channel_lock(mission_params.carrier_data.discord_channel)
+        if locked: # this SHOULD be locked at this point, but we'll still check
+            await unlock_mission_channel(mission_params.carrier_data.discord_channel)
+            print("Channel lock released")
+            embed = discord.Embed(
+                description=f"🔓 Released lock for `{mission_params.carrier_data.discord_channel}`",
+                color=constants.EMBED_COLOUR_OK
+            )
+            await spamchannel.send(embed=embed)
     except Exception as e:
         embed = discord.Embed(
             description=f"❌ Could not release lock for `{mission_params.carrier_data.discord_channel}`: {e}",
@@ -1340,13 +1348,15 @@ async def mission_generation_complete(interaction: discord.Interaction, mission_
 
     try:
         print("Making absolutely sure channel lock isn't engaged")
-        await unlock_mission_channel(mission_params.carrier_data.discord_channel)
-        embed = discord.Embed(
-            description=f"🔓 Released lock for `{mission_params.carrier_data.discord_channel}`",
-            color=constants.EMBED_COLOUR_OK
-        )
-        spamchannel = bot.get_channel(bot_spam_channel())
-        await spamchannel.send(embed=embed)
+        locked = check_mission_channel_lock(mission_params.carrier_data.discord_channel)
+        if locked:
+            await unlock_mission_channel(mission_params.carrier_data.discord_channel)
+            embed = discord.Embed(
+                description=f"🔓 Released lock for `{mission_params.carrier_data.discord_channel}`",
+                color=constants.EMBED_COLOUR_OK
+            )
+            spamchannel = bot.get_channel(bot_spam_channel())
+            await spamchannel.send(embed=embed)
     finally:
         # nothing to do here, lock should already be disengaged
         pass
