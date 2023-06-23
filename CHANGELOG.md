@@ -1,6 +1,14 @@
 # Changelog
 
-## 2.1.5
+## 2.2
+
+New commands:
+- [#473](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/473) App command `Toggle Event Organiser` to grant Verified Member role, usably by Community Mentors, Mods, and Admins.
+- [#475](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/475) App command `Verify Member` to grant or remove Event Organiser role, usably by Community Mentors, Mods, and Admins.
+- [#474](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/474) App command `Make CCO Trainee` to grant or remove the CCO Trainee role, usable by CCO Mentors, Mods, and Admins.
+- [#474](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/474) App command `Make Full CCO` to grant the Certified Carrier and P.T.N. Fleet Reserve roles, usable by CCO Mentors, Mods, and Admins.
+
+Other changes:
 
 - [#529](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/529) EDMC OFF text above channel alert is now an image
  - random shh/secret/ninja gifs used in embed in place of previous superhero images

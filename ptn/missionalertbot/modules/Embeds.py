@@ -16,6 +16,7 @@ import ptn.missionalertbot.classes.CarrierData as CarrierData
 
 # import local constants
 import ptn.missionalertbot.constants as constants
+from ptn.missionalertbot.constants import ptn_logo_discord
 
 #import local modules
 from ptn.missionalertbot.database.database import find_mission
@@ -138,4 +139,77 @@ def _add_common_embed_fields(embed, carrier_data, ctx_interaction):
     embed.add_field(name="Market Data", value=f"`;stock {carrier_data.carrier_short_name}`", inline=True)
     embed.add_field(name="Last Trade", value=f"<t:{carrier_data.lasttrade}> (<t:{carrier_data.lasttrade}:R>)", inline=True)
     # shortname is not relevant to users and will be auto-generated in future
+    return embed
+
+# embed to notify someone they've been made a Verified Member
+def verified_member_embed(message):
+    desc = f"""
+    Your screenshot featuring you at an official PTN Fleet Carrier {message.jump_url} has been accepted and you are now a **Verified Member** on the PTN Discord. o7 CMDR!
+    """
+    embed = discord.Embed (
+        title="Pilots Trade Network - Verified Member Granted",
+        description=desc,
+        color=constants.EMBED_COLOUR_OK
+    )
+    embed.set_thumbnail(url=ptn_logo_discord())
+
+    return embed
+
+# embed to notify someone they've been made an Event Organiser
+def event_organiser_embed():
+    desc = f"""
+    You've been given the **Event Organiser** role on the PTN Discord. This is a temporary role that allows access to the <#1023295746692350012> channel where our Community Team can help you plan, organise, and put on an event on the PTN Discord. o7 CMDR!
+    """
+    embed = discord.Embed (
+        title="Pilots Trade Network - Event Organiser Role",
+        description=desc,
+        color=constants.EMBED_COLOUR_OK
+    )
+    embed.set_thumbnail(url=ptn_logo_discord())
+
+    return embed
+
+# embed to feedback that a user was granted a role
+def role_granted_embed(user, role):
+    desc = f"""
+    ✅ Gave <@{user.id}> the <@&{role.id}> role.
+    """
+    embed = discord.Embed (
+        description=desc,
+        color=constants.EMBED_COLOUR_OK
+    )
+
+    return embed
+
+# embed to feedback that a user already has the target role
+def role_already_embed(user, role):
+    desc = f"""
+    ✅ <@{user.id}> already has the <@&{role.id}> role.
+    """
+    embed = discord.Embed (
+        description=desc,
+        color=constants.EMBED_COLOUR_OK
+    )
+
+    return embed
+
+# embed to ask a command user whether they want to remove the role from a target user
+def confirm_remove_role_embed(user, role):
+    embed = discord.Embed(
+        description=f":warning: <@{user.id}> already has the <@&{role.id}> role. Do you want to remove it?",
+        color=constants.EMBED_COLOUR_QU
+    )
+
+    return embed
+
+# embed to feedback that a user had a role removed
+def role_removed_embed(user, role):
+    desc = f"""
+    ✅ Removed the <@&{role.id}> role from <@{user.id}>.
+    """
+    embed = discord.Embed (
+        description=desc,
+        color=constants.EMBED_COLOUR_OK
+    )
+
     return embed
