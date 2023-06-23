@@ -16,7 +16,7 @@ from discord.ext.commands import GroupCog
 # import local constants
 import ptn.missionalertbot.constants as constants
 from ptn.missionalertbot.constants import bot, mission_command_channel, certcarrier_role, trainee_role, seconds_long, rescarrier_role, commodities_common, bot_spam_channel, \
-    training_mission_command_channel, seconds_very_short, admin_role, mod_role, cco_mentor_role, aco_role
+    training_mission_command_channel, seconds_very_short, admin_role, mod_role, cco_mentor_role, aco_role, recruit_role
 
 # import local classes
 from ptn.missionalertbot.classes.MissionParams import MissionParams
@@ -98,6 +98,7 @@ async def toggle_cco(interaction:  discord.Interaction, member: discord.Member):
     reserve_role = discord.utils.get(interaction.guild.roles, id=rescarrier_role())
     aco_role_object = discord.utils.get(interaction.guild.roles, id=aco_role())
     trainee_role_object = discord.utils.get(interaction.guild.roles, id=trainee_role())
+    recruit_role_object = discord.utils.get(interaction.guild.roles, id=recruit_role())
     role = True if cco_role in member_roles else False # only checking for CCO role
 
     if not role: # check whether they have the role already
@@ -105,7 +106,7 @@ async def toggle_cco(interaction:  discord.Interaction, member: discord.Member):
 
         try:
             roles = [cco_role, reserve_role]
-            remove_roles = [aco_role_object, trainee_role_object]
+            remove_roles = [aco_role_object, trainee_role_object, recruit_role_object]
             view = ConfirmGrantRoleView(member, roles, remove_roles)
 
             embed = confirm_grant_role_embed(member, cco_role)
