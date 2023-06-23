@@ -91,6 +91,7 @@ PROD_RESCARRIER_ROLE = 929985255903998002 # Fleet Reserve Carrier role on live s
 PROD_ACO_ROLE = 867811399195426837 # ACO role on live
 PROD_CCO_MENTOR_ROLE = 906224455892738109 # CCO Mentor role on test server
 PROD_TRAINEE_ROLE = 800439864797167637 # CCO Trainee role on live server
+PROD_RECRUIT_ROLE = 800681823575343116 # CCO Recruit role
 PROD_CPILLAR_ROLE = 863789660425027624 # Community Pillar role on live server
 PROD_DEV_ROLE = 812988180210909214 # Developer role ID on live
 PROD_MOD_ROLE = 813814494563401780 # Mod role ID on Live
@@ -142,6 +143,7 @@ TEST_RESCARRIER_ROLE = 947520552766152744 # Fleet Reserve Carrier role on test s
 TEST_ACO_ROLE = 903289778680770590 # ACO role on test server
 TEST_CCO_MENTOR_ROLE = 1121883414694473728 # CCO Mentor role on test server
 TEST_TRAINEE_ROLE = 1048912218344923187 # CCO Trainee role on test server
+TEST_RECRUIT_ROLE = 1121916871088803871 # CCO Recruit role
 TEST_CPILLAR_ROLE = 903289927184314388 # Community Pillar role on test server
 TEST_DEV_ROLE = 1048913812163678278 # Dev role ID on test
 TEST_VERIFIED_ROLE = 903289848427851847 # Verified Member
@@ -390,6 +392,9 @@ def cco_mentor_role():
 
 def trainee_role():
   return PROD_TRAINEE_ROLE if _production else TEST_TRAINEE_ROLE
+
+def recruit_role():
+  return PROD_RECRUIT_ROLE if _production else TEST_RECRUIT_ROLE
 
 def cpillar_role():
   return PROD_CPILLAR_ROLE if _production else TEST_CPILLAR_ROLE
