@@ -49,6 +49,8 @@ Event Organiser
 async def verify_member(interaction:  discord.Interaction, message: discord.Message):
     print(f"verify_member called by {interaction.user.display_name} for {message.author.display_name}")
 
+    spamchannel = bot.get_channel(bot_spam_channel())
+
     member = message.author
     member_roles = member.roles
     vm_role = discord.utils.get(interaction.guild.roles, id=verified_role())
@@ -65,8 +67,9 @@ async def verify_member(interaction:  discord.Interaction, message: discord.Mess
             await message.add_reaction(fc_complete_reaction)
             
             # feed back to the command user
-            embed = role_granted_embed(member, vm_role)
+            embed, bot_spam_embed = role_granted_embed(interaction, member, vm_role)
             await interaction.response.send_message(embed=embed, ephemeral=True)
+            await spamchannel.send(embed=bot_spam_embed)
 
             # dm the target user
             print("Notifying target user")
@@ -88,9 +91,10 @@ async def verify_member(interaction:  discord.Interaction, message: discord.Mess
 
 @bot.tree.context_menu(name='Toggle Event Organiser')
 @check_roles([cmentor_role(), admin_role(), mod_role()])
-@check_command_channel(roleapps_channel())
 async def toggle_event_organiser(interaction:  discord.Interaction, member: discord.Member):
     print(f"toggle_event_organiser called by {interaction.user.display_name} for {member.display_name}")
+
+    spamchannel = bot.get_channel(bot_spam_channel())
 
     member_roles = member.roles
     eo_role = discord.utils.get(interaction.guild.roles, id=event_organiser_role())
@@ -104,8 +108,9 @@ async def toggle_event_organiser(interaction:  discord.Interaction, member: disc
             await member.add_roles(eo_role)
          
             # feed back to the command user
-            embed = role_granted_embed(member, eo_role)
+            embed, bot_spam_embed = role_granted_embed(interaction, member, eo_role)
             await interaction.response.send_message(embed=embed, ephemeral=True)
+            await spamchannel.send(embed=bot_spam_embed)
 
             # dm the target user
             print("Notifying target user")
