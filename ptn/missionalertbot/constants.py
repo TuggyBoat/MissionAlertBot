@@ -211,10 +211,29 @@ hello_gifs = [
 ]
 
 error_gifs = [
-    'https://tenor.com/view/beaker-fire-shit-omg-disaster-gif-4767835',
-    'https://tenor.com/view/nothingtosee-disperse-casual-explosion-gif-4545906',
-    'https://tenor.com/view/spongebob-patrick-panic-run-scream-gif-4656335',
-    'https://tenor.com/view/angry-panda-rage-mad-gif-11780191'
+    'https://media.tenor.com/-DSYvCR3HnYAAAAC/beaker-fire.gif', # muppets
+    'https://media.tenor.com/M1rOzWS3NsQAAAAC/nothingtosee-disperse.gif', # naked gun
+    'https://media.tenor.com/oSASxe-6GesAAAAC/spongebob-patrick.gif', # spongebob
+    'https://media.tenor.com/u-1jz7ttHhEAAAAC/angry-panda-rage.gif' # panda smash
+]
+
+shush_gifs = [
+    'https://media.tenor.com/W-42HlChzwAAAAAC/rainn-wilson.gif', # dwight office
+    'https://media.tenor.com/wRdB0HFymEYAAAAC/shh-shhh.gif', # abc family
+    'https://media.tenor.com/5x934L_nVKEAAAAC/monsters-inc-shhh.gif', # monsters inc
+    'https://media.tenor.com/wdI0GN3wOEcAAAAC/jklsouth-jkltelugu.gif', # indian trio
+    'https://media.tenor.com/crSLO3cPdtMAAAAC/shh-shush.gif', # loki
+    'https://media.tenor.com/pPxnm115AAcAAAAC/shhh-shush.gif', # the hangover
+    # 'https://media.tenor.com/41m2U3C8u5IAAAAC/shush-quiet.gif', # idk
+    'https://media.tenor.com/xenQex5uNuUAAAAC/shh-shush.gif', # ironman
+    'https://media.tenor.com/Ujw5zAgQil8AAAAC/shush.gif', # rachel mcadams
+    'https://media.tenor.com/JYqjuG9NVDIAAAAC/bravo-six-going-dark-cod.gif', # bravo six going dark
+    'https://media.tenor.com/XxycW4o-hjUAAAAC/aviation-ninja-blue-ninja.gif', # ninja running
+    'https://media.tenor.com/0D6zx8tIJH0AAAAC/ninjaa.gif', # ninja on beach
+    'https://media.tenor.com/BxBXA_6u-PQAAAAC/lotr-keep-it-safe.gif', # LOTR secret safe
+    'https://media.tenor.com/AShI_mNZvtEAAAAC/dont-worry-i-wont-tell-anyone-david-rose.gif', # schitts creek david
+    # 'https://media.tenor.com/rZKq9TvhJP0AAAAC/classified-information-top-secret.gif', # classified top secret
+    'https://media.tenor.com/PgAtcM06qBQAAAAC/secret-lover.gif' # it's our secret wink
 ]
 
 current_month = strftime('%B')
@@ -255,6 +274,8 @@ ICON_FC_UNLOADING = 'https://pilotstradenetwork.com/wp-content/uploads/2023/06/f
 ICON_EDMC_OFF = 'https://pilotstradenetwork.com/wp-content/uploads/2023/06/edmc_off_2.jpg'
 ICON_FC_COMPLETE = 'https://pilotstradenetwork.com/wp-content/uploads/2023/05/fc_complete.png'
 ICON_FC_EMPTY = 'https://pilotstradenetwork.com/wp-content/uploads/2023/06/fc_empty.png'
+EMOJI_SHUSH = 'https://pilotstradenetwork.com/wp-content/uploads/2023/06/shush.png'
+BANNER_EDMC_OFF = os.path.join(EDMC_OFF_PATH, 'channel-edmc-off-banner-orange.png')
 
 
 # discord direct invite URL
