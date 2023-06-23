@@ -143,6 +143,7 @@ def _add_common_embed_fields(embed, carrier_data, ctx_interaction):
 
 # embed to notify someone they've been made a Verified Member
 def verified_member_embed(message):
+    print("Called verified_member_embed")
     desc = f"""
     Your screenshot featuring you at an official PTN Fleet Carrier {message.jump_url} has been accepted and you are now a **Verified Member** on the PTN Discord. o7 CMDR!
     """
@@ -157,6 +158,7 @@ def verified_member_embed(message):
 
 # embed to notify someone they've been made an Event Organiser
 def event_organiser_embed():
+    print("Called event_organiser_embed")
     desc = f"""
     You've been given the **Event Organiser** role on the PTN Discord. This is a temporary role that allows access to the <#1023295746692350012> channel where our Community Team can help you plan, organise, and put on an event on the PTN Discord. o7 CMDR!
     """
@@ -170,7 +172,8 @@ def event_organiser_embed():
     return embed
 
 # embed to feedback that a user was granted a role
-def role_granted_embed(user, role):
+def role_granted_embed(interaction, user, role):
+    print("Called role_granted_embed")
     desc = f"""
     ✅ Gave <@{user.id}> the <@&{role.id}> role.
     """
@@ -179,10 +182,22 @@ def role_granted_embed(user, role):
         color=constants.EMBED_COLOUR_OK
     )
 
-    return embed
+    try:
+        command_name = f" using `{interaction.command.name}`"
+    except:
+        command_name = ""
+
+    desc = f"<@{interaction.user.id}> gave the <@&{role.id}> role to <@{user.id}>" + command_name
+    bot_spam_embed = discord.Embed (
+        description=desc,
+        color=constants.EMBED_COLOUR_OK
+    )
+
+    return embed, bot_spam_embed
 
 # embed to feedback that a user already has the target role
 def role_already_embed(user, role):
+    print("Called role_already_embed")
     desc = f"""
     ✅ <@{user.id}> already has the <@&{role.id}> role.
     """
@@ -195,6 +210,7 @@ def role_already_embed(user, role):
 
 # embed to ask a command user whether they want to remove the role from a target user
 def confirm_remove_role_embed(user, role):
+    print("Called confirm_remove_role_embed")
     embed = discord.Embed(
         description=f":warning: <@{user.id}> already has the <@&{role.id}> role. Do you want to remove it?",
         color=constants.EMBED_COLOUR_QU
@@ -202,8 +218,19 @@ def confirm_remove_role_embed(user, role):
 
     return embed
 
+# embed to ask a command user whether they want to remove the role from a target user
+def confirm_grant_role_embed(user, role):
+    print("Called confirm_grant_role_embed")
+    embed = discord.Embed(
+        description=f":warning: Are you sure you want to give <@{user.id}> the <@&{role.id}> role?",
+        color=constants.EMBED_COLOUR_QU
+    )
+
+    return embed
+
 # embed to feedback that a user had a role removed
-def role_removed_embed(user, role):
+def role_removed_embed(interaction, user, role):
+    print("Called role_removed_embed")
     desc = f"""
     ✅ Removed the <@&{role.id}> role from <@{user.id}>.
     """
@@ -212,4 +239,16 @@ def role_removed_embed(user, role):
         color=constants.EMBED_COLOUR_OK
     )
 
-    return embed
+    try:
+        command_name = f" using `{interaction.command.name}`"
+    except:
+        command_name = ""
+
+    desc = f"<@{interaction.user.id}> removed the <@&{role.id}> role from <@{user.id}>" + command_name
+
+    bot_spam_embed = discord.Embed (
+        description=desc,
+        color=constants.EMBED_COLOUR_OK
+    )
+
+    return embed, bot_spam_embed
