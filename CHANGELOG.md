@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.1.5
+
+- [#529](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/529) EDMC OFF text above channel alert is now an image
+ - random shh/secret/ninja gifs used in embed in place of previous superhero images
+
+
 ## 2.1.4
 
 - [#521](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/521) `Pads` parameter will be vastly more forgiving of acceptable input (`/cco load`, `/cco unload`, `/cco edit`)
