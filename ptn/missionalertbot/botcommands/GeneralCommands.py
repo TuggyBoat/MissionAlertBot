@@ -71,13 +71,15 @@ cron_status - admin
 ping - admin
 /greet - elevated roles
 stopquit - admin
-unlock_override - admin/missions
+/admin_delete_mission - admin/missions
+/admin_release_channel_lock - admin/missions
+/admin_acquire_channel_lock - admin/missions
 
 GENERAL - USER-FACING
 ission - mission
 issions - mission
-complete - mission
-/mission - mission
+/mission complete - mission
+/mission information - mission
 /missions - mission
 /nominate - general/community
 /nominate_remove - general/community

@@ -20,9 +20,104 @@ from ptn.missionalertbot.constants import seconds_long, o7_emoji, bot_spam_chann
 # import local modules
 from ptn.missionalertbot.database.database import delete_nominee_from_db, delete_carrier_from_db, _update_carrier_details_in_database, find_carrier, CarrierDbFields, mission_db, missions_conn
 from ptn.missionalertbot.modules.DateString import get_mission_delete_hammertime
-from ptn.missionalertbot.modules.Embeds import _configure_all_carrier_detail_embed, _generate_cc_notice_embed
-from ptn.missionalertbot.modules.helpers import _remove_cc_manager
+from ptn.missionalertbot.modules.Embeds import _configure_all_carrier_detail_embed, _generate_cc_notice_embed, role_removed_embed
+from ptn.missionalertbot.modules.helpers import _remove_cc_manager, GenericError, on_generic_error
 from ptn.missionalertbot.modules.MissionCleaner import _cleanup_completed_mission
+
+
+# buttons for confirm role add
+class ConfirmGrantRoleView(View):
+    def __init__(self, member: discord.Member, roles, timeout=30):
+        self.member = member
+        self.role = roles
+        super().__init__(timeout=timeout)
+
+    @discord.ui.button(label="Grant", style=discord.ButtonStyle.success, emoji="✅", custom_id="grant")
+    async def grant_role_button(self, interaction, button):
+        print(f"{interaction.user.name} confirms grant {self.role.name} role")
+        try:
+            embeds = []
+            await self.member.add_roles(*[self.roles])
+            for role in self.roles:
+                embed = role_removed_embed(self.member, role)
+                embeds.append[embed]
+            await interaction.response.edit_message(embeds=embeds, view=None)
+        except Exception as e:
+            try:
+                raise GenericError(e)
+            except Exception as e:
+                await on_generic_error(interaction, e)
+
+    @discord.ui.button(label="Cancel", style=discord.ButtonStyle.secondary, emoji="✖", custom_id="cancel")
+    async def cancel_grant_role_button(self, interaction, button):
+        print(f"{interaction.user.name} cancelled grant {self.role.name} role")
+        embed = discord.Embed(
+            description="Cancelled.",
+            color=constants.EMBED_COLOUR_OK
+        )
+        return await interaction.response.edit_message(embed=embed, view=None)
+
+
+    async def on_timeout(self):
+        # return a message to the user that the interaction has timed out
+        timeout_embed = discord.Embed(
+            description="Timed out.",
+            color=constants.EMBED_COLOUR_ERROR
+        )
+
+        # remove buttons
+        self.clear_items()
+
+        try:
+            await self.message.edit(embed=timeout_embed, view=self)
+        except Exception as e:
+            print(e)
+
+
+# buttons for confirm role removal
+class ConfirmRemoveRoleView(View):
+    def __init__(self, member: discord.Member, role, timeout=30):
+        self.member = member
+        self.role = role
+        super().__init__(timeout=timeout)
+
+    @discord.ui.button(label="Remove", style=discord.ButtonStyle.danger, emoji="💥", custom_id="remove")
+    async def remove_role_button(self, interaction, button):
+        print(f"{interaction.user.name} confirms remove {self.role.name} role")
+        try:
+            await self.member.remove_roles(self.role)
+            embed = role_removed_embed(self.member, self.role)
+            await interaction.response.edit_message(embed=embed, view=None)
+        except Exception as e:
+            try:
+                raise GenericError(e)
+            except Exception as e:
+                await on_generic_error(interaction, e)
+
+    @discord.ui.button(label="Cancel", style=discord.ButtonStyle.secondary, emoji="✖", custom_id="cancel")
+    async def cancel_remove_role_button(self, interaction, button):
+        print(f"{interaction.user.name} cancelled remove {self.role.name} role")
+        embed = discord.Embed(
+            description="Cancelled.",
+            color=constants.EMBED_COLOUR_OK
+        )
+        return await interaction.response.edit_message(embed=embed, view=None)
+
+
+    async def on_timeout(self):
+        # return a message to the user that the interaction has timed out
+        timeout_embed = discord.Embed(
+            description="Timed out.",
+            color=constants.EMBED_COLOUR_ERROR
+        )
+
+        # remove buttons
+        self.clear_items()
+
+        try:
+            await self.message.edit(embed=timeout_embed, view=self)
+        except Exception as e:
+            print(e)
 
 
 # buttons for mission manual delete

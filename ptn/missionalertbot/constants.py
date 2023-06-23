@@ -76,8 +76,10 @@ PROD_BOT_COMMAND_CHANNEL = 802523724674891826   # Bot backend commands are locke
 PROD_CTEAM_BOT_CHANNEL = 895083178761547806 # bot command channel for cteam only
 PROD_BOT_SPAM_CHANNEL = 801258393205604372 # Certain bot logging messages go here
 PROD_DEV_CHANNEL = 827656814911815702 # Development channel for MAB on live
+PROD_ROLEAPPS_CHANNEL = 867820665515147293 # role-applications on the live server
 PROD_UPVOTE_EMOJI = 828287733227192403 # upvote emoji on live server
 PROD_O7_EMOJI = 806138784294371368 # o7 emoji on live server
+PROD_FC_COMPLETE_EMOJI = 878216234653605968 # fc_complete emoji
 PROD_HAULER_ROLE = 875313960834965544 # hauler role ID on live server
 PROD_WINELOADER_ROLE = 881809680765165578 # wine loader role on live
 PROD_CC_ROLE = 869340261057196072 # CC role on live server
@@ -86,10 +88,13 @@ PROD_ADMIN_ROLE = 800091021852803072 # MAB Bot Admin role on live server (curren
 PROD_CMENTOR_ROLE = 863521103434350613 # Community Mentor role on live server
 PROD_CERTCARRIER_ROLE = 800091463160430654 # Certified Carrier role on live server
 PROD_RESCARRIER_ROLE = 929985255903998002 # Fleet Reserve Carrier role on live server
+PROD_CCO_MENTOR_ROLE = 906224455892738109 # CCO Mentor role on test server
 PROD_TRAINEE_ROLE = 800439864797167637 # CCO Trainee role on live server
 PROD_CPILLAR_ROLE = 863789660425027624 # Community Pillar role on live server
 PROD_DEV_ROLE = 812988180210909214 # Developer role ID on live
 PROD_MOD_ROLE = 813814494563401780 # Mod role ID on Live
+PROD_VERIFIED_ROLE = 867820916331118622 # Verified Member
+PROD_EVENT_ORGANISER_ROLE = 1023296182639939594 # Event Organiser
 PROD_TRADE_CAT = 801558838414409738 # Trade Carrier category on live server
 PROD_ARCHIVE_CAT = 1048957416781393970 # Archive category on live server
 PROD_SECONDS_VERY_SHORT = 10 # time between channel deletion trigger and actual deletion (10)
@@ -120,8 +125,10 @@ TEST_BOT_COMMAND_CHANNEL = 842152343441375283   # Bot backend commands are locke
 TEST_CTEAM_BOT_CHANNEL = 842152343441375283 # bot command channel for cteam only
 TEST_BOT_SPAM_CHANNEL = 842525081858867211 # Bot logging messages on the test server
 TEST_DEV_CHANNEL = 1063765215457583164 # Development channel for MAB on test
+TEST_ROLEAPPS_CHANNEL = 1121736676247609394 # role-applications on the test server
 TEST_UPVOTE_EMOJI = 849388681382068225 # upvote emoji on test server
 TEST_O7_EMOJI = 903744117144698950 # o7 emoji on test server
+TEST_FC_COMPLETE_EMOJI = 884673510067286076 # fc_complete emoji
 TEST_HAULER_ROLE = 875439909102575647 # hauler role ID on test server
 TEST_WINELOADER_ROLE = 1119189364522623068 # wine loader role on test
 TEST_CC_ROLE = 877220476827619399 # CC role on test server
@@ -131,9 +138,12 @@ TEST_MOD_ROLE = 903292469049974845 # Mod role on test server
 TEST_CMENTOR_ROLE = 877586763672072193 # Community Mentor role on test server
 TEST_CERTCARRIER_ROLE = 822999970012463154 # Certified Carrier role on test server
 TEST_RESCARRIER_ROLE = 947520552766152744 # Fleet Reserve Carrier role on test server
+TEST_CCO_MENTOR_ROLE = 1121883414694473728 # CCO Mentor role on test server
 TEST_TRAINEE_ROLE = 1048912218344923187 # CCO Trainee role on test server
 TEST_CPILLAR_ROLE = 903289927184314388 # Community Pillar role on test server
 TEST_DEV_ROLE = 1048913812163678278 # Dev role ID on test
+TEST_VERIFIED_ROLE = 903289848427851847 # Verified Member
+TEST_EVENT_ORGANISER_ROLE = 1121748430650355822 # Event Organiser
 TEST_TRADE_CAT = 876569219259580436 # Trade Carrier category on live server
 TEST_ARCHIVE_CAT = 877244591579992144 # Archive category on live server
 TEST_SECONDS_VERY_SHORT = 10 # time between channel deletion trigger and actual deletion
@@ -211,10 +221,29 @@ hello_gifs = [
 ]
 
 error_gifs = [
-    'https://tenor.com/view/beaker-fire-shit-omg-disaster-gif-4767835',
-    'https://tenor.com/view/nothingtosee-disperse-casual-explosion-gif-4545906',
-    'https://tenor.com/view/spongebob-patrick-panic-run-scream-gif-4656335',
-    'https://tenor.com/view/angry-panda-rage-mad-gif-11780191'
+    'https://media.tenor.com/-DSYvCR3HnYAAAAC/beaker-fire.gif', # muppets
+    'https://media.tenor.com/M1rOzWS3NsQAAAAC/nothingtosee-disperse.gif', # naked gun
+    'https://media.tenor.com/oSASxe-6GesAAAAC/spongebob-patrick.gif', # spongebob
+    'https://media.tenor.com/u-1jz7ttHhEAAAAC/angry-panda-rage.gif' # panda smash
+]
+
+shush_gifs = [
+    'https://media.tenor.com/W-42HlChzwAAAAAC/rainn-wilson.gif', # dwight office
+    'https://media.tenor.com/wRdB0HFymEYAAAAC/shh-shhh.gif', # abc family
+    'https://media.tenor.com/5x934L_nVKEAAAAC/monsters-inc-shhh.gif', # monsters inc
+    'https://media.tenor.com/wdI0GN3wOEcAAAAC/jklsouth-jkltelugu.gif', # indian trio
+    'https://media.tenor.com/crSLO3cPdtMAAAAC/shh-shush.gif', # loki
+    'https://media.tenor.com/pPxnm115AAcAAAAC/shhh-shush.gif', # the hangover
+    # 'https://media.tenor.com/41m2U3C8u5IAAAAC/shush-quiet.gif', # idk
+    'https://media.tenor.com/xenQex5uNuUAAAAC/shh-shush.gif', # ironman
+    'https://media.tenor.com/Ujw5zAgQil8AAAAC/shush.gif', # rachel mcadams
+    'https://media.tenor.com/JYqjuG9NVDIAAAAC/bravo-six-going-dark-cod.gif', # bravo six going dark
+    'https://media.tenor.com/XxycW4o-hjUAAAAC/aviation-ninja-blue-ninja.gif', # ninja running
+    'https://media.tenor.com/0D6zx8tIJH0AAAAC/ninjaa.gif', # ninja on beach
+    'https://media.tenor.com/BxBXA_6u-PQAAAAC/lotr-keep-it-safe.gif', # LOTR secret safe
+    'https://media.tenor.com/AShI_mNZvtEAAAAC/dont-worry-i-wont-tell-anyone-david-rose.gif', # schitts creek david
+    # 'https://media.tenor.com/rZKq9TvhJP0AAAAC/classified-information-top-secret.gif', # classified top secret
+    'https://media.tenor.com/PgAtcM06qBQAAAAC/secret-lover.gif' # it's our secret wink
 ]
 
 current_month = strftime('%B')
@@ -255,6 +284,8 @@ ICON_FC_UNLOADING = 'https://pilotstradenetwork.com/wp-content/uploads/2023/06/f
 ICON_EDMC_OFF = 'https://pilotstradenetwork.com/wp-content/uploads/2023/06/edmc_off_2.jpg'
 ICON_FC_COMPLETE = 'https://pilotstradenetwork.com/wp-content/uploads/2023/05/fc_complete.png'
 ICON_FC_EMPTY = 'https://pilotstradenetwork.com/wp-content/uploads/2023/06/fc_empty.png'
+EMOJI_SHUSH = 'https://pilotstradenetwork.com/wp-content/uploads/2023/06/shush.png'
+BANNER_EDMC_OFF = os.path.join(EDMC_OFF_PATH, 'channel-edmc-off-banner-orange.png')
 
 
 # discord direct invite URL
@@ -310,11 +341,17 @@ def bot_spam_channel():
 def bot_dev_channel():
   return PROD_DEV_CHANNEL if _production else TEST_DEV_CHANNEL
 
+def roleapps_channel():
+  return PROD_ROLEAPPS_CHANNEL if _production else TEST_ROLEAPPS_CHANNEL
+
 def upvote_emoji():
   return PROD_UPVOTE_EMOJI if _production else TEST_UPVOTE_EMOJI
 
 def o7_emoji():
   return PROD_O7_EMOJI if _production else TEST_O7_EMOJI
+
+def fc_complete_emoji():
+  return PROD_FC_COMPLETE_EMOJI if _production else TEST_FC_COMPLETE_EMOJI
 
 def hauler_role():
   return PROD_HAULER_ROLE if _production else TEST_HAULER_ROLE
@@ -343,6 +380,9 @@ def certcarrier_role():
 def rescarrier_role():
   return PROD_RESCARRIER_ROLE if _production else TEST_RESCARRIER_ROLE
 
+def cco_mentor_role():
+  return PROD_CCO_MENTOR_ROLE if _production else TEST_CCO_MENTOR_ROLE
+
 def trainee_role():
   return PROD_TRAINEE_ROLE if _production else TEST_TRAINEE_ROLE
 
@@ -351,6 +391,12 @@ def cpillar_role():
 
 def dev_role():
   return PROD_DEV_ROLE if _production else TEST_DEV_ROLE
+
+def verified_role():
+  return PROD_VERIFIED_ROLE if _production else TEST_VERIFIED_ROLE
+
+def event_organiser_role():
+  return PROD_EVENT_ORGANISER_ROLE if _production else TEST_EVENT_ORGANISER_ROLE
 
 def trade_cat():
   return PROD_TRADE_CAT if _production else TEST_TRADE_CAT

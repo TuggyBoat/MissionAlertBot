@@ -15,17 +15,20 @@ from discord.ui import View, Button
 
 # import local classes
 from ptn.missionalertbot.classes.CommunityCarrierData import CommunityCarrierData
-from ptn.missionalertbot.classes.Views import RemoveCCView, SendNoticeModal
+from ptn.missionalertbot.classes.Views import RemoveCCView, SendNoticeModal, ConfirmRemoveRoleView
 
 # import local constants
 import ptn.missionalertbot.constants as constants
-from ptn.missionalertbot.constants import bot, cmentor_role, admin_role, cc_role, cc_cat, archive_cat, bot_spam_channel, cpillar_role, mod_role
+from ptn.missionalertbot.constants import bot, cmentor_role, admin_role, cc_role, cc_cat, archive_cat, bot_spam_channel, cpillar_role, mod_role, \
+    roleapps_channel, verified_role, fc_complete_emoji, event_organiser_role
 
 # import local modules
 from ptn.missionalertbot.database.database import carrier_db
 from ptn.missionalertbot.modules.helpers import on_app_command_error, check_roles, _regex_alphanumeric_with_hyphens, _cc_owner_check, _cc_role_create_check, \
-    _cc_create_channel, _cc_role_create, _cc_assign_permissions, _cc_db_enter, _remove_cc_role_from_owner, _cc_role_delete, _openclose_community_channel, _send_notice_channel_check
-from ptn.missionalertbot.modules.Embeds import _generate_cc_notice_embed
+    _cc_create_channel, _cc_role_create, _cc_assign_permissions, _cc_db_enter, _remove_cc_role_from_owner, _cc_role_delete, _openclose_community_channel, _send_notice_channel_check, \
+    check_command_channel, GenericError, on_generic_error
+from ptn.missionalertbot.modules.Embeds import _generate_cc_notice_embed, verified_member_embed, event_organiser_embed, role_granted_embed, role_already_embed, \
+    confirm_remove_role_embed
 
 
 """
@@ -36,9 +39,96 @@ Uses bot.tree instead of app_commands
 Send CC Notice
 Edit CC Notice
 Upload CC Thumb
+Verify Member
+Event Organiser
 """
 
-# send_notice app command - alternative to above, just noms a message like adroomba but via right click
+@bot.tree.context_menu(name='Verify Member')
+@check_roles([cmentor_role(), admin_role(), mod_role()])
+@check_command_channel(roleapps_channel())
+async def verify_member(interaction:  discord.Interaction, message: discord.Message):
+    print(f"verify_member called by {interaction.user.display_name} for {message.author.display_name}")
+
+    member = message.author
+    member_roles = member.roles
+    vm_role = discord.utils.get(interaction.guild.roles, id=verified_role())
+    role = True if vm_role in member_roles else False
+
+    if not role: # check whether they have the role already
+        print("Member does not already have role")
+
+        try:
+            print(f"Giving {vm_role.name} role to {member.name}")
+            await member.add_roles(vm_role)
+
+            fc_complete_reaction = f"<:fc_complete:{fc_complete_emoji()}>"
+            await message.add_reaction(fc_complete_reaction)
+            
+            # feed back to the command user
+            embed = role_granted_embed(member, vm_role)
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+
+            # dm the target user
+            print("Notifying target user")
+            embed = verified_member_embed(message)
+            await member.send(embed=embed)
+
+        except Exception as e:
+            try:
+                raise GenericError(e)
+            except Exception as e:
+                await on_generic_error(interaction, e)
+
+
+    else:
+        print("Member has role already")
+        embed = role_already_embed(message.author, vm_role)
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+
+@bot.tree.context_menu(name='Toggle Event Organiser')
+@check_roles([cmentor_role(), admin_role(), mod_role()])
+@check_command_channel(roleapps_channel())
+async def toggle_event_organiser(interaction:  discord.Interaction, member: discord.Member):
+    print(f"toggle_event_organiser called by {interaction.user.display_name} for {member.display_name}")
+
+    member_roles = member.roles
+    eo_role = discord.utils.get(interaction.guild.roles, id=event_organiser_role())
+    role = True if eo_role in member_roles else False
+
+    if not role: # check whether they have the role already
+        print("Member does not already have role, granting...")
+
+        try:
+            print(f"Giving {eo_role.name} role to {member.name}")
+            await member.add_roles(eo_role)
+         
+            # feed back to the command user
+            embed = role_granted_embed(member, eo_role)
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+
+            # dm the target user
+            print("Notifying target user")
+            embed = event_organiser_embed()
+            await member.send(embed=embed)
+
+        except Exception as e:
+            try:
+                raise GenericError(e)
+            except Exception as e:
+                await on_generic_error(interaction, e)
+
+    else:
+        print("Member has role already, asking if user wants to remove...")
+        view = ConfirmRemoveRoleView(member, eo_role)
+
+        embed = confirm_remove_role_embed(member, eo_role)
+
+        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+        view.message = await interaction.original_response()
+
+
+# send_notice app command - alternative to slash command, just noms a message like adroomba but via right click
 @bot.tree.context_menu(name='Send CC Notice')
 @check_roles([cmentor_role(), admin_role(), cc_role()])
 async def send_cc_notice(interaction:  discord.Interaction, message: discord.Message):

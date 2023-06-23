@@ -567,9 +567,6 @@ async def send_mission_to_discord(interaction, mission_params):
     if not mission_params.discord_text:
         discord_text = txt_create_discord(mission_params)
         mission_params.discord_text = discord_text
-    if mission_params.edmc_off: mission_params.discord_msg_content = ":warning:    " \
-        ":regional_indicator_e: :regional_indicator_d: :regional_indicator_m:" \
-        " :regional_indicator_c: :shushing_face: :mobile_phone_off:    :warning:" 
     print("Defined discord elements")
 
     # beyond this point we need to release channel lock if mission creation fails
@@ -595,6 +592,10 @@ async def send_mission_to_discord(interaction, mission_params):
         trade_alert_msg = await alerts_channel.send(embed=embed)
         mission_params.discord_alert_id = trade_alert_msg.id
 
+        if mission_params.edmc_off: # add in EDMC OFF header image
+            edmc_off_banner_file = discord.File(constants.BANNER_EDMC_OFF, filename="image.png")
+            await mission_temp_channel.send(file=edmc_off_banner_file)
+
         discord_file = discord.File(mission_params.discord_img_name, filename="image.png")
 
         print("Defining Discord embeds...")
@@ -619,17 +620,18 @@ async def send_mission_to_discord(interaction, mission_params):
                             " **a secret**! For this reason **please disable/exit all journal reporting plugins/programs**"
                            f" and leave them off until all missions at this location are complete. Thanks CMDRs! <:o7:{o7_emoji()}>"),
                     color=constants.EMBED_COLOUR_REDDIT)
-            edmc_file_name = f'edmc_off_{random.randint(1,2)}.png'
-            edmc_path = os.path.join(constants.EDMC_OFF_PATH, edmc_file_name)
-            edmc_file = discord.File(edmc_path, filename="image.png")
 
-            embed.set_image(url="attachment://image.png")
-            pin_edmc = await mission_temp_channel.send(file=edmc_file, embed=embed)
+            # attach a random shush gif
+            edmc_off_gif_url = random.choice(constants.shush_gifs)
+            embed.set_image(url=edmc_off_gif_url)
+
+            # send and pin message
+            pin_edmc = await mission_temp_channel.send(embed=embed)
             await pin_edmc.pin()
 
             embed = discord.Embed(title=f"EDMC OFF messages sent for {mission_params.carrier_data.carrier_long_name}", description='External posts (Reddit, Webhooks) will be skipped.',
                         color=constants.EMBED_COLOUR_DISCORD)
-            embed.set_thumbnail(url=constants.ICON_EDMC_OFF)
+            embed.set_thumbnail(url=constants.EMOJI_SHUSH)
             await interaction.channel.send(embed=embed)
 
             print('Reacting to #official-trade-alerts message with EDMC OFF')
