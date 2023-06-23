@@ -50,11 +50,33 @@ class CommandRoleError(app_commands.CheckFailure): # role check error
         super().__init__(permitted_roles, formatted_role_list, "Role check error raised")
     pass
 
+
+class GenericError(Exception):
+    pass
+
 """
 A primitive global error handler for all app commands (slash & ctx menus)
 
 returns: the error message to the user and log
 """
+async def on_generic_error(
+    interaction: Interaction,
+    error
+):
+    if isinstance(error, GenericError):
+        print(f"Generic error raised: {error}")
+        embed = discord.Embed(
+            description=f"❌ Error: {error}",
+            color=constants.EMBED_COLOUR_ERROR
+        )
+        try:
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+        except:
+            await interaction.followup.send(embed=embed, ephemeral=True)
+    else:
+        print("Another error occurred")
+
+
 async def on_app_command_error(
     interaction: Interaction,
     error: AppCommandError
@@ -88,6 +110,17 @@ async def on_app_command_error(
                 )
             print("notify user")
             await interaction.response.send_message(embed=embed, ephemeral=True)
+
+        elif isinstance(error, GenericError):
+            print("Generic error raised")
+            embed = discord.Embed(
+                description=f"❌ Error: {error}",
+                color=constants.EMBED_COLOUR_ERROR
+            )
+            try:
+                await interaction.response.send_message(embed=embed, ephemeral=True)
+            except:
+                await interaction.followup.send(embed=embed, ephemeral=True)
 
         else:
             print("Generic error message raised")

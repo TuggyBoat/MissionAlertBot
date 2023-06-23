@@ -13,18 +13,21 @@ from discord.app_commands import Group, command, describe
 from discord.ext import commands
 from discord.ext.commands import GroupCog
 
-# import local classes
-from ptn.missionalertbot.classes.MissionParams import MissionParams
-
 # import local constants
 import ptn.missionalertbot.constants as constants
 from ptn.missionalertbot.constants import bot, mission_command_channel, certcarrier_role, trainee_role, seconds_long, rescarrier_role, commodities_common, bot_spam_channel, \
-    training_mission_command_channel, seconds_very_short
+    training_mission_command_channel, seconds_very_short, admin_role, mod_role, cco_mentor_role
+
+# import local classes
+from ptn.missionalertbot.classes.MissionParams import MissionParams
+from ptn.missionalertbot.classes.Views import ConfirmRemoveRoleView, ConfirmGrantRoleView
 
 # import local modules
 from ptn.missionalertbot.database.database import find_mission, find_webhook_from_owner, add_webhook_to_database, find_webhook_by_name, delete_webhook_by_name, CarrierDbFields, find_carrier
 from ptn.missionalertbot.modules.DateString import get_mission_delete_hammertime
-from ptn.missionalertbot.modules.helpers import on_app_command_error, convert_str_to_float_or_int, check_command_channel, check_roles, check_training_mode
+from ptn.missionalertbot.modules.Embeds import role_granted_embed, confirm_remove_role_embed, role_already_embed
+from ptn.missionalertbot.modules.helpers import on_app_command_error, convert_str_to_float_or_int, check_command_channel, check_roles, check_training_mode, on_generic_error, \
+    GenericError
 from ptn.missionalertbot.modules.ImageHandling import assign_carrier_image
 from ptn.missionalertbot.modules.MissionGenerator import confirm_send_mission_via_button
 from ptn.missionalertbot.modules.MissionCleaner import _cleanup_completed_mission
@@ -39,11 +42,86 @@ CERTIFIED CARRIER OWNER COMMANDS
 /cco image - CCO
 /cco load - CCO/mission
 /cco unload - CCO/mission
+/cco edit - CCO/mission
 /cco webhook add - CCO/database
 /cco webhook delete - CCO/database
 /cco webhook view - CCO/database
 
 """
+
+@bot.tree.context_menu(name='Make CCO Recruit')
+@check_roles([cco_mentor_role(), admin_role(), mod_role()])
+async def toggle_cco_recruit(interaction:  discord.Interaction, member: discord.Member):
+    print(f"toggle_cco_recruit called by {interaction.user.display_name} for {member.display_name}")
+
+    member_roles = member.roles
+    cco_trainee_role_object = discord.utils.get(interaction.guild.roles, id=trainee_role())
+    role = True if cco_trainee_role_object in member_roles else False
+
+    if not role: # check whether they have the role already
+        print("Member does not already have role, granting...")
+
+        try:
+            print(f"Giving {cco_trainee_role_object.name} role to {member.name}")
+            await member.add_roles(cco_trainee_role_object)
+         
+            # feed back to the command user
+            embed = role_granted_embed(member, cco_trainee_role_object)
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+
+        except Exception as e:
+            try:
+                raise GenericError(e)
+            except Exception as e:
+                await on_generic_error(interaction, e)
+
+    else:
+        print("Member has role already, asking if user wants to remove...")
+        view = ConfirmRemoveRoleView(member, cco_trainee_role_object)
+
+        embed = confirm_remove_role_embed(member, cco_trainee_role_object)
+
+        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+        view.message = await interaction.original_response()
+
+
+@bot.tree.context_menu(name='Make Full CCO')
+@check_roles([cco_mentor_role(), admin_role(), mod_role()])
+async def toggle_cco(interaction:  discord.Interaction, member: discord.Member):
+    print(f"toggle_cco called by {interaction.user.display_name} for {member.display_name}")
+
+    member_roles = member.roles
+    cco_role = discord.utils.get(interaction.guild.roles, id=certcarrier_role())
+    reserve_role = discord.utils.get(interaction.guild.roles, id=rescarrier_role())
+    role = True if cco_role in member_roles else False # only checking for CCO role
+
+    if not role: # check whether they have the role already
+        print("Member does not already have role, checking user is sure about granting...")
+
+        try:
+            roles = [cco_role, reserve_role]
+            view = ConfirmGrantRoleView(member, roles)
+
+            embed = confirm_remove_role_embed(member, cco_role)
+
+            await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+            view.message = await interaction.original_response()
+
+        except Exception as e:
+            try:
+                raise GenericError(e)
+            except Exception as e:
+                await on_generic_error(interaction, e)
+
+    else:
+        print("Member has role already")
+        embed = role_already_embed(member, cco_role)
+        whoops_embed = discord.Embed(
+            description=f"😬 If they **shouldn't** have this role, please message a <@&{mod_role()}> or <@&{admin_role()}> immediately.",
+            color=constants.EMBED_COLOUR_RP
+        )
+        embeds = [embed, whoops_embed]
+        await interaction.response.send_message(embeds=embeds, ephemeral=True)
 
 
 async def cco_mission_complete(interaction, carrier, is_complete, message):
