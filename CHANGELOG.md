@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.2.1
+
+- [#533](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/533) `Make Full CCO` now removes Trainee and ACO roles from target user
+- [#534](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/534) Notify bot-spam on role grants and removals
+
+
 ## 2.2
 
 New commands:

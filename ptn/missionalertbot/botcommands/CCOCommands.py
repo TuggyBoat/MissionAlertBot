@@ -16,7 +16,7 @@ from discord.ext.commands import GroupCog
 # import local constants
 import ptn.missionalertbot.constants as constants
 from ptn.missionalertbot.constants import bot, mission_command_channel, certcarrier_role, trainee_role, seconds_long, rescarrier_role, commodities_common, bot_spam_channel, \
-    training_mission_command_channel, seconds_very_short, admin_role, mod_role, cco_mentor_role
+    training_mission_command_channel, seconds_very_short, admin_role, mod_role, cco_mentor_role, aco_role
 
 # import local classes
 from ptn.missionalertbot.classes.MissionParams import MissionParams
@@ -25,7 +25,7 @@ from ptn.missionalertbot.classes.Views import ConfirmRemoveRoleView, ConfirmGran
 # import local modules
 from ptn.missionalertbot.database.database import find_mission, find_webhook_from_owner, add_webhook_to_database, find_webhook_by_name, delete_webhook_by_name, CarrierDbFields, find_carrier
 from ptn.missionalertbot.modules.DateString import get_mission_delete_hammertime
-from ptn.missionalertbot.modules.Embeds import role_granted_embed, confirm_remove_role_embed, role_already_embed
+from ptn.missionalertbot.modules.Embeds import role_granted_embed, confirm_remove_role_embed, role_already_embed, confirm_grant_role_embed
 from ptn.missionalertbot.modules.helpers import on_app_command_error, convert_str_to_float_or_int, check_command_channel, check_roles, check_training_mode, on_generic_error, \
     GenericError
 from ptn.missionalertbot.modules.ImageHandling import assign_carrier_image
@@ -49,10 +49,12 @@ CERTIFIED CARRIER OWNER COMMANDS
 
 """
 
-@bot.tree.context_menu(name='Make CCO Recruit')
+@bot.tree.context_menu(name='Make CCO Trainee')
 @check_roles([cco_mentor_role(), admin_role(), mod_role()])
-async def toggle_cco_recruit(interaction:  discord.Interaction, member: discord.Member):
-    print(f"toggle_cco_recruit called by {interaction.user.display_name} for {member.display_name}")
+async def toggle_cco_trainee(interaction:  discord.Interaction, member: discord.Member):
+    print(f"toggle_cco_trainee called by {interaction.user.display_name} for {member.display_name}")
+
+    spamchannel = bot.get_channel(bot_spam_channel())
 
     member_roles = member.roles
     cco_trainee_role_object = discord.utils.get(interaction.guild.roles, id=trainee_role())
@@ -66,8 +68,9 @@ async def toggle_cco_recruit(interaction:  discord.Interaction, member: discord.
             await member.add_roles(cco_trainee_role_object)
          
             # feed back to the command user
-            embed = role_granted_embed(member, cco_trainee_role_object)
+            embed, bot_spam_embed = role_granted_embed(interaction, member, cco_trainee_role_object)
             await interaction.response.send_message(embed=embed, ephemeral=True)
+            await spamchannel.send(embed=bot_spam_embed)
 
         except Exception as e:
             try:
@@ -93,6 +96,8 @@ async def toggle_cco(interaction:  discord.Interaction, member: discord.Member):
     member_roles = member.roles
     cco_role = discord.utils.get(interaction.guild.roles, id=certcarrier_role())
     reserve_role = discord.utils.get(interaction.guild.roles, id=rescarrier_role())
+    aco_role_object = discord.utils.get(interaction.guild.roles, id=aco_role())
+    trainee_role_object = discord.utils.get(interaction.guild.roles, id=trainee_role())
     role = True if cco_role in member_roles else False # only checking for CCO role
 
     if not role: # check whether they have the role already
@@ -100,14 +105,16 @@ async def toggle_cco(interaction:  discord.Interaction, member: discord.Member):
 
         try:
             roles = [cco_role, reserve_role]
-            view = ConfirmGrantRoleView(member, roles)
+            remove_roles = [aco_role_object, trainee_role_object]
+            view = ConfirmGrantRoleView(member, roles, remove_roles)
 
-            embed = confirm_remove_role_embed(member, cco_role)
+            embed = confirm_grant_role_embed(member, cco_role)
 
             await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
             view.message = await interaction.original_response()
 
         except Exception as e:
+            print(e)
             try:
                 raise GenericError(e)
             except Exception as e:

@@ -88,6 +88,7 @@ PROD_ADMIN_ROLE = 800091021852803072 # MAB Bot Admin role on live server (curren
 PROD_CMENTOR_ROLE = 863521103434350613 # Community Mentor role on live server
 PROD_CERTCARRIER_ROLE = 800091463160430654 # Certified Carrier role on live server
 PROD_RESCARRIER_ROLE = 929985255903998002 # Fleet Reserve Carrier role on live server
+PROD_ACO_ROLE = 867811399195426837 # ACO role on live
 PROD_CCO_MENTOR_ROLE = 906224455892738109 # CCO Mentor role on test server
 PROD_TRAINEE_ROLE = 800439864797167637 # CCO Trainee role on live server
 PROD_CPILLAR_ROLE = 863789660425027624 # Community Pillar role on live server
@@ -138,6 +139,7 @@ TEST_MOD_ROLE = 903292469049974845 # Mod role on test server
 TEST_CMENTOR_ROLE = 877586763672072193 # Community Mentor role on test server
 TEST_CERTCARRIER_ROLE = 822999970012463154 # Certified Carrier role on test server
 TEST_RESCARRIER_ROLE = 947520552766152744 # Fleet Reserve Carrier role on test server
+TEST_ACO_ROLE = 903289778680770590 # ACO role on test server
 TEST_CCO_MENTOR_ROLE = 1121883414694473728 # CCO Mentor role on test server
 TEST_TRAINEE_ROLE = 1048912218344923187 # CCO Trainee role on test server
 TEST_CPILLAR_ROLE = 903289927184314388 # Community Pillar role on test server
@@ -379,6 +381,9 @@ def certcarrier_role():
 
 def rescarrier_role():
   return PROD_RESCARRIER_ROLE if _production else TEST_RESCARRIER_ROLE
+
+def aco_role():
+  return PROD_ACO_ROLE if _production else TEST_ACO_ROLE
 
 def cco_mentor_role():
   return PROD_CCO_MENTOR_ROLE if _production else TEST_CCO_MENTOR_ROLE
