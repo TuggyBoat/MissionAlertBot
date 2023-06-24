@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.2.2
+
+- [#541](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/541) Using `/carrier_add` now also outputs the code needed to add the carrier to stockbot
+
+
 ## 2.2.1
 
 - [#533](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/533) `Make Full CCO` now removes Trainee, Recruit, and ACO roles from target user

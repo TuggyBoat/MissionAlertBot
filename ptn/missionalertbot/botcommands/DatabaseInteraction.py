@@ -246,10 +246,19 @@ class DatabaseInteraction(commands.Cog):
         await add_carrier_to_database(short_name, long_name, carrier_id, stripped_name.lower(), 0, owner_id)
 
         carrier_data = find_carrier(long_name, CarrierDbFields.longname.name)
-        embed = discord.Embed(title="Fleet Carrier successfully added to database",
+        info_embed = discord.Embed(title="Fleet Carrier successfully added to database",
                             color=constants.EMBED_COLOUR_OK)
-        embed = _add_common_embed_fields(embed, carrier_data, interaction)
-        return await interaction.response.send_message(embed=embed)
+        info_embed = _add_common_embed_fields(info_embed, carrier_data, interaction)
+
+        cp_embed = discord.Embed(
+            title="Copy/Paste code for Stockbot",
+            description=f"```;add_FC {carrier_data.carrier_identifier} {carrier_data.carrier_short_name} {carrier_data.ownerid}```",
+            color=constants.EMBED_COLOUR_QU
+        )
+
+        embeds = [info_embed, cp_embed]
+
+        return await interaction.response.send_message(embeds=embeds)
 
 
     # remove FC from database
