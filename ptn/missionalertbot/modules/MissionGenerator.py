@@ -1213,6 +1213,7 @@ async def create_mission_temp_channel(interaction, mission_params):
     await lockwait_msg.delete()
 
     mission_channel_name = mission_params.carrier_data.discord_channel
+    mission_temp_channel = False
 
     # only check for the channel in the target category
     if mission_params.training:
