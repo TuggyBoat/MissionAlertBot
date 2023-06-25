@@ -248,7 +248,7 @@ class MissionCompleteView(View):
                                     f"PTN Discord by {interaction.user.display_name}*"
                 discord_complete_embed = discord.Embed(
                     title=f"{self.mission_data.carrier_name} MISSION COMPLETE",
-                    description=f"<@{interaction.user.id}> reports mission complete! This mission channel will be removed {hammertime}",
+                    description=f"<@{interaction.user.id}> reports mission complete! This mission channel will be removed {hammertime} unless a new mission is started.",
                     color=constants.EMBED_COLOUR_OK
                 )
                 print("Sending to _cleanup_completed_mission")
@@ -306,7 +306,7 @@ class MissionFailedModal(Modal):
             discord_complete_embed = discord.Embed(
                 title=f"{self.mission_data.carrier_name} MISSION CONCLUDED",
                 description=f"<@{interaction.user.id}> reports this mission **cannot be completed** and has thus concluded. Reason:\n\n> {self.reason}."
-                            f"\n\nThis mission channel will be removed {hammertime}",
+                            f"\n\nThis mission channel will be removed {hammertime} unless a new mission is started.",
                 color=constants.EMBED_COLOUR_ERROR
             )
 

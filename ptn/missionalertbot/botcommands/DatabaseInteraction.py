@@ -119,9 +119,16 @@ class DatabaseInteraction(commands.Cog):
     @check_command_channel(cteam_bot_channel())
     async def cp_nominees_list(self, interaction: discord.Interaction, number: int):
 
+        embed = discord.Embed(
+            description="⏳ Please wait while I fetch user data for all desired nominees. This could take some time if the nominees list is large.",
+            color=constants.EMBED_COLOUR_QU
+        )
+
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
         numberint = int(number)
 
-        print(f"nom_list called by {interaction.user}")
+        print(f"cp_nominees_list called by {interaction.user}")
         embed=discord.Embed(title="Community Pillar nominees", description=f"Showing all with {number} nominations or more.", color=constants.EMBED_COLOUR_OK)
 
         print("reading database")
@@ -132,7 +139,7 @@ class DatabaseInteraction(commands.Cog):
         carrier_db.execute(f"SELECT DISTINCT pillarid FROM nominees")
         nominees_data = [NomineesData(nominees) for nominees in carrier_db.fetchall()]
         for nominees in nominees_data:
-            print(nominees.pillar_id)
+            print(f"Iterating for {nominees.pillar_id}...")
 
             # 2: pass each unique pillar through to the counting function to retrieve the number of times they appear in the table
 
@@ -152,11 +159,19 @@ class DatabaseInteraction(commands.Cog):
 
             # only show those with a count >= the number the user specified
             if count >= numberint:
-                embed.add_field(name=f'{count} nominations', value=f"<@{nominees.pillar_id}>", inline=False)
+                try: # try to get a user object for this nominee
+                    print("Fetching user object...")
+                    nominee = await bot.fetch_user(nominees.pillar_id)
+                    nominee_name = f"({nominee.display_name}/`{nominee.name}`)"
+                except Exception as e:
+                    print(f"Unable to fetch Discord user object for {nominees.pillar_id}: {e}")
+                    nominee_name = ""
+
+                embed.add_field(name=f'{count} nominations', value=f"<@{nominees.pillar_id}> {nominee_name}", inline=False)
 
         view = BroadcastView(embed)
 
-        await interaction.response.send_message(embed=embed, ephemeral=True, view=view)
+        await interaction.edit_original_response(embed=embed, view=view)
         return print("nom_count complete")
 
 
@@ -167,28 +182,46 @@ class DatabaseInteraction(commands.Cog):
     @check_command_channel(cteam_bot_channel())
     async def cp_nomination_details(self, interaction: discord.Interaction, userid: str):
 
-        member = await bot.fetch_user(userid)
-        print(f"looked for member with {userid} and found {member}")
+        embed = discord.Embed(
+            description="⏳ Please wait while I fetch user data for this nominee.",
+            color=constants.EMBED_COLOUR_QU
+        )
 
-        print(f"nom_details called by {interaction.user} for member: {member}")
+        await interaction.response.send_message(embed=embed, ephemeral=True)
 
-        embed=discord.Embed(title=f"Nomination details", description=f"Discord user <@{member.id}>", color=constants.EMBED_COLOUR_OK)
+        try: # check if we can find the user object, otherwise user is probably not on server anymore
+            member = await bot.fetch_user(userid)
+            print(f"looked for member with {userid} and found {member}")
+            member_names = f"({member.display_name}/`{member.name}`)"
+        except Exception as e:
+            embed = discord.Embed(
+                description=f"❌ **ERROR**: Unable to resolve a Discord user on this server with ID {userid}: {e}",
+                color=constants.EMBED_COLOUR_ERROR
+            )
+            return await interaction.edit_original_response(embed=embed)
+
+        print(f"cp_nomination_details called by {interaction.user} for member: {member}")
+
+        embed=discord.Embed(title=f"Nomination details", description=f"Discord user <@{member.id}> {member_names}", color=constants.EMBED_COLOUR_OK)
 
         # look up specified user and return every entry for them as embed fields. TODO: This will break after too many nominations, would need to be paged.
         # if an empty list is returned, update the embed description and color
         nominees_data = find_nominee_with_id(userid)
         if nominees_data:
             for nominees in nominees_data:
-                nominator = await bot.fetch_user(nominees.nom_id)
-                embed.add_field(name=f'Nominator: {nominator.display_name}',
-                                value=f"{nominees.note}", inline=False)
+                try:
+                    nominator = await bot.fetch_user(nominees.nom_id)
+                    embed.add_field(name=f'Nominator: {nominator.display_name}',
+                                    value=f"{nominees.note}", inline=False)
+                except Exception as e:
+                    print(f"Unable to get nominating user: {nominees.nom_id}: {e}")
         else:
             embed.description = f'No nominations found for <@{member.id}>'
             embed.color = constants.EMBED_COLOUR_REDDIT
 
         view = BroadcastView(embed)
 
-        await interaction.response.send_message(embed=embed, ephemeral=True, view=view)
+        await interaction.edit_original_response(embed=embed, view=view)
 
 
     """
@@ -246,10 +279,19 @@ class DatabaseInteraction(commands.Cog):
         await add_carrier_to_database(short_name, long_name, carrier_id, stripped_name.lower(), 0, owner_id)
 
         carrier_data = find_carrier(long_name, CarrierDbFields.longname.name)
-        embed = discord.Embed(title="Fleet Carrier successfully added to database",
+        info_embed = discord.Embed(title="Fleet Carrier successfully added to database",
                             color=constants.EMBED_COLOUR_OK)
-        embed = _add_common_embed_fields(embed, carrier_data, interaction)
-        return await interaction.response.send_message(embed=embed)
+        info_embed = _add_common_embed_fields(info_embed, carrier_data, interaction)
+
+        cp_embed = discord.Embed(
+            title="Copy/Paste code for Stockbot",
+            description=f"```;add_FC {carrier_data.carrier_identifier} {carrier_data.carrier_short_name} {carrier_data.ownerid}```",
+            color=constants.EMBED_COLOUR_QU
+        )
+
+        embeds = [info_embed, cp_embed]
+
+        return await interaction.response.send_message(embeds=embeds)
 
 
     # remove FC from database

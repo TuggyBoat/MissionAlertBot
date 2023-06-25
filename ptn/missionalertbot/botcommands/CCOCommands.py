@@ -165,7 +165,7 @@ async def cco_mission_complete(interaction, carrier, is_complete, message):
     reddit_complete_text = f"    INCOMING WIDEBAND TRANSMISSION: P.T.N. CARRIER MISSION UPDATE\n\n**{mission_data.carrier_name}** mission {status}. o7 CMDRs!\n\n{reddit_msg}"
     discord_complete_embed = discord.Embed(
         title=f"{mission_data.carrier_name} MISSION {status.upper()}",
-        description=f"{discord_msg}\n\nThis mission channel will be removed {hammertime}",
+        description=f"{discord_msg}\n\nThis mission channel will be removed {hammertime} unless a new mission is started.",
         color=constants.EMBED_COLOUR_OK
     )
 
