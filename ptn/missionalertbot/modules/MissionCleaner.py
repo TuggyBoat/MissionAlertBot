@@ -27,7 +27,7 @@ from ptn.missionalertbot.constants import bot, bot_spam_channel, wine_alerts_loa
 
 # import local modules
 from ptn.missionalertbot.database.database import backup_database, mission_db, missions_conn, find_carrier, CarrierDbFields
-from ptn.missionalertbot.modules.DateString import get_final_delete_hammertime
+from ptn.missionalertbot.modules.DateString import get_final_delete_hammertime, get_mission_delete_hammertime
 from ptn.missionalertbot.modules.helpers import lock_mission_channel, unlock_mission_channel, clean_up_pins, ChannelDefs, check_mission_channel_lock
 
 
@@ -171,8 +171,9 @@ async def _cleanup_completed_mission(interaction: discord.Interaction, mission_d
             # command feedback
             print("Log usage in bot spam")
             spamchannel = bot.get_channel(bot_spam_channel())
+            reason = f"\n\nReason given: `{message}`" if not message == None else ""
             embed = discord.Embed(title=f"Mission {status} for {mission_data.carrier_name}",
-                                description=f"<@{interaction.user.id}> reported in <#{interaction.channel.id}> ({interaction.channel.name}).",
+                                description=f"<@{interaction.user.id}> reported in <#{interaction.channel.id}> ({interaction.channel.name}).{reason}",
                                 color=constants.EMBED_COLOUR_OK)
             embed.set_thumbnail(url=thumb)
             await spamchannel.send(embed=embed)
@@ -198,10 +199,12 @@ async def _cleanup_completed_mission(interaction: discord.Interaction, mission_d
                 # notify by DM
                 owner = await bot.fetch_user(carrier_data.ownerid)
 
+                hammertime = get_mission_delete_hammertime()
+
                 dm_embed = discord.Embed(
                     title=f"{carrier_data.carrier_long_name} MISSION {status.upper()}",
                     description=f"Ahoy CMDR! {interaction.user.display_name} has concluded the trade mission for your Fleet Carrier **{carrier_data.carrier_long_name}**. "
-                                f"Its mission channel will be removed in {seconds_long()//60} minutes unless a new mission is started.",
+                                f"Its mission channel will be removed {hammertime} unless a new mission is started.",
                     color=constants.EMBED_COLOUR_QU
                     )
                 dm_embed.set_thumbnail(url=thumb)

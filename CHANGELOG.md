@@ -1,8 +1,12 @@
 # Changelog
 
 ## 2.2.2
-
+- [#545](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/545) `/cco load` and `/cco unload` now have the option to send to Discord at the top, with a note that it is mandatory.
+ - Using it no longer sends exclusively to Discord, ignoring other selections.
 - [#541](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/541) Using `/carrier_add` now also outputs the code needed to add the carrier to stockbot
+- [#540](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/540) Reason given for mission failure (or success!) now included in bot spam notification.
+- [#543](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/543) Added pad size to the station info embed.
+- The `this mission channel will be removed in...` notice now clarifies removal will take place `unless a new mission is started.`
 
 
 ## 2.2.1

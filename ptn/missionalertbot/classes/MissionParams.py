@@ -18,7 +18,7 @@ class MissionParams:
         else:
             info_dict = dict()
 
-        self.training = info_dict.get('training', None) # whether this is a training mission or not
+        self.training = info_dict.get('training', False) # whether this is a training mission or not
         self.channel_defs = info_dict.get('channel_defs', None) # defines channels used by mission generator
         self.copypaste_embed = info_dict.get('copypaste_embed', None) # embed containing the copy/paste string for the command used
         self.carrier_name_search_term = info_dict.get('carrier_name_search_term', None) # the carrier name fragment to search for

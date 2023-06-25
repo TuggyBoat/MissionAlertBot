@@ -30,7 +30,7 @@ from ptn.missionalertbot.classes.MissionParams import MissionParams
 # import local constants
 import ptn.missionalertbot.constants as constants
 from ptn.missionalertbot.constants import bot, get_reddit, seconds_short, upvote_emoji, hauler_role, trainee_role, \
-    get_guild, get_overwrite_perms, ptn_logo_discord, wineloader_role, o7_emoji, bot_spam_channel
+    get_guild, get_overwrite_perms, ptn_logo_discord, wineloader_role, o7_emoji, bot_spam_channel, discord_emoji, training_cat, trade_cat
 
 # import local modules
 from ptn.missionalertbot.database.database import backup_database, mission_db, missions_conn, find_carrier, CarrierDbFields, \
@@ -68,15 +68,15 @@ class MissionSendSelectMenu(Select):
         self.mission_params = mission_params
         self.author = author
         options=[
+            discord.SelectOption(label="Discord", emoji=f"<:discord:{discord_emoji()}>", description="Sending to the PTN Discord is required."),
+            discord.SelectOption(label="Notify Haulers", emoji="🔔", description="Send a notification ping to the appropriate Hauler role."),
             discord.SelectOption(label="Webhooks", emoji="🌐", description="Send mission to your webhooks."),
             discord.SelectOption(label="Reddit", emoji=discord.PartialEmoji.from_str(f"<:upvote:{upvote_emoji()}>"), description="Send mission to the PTN subreddit."),
-            discord.SelectOption(label="Notify Haulers", emoji="🔔", description="Send a notification ping to the appropriate Hauler role."),
-            discord.SelectOption(label="EDMC-OFF", emoji="🤫", description="Flag the mission as EDMC-OFF: sends to PTN Discord only."),
-            discord.SelectOption(label="Discord Only", emoji="❌", description="None of the above: send only to the PTN Discord."),
+            discord.SelectOption(label="EDMC-OFF", emoji="🤫", description="Flag the mission as EDMC-OFF: external sends blocked."),
             discord.SelectOption(label="Copy-Paste Text", emoji="📃", description="Create texts for copy/pasting."),
             discord.SelectOption(label="Return to menu", emoji="◀", description="Return to the main menu.")
         ] 
-        super().__init__(placeholder="Select your options", max_values=4, min_values=1, options=options)
+        super().__init__(placeholder="Select your options", max_values=5, min_values=1, options=options)
 
     async def callback(self, interaction: discord.Interaction):
         self.mission_params.sendflags = []
@@ -92,34 +92,24 @@ class MissionSendSelectMenu(Select):
                 print(e)
                 return
 
-        if 'Discord Only' in self.values:
-            if not 'd' in self.mission_params.sendflags: self.mission_params.sendflags.append('d')
-            print("User wants to send to Discord only")
-            try: 
-                await interaction.response.edit_message(embeds=self.mission_params.original_message_embeds, view=None)
-            except Exception as e:
-                print(e)
-            print("Calling mission generator from Send Mission select menu")
-            return await gen_mission(interaction, self.mission_params)
+        if 'Discord' in self.values:
+            print("User chose Discord option")
+            self.mission_params.sendflags.append('d')
 
         if 'Webhooks' in self.values:
             print("Adding webhook send")
-            if not 'd' in self.mission_params.sendflags: self.mission_params.sendflags.append('d')
             self.mission_params.sendflags.append('w')
         
         if 'Reddit' in self.values:
             print("Adding Reddit send")
-            if not 'd' in self.mission_params.sendflags: self.mission_params.sendflags.append('d')
             self.mission_params.sendflags.append('r')
 
         if 'Notify Haulers' in self.values:
             print("Adding hauler notify")
-            if not 'd' in self.mission_params.sendflags: self.mission_params.sendflags.append('d')
             self.mission_params.sendflags.append('n')
 
         if 'EDMC-OFF' in self.values:
             print("Adding EDMC-OFF flag")
-            if not 'd' in self.mission_params.sendflags: self.mission_params.sendflags.append('d')
             self.mission_params.sendflags.append('e')
 
         if 'Copy-Paste Text' in self.values:
@@ -370,7 +360,7 @@ async def validate_profit(interaction: discord.Interaction, mission_params):
     print("Validating profit")
     if not float(mission_params.profit):
         profit_error_embed = discord.Embed(
-            description=f"ERROR: Profit must be a number (int or float), e.g. `10` or `4.5` but not `ten` or `lots` or `{mission_params.profit_raw}`.",
+            description=f"❌ **ERROR**: Profit must be a number (int or float), e.g. `10` or `4.5` but not `ten` or `lots` or `{mission_params.profit_raw}`.",
             color=constants.EMBED_COLOUR_ERROR
         )
         profit_error_embed.set_footer(text="You wonky banana.")
@@ -384,7 +374,7 @@ async def validate_pads(interaction: discord.Interaction, mission_params):
         # In case a user provides some junk for pads size, gate it
         print(f'Exiting mission generation requested by {interaction.user} as pad size is invalid, provided: {mission_params.pads}')
         pads_error_embed = discord.Embed(
-            description=f"ERROR: Pads must be `L` or `M`, or use autocomplete to select `Large` or `Medium`. `{mission_params.pads}` is right out.",
+            description=f"❌ **ERROR**: Pads must be `L` or `M`, or use autocomplete to select `Large` or `Medium`. `{mission_params.pads}` is right out.",
             color=constants.EMBED_COLOUR_ERROR
         )
         pads_error_embed.set_footer(text="You silly goose.")
@@ -397,7 +387,7 @@ async def validate_supplydemand(interaction: discord.Interaction, mission_params
     print("Validating supply/demand")
     if not float(mission_params.demand):
         profit_error_embed = discord.Embed(
-            description=f"ERROR: Supply/demand must be a number (int or float), e.g. `20` or `16.5` but not `twenty thousand` or `loads` or `{mission_params.demand_raw}`.",
+            description=f"❌ **ERROR**: Supply/demand must be a number (int or float), e.g. `20` or `16.5` but not `twenty thousand` or `loads` or `{mission_params.demand_raw}`.",
             color=constants.EMBED_COLOUR_ERROR
         )
         profit_error_embed.set_footer(text="You adorable scamp.")
@@ -406,7 +396,7 @@ async def validate_supplydemand(interaction: discord.Interaction, mission_params
         return await interaction.channel.send(embed=profit_error_embed)
     elif float(mission_params.demand) > 25:
         profit_error_embed = discord.Embed(
-            description=f"ERROR: Supply/demand is expressed in thousands of tons (K), so cannot be higher than the maximum capacity of a Fleet Carrier (25K tons).",
+            description=f"❌ **ERROR**: Supply/demand is expressed in thousands of tons (K), so cannot be higher than the maximum capacity of a Fleet Carrier (25K tons).",
             color=constants.EMBED_COLOUR_ERROR
         )
         profit_error_embed.set_footer(text="You loveable bumpkin.")
@@ -447,11 +437,13 @@ async def return_discord_channel_embeds(mission_params):
     owner = await bot.fetch_user(mission_params.carrier_data.ownerid)
     owner_name = owner.display_name
     owner_avatar = owner.display_avatar
+    pads = "**LARGE**" if 'l' in mission_params.pads.lower() else "**MEDIUM**"
 
     # define embed content
     print("Define buy embed")
     if mission_params.mission_type == 'load': # embeds for a loading mission
         buy_description=f"📌 Station: **{mission_params.station.upper()}**" \
+                        f"\n🛬 Landing Pad: {pads}" \
                         f"\n🌟 System: **{mission_params.system.upper()}**" \
                         f"\n📦 Commodity: **{mission_params.commodity_name.upper()}**"
         
@@ -475,6 +467,7 @@ async def return_discord_channel_embeds(mission_params):
         buy_thumb = ptn_logo_discord()
 
         sell_description=f"📌 Station: **{mission_params.station.upper()}**" \
+                         f"\n🛬 Landing Pad: {pads}" \
                          f"\n💰 Profit: **{mission_params.profit}K PER TON**" \
                          f"\n📥 Demand: **{mission_params.demand}K TONS**"
         
@@ -720,7 +713,7 @@ async def send_mission_to_subreddit(interaction, mission_params):
     except Exception as e:
         print(f"Error posting to Reddit: {e}")
         reddit_error_embed = discord.Embed(
-            description=f"ERROR: Could not send to Reddit. {e}",
+            description=f"❌ **ERROR**: Could not send to Reddit. {e}",
             color=constants.EMBED_COLOUR_ERROR
         )
         reddit_error_embed.set_footer(text="Attempting to continue with other sends.")
@@ -779,7 +772,7 @@ async def send_mission_to_webhook(interaction, mission_params):
                 except Exception as e:
                     print(f"Error sending webhooks: {e}")
                     inloop_webhook_error_embed = discord.Embed(
-                        description=f"ERROR: Could not send to Webhook {webhook_name}. {e}",
+                        description=f"❌ **ERROR**: Could not send to Webhook {webhook_name}. {e}",
                         color=constants.EMBED_COLOUR_ERROR
                     )
                     inloop_webhook_error_embed.set_footer(text="Attempting to continue with other sends.")
@@ -788,7 +781,7 @@ async def send_mission_to_webhook(interaction, mission_params):
     except Exception as e:
         print(f"Error sending webhooks: {e}")
         webhook_error_embed = discord.Embed(
-            description=f"ERROR: Could not send to Webhooks. {e}",
+            description=f"❌ **ERROR**: Could not send to Webhooks. {e}",
             color=constants.EMBED_COLOUR_ERROR
         )
         webhook_error_embed.set_footer(text="Attempting to continue with other sends.")
@@ -973,7 +966,7 @@ async def prepare_for_gen_mission(interaction: discord.Interaction, mission_para
     carrier_data = find_carrier(mission_params.carrier_name_search_term, CarrierDbFields.longname.name)
     if not carrier_data:  # error condition
         carrier_error_embed = discord.Embed(
-            description=f"ERROR: No carrier found for '**{mission_params.carrier_name_search_term}**'. Use `/owner` to see a list of your carriers. If it's not in the list, ask an Admin to add it for you.",
+            description=f"❌ **ERROR**: No carrier found for '**{mission_params.carrier_name_search_term}**'. Use `/owner` to see a list of your carriers. If it's not in the list, ask an Admin to add it for you.",
             color=constants.EMBED_COLOUR_ERROR
         )
         carrier_error_embed.set_footer(text="You silly sausage.")
@@ -1111,10 +1104,13 @@ async def gen_mission(interaction: discord.Interaction, mission_params):
                 await interaction.channel.send(embed=embed)
 
         else: # for mission gen to work and be stored in the database, the d option MUST be selected.
-            embed = discord.Embed(title="ERROR: Mission generation cancelled",
-                                    description="You must include the **d**iscord option to use role pings or send external alerts (Reddit, Webhooks).",
-                                    color=constants.EMBED_COLOUR_ERROR)
+            embed = discord.Embed(
+                description="❌ **ERROR**: Sending to Discord is **required**. Please try again.",
+                color=constants.EMBED_COLOUR_ERROR
+            )
+            embed.set_footer(text="No gentle snark this time. Only mild disapproval.")
             await interaction.channel.send(embed=embed)
+            submit_mission = False
 
         print("All options worked through, now clean up")
 
@@ -1148,7 +1144,7 @@ async def gen_mission(interaction: discord.Interaction, mission_params):
             text = "Mission was **not** entered into the database. It may require manual cleanup of channels etc."
 
         embed = discord.Embed(
-            description=f"ERROR: {e}\n\n{text}",
+            description=f"❌ **ERROR**: {e}\n\n{text}",
             color=constants.EMBED_COLOUR_ERROR
         )
         await interaction.channel.send(embed=embed)
@@ -1212,11 +1208,24 @@ async def create_mission_temp_channel(interaction, mission_params):
             description=f"❌ Could not acquire lock for `{mission_params.carrier_data.discord_channel}` after 10 seconds. Please try mission generation again. If the problem persists, contact an Admin.",
             color=constants.EMBED_COLOUR_ERROR
         )
-        return await interaction.channel.send("Error: Channel lock could not be acquired, please try again. If the problem persists please contact an Admin.")
+        return await interaction.channel.send("❌ **ERROR**: Channel lock could not be acquired, please try again. If the problem persists please contact an Admin.")
 
     await lockwait_msg.delete()
 
-    mission_temp_channel = discord.utils.get(interaction.guild.channels, name=mission_params.carrier_data.discord_channel)
+    mission_channel_name = mission_params.carrier_data.discord_channel
+
+    # only check for the channel in the target category
+    if mission_params.training:
+        # check for the channel in the training category
+        category = bot.get_channel(training_cat())
+    else:
+        # check for the channel in the trade carriers category
+        category = bot.get_channel(trade_cat())
+
+    for channel in category.channels:
+        if channel.name == mission_channel_name:
+            print(f"Found existing channel in category {category}")
+            mission_temp_channel = channel
 
     if mission_temp_channel:
         # channel exists, so reuse it

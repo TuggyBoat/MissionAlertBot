@@ -26,7 +26,7 @@ from ptn.missionalertbot.classes.CommunityCarrierData import CommunityCarrierDat
 # import local constants
 import ptn.missionalertbot.constants as constants
 from ptn.missionalertbot.constants import bot, cc_role, get_overwrite_perms, get_guild, bot_spam_channel, archive_cat, cc_cat, cmentor_role, admin_role, \
-    training_category, training_alerts, training_mission_command_channel, training_upvotes, training_wine_alerts, training_sub_reddit, training_reddit_in_progress, training_reddit_completed, \
+    training_cat, training_alerts, training_mission_command_channel, training_upvotes, training_wine_alerts, training_sub_reddit, training_reddit_in_progress, training_reddit_completed, \
     trade_cat, trade_alerts_channel, mission_command_channel, channel_upvotes, wine_alerts_loading_channel, wine_alerts_unloading_channel, sub_reddit, \
     reddit_flair_mission_start, reddit_flair_mission_stop
 
@@ -697,10 +697,10 @@ class ChannelDefs:
 
 # check whether CCO command is being used in training or live categories
 def check_training_mode(interaction: discord.Interaction):
-    if interaction.channel.category.id == training_category():
+    if interaction.channel.category.id == training_cat():
         training = True
         print(f"Training mode detected for {interaction.command.name} in {interaction.channel.name} called by {interaction.user.display_name}")
-        channel_defs = ChannelDefs(training_category(), training_alerts(), training_mission_command_channel(), training_upvotes(), training_wine_alerts(), training_wine_alerts(), training_sub_reddit(), training_reddit_in_progress(), training_reddit_completed())
+        channel_defs = ChannelDefs(training_cat(), training_alerts(), training_mission_command_channel(), training_upvotes(), training_wine_alerts(), training_wine_alerts(), training_sub_reddit(), training_reddit_in_progress(), training_reddit_completed())
     else:
         training = False
         channel_defs = ChannelDefs(trade_cat(), trade_alerts_channel(), mission_command_channel(), channel_upvotes(), wine_alerts_loading_channel(), wine_alerts_unloading_channel(), sub_reddit(), reddit_flair_mission_start(), reddit_flair_mission_stop())
