@@ -259,7 +259,6 @@ class CTeamCommands(commands.Cog):
     # custom global error handler
     # attaching the handler when the cog is loaded
     # and storing the old handler
-    # this is required for option 1
     def cog_load(self):
         tree = self.bot.tree
         self._old_tree_error = tree.on_error

@@ -37,10 +37,11 @@ class GenericError(Exception): # generic error
     pass
 
 class CustomError(Exception): # an error handler that hides the Exception text from the user, but shows custom text sent from the source instead
-    def __init__(self, message, isprivate):
+    def __init__(self, message, isprivate=True):
         self.message = message
         self.isprivate = isprivate
         super().__init__(self.message, "CustomError raised")
+
 
 """
 A primitive global error handler for all app commands (slash & ctx menus)
@@ -72,7 +73,7 @@ async def on_generic_error(
         except:
             await interaction.followup.send(embed=embed, ephemeral=True)
 
-    elif isinstance (error, CustomError): # this class receives custom error messages and displays either privately or publicly
+    elif isinstance(error, CustomError): # this class receives custom error messages and displays either privately or publicly
         message = error.message
         isprivate = error.isprivate
         print(f"Raised CustomError from {error} with message {message}")
@@ -129,8 +130,27 @@ async def on_app_command_error(
             print("notify user")
             await interaction.response.send_message(embed=embed, ephemeral=True)
 
+        elif isinstance(error, CustomError):
+            message = error.message
+            isprivate = error.isprivate
+            print(f"Raised CustomError from {error} with message {message}")
+            embed = discord.Embed(
+                description=f"❌ {message}",
+                color=constants.EMBED_COLOUR_ERROR
+            )
+            if isprivate: # message should be ephemeral
+                try:
+                    await interaction.response.send_message(embed=embed, ephemeral=True)
+                except:
+                    await interaction.followup.send(embed=embed, ephemeral=True)
+            else: # message should be public - use for CCO commands
+                try:
+                    await interaction.response.send_message(embed=embed)
+                except:
+                    await interaction.followup.send(embed=embed)
+
         elif isinstance(error, GenericError):
-            print("Generic error raised")
+            print(f"Generic error raised: {error}")
             embed = discord.Embed(
                 description=f"❌ {error}",
                 color=constants.EMBED_COLOUR_ERROR

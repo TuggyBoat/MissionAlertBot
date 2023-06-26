@@ -26,7 +26,7 @@ from ptn.missionalertbot.classes.Views import ConfirmRemoveRoleView, ConfirmGran
 from ptn.missionalertbot.database.database import find_mission, find_webhook_from_owner, add_webhook_to_database, find_webhook_by_name, delete_webhook_by_name, CarrierDbFields, find_carrier
 from ptn.missionalertbot.modules.DateString import get_mission_delete_hammertime
 from ptn.missionalertbot.modules.Embeds import role_granted_embed, confirm_remove_role_embed, role_already_embed, confirm_grant_role_embed
-from ptn.missionalertbot.modules.ErrorHandler import on_app_command_error, on_generic_error, GenericError
+from ptn.missionalertbot.modules.ErrorHandler import on_app_command_error, on_generic_error, GenericError, CustomError
 from ptn.missionalertbot.modules.helpers import convert_str_to_float_or_int, check_command_channel, check_roles, check_training_mode
 from ptn.missionalertbot.modules.ImageHandling import assign_carrier_image
 from ptn.missionalertbot.modules.MissionGenerator import confirm_send_mission_via_button
@@ -154,12 +154,12 @@ async def cco_mission_complete(interaction, carrier, is_complete, message):
     print(f'Request received from {interaction.user.display_name} to mark the mission of {carrier} as done from channel: '
         f'{current_channel}')
 
-    mission_data = find_mission(carrier, "carrier")
-    if not mission_data:
-        embed = discord.Embed(
-            description=f"❌ No trade missions found for carriers matching \"**{carrier}\"**.",
-            color=constants.EMBED_COLOUR_ERROR)
-        return await interaction.response.send_message(embed=embed, ephemeral=True)
+    try:
+        mission_data = find_mission(carrier, "carrier")
+        if not mission_data:
+            raise CustomError(f"No trade missions found for carriers matching `{carrier}`")
+    except CustomError as e:
+        return await on_generic_error(interaction, e)
 
     else:
         embed = discord.Embed(
@@ -196,7 +196,6 @@ class CCOCommands(commands.Cog):
     # custom global error handler
     # attaching the handler when the cog is loaded
     # and storing the old handler
-    # this is required for option 1
     def cog_load(self):
         tree = self.bot.tree
         self._old_tree_error = tree.on_error
@@ -343,22 +342,20 @@ class CCOCommands(commands.Cog):
 
             # find the target carrier
             print("Looking for carrier data")
-            carrier_data = find_carrier(carrier, CarrierDbFields.longname.name)
-            if not carrier_data:
-                embed = discord.Embed(
-                    description=f"❌ no carrier found matching {carrier}.",
-                    color=constants.EMBED_COLOUR_ERROR
-                )
-                return await interaction.response.send_message(embed=embed)
+            try:
+                carrier_data = find_carrier(carrier, CarrierDbFields.longname.name)
+                if not carrier_data:
+                    raise CustomError(f"No carrier found matching {carrier}.")
+            except CustomError as e:
+                return await on_generic_error(interaction, e)
 
             # find mission data for carrier
-            mission_data = find_mission(carrier_data.carrier_long_name, 'Carrier')
-            if not mission_data:
-                embed = discord.Embed(
-                    description=f"❌ no active mission found for {carrier_data.carrier_long_name} ({carrier_data.carrier_identifier}).",
-                    color=constants.EMBED_COLOUR_ERROR
-                )
-                return await interaction.response.send_message(embed=embed)
+            try:
+                mission_data = find_mission(carrier_data.carrier_long_name, 'Carrier')
+                if not mission_data:
+                    raise CustomError(f"No active mission found for {carrier_data.carrier_long_name} ({carrier_data.carrier_identifier}).")
+            except CustomError as e:
+                return await on_generic_error(interaction, e)
 
             # define the original mission_params
             mission_params = mission_data.mission_params
@@ -504,24 +501,18 @@ class CCOCommands(commands.Cog):
         webhook_data = find_webhook_from_owner(interaction.user.id)
         if webhook_data:
             for webhook in webhook_data:
-                if webhook.webhook_url == webhook_url:
-                    print("Found duplicate webhook for URL")
-                    embed = discord.Embed(
-                        description=f"❌ You already have a webhook with that URL called \"{webhook.webhook_name}\": {webhook.webhook_url}",
-                        color=constants.EMBED_COLOUR_ERROR
-                    )
-                    await interaction.edit_original_response(embed=embed)
-                    return
+                try:
+                    if webhook.webhook_url == webhook_url:
+                        print("Found duplicate webhook for URL")
+                        raise CustomError(f"You already have a webhook with that URL called \"{webhook.webhook_name}\": {webhook.webhook_url}")
 
-                elif webhook.webhook_name == webhook_name:
-                    print("Found duplicate webhook for name")
-                    embed = discord.Embed(
-                        description=f"❌ You already have a webhook called \"{webhook.webhook_name}\": {webhook.webhook_url}",
-                        color=constants.EMBED_COLOUR_ERROR
-                    )
-                    await interaction.edit_original_response(embed=embed)
-                    return
-                
+                    elif webhook.webhook_name == webhook_name:
+                        print("Found duplicate webhook for name")
+                        raise CustomError(f"You already have a webhook called \"{webhook.webhook_name}\": {webhook.webhook_url}")
+
+                except CustomError as e:
+                    return await on_generic_error(interaction, e)
+
                 else:
                     print("Webhook is not duplicate, proceeding")
 
@@ -559,19 +550,18 @@ class CCOCommands(commands.Cog):
         try:
             await add_webhook_to_database(interaction.user.id, webhook_url, webhook_name)
         except Exception as e:
-            embed = discord.Embed(
-                description=f"❌ {e}",
-                color=constants.EMBED_COLOUR_ERROR
-            )
-            await interaction.edit_original_response(embed=embed)
+            try:
+                raise GenericError(e)
+            except Exception as e:
+                await on_generic_error(interaction, e)
 
-            # notify in bot_spam
-            embed = discord.Embed(
-                description=f"Error on /webhook_add by {interaction.user}: {e}",
-                color=constants.EMBED_COLOUR_ERROR
-            )
-            await spamchannel.send(embed=embed)
-            return print(f"Error on /webhook_add by {interaction.user}: {e}")
+                # notify in bot_spam
+                embed = discord.Embed(
+                    description=f"Error on /webhook_add by {interaction.user}: {e}",
+                    color=constants.EMBED_COLOUR_ERROR
+                )
+                await spamchannel.send(embed=embed)
+                return print(f"Error on /webhook_add by {interaction.user}: {e}")
 
         # notify user of success
         embed = discord.Embed(title="WEBHOOK ADDED",
@@ -640,11 +630,10 @@ class CCOCommands(commands.Cog):
                 )
                 await interaction.response.send_message(embed=embed, ephemeral=True)
             except Exception as e:
-                embed = discord.Embed(
-                    description=f"❌ {e}",
-                    color=constants.EMBED_COLOUR_ERROR
-                )
-                await interaction.response.send_message(embed=embed, ephemeral=True)
+                try:
+                    raise GenericError(e)
+                except Exception as e:
+                    return await on_generic_error(interaction, e)
 
         else: # no webhook data found
             embed = discord.Embed(
