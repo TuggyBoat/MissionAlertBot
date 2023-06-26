@@ -22,13 +22,13 @@ from ptn.missionalertbot.classes.Views import db_delete_View, BroadcastView, Car
 
 # local constants
 import ptn.missionalertbot.constants as constants
-from ptn.missionalertbot.constants import bot, cmentor_role, admin_role, cteam_bot_channel, cteam_bot_channel, bot_command_channel, cc_role, bot_spam_channel, \
-    certcarrier_role, trainee_role, mission_command_channel
+from ptn.missionalertbot.constants import bot, cmentor_role, admin_role, cteam_bot_channel, cteam_bot_channel, bot_command_channel, cc_role
 
 # local modules
 from ptn.missionalertbot.database.database import find_nominee_with_id, carrier_db, CarrierDbFields, CarrierData, find_carrier, backup_database, \
      add_carrier_to_database, find_carriers_mult, find_commodity, find_community_carrier, CCDbFields, find_mission
-from ptn.missionalertbot.modules.helpers import on_app_command_error, check_roles, check_command_channel, _regex_alphanumeric_with_hyphens
+from ptn.missionalertbot.modules.ErrorHandler import on_app_command_error
+from ptn.missionalertbot.modules.helpers import check_roles, check_command_channel, _regex_alphanumeric_with_hyphens
 from ptn.missionalertbot.modules.Embeds import _add_common_embed_fields, _configure_all_carrier_detail_embed
 
 
@@ -64,7 +64,6 @@ class DatabaseInteraction(commands.Cog):
     # custom global error handler
     # attaching the handler when the cog is loaded
     # and storing the old handler
-    # this is required for option 1
     def cog_load(self):
         tree = self.bot.tree
         self._old_tree_error = tree.on_error
@@ -195,7 +194,7 @@ class DatabaseInteraction(commands.Cog):
             member_names = f"({member.display_name}/`{member.name}`)"
         except Exception as e:
             embed = discord.Embed(
-                description=f"❌ **ERROR**: Unable to resolve a Discord user on this server with ID {userid}: {e}",
+                description=f"❌ Unable to resolve a Discord user on this server with ID {userid}: {e}",
                 color=constants.EMBED_COLOUR_ERROR
             )
             return await interaction.edit_original_response(embed=embed)
@@ -324,9 +323,10 @@ class DatabaseInteraction(commands.Cog):
 
             else:
                 print(f'No carrier with given ID found in database.')
-                embed = discord.Embed(title="Error",
-                                      description=f"Couldn't find a carrier with ID #{db_id}.",
-                                      color=constants.EMBED_COLOUR_ERROR)
+                embed = discord.Embed(
+                    description=f"❌ Couldn't find a carrier with ID #{db_id}.",
+                    color=constants.EMBED_COLOUR_ERROR
+                )
                 await interaction.response.send_message(embed=embed, ephemeral=True)
 
         except TypeError as e:
@@ -919,7 +919,7 @@ class DatabaseInteraction(commands.Cog):
         mission_data = find_mission(carrier, "carrier")
         if not mission_data:
             embed = discord.Embed(
-                description=f"**ERROR**: no trade missions found for carriers matching \"**{carrier}\"**.",
+                description=f"❌ No trade missions found for carriers matching \"**{carrier}\"**.",
                 color=constants.EMBED_COLOUR_ERROR
             )
             return await interaction.response.send_message(embed=embed, ephemeral=True)

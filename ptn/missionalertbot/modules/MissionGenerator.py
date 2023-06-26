@@ -37,6 +37,7 @@ from ptn.missionalertbot.database.database import backup_database, mission_db, m
     find_commodity, find_mission, carrier_db, carriers_conn, find_webhook_from_owner
 from ptn.missionalertbot.modules.DateString import get_formatted_date_string
 from ptn.missionalertbot.modules.Embeds import _mission_summary_embed
+from ptn.missionalertbot.modules.ErrorHandler import on_generic_error, CustomError
 from ptn.missionalertbot.modules.helpers import lock_mission_channel, unlock_mission_channel, check_mission_channel_lock
 from ptn.missionalertbot.modules.ImageHandling import assign_carrier_image, create_carrier_reddit_mission_image, create_carrier_discord_mission_image
 from ptn.missionalertbot.modules.MissionCleaner import remove_carrier_channel
@@ -360,7 +361,7 @@ async def validate_profit(interaction: discord.Interaction, mission_params):
     print("Validating profit")
     if not float(mission_params.profit):
         profit_error_embed = discord.Embed(
-            description=f"❌ **ERROR**: Profit must be a number (int or float), e.g. `10` or `4.5` but not `ten` or `lots` or `{mission_params.profit_raw}`.",
+            description=f"❌ Profit must be a number (int or float), e.g. `10` or `4.5` but not `ten` or `lots` or `{mission_params.profit_raw}`.",
             color=constants.EMBED_COLOUR_ERROR
         )
         profit_error_embed.set_footer(text="You wonky banana.")
@@ -374,7 +375,7 @@ async def validate_pads(interaction: discord.Interaction, mission_params):
         # In case a user provides some junk for pads size, gate it
         print(f'Exiting mission generation requested by {interaction.user} as pad size is invalid, provided: {mission_params.pads}')
         pads_error_embed = discord.Embed(
-            description=f"❌ **ERROR**: Pads must be `L` or `M`, or use autocomplete to select `Large` or `Medium`. `{mission_params.pads}` is right out.",
+            description=f"❌ Pads must be `L` or `M`, or use autocomplete to select `Large` or `Medium`. `{mission_params.pads}` is right out.",
             color=constants.EMBED_COLOUR_ERROR
         )
         pads_error_embed.set_footer(text="You silly goose.")
@@ -387,7 +388,7 @@ async def validate_supplydemand(interaction: discord.Interaction, mission_params
     print("Validating supply/demand")
     if not float(mission_params.demand):
         profit_error_embed = discord.Embed(
-            description=f"❌ **ERROR**: Supply/demand must be a number (int or float), e.g. `20` or `16.5` but not `twenty thousand` or `loads` or `{mission_params.demand_raw}`.",
+            description=f"❌ Supply/demand must be a number (int or float), e.g. `20` or `16.5` but not `twenty thousand` or `loads` or `{mission_params.demand_raw}`.",
             color=constants.EMBED_COLOUR_ERROR
         )
         profit_error_embed.set_footer(text="You adorable scamp.")
@@ -396,7 +397,7 @@ async def validate_supplydemand(interaction: discord.Interaction, mission_params
         return await interaction.channel.send(embed=profit_error_embed)
     elif float(mission_params.demand) > 25:
         profit_error_embed = discord.Embed(
-            description=f"❌ **ERROR**: Supply/demand is expressed in thousands of tons (K), so cannot be higher than the maximum capacity of a Fleet Carrier (25K tons).",
+            description=f"❌ Supply/demand is expressed in thousands of tons (K), so cannot be higher than the maximum capacity of a Fleet Carrier (25K tons).",
             color=constants.EMBED_COLOUR_ERROR
         )
         profit_error_embed.set_footer(text="You loveable bumpkin.")
@@ -417,7 +418,11 @@ async def define_commodity(interaction: discord.Interaction, mission_params):
         if not mission_params.returnflag:
             return # we've already given the user feedback on why there's a problem, we just want to quit gracefully now
         if not mission_params.commodity_name:  # error condition
-            raise ValueError('Missing commodity data')
+            try:
+                raise CustomError("You must input a valid commodity.", isprivate=False)
+            except CustomError as e:
+                print(e)
+                await on_generic_error(interaction, e)
 
 
 async def return_discord_alert_embed(interaction, mission_params):
@@ -648,7 +653,8 @@ async def send_mission_to_discord(interaction, mission_params):
 
     except Exception as e:
         print(f"Error sending to Discord: {e}")
-        await interaction.channel.send(f"Error sending to Discord: {e}\nAttempting to continue with mission gen...")
+        await interaction.channel.send(f"❌ Could not send to Discord, mission generation aborted: {e}")
+        return
 
 
 async def check_profit_margin_on_external_send(interaction, mission_params):
@@ -713,7 +719,7 @@ async def send_mission_to_subreddit(interaction, mission_params):
     except Exception as e:
         print(f"Error posting to Reddit: {e}")
         reddit_error_embed = discord.Embed(
-            description=f"❌ **ERROR**: Could not send to Reddit. {e}",
+            description=f"❌ Could not send to Reddit. {e}",
             color=constants.EMBED_COLOUR_ERROR
         )
         reddit_error_embed.set_footer(text="Attempting to continue with other sends.")
@@ -772,7 +778,7 @@ async def send_mission_to_webhook(interaction, mission_params):
                 except Exception as e:
                     print(f"Error sending webhooks: {e}")
                     inloop_webhook_error_embed = discord.Embed(
-                        description=f"❌ **ERROR**: Could not send to Webhook {webhook_name}. {e}",
+                        description=f"❌ Could not send to Webhook {webhook_name}. {e}",
                         color=constants.EMBED_COLOUR_ERROR
                     )
                     inloop_webhook_error_embed.set_footer(text="Attempting to continue with other sends.")
@@ -781,7 +787,7 @@ async def send_mission_to_webhook(interaction, mission_params):
     except Exception as e:
         print(f"Error sending webhooks: {e}")
         webhook_error_embed = discord.Embed(
-            description=f"❌ **ERROR**: Could not send to Webhooks. {e}",
+            description=f"❌ Could not send to Webhooks. {e}",
             color=constants.EMBED_COLOUR_ERROR
         )
         webhook_error_embed.set_footer(text="Attempting to continue with other sends.")
@@ -966,7 +972,7 @@ async def prepare_for_gen_mission(interaction: discord.Interaction, mission_para
     carrier_data = find_carrier(mission_params.carrier_name_search_term, CarrierDbFields.longname.name)
     if not carrier_data:  # error condition
         carrier_error_embed = discord.Embed(
-            description=f"❌ **ERROR**: No carrier found for '**{mission_params.carrier_name_search_term}**'. Use `/owner` to see a list of your carriers. If it's not in the list, ask an Admin to add it for you.",
+            description=f"❌ No carrier found for '**{mission_params.carrier_name_search_term}**'. Use `/owner` to see a list of your carriers. If it's not in the list, ask an Admin to add it for you.",
             color=constants.EMBED_COLOUR_ERROR
         )
         carrier_error_embed.set_footer(text="You silly sausage.")
@@ -1018,7 +1024,7 @@ async def prepare_for_gen_mission(interaction: discord.Interaction, mission_para
             image_is_good = False
         if not image_is_good:
             print("Still no good image, aborting")
-            embed = discord.Embed(description="**ERROR**: You must have a valid mission image to continue.", color=constants.EMBED_COLOUR_ERROR)
+            embed = discord.Embed(description="❌ You must have a valid mission image to continue.", color=constants.EMBED_COLOUR_ERROR)
             mission_params.returnflag = False
             return await interaction.channel.send(embed=embed) # error condition
     print(f"image check returnflag status: {mission_params.returnflag}")
@@ -1047,6 +1053,8 @@ async def gen_mission(interaction: discord.Interaction, mission_params):
     current_channel = interaction.channel
 
     mission_params.print_values()
+
+    submit_mission = False
 
     print(f'Mission generation type: {mission_params.mission_type} requested by {interaction.user}. Request triggered from '
         f'channel {current_channel}.')
@@ -1081,6 +1089,10 @@ async def gen_mission(interaction: discord.Interaction, mission_params):
         if "d" in mission_params.sendflags: # send to discord and save to mission database
             async with interaction.channel.typing():
                 submit_mission, mission_temp_channel = await send_mission_to_discord(interaction, mission_params)
+                if not submit_mission: # error condition, cleanup after ourselves
+                    cleanup_temp_image_file(mission_params.discord_img_name)
+                    if mission_params.mission_temp_channel_id:
+                        await remove_carrier_channel(mission_params.mission_temp_channel_id, seconds_short)
 
             if "r" in mission_params.sendflags and not mission_params.edmc_off: # send to subreddit
                 async with interaction.channel.typing():
@@ -1105,7 +1117,7 @@ async def gen_mission(interaction: discord.Interaction, mission_params):
 
         else: # for mission gen to work and be stored in the database, the d option MUST be selected.
             embed = discord.Embed(
-                description="❌ **ERROR**: Sending to Discord is **required**. Please try again.",
+                description="❌ Sending to Discord is **required**. Please try again.",
                 color=constants.EMBED_COLOUR_ERROR
             )
             embed.set_footer(text="No gentle snark this time. Only mild disapproval.")
@@ -1144,7 +1156,7 @@ async def gen_mission(interaction: discord.Interaction, mission_params):
             text = "Mission was **not** entered into the database. It may require manual cleanup of channels etc."
 
         embed = discord.Embed(
-            description=f"❌ **ERROR**: {e}\n\n{text}",
+            description=f"❌ {e}\n\n{text}",
             color=constants.EMBED_COLOUR_ERROR
         )
         await interaction.channel.send(embed=embed)
@@ -1208,7 +1220,7 @@ async def create_mission_temp_channel(interaction, mission_params):
             description=f"❌ Could not acquire lock for `{mission_params.carrier_data.discord_channel}` after 10 seconds. Please try mission generation again. If the problem persists, contact an Admin.",
             color=constants.EMBED_COLOUR_ERROR
         )
-        return await interaction.channel.send("❌ **ERROR**: Channel lock could not be acquired, please try again. If the problem persists please contact an Admin.")
+        return await interaction.channel.send("❌ Channel lock could not be acquired, please try again. If the problem persists please contact an Admin.")
 
     await lockwait_msg.delete()
 

@@ -474,7 +474,7 @@ async def update_reddit_post(interaction: discord.Interaction, mission_params, s
         except Exception as e:
             print(f"Error posting to Reddit: {e}")
             reddit_error_embed = discord.Embed(
-                description=f"ERROR: Could not send to Reddit. {e}",
+                description=f"❌ Could not send to Reddit. {e}",
                 color=constants.EMBED_COLOUR_ERROR
             )
             reddit_error_embed.set_footer(text="Attempting to continue with updates.")
@@ -495,7 +495,7 @@ async def update_reddit_post(interaction: discord.Interaction, mission_params, s
             await original_post.flair.select(mission_params.channel_defs.reddit_flair_completed)
             await original_post.mod.spoiler()
         except Exception as e:
-            embed=discord.Embed(description=f"Error sending comment to old Reddit post on mission update: {e}", color=constants.EMBED_COLOUR_ERROR)
+            embed=discord.Embed(description=f"❌ Couldn't send comment to original Reddit post: {e}", color=constants.EMBED_COLOUR_ERROR)
             embed.set_footer(text="Attempting to continue with updates.")
             await interaction.channel.send(embed=embed)
             embed=discord.Embed(description=f"Error sending comment to old Reddit post on mission update: {e}", color=constants.EMBED_COLOUR_ERROR)
@@ -516,7 +516,7 @@ async def update_mission_db(interaction: discord.Interaction, mission_params, sp
 async def commodity_wine_error(interaction: discord.Interaction, mission_params):
     print("user tried to change commodity to or from wine")
     embed = discord.Embed(
-        description="ERROR: Sorry, you cannot change commodity to or from Wine.",
+        description="❌ Sorry, you cannot change commodity to or from Wine.",
         color=constants.EMBED_COLOUR_ERROR
     )
     mission_params.returnflag = False

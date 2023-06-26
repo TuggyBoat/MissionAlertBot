@@ -1,6 +1,8 @@
 """
 Functions relating to the databases used by MAB.
 
+Depends on: constants, ErrorHandler
+
 """
 
 # libraries
@@ -28,6 +30,7 @@ from ptn.missionalertbot.constants import bot
 
 # local modules
 from ptn.missionalertbot.modules.DateString import get_formatted_date_string
+from ptn.missionalertbot.modules.ErrorHandler import CustomError, on_generic_error
 
 
 # connect to sqlite carrier database
@@ -801,7 +804,7 @@ async def find_commodity(mission_params, interaction):
     if not commodities:
         mission_params.returnflag = False 
         embed = discord.Embed(
-            description=f"ERROR: No commodities found for {mission_params.commodity_search_term}.",
+            description=f"❌ No commodities found for {mission_params.commodity_search_term}.",
             color=constants.EMBED_COLOUR_ERROR
         )
         print('No commodities found for request')
@@ -813,10 +816,17 @@ async def find_commodity(mission_params, interaction):
     elif len(commodities) > 3:
         # If we ever get into a scenario where more than 3 commodities can be found with the same search directly, then
         # we need to revisit this limit
+        mission_params.returnflag = False 
         print(f'More than 3 commodities found for: "{mission_params.commodity_search_term}", {interaction.user.display_name} needs to search better.')
-        await interaction.channel.send(f'Please narrow down your commodity search, we found {len(commodities)} matches for your '
-                       f'input choice: "{mission_params.commodity_search_term}"')
+        error_message = f'Please narrow down your commodity search, we found {len(commodities)} matches for your input choice: "{mission_params.commodity_search_term}"'
+        try:
+            raise CustomError(error_message, isprivate=False)
+        except CustomError as e:
+            print(e)
+            await on_generic_error(interaction, e)
+
         return # Just return None here and let the calling method figure out what is needed to happen
+
     else:
         print(f'Between 1 and 3 commodities found for: "{mission_params.commodity_search_term}", asking {interaction.user.display_name} which they want.')
         # The database runs a partial match, in the case we have more than 1 ask the user which they want.

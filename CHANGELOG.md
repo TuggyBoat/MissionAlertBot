@@ -1,5 +1,19 @@
 # Changelog
 
+## 2.2.3
+- [#548](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/548) Errors on commodity search during mission generation now handled by the global error handler.
+- [#550](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/550) Role grant/removal context menu commands should now be more resilient to Discord lag.
+- [#549](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/549) Moved most CCOCommands errors to error handler
+
+Error message tweaks:
+
+- Various small tweaks to most error message formats
+- User-facing text now generally reads "❌" intead of "ERROR"
+- New custom error class: CustomError
+ - takes a custom message to return to the user
+ - response can be set private or public
+
+
 ## 2.2.2
 - [#545](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/545) `/cco load` and `/cco unload` now have the option to send to Discord at the top, with a note that it is mandatory.
  - Using it no longer sends exclusively to Discord, ignoring other selections.

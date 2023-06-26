@@ -1,7 +1,7 @@
 """
 A module for helper functions called by other modules.
 
-Depends on: constants, database
+Depends on: constants, ErrorHandler, database
 
 """
 
@@ -16,7 +16,6 @@ import sys
 # import discord.py
 import discord
 from discord import Interaction, app_commands
-from discord.app_commands import AppCommandError, CheckFailure
 from discord.errors import HTTPException, Forbidden, NotFound
 from discord.ext import commands
 
@@ -32,105 +31,7 @@ from ptn.missionalertbot.constants import bot, cc_role, get_overwrite_perms, get
 
 # import local modules
 from ptn.missionalertbot.database.database import find_community_carrier, CCDbFields, carrier_db, carrier_db_lock, carriers_conn, delete_community_carrier_from_db
-
-
-# custom errors
-class CommandChannelError(app_commands.CheckFailure): # channel check error
-    def __init__(self, permitted_channel, formatted_channel_list):
-        self.permitted_channel = permitted_channel
-        self.formatted_channel_list = formatted_channel_list
-        super().__init__(permitted_channel, formatted_channel_list, "Channel check error raised")
-    pass
-
-
-class CommandRoleError(app_commands.CheckFailure): # role check error
-    def __init__(self, permitted_roles, formatted_role_list):
-        self.permitted_roles = permitted_roles
-        self.formatted_role_list = formatted_role_list
-        super().__init__(permitted_roles, formatted_role_list, "Role check error raised")
-    pass
-
-
-class GenericError(Exception):
-    pass
-
-"""
-A primitive global error handler for all app commands (slash & ctx menus)
-
-returns: the error message to the user and log
-"""
-async def on_generic_error(
-    interaction: Interaction,
-    error
-):
-    if isinstance(error, GenericError):
-        print(f"Generic error raised: {error}")
-        embed = discord.Embed(
-            description=f"❌ Error: {error}",
-            color=constants.EMBED_COLOUR_ERROR
-        )
-        try:
-            await interaction.response.send_message(embed=embed, ephemeral=True)
-        except:
-            await interaction.followup.send(embed=embed, ephemeral=True)
-    else:
-        print("Another error occurred")
-
-
-async def on_app_command_error(
-    interaction: Interaction,
-    error: AppCommandError
-):
-    print(f"Error from {interaction.command.name} in {interaction.channel.name} called by {interaction.user.display_name}: {error}")
-
-    try:
-        if isinstance(error, CommandChannelError):
-            print("Channel check error raised")
-            formatted_channel_list = error.args[1]
-
-            embed=discord.Embed(
-                description=f"Sorry, you can only run this command out of: {formatted_channel_list}",
-                color=constants.EMBED_COLOUR_ERROR
-            )
-            await interaction.response.send_message(embed=embed, ephemeral=True)
-
-        elif isinstance(error, CommandRoleError):
-            print("Role check error raised")
-            permitted_roles = error.args[0]
-            formatted_role_list = error.args[1]
-            if len(permitted_roles)>1:
-                embed=discord.Embed(
-                    description=f"**Permission denied**: You need one of the following roles to use this command:\n{formatted_role_list}",
-                    color=constants.EMBED_COLOUR_ERROR
-                )
-            else:
-                embed=discord.Embed(
-                    description=f"**Permission denied**: You need the following role to use this command:\n{formatted_role_list}",
-                    color=constants.EMBED_COLOUR_ERROR
-                )
-            print("notify user")
-            await interaction.response.send_message(embed=embed, ephemeral=True)
-
-        elif isinstance(error, GenericError):
-            print("Generic error raised")
-            embed = discord.Embed(
-                description=f"❌ Error: {error}",
-                color=constants.EMBED_COLOUR_ERROR
-            )
-            try:
-                await interaction.response.send_message(embed=embed, ephemeral=True)
-            except:
-                await interaction.followup.send(embed=embed, ephemeral=True)
-
-        else:
-            print("Generic error message raised")
-            try:
-                await interaction.response.send_message(error, ephemeral=True)
-            except:
-                await interaction.followup.send(error, ephemeral=True)
-
-    except Exception as e:
-        print(f"An error occurred in the error handler (lol): {e}")
+from ptn.missionalertbot.modules.ErrorHandler import CommandChannelError, CommandRoleError
 
 
 # trio of helper functions to check a user's permission to run a command based on their roles, and return a helpful error if they don't have the correct role(s)
@@ -318,7 +219,7 @@ async def _cc_role_create_check(interaction, new_channel_name):
     if new_role:
         # if the role exists we won't use it because it could lead to security concerns :(
         print(f"Role {new_role} already exists.")
-        embed = discord.Embed(description=f"**Error**: The role <@&{new_role.id}> already exists. Please choose a different name for your Community channel or delete the existing role and try again.", color=constants.EMBED_COLOUR_ERROR)
+        embed = discord.Embed(description=f"❌ The role <@&{new_role.id}> already exists. Please choose a different name for your Community channel or delete the existing role and try again.", color=constants.EMBED_COLOUR_ERROR)
         await interaction.response.send_message(embed=embed)
         return False
     return True
@@ -427,7 +328,7 @@ async def _remove_cc_manager(interaction, delete_channel, button_self):
     community_carrier = CommunityCarrierData(carrier_db.fetchone())
     # error if not
     if not community_carrier:
-        embed = discord.Embed(description=f"Error: This somehow does not appear to be a community channel anymore(?).", color=constants.EMBED_COLOUR_ERROR, ephemeral=True)
+        embed = discord.Embed(description=f"❌ This somehow does not appear to be a community channel anymore(?).", color=constants.EMBED_COLOUR_ERROR, ephemeral=True)
         await interaction.response.send_message(embed=embed)
         return
 
@@ -603,14 +504,14 @@ async def _openclose_community_channel(interaction, open):
     #check we're in the right category
     cc_category = discord.utils.get(interaction.guild.categories, id=cc_cat())
     if not interaction.channel.category == cc_category:
-        embed = discord.Embed(description=f"**Error**: This command can only be used in an active Community channel in the <#{cc_cat()}> category.", color=constants.EMBED_COLOUR_ERROR)
+        embed = discord.Embed(description=f"❌ This command can only be used in an active Community channel in the <#{cc_cat()}> category.", color=constants.EMBED_COLOUR_ERROR)
         return await interaction.response.send_message(embed=embed, ephemeral=True)
 
     # now set permissions
     try:
         await interaction.channel.set_permissions(interaction.guild.default_role, overwrite=None) if open else await interaction.channel.set_permissions(interaction.guild.default_role, read_messages=False)
     except Exception as e:
-        embed = discord.Embed(description=f"**ERROR**: Could not {status_text_verb} channel: {e}")
+        embed = discord.Embed(description=f"❌ Could not {status_text_verb} channel: {e}")
         await interaction.response.send_message(embed=embed, ephemeral=True)
         return
 
