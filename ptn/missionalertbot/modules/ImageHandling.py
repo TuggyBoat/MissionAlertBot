@@ -314,7 +314,7 @@ async def assign_carrier_image(interaction: discord.Interaction, lookname, origi
                 except Exception as e: # they uploaded something daft
                     print(e)
                     embed = discord.Embed(
-                        description="ERROR: I don't recognise that as an image file. Upload aborted.",
+                        description="❌ I don't recognise that as an image file. Upload aborted.",
                         color=constants.EMBED_COLOUR_ERROR
                     )
                     await interaction.channel.send(embed=embed)

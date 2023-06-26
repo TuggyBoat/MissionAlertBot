@@ -28,7 +28,8 @@ from ptn.missionalertbot.constants import bot, bot_command_channel, bot_dev_chan
 from ptn.missionalertbot.database.database import backup_database, find_carrier, find_mission, _is_carrier_channel, \
     mission_db, carrier_db, carrier_db_lock, carriers_conn, find_nominator_with_id, delete_nominee_by_nominator, find_community_carrier, CCDbFields
 from ptn.missionalertbot.modules.Embeds import _is_mission_active_embed, _format_missions_embed
-from ptn.missionalertbot.modules.helpers import bot_exit, check_roles, check_command_channel, on_app_command_error, unlock_mission_channel, lock_mission_channel, check_mission_channel_lock
+from ptn.missionalertbot.modules.ErrorHandler import on_app_command_error
+from ptn.missionalertbot.modules.helpers import bot_exit, check_roles, check_command_channel, unlock_mission_channel, lock_mission_channel, check_mission_channel_lock
 from ptn.missionalertbot.modules.BackgroundTasks import lasttrade_cron, _monitor_reddit_comments
 from ptn.missionalertbot.modules.MissionCleaner import check_trade_channels_on_startup
 
@@ -626,7 +627,7 @@ class GeneralCommands(commands.Cog):
         # check if role actually exists
         if not notify_role:
             await interaction.response.send_message("Sorry, I couldn't find a notification role for this channel. Please report this to an Admin.", ephemeral=True)
-            await spamchannel.send(f"**ERROR**: {interaction.user} tried to use `/notify_me` in <#{interaction.channel.id}> but received an error (role does not exist).")
+            await spamchannel.send(f"❌ {interaction.user} tried to use `/notify_me` in <#{interaction.channel.id}> but received an error (role does not exist).")
             print(f"No role found matching {interaction.channel}")
             return
 

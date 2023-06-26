@@ -120,7 +120,7 @@ async def _cleanup_completed_mission(interaction: discord.Interaction, mission_d
                     await submission.flair.select(mission_params.channel_defs.reddit_flair_completed)
                     await submission.mod.spoiler()
                 except:
-                    feedback_embed.add_field(name="Error", value="Failed updating Reddit :(")
+                    feedback_embed.add_field(name="Error", value="❌ Failed updating Reddit :(")
 
 
             # update webhooks
@@ -157,7 +157,7 @@ async def _cleanup_completed_mission(interaction: discord.Interaction, mission_d
 
                         except Exception as e:
                             print(f"Failed updating webhook message {webhook_jump_url} with URL {webhook_url}: {e}")
-                            await feedback_embed.add_field(name="Error", value=f"Failed updating webhook message {webhook_jump_url} with URL {webhook_url}: {e}")
+                            await feedback_embed.add_field(name="Error", value=f"❌ Failed updating webhook message {webhook_jump_url} with URL {webhook_url}: {e}")
             except: 
                 print("No mission_params found to define webhooks, pre-2.1.0 mission?")
 

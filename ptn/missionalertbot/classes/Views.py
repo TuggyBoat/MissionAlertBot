@@ -1,7 +1,7 @@
 """
 Define classes for Views used by Interactions
 
-Depends on: constants, database, Embeds, helpers, MissionCleaner
+Depends on: constants, database, Embeds, ErrorHandler, helpers, MissionCleaner
 
 """
 
@@ -21,7 +21,8 @@ from ptn.missionalertbot.constants import seconds_long, o7_emoji, bot_spam_chann
 from ptn.missionalertbot.database.database import delete_nominee_from_db, delete_carrier_from_db, _update_carrier_details_in_database, find_carrier, CarrierDbFields, mission_db, missions_conn
 from ptn.missionalertbot.modules.DateString import get_mission_delete_hammertime
 from ptn.missionalertbot.modules.Embeds import _configure_all_carrier_detail_embed, _generate_cc_notice_embed, role_removed_embed, role_granted_embed
-from ptn.missionalertbot.modules.helpers import _remove_cc_manager, GenericError, on_generic_error
+from ptn.missionalertbot.modules.ErrorHandler import GenericError, on_generic_error
+from ptn.missionalertbot.modules.helpers import _remove_cc_manager
 from ptn.missionalertbot.modules.MissionCleaner import _cleanup_completed_mission
 
 

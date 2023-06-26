@@ -26,8 +26,8 @@ from ptn.missionalertbot.classes.Views import ConfirmRemoveRoleView, ConfirmGran
 from ptn.missionalertbot.database.database import find_mission, find_webhook_from_owner, add_webhook_to_database, find_webhook_by_name, delete_webhook_by_name, CarrierDbFields, find_carrier
 from ptn.missionalertbot.modules.DateString import get_mission_delete_hammertime
 from ptn.missionalertbot.modules.Embeds import role_granted_embed, confirm_remove_role_embed, role_already_embed, confirm_grant_role_embed
-from ptn.missionalertbot.modules.helpers import on_app_command_error, convert_str_to_float_or_int, check_command_channel, check_roles, check_training_mode, on_generic_error, \
-    GenericError
+from ptn.missionalertbot.modules.ErrorHandler import on_app_command_error, on_generic_error, GenericError
+from ptn.missionalertbot.modules.helpers import convert_str_to_float_or_int, check_command_channel, check_roles, check_training_mode
 from ptn.missionalertbot.modules.ImageHandling import assign_carrier_image
 from ptn.missionalertbot.modules.MissionGenerator import confirm_send_mission_via_button
 from ptn.missionalertbot.modules.MissionCleaner import _cleanup_completed_mission
@@ -143,7 +143,7 @@ async def cco_mission_complete(interaction, carrier, is_complete, message):
     mission_data = find_mission(carrier, "carrier")
     if not mission_data:
         embed = discord.Embed(
-            description=f"**ERROR**: no trade missions found for carriers matching \"**{carrier}\"**.",
+            description=f"❌ No trade missions found for carriers matching \"**{carrier}\"**.",
             color=constants.EMBED_COLOUR_ERROR)
         return await interaction.response.send_message(embed=embed, ephemeral=True)
 
@@ -332,7 +332,7 @@ class CCOCommands(commands.Cog):
             carrier_data = find_carrier(carrier, CarrierDbFields.longname.name)
             if not carrier_data:
                 embed = discord.Embed(
-                    description=f"Error: no carrier found matching {carrier}.",
+                    description=f"❌ no carrier found matching {carrier}.",
                     color=constants.EMBED_COLOUR_ERROR
                 )
                 return await interaction.response.send_message(embed=embed)
@@ -341,7 +341,7 @@ class CCOCommands(commands.Cog):
             mission_data = find_mission(carrier_data.carrier_long_name, 'Carrier')
             if not mission_data:
                 embed = discord.Embed(
-                    description=f"Error: no active mission found for {carrier_data.carrier_long_name} ({carrier_data.carrier_identifier}).",
+                    description=f"❌ no active mission found for {carrier_data.carrier_long_name} ({carrier_data.carrier_identifier}).",
                     color=constants.EMBED_COLOUR_ERROR
                 )
                 return await interaction.response.send_message(embed=embed)
@@ -493,7 +493,7 @@ class CCOCommands(commands.Cog):
                 if webhook.webhook_url == webhook_url:
                     print("Found duplicate webhook for URL")
                     embed = discord.Embed(
-                        description=f"ERROR: You already have a webhook with that URL called \"{webhook.webhook_name}\": {webhook.webhook_url}",
+                        description=f"❌ You already have a webhook with that URL called \"{webhook.webhook_name}\": {webhook.webhook_url}",
                         color=constants.EMBED_COLOUR_ERROR
                     )
                     await interaction.edit_original_response(embed=embed)
@@ -502,7 +502,7 @@ class CCOCommands(commands.Cog):
                 elif webhook.webhook_name == webhook_name:
                     print("Found duplicate webhook for name")
                     embed = discord.Embed(
-                        description=f"ERROR: You already have a webhook called \"{webhook.webhook_name}\": {webhook.webhook_url}",
+                        description=f"❌ You already have a webhook called \"{webhook.webhook_name}\": {webhook.webhook_url}",
                         color=constants.EMBED_COLOUR_ERROR
                     )
                     await interaction.edit_original_response(embed=embed)
@@ -529,7 +529,7 @@ class CCOCommands(commands.Cog):
 
         except Exception as e: # webhook could not be sent
             embed = discord.Embed(
-                description=f"ERROR: {e}",
+                description=f"❌ {e}",
                 color=constants.EMBED_COLOUR_ERROR
             )
             embed.set_footer(text="Webhook could not be validated: unable to send message to webhook.")
@@ -546,7 +546,7 @@ class CCOCommands(commands.Cog):
             await add_webhook_to_database(interaction.user.id, webhook_url, webhook_name)
         except Exception as e:
             embed = discord.Embed(
-                description=f"ERROR: {e}",
+                description=f"❌ {e}",
                 color=constants.EMBED_COLOUR_ERROR
             )
             await interaction.edit_original_response(embed=embed)
@@ -627,7 +627,7 @@ class CCOCommands(commands.Cog):
                 await interaction.response.send_message(embed=embed, ephemeral=True)
             except Exception as e:
                 embed = discord.Embed(
-                    description=f"ERROR: {e}",
+                    description=f"❌ {e}",
                     color=constants.EMBED_COLOUR_ERROR
                 )
                 await interaction.response.send_message(embed=embed, ephemeral=True)
