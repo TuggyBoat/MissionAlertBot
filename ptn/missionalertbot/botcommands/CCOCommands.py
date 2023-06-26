@@ -54,6 +54,13 @@ CERTIFIED CARRIER OWNER COMMANDS
 async def toggle_cco_trainee(interaction:  discord.Interaction, member: discord.Member):
     print(f"toggle_cco_trainee called by {interaction.user.display_name} for {member.display_name}")
 
+    embed = discord.Embed(
+        description=f"⏳ Toggling <@&{trainee_role()}> role for <@{member.id}>...",
+        color=constants.EMBED_COLOUR_QU
+    )
+
+    await interaction.response.send_message(embed=embed, ephemeral=True)
+
     spamchannel = bot.get_channel(bot_spam_channel())
 
     member_roles = member.roles
@@ -69,7 +76,7 @@ async def toggle_cco_trainee(interaction:  discord.Interaction, member: discord.
          
             # feed back to the command user
             embed, bot_spam_embed = role_granted_embed(interaction, member, cco_trainee_role_object)
-            await interaction.response.send_message(embed=embed, ephemeral=True)
+            await interaction.edit_original_response(embed=embed)
             await spamchannel.send(embed=bot_spam_embed)
 
         except Exception as e:
@@ -84,7 +91,7 @@ async def toggle_cco_trainee(interaction:  discord.Interaction, member: discord.
 
         embed = confirm_remove_role_embed(member, cco_trainee_role_object)
 
-        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+        await interaction.edit_original_response(embed=embed, view=view)
         view.message = await interaction.original_response()
 
 
@@ -92,6 +99,13 @@ async def toggle_cco_trainee(interaction:  discord.Interaction, member: discord.
 @check_roles([cco_mentor_role(), admin_role(), mod_role()])
 async def toggle_cco(interaction:  discord.Interaction, member: discord.Member):
     print(f"toggle_cco called by {interaction.user.display_name} for {member.display_name}")
+
+    embed = discord.Embed(
+        description=f"⏳ Preparing to make <@{member.id}> a <@&{certcarrier_role()}>...",
+        color=constants.EMBED_COLOUR_QU
+    )
+
+    await interaction.response.send_message(embed=embed, ephemeral=True)
 
     member_roles = member.roles
     cco_role = discord.utils.get(interaction.guild.roles, id=certcarrier_role())
@@ -111,7 +125,7 @@ async def toggle_cco(interaction:  discord.Interaction, member: discord.Member):
 
             embed = confirm_grant_role_embed(member, cco_role)
 
-            await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+            await interaction.edit_original_response(embed=embed, view=view)
             view.message = await interaction.original_response()
 
         except Exception as e:
@@ -129,7 +143,7 @@ async def toggle_cco(interaction:  discord.Interaction, member: discord.Member):
             color=constants.EMBED_COLOUR_RP
         )
         embeds = [embed, whoops_embed]
-        await interaction.response.send_message(embeds=embeds, ephemeral=True)
+        await interaction.edit_original_response(embeds=embeds)
 
 
 async def cco_mission_complete(interaction, carrier, is_complete, message):

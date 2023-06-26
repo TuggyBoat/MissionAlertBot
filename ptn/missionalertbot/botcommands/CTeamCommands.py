@@ -50,6 +50,13 @@ Event Organiser
 async def verify_member(interaction:  discord.Interaction, message: discord.Message):
     print(f"verify_member called by {interaction.user.display_name} for {message.author.display_name}")
 
+    embed = discord.Embed(
+        description=f"⏳ Making <@{message.author.id}> a Verified Member...",
+        color=constants.EMBED_COLOUR_QU
+    )
+
+    await interaction.response.send_message(embed=embed, ephemeral=True)
+
     spamchannel = bot.get_channel(bot_spam_channel())
 
     member = message.author
@@ -69,7 +76,7 @@ async def verify_member(interaction:  discord.Interaction, message: discord.Mess
             
             # feed back to the command user
             embed, bot_spam_embed = role_granted_embed(interaction, member, vm_role)
-            await interaction.response.send_message(embed=embed, ephemeral=True)
+            await interaction.edit_original_response(embed=embed)
             await spamchannel.send(embed=bot_spam_embed)
 
             # dm the target user
@@ -87,13 +94,20 @@ async def verify_member(interaction:  discord.Interaction, message: discord.Mess
     else:
         print("Member has role already")
         embed = role_already_embed(message.author, vm_role)
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+        await interaction.edit_original_response(embed=embed)
 
 
 @bot.tree.context_menu(name='Toggle Event Organiser')
 @check_roles([cmentor_role(), admin_role(), mod_role()])
 async def toggle_event_organiser(interaction:  discord.Interaction, member: discord.Member):
     print(f"toggle_event_organiser called by {interaction.user.display_name} for {member.display_name}")
+
+    embed = discord.Embed(
+        description=f"⏳ Toggling <@&{event_organiser_role()}> role for <@{member.id}>...",
+        color=constants.EMBED_COLOUR_QU
+    )
+
+    await interaction.response.send_message(embed=embed, ephemeral=True)
 
     spamchannel = bot.get_channel(bot_spam_channel())
 
@@ -110,7 +124,7 @@ async def toggle_event_organiser(interaction:  discord.Interaction, member: disc
          
             # feed back to the command user
             embed, bot_spam_embed = role_granted_embed(interaction, member, eo_role)
-            await interaction.response.send_message(embed=embed, ephemeral=True)
+            await interaction.edit_original_response(embed=embed)
             await spamchannel.send(embed=bot_spam_embed)
 
             # dm the target user
@@ -130,7 +144,7 @@ async def toggle_event_organiser(interaction:  discord.Interaction, member: disc
 
         embed = confirm_remove_role_embed(member, eo_role)
 
-        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+        await interaction.edit_original_response(embed=embed, view=view)
         view.message = await interaction.original_response()
 
 
