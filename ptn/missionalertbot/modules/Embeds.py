@@ -183,8 +183,10 @@ def role_granted_embed(interaction, user, role):
     )
 
     try:
+        print("Checking for command name...")
         command_name = f" using `{interaction.command.name}`"
     except:
+        print("Command name not accessible")
         command_name = ""
 
     desc = f"<@{interaction.user.id}> gave the <@&{role.id}> role to <@{user.id}>" + command_name
@@ -193,6 +195,7 @@ def role_granted_embed(interaction, user, role):
         color=constants.EMBED_COLOUR_OK
     )
 
+    print("Returning embed")
     return embed, bot_spam_embed
 
 # embed to feedback that a user already has the target role
@@ -240,8 +243,10 @@ def role_removed_embed(interaction, user, role):
     )
 
     try:
+        print("Checking for command name...")
         command_name = f" using `{interaction.command.name}`"
     except:
+        print("Command name not accessible")
         command_name = ""
 
     desc = f"<@{interaction.user.id}> removed the <@&{role.id}> role from <@{user.id}>" + command_name
@@ -251,4 +256,5 @@ def role_removed_embed(interaction, user, role):
         color=constants.EMBED_COLOUR_OK
     )
 
+    print("Returning embed")
     return embed, bot_spam_embed

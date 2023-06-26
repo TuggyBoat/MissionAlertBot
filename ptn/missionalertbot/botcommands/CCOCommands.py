@@ -26,8 +26,8 @@ from ptn.missionalertbot.classes.Views import ConfirmRemoveRoleView, ConfirmGran
 from ptn.missionalertbot.database.database import find_mission, find_webhook_from_owner, add_webhook_to_database, find_webhook_by_name, delete_webhook_by_name, CarrierDbFields, find_carrier
 from ptn.missionalertbot.modules.DateString import get_mission_delete_hammertime
 from ptn.missionalertbot.modules.Embeds import role_granted_embed, confirm_remove_role_embed, role_already_embed, confirm_grant_role_embed
-from ptn.missionalertbot.modules.helpers import on_app_command_error, convert_str_to_float_or_int, check_command_channel, check_roles, check_training_mode, on_generic_error, \
-    GenericError
+from ptn.missionalertbot.modules.ErrorHandler import on_app_command_error, on_generic_error, GenericError, CustomError
+from ptn.missionalertbot.modules.helpers import convert_str_to_float_or_int, check_command_channel, check_roles, check_training_mode
 from ptn.missionalertbot.modules.ImageHandling import assign_carrier_image
 from ptn.missionalertbot.modules.MissionGenerator import confirm_send_mission_via_button
 from ptn.missionalertbot.modules.MissionCleaner import _cleanup_completed_mission
@@ -54,6 +54,13 @@ CERTIFIED CARRIER OWNER COMMANDS
 async def toggle_cco_trainee(interaction:  discord.Interaction, member: discord.Member):
     print(f"toggle_cco_trainee called by {interaction.user.display_name} for {member.display_name}")
 
+    embed = discord.Embed(
+        description=f"⏳ Toggling <@&{trainee_role()}> role for <@{member.id}>...",
+        color=constants.EMBED_COLOUR_QU
+    )
+
+    await interaction.response.send_message(embed=embed, ephemeral=True)
+
     spamchannel = bot.get_channel(bot_spam_channel())
 
     member_roles = member.roles
@@ -69,7 +76,7 @@ async def toggle_cco_trainee(interaction:  discord.Interaction, member: discord.
          
             # feed back to the command user
             embed, bot_spam_embed = role_granted_embed(interaction, member, cco_trainee_role_object)
-            await interaction.response.send_message(embed=embed, ephemeral=True)
+            await interaction.edit_original_response(embed=embed)
             await spamchannel.send(embed=bot_spam_embed)
 
         except Exception as e:
@@ -84,7 +91,7 @@ async def toggle_cco_trainee(interaction:  discord.Interaction, member: discord.
 
         embed = confirm_remove_role_embed(member, cco_trainee_role_object)
 
-        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+        await interaction.edit_original_response(embed=embed, view=view)
         view.message = await interaction.original_response()
 
 
@@ -92,6 +99,13 @@ async def toggle_cco_trainee(interaction:  discord.Interaction, member: discord.
 @check_roles([cco_mentor_role(), admin_role(), mod_role()])
 async def toggle_cco(interaction:  discord.Interaction, member: discord.Member):
     print(f"toggle_cco called by {interaction.user.display_name} for {member.display_name}")
+
+    embed = discord.Embed(
+        description=f"⏳ Preparing to make <@{member.id}> a <@&{certcarrier_role()}>...",
+        color=constants.EMBED_COLOUR_QU
+    )
+
+    await interaction.response.send_message(embed=embed, ephemeral=True)
 
     member_roles = member.roles
     cco_role = discord.utils.get(interaction.guild.roles, id=certcarrier_role())
@@ -111,7 +125,7 @@ async def toggle_cco(interaction:  discord.Interaction, member: discord.Member):
 
             embed = confirm_grant_role_embed(member, cco_role)
 
-            await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+            await interaction.edit_original_response(embed=embed, view=view)
             view.message = await interaction.original_response()
 
         except Exception as e:
@@ -129,7 +143,7 @@ async def toggle_cco(interaction:  discord.Interaction, member: discord.Member):
             color=constants.EMBED_COLOUR_RP
         )
         embeds = [embed, whoops_embed]
-        await interaction.response.send_message(embeds=embeds, ephemeral=True)
+        await interaction.edit_original_response(embeds=embeds)
 
 
 async def cco_mission_complete(interaction, carrier, is_complete, message):
@@ -140,12 +154,12 @@ async def cco_mission_complete(interaction, carrier, is_complete, message):
     print(f'Request received from {interaction.user.display_name} to mark the mission of {carrier} as done from channel: '
         f'{current_channel}')
 
-    mission_data = find_mission(carrier, "carrier")
-    if not mission_data:
-        embed = discord.Embed(
-            description=f"**ERROR**: no trade missions found for carriers matching \"**{carrier}\"**.",
-            color=constants.EMBED_COLOUR_ERROR)
-        return await interaction.response.send_message(embed=embed, ephemeral=True)
+    try:
+        mission_data = find_mission(carrier, "carrier")
+        if not mission_data:
+            raise CustomError(f"No trade missions found for carriers matching `{carrier}`")
+    except CustomError as e:
+        return await on_generic_error(interaction, e)
 
     else:
         embed = discord.Embed(
@@ -182,7 +196,6 @@ class CCOCommands(commands.Cog):
     # custom global error handler
     # attaching the handler when the cog is loaded
     # and storing the old handler
-    # this is required for option 1
     def cog_load(self):
         tree = self.bot.tree
         self._old_tree_error = tree.on_error
@@ -329,22 +342,20 @@ class CCOCommands(commands.Cog):
 
             # find the target carrier
             print("Looking for carrier data")
-            carrier_data = find_carrier(carrier, CarrierDbFields.longname.name)
-            if not carrier_data:
-                embed = discord.Embed(
-                    description=f"Error: no carrier found matching {carrier}.",
-                    color=constants.EMBED_COLOUR_ERROR
-                )
-                return await interaction.response.send_message(embed=embed)
+            try:
+                carrier_data = find_carrier(carrier, CarrierDbFields.longname.name)
+                if not carrier_data:
+                    raise CustomError(f"No carrier found matching {carrier}.")
+            except CustomError as e:
+                return await on_generic_error(interaction, e)
 
             # find mission data for carrier
-            mission_data = find_mission(carrier_data.carrier_long_name, 'Carrier')
-            if not mission_data:
-                embed = discord.Embed(
-                    description=f"Error: no active mission found for {carrier_data.carrier_long_name} ({carrier_data.carrier_identifier}).",
-                    color=constants.EMBED_COLOUR_ERROR
-                )
-                return await interaction.response.send_message(embed=embed)
+            try:
+                mission_data = find_mission(carrier_data.carrier_long_name, 'Carrier')
+                if not mission_data:
+                    raise CustomError(f"No active mission found for {carrier_data.carrier_long_name} ({carrier_data.carrier_identifier}).")
+            except CustomError as e:
+                return await on_generic_error(interaction, e)
 
             # define the original mission_params
             mission_params = mission_data.mission_params
@@ -490,24 +501,18 @@ class CCOCommands(commands.Cog):
         webhook_data = find_webhook_from_owner(interaction.user.id)
         if webhook_data:
             for webhook in webhook_data:
-                if webhook.webhook_url == webhook_url:
-                    print("Found duplicate webhook for URL")
-                    embed = discord.Embed(
-                        description=f"ERROR: You already have a webhook with that URL called \"{webhook.webhook_name}\": {webhook.webhook_url}",
-                        color=constants.EMBED_COLOUR_ERROR
-                    )
-                    await interaction.edit_original_response(embed=embed)
-                    return
+                try:
+                    if webhook.webhook_url == webhook_url:
+                        print("Found duplicate webhook for URL")
+                        raise CustomError(f"You already have a webhook with that URL called \"{webhook.webhook_name}\": {webhook.webhook_url}")
 
-                elif webhook.webhook_name == webhook_name:
-                    print("Found duplicate webhook for name")
-                    embed = discord.Embed(
-                        description=f"ERROR: You already have a webhook called \"{webhook.webhook_name}\": {webhook.webhook_url}",
-                        color=constants.EMBED_COLOUR_ERROR
-                    )
-                    await interaction.edit_original_response(embed=embed)
-                    return
-                
+                    elif webhook.webhook_name == webhook_name:
+                        print("Found duplicate webhook for name")
+                        raise CustomError(f"You already have a webhook called \"{webhook.webhook_name}\": {webhook.webhook_url}")
+
+                except CustomError as e:
+                    return await on_generic_error(interaction, e)
+
                 else:
                     print("Webhook is not duplicate, proceeding")
 
@@ -529,7 +534,7 @@ class CCOCommands(commands.Cog):
 
         except Exception as e: # webhook could not be sent
             embed = discord.Embed(
-                description=f"ERROR: {e}",
+                description=f"❌ {e}",
                 color=constants.EMBED_COLOUR_ERROR
             )
             embed.set_footer(text="Webhook could not be validated: unable to send message to webhook.")
@@ -545,19 +550,18 @@ class CCOCommands(commands.Cog):
         try:
             await add_webhook_to_database(interaction.user.id, webhook_url, webhook_name)
         except Exception as e:
-            embed = discord.Embed(
-                description=f"ERROR: {e}",
-                color=constants.EMBED_COLOUR_ERROR
-            )
-            await interaction.edit_original_response(embed=embed)
+            try:
+                raise GenericError(e)
+            except Exception as e:
+                await on_generic_error(interaction, e)
 
-            # notify in bot_spam
-            embed = discord.Embed(
-                description=f"Error on /webhook_add by {interaction.user}: {e}",
-                color=constants.EMBED_COLOUR_ERROR
-            )
-            await spamchannel.send(embed=embed)
-            return print(f"Error on /webhook_add by {interaction.user}: {e}")
+                # notify in bot_spam
+                embed = discord.Embed(
+                    description=f"Error on /webhook_add by {interaction.user}: {e}",
+                    color=constants.EMBED_COLOUR_ERROR
+                )
+                await spamchannel.send(embed=embed)
+                return print(f"Error on /webhook_add by {interaction.user}: {e}")
 
         # notify user of success
         embed = discord.Embed(title="WEBHOOK ADDED",
@@ -626,17 +630,15 @@ class CCOCommands(commands.Cog):
                 )
                 await interaction.response.send_message(embed=embed, ephemeral=True)
             except Exception as e:
-                embed = discord.Embed(
-                    description=f"ERROR: {e}",
-                    color=constants.EMBED_COLOUR_ERROR
-                )
-                await interaction.response.send_message(embed=embed, ephemeral=True)
+                try:
+                    raise GenericError(e)
+                except Exception as e:
+                    return await on_generic_error(interaction, e)
 
         else: # no webhook data found
-            embed = discord.Embed(
-                description=f"No webhook found matching {webhook_data.webhook_name}",
-                color=constants.EMBED_COLOUR_ERROR
-            )
-            await interaction.response.send_message(embed=embed, ephemeral=True)
+            try:
+                raise CustomError(f"No webhook found matching identifier `{webhook_name}`. You can use `/cco webhook view` to view your webhooks.")
+            except Exception as e:
+                return await on_generic_error(interaction, e)
 
         return

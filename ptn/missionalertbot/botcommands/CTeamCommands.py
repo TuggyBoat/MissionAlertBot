@@ -24,9 +24,10 @@ from ptn.missionalertbot.constants import bot, cmentor_role, admin_role, cc_role
 
 # import local modules
 from ptn.missionalertbot.database.database import carrier_db
-from ptn.missionalertbot.modules.helpers import on_app_command_error, check_roles, _regex_alphanumeric_with_hyphens, _cc_owner_check, _cc_role_create_check, \
-    _cc_create_channel, _cc_role_create, _cc_assign_permissions, _cc_db_enter, _remove_cc_role_from_owner, _cc_role_delete, _openclose_community_channel, _send_notice_channel_check, \
-    check_command_channel, GenericError, on_generic_error
+from ptn.missionalertbot.modules.ErrorHandler import on_app_command_error, GenericError, on_generic_error
+from ptn.missionalertbot.modules.helpers import check_roles, _regex_alphanumeric_with_hyphens, _cc_owner_check, _cc_role_create_check, \
+    _cc_create_channel, _cc_role_create, _cc_assign_permissions, _cc_db_enter, _remove_cc_role_from_owner, _cc_role_delete, _openclose_community_channel, \
+    _send_notice_channel_check, check_command_channel
 from ptn.missionalertbot.modules.Embeds import _generate_cc_notice_embed, verified_member_embed, event_organiser_embed, role_granted_embed, role_already_embed, \
     confirm_remove_role_embed
 
@@ -49,6 +50,13 @@ Event Organiser
 async def verify_member(interaction:  discord.Interaction, message: discord.Message):
     print(f"verify_member called by {interaction.user.display_name} for {message.author.display_name}")
 
+    embed = discord.Embed(
+        description=f"⏳ Making <@{message.author.id}> a Verified Member...",
+        color=constants.EMBED_COLOUR_QU
+    )
+
+    await interaction.response.send_message(embed=embed, ephemeral=True)
+
     spamchannel = bot.get_channel(bot_spam_channel())
 
     member = message.author
@@ -68,7 +76,7 @@ async def verify_member(interaction:  discord.Interaction, message: discord.Mess
             
             # feed back to the command user
             embed, bot_spam_embed = role_granted_embed(interaction, member, vm_role)
-            await interaction.response.send_message(embed=embed, ephemeral=True)
+            await interaction.edit_original_response(embed=embed)
             await spamchannel.send(embed=bot_spam_embed)
 
             # dm the target user
@@ -86,13 +94,20 @@ async def verify_member(interaction:  discord.Interaction, message: discord.Mess
     else:
         print("Member has role already")
         embed = role_already_embed(message.author, vm_role)
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+        await interaction.edit_original_response(embed=embed)
 
 
 @bot.tree.context_menu(name='Toggle Event Organiser')
 @check_roles([cmentor_role(), admin_role(), mod_role()])
 async def toggle_event_organiser(interaction:  discord.Interaction, member: discord.Member):
     print(f"toggle_event_organiser called by {interaction.user.display_name} for {member.display_name}")
+
+    embed = discord.Embed(
+        description=f"⏳ Toggling <@&{event_organiser_role()}> role for <@{member.id}>...",
+        color=constants.EMBED_COLOUR_QU
+    )
+
+    await interaction.response.send_message(embed=embed, ephemeral=True)
 
     spamchannel = bot.get_channel(bot_spam_channel())
 
@@ -109,7 +124,7 @@ async def toggle_event_organiser(interaction:  discord.Interaction, member: disc
          
             # feed back to the command user
             embed, bot_spam_embed = role_granted_embed(interaction, member, eo_role)
-            await interaction.response.send_message(embed=embed, ephemeral=True)
+            await interaction.edit_original_response(embed=embed)
             await spamchannel.send(embed=bot_spam_embed)
 
             # dm the target user
@@ -129,7 +144,7 @@ async def toggle_event_organiser(interaction:  discord.Interaction, member: disc
 
         embed = confirm_remove_role_embed(member, eo_role)
 
-        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+        await interaction.edit_original_response(embed=embed, view=view)
         view.message = await interaction.original_response()
 
 
@@ -182,7 +197,7 @@ async def edit_cc_notice(interaction:  discord.Interaction, message: discord.Mes
     We can check 2 & 3 with the same string
     """
     if not message.author.id == bot.user.id or not f"New message from <@{interaction.user.id}>" in message.content:
-        await interaction.response.send_message(embed=discord.Embed(description=f"Error: This does not appear to be a CC Notice message, or a CC Notice message authored by you.", color=constants.EMBED_COLOUR_ERROR), ephemeral=True)
+        await interaction.response.send_message(embed=discord.Embed(description=f"❌ This does not appear to be a CC Notice message, or a CC Notice message authored by you.", color=constants.EMBED_COLOUR_ERROR), ephemeral=True)
 
     # Zhu'li, do the thing
     # call the sendnotice modal to take the message
@@ -217,7 +232,7 @@ async def upload_cc_thumb(interaction:  discord.Interaction, message: discord.Me
             try: # try to delete it
                 os.remove(f"{constants.CC_IMAGE_PATH}/{interaction.channel.id}.png")
             except Exception as e:
-                await interaction.followup.send(embed = discord.Embed(description=f"**ERROR**: {e}", color=constants.EMBED_COLOUR_ERROR), ephemeral=True)
+                await interaction.followup.send(embed = discord.Embed(description=f"❌ {e}", color=constants.EMBED_COLOUR_ERROR), ephemeral=True)
     return
 
 
@@ -244,7 +259,6 @@ class CTeamCommands(commands.Cog):
     # custom global error handler
     # attaching the handler when the cog is loaded
     # and storing the old handler
-    # this is required for option 1
     def cog_load(self):
         tree = self.bot.tree
         self._old_tree_error = tree.on_error
@@ -277,7 +291,7 @@ class CTeamCommands(commands.Cog):
         # PROCESS: check for valid emoji
         print(emoji.is_emoji(emoji_string))
         if not emoji.is_emoji(emoji_string) and not emoji_string == None:
-            embed = discord.Embed(description="**Error**: Invalid emoji supplied. Use a valid Unicode emoji from your emoji keyboard,"
+            embed = discord.Embed(description="❌ Invalid emoji supplied. Use a valid Unicode emoji from your emoji keyboard,"
                                             f"or leave the field blank. **Discord custom emojis will not work**.", color=constants.EMBED_COLOUR_ERROR)
             bu_link = Button(label="Full Emoji List", url="https://unicode.org/emoji/charts/full-emoji-list.html")
             view = View()
@@ -289,7 +303,7 @@ class CTeamCommands(commands.Cog):
 
         # check the channel name isn't too long
         if len(stripped_channel_name) > 30:
-            embed = discord.Embed(description="**Error**: Channel name should be fewer than 30 characters. (Preferably a *lot* fewer.)", color=constants.EMBED_COLOUR_ERROR)
+            embed = discord.Embed(description="❌ Channel name should be fewer than 30 characters. (Preferably a *lot* fewer.)", color=constants.EMBED_COLOUR_ERROR)
             return await interaction.response.send_message(embed=embed, ephemeral=True)
 
         # join with the emoji
@@ -312,19 +326,19 @@ class CTeamCommands(commands.Cog):
         if new_channel:
             # check whether it's an existing CC channel
             if new_channel.category == cc_category:
-                embed = discord.Embed(description=f"**Error**: A Community channel <#{new_channel.id}> already exists."
+                embed = discord.Embed(description=f"❌ A Community channel <#{new_channel.id}> already exists."
                                     f" Please choose a different name for your Community channel.", color=constants.EMBED_COLOUR_ERROR)
                 await interaction.response.send_message(embed=embed)
 
             # check whether it's an archived CC channel
             elif new_channel.category == archive_category:
-                embed = discord.Embed(description=f"**Error**: A Community channel <#{new_channel.id}> already exists in the archives."
+                embed = discord.Embed(description=f"❌ A Community channel <#{new_channel.id}> already exists in the archives."
                                     f" Use `/restore_community_channel` in the channel to restore it.", color=constants.EMBED_COLOUR_ERROR)
                 await interaction.response.send_message(embed=embed)
 
             # the channel must exist with that name elsewhere on the server and so can't be used
             else:
-                embed = discord.Embed(description=f"**Error**: A channel <#{new_channel.id}> already exists on the server"
+                embed = discord.Embed(description=f"❌ A channel <#{new_channel.id}> already exists on the server"
                                     f" and does not appear to be a Community channel."
                                     f" Please choose a different name for your Community channel.", color=constants.EMBED_COLOUR_ERROR)
                 await interaction.response.send_message(embed=embed)
@@ -363,7 +377,7 @@ class CTeamCommands(commands.Cog):
 
         # check we're in an archived community channel
         if not interaction.channel.category == archive_category:
-            embed = discord.Embed(description=f"**Error**: This command can only be used in an archived Community channel in the <#{archive_cat()}> category.", color=constants.EMBED_COLOUR_QU)
+            embed = discord.Embed(description=f"❌ This command can only be used in an archived Community channel in the <#{archive_cat()}> category.", color=constants.EMBED_COLOUR_QU)
             return await interaction.response.send_message(embed=embed)
 
         # now prep the channel
@@ -379,7 +393,7 @@ class CTeamCommands(commands.Cog):
             embed = discord.Embed(description=f"<#{interaction.channel.id}> moved to <#{cc_cat()}>.", color=constants.EMBED_COLOUR_OK)
             await interaction.response.send_message(embed=embed)
         except Exception as e:
-            embed = discord.Embed(description=f"**Error**: {e}", color=constants.EMBED_COLOUR_ERROR)
+            embed = discord.Embed(description=f"❌ {e}", color=constants.EMBED_COLOUR_ERROR)
             await interaction.response.send_message(embed=embed)
             raise EnvironmentError(f"Error moving channel: {e}")
 
