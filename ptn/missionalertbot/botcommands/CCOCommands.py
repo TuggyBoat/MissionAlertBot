@@ -636,10 +636,9 @@ class CCOCommands(commands.Cog):
                     return await on_generic_error(interaction, e)
 
         else: # no webhook data found
-            embed = discord.Embed(
-                description=f"No webhook found matching {webhook_data.webhook_name}",
-                color=constants.EMBED_COLOUR_ERROR
-            )
-            await interaction.response.send_message(embed=embed, ephemeral=True)
+            try:
+                raise CustomError(f"No webhook found matching identifier `{webhook_name}`. You can use `/cco webhook view` to view your webhooks.")
+            except Exception as e:
+                return await on_generic_error(interaction, e)
 
         return
