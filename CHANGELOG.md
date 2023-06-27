@@ -2,6 +2,7 @@
 
 ## 2.2.4
 - [#554](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/554) Corrected time on mission generator channel lock alert.
+- [#556](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/556) Wine loads will no longer ping the BubbleWineLoader role even if the Select Menu is used to attempt to do so.
 
 
 ## 2.2.3
