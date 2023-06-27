@@ -805,7 +805,7 @@ async def notify_hauler_role(interaction, mission_params, mission_temp_channel):
         )
         embed.set_footer(text="As our glorious tipsy overlords, the Sommeliers, have decreed o7")
         embed.set_thumbnail(url=constants.ICON_FC_EMPTY)
-        await interaction.channel.send(embed=embed)
+        return await interaction.channel.send(embed=embed)
 
     if mission_params.training:
         ping_role_id = trainee_role()
