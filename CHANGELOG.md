@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.2.4
+- [#554](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/554) Corrected time on mission generator channel lock alert.
+
+
 ## 2.2.3
 - [#548](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/548) Errors on commodity search during mission generation now handled by the global error handler.
 - [#550](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/550) Role grant/removal context menu commands should now be more resilient to Discord lag.
