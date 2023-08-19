@@ -98,6 +98,7 @@ PROD_DEV_ROLE = 812988180210909214 # Developer role ID on live
 PROD_MOD_ROLE = 813814494563401780 # Mod role ID on Live
 PROD_VERIFIED_ROLE = 867820916331118622 # Verified Member
 PROD_EVENT_ORGANISER_ROLE = 1023296182639939594 # Event Organiser
+PROD_BOT_ROLE = 802523214809923596 # General Bot role on live (Robot Overlords)
 PROD_TRADE_CAT = 801558838414409738 # Trade Carrier category on live server
 PROD_ARCHIVE_CAT = 1048957416781393970 # Archive category on live server
 PROD_SECONDS_VERY_SHORT = 10 # time between channel deletion trigger and actual deletion (10)
