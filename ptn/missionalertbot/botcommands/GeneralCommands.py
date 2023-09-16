@@ -115,7 +115,8 @@ class GeneralCommands(commands.Cog):
     # processed when the bot connects to Discord
     @commands.Cog.listener()
     async def on_ready(self):
-        print(f'{bot.user.name} has connected to Discord!')
+        # TODO: this should be moved to an on_setup hook
+        print(f'{bot.user.name} version: {__version__} has connected to Discord!')
         devchannel = bot.get_channel(bot_dev_channel())
         embed = discord.Embed(title="MISSION ALERT BOT ONLINE", description=f"<@{bot.user.id}> connected, version **{__version__}**.", color=constants.EMBED_COLOUR_OK)
         embed.set_image(url=random.choice(constants.hello_gifs))
@@ -123,9 +124,11 @@ class GeneralCommands(commands.Cog):
 
         # Check if any trade channels were not deleted before bot restart/stop
         await check_trade_channels_on_startup()
-        # start the lasttrade_cron loop.
-        lasttrade_cron.start()
-        # start monitoring reddit comments
+
+        # start the lasttrade_cron loop if not running
+        if not lasttrade_cron.is_running():
+            lasttrade_cron.start()
+        # start monitoring reddit comments if not running
         if not _monitor_reddit_comments.is_running():
             _monitor_reddit_comments.start()
 
