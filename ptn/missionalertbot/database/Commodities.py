@@ -241,6 +241,5 @@ commodities_all = [
     'Landmines',
     'Non-Lethal Weapons',
     'Personal Weapons',
-    'Reactive Armour',
-    'Roflcopters'
+    'Reactive Armour'
 ] # full list of all commodities
