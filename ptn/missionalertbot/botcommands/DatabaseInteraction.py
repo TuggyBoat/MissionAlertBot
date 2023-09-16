@@ -609,7 +609,7 @@ class DatabaseInteraction(commands.Cog):
 
     # find commodity
     @app_commands.command(name="find_commodity",
-                          description="Private command: Search for a commodity by partial match for its name.")
+                          description="Search for a commodity by partial match for its name.")
     @app_commands.describe(commodity_search_term='Part of the full name of the commodity you wish to find.')
     async def search_for_commodity(self, interaction: discord.Interaction, commodity_search_term: str):
         print(f'search_for_commodity called by {interaction.user} to search for {commodity_search_term}')
@@ -619,12 +619,14 @@ class DatabaseInteraction(commands.Cog):
 
         commodity_wrapper = Commodity(commodity_search_term)
 
+        await interaction.response.send_message(f"Searching for commodity {commodity_search_term}...")
+
         try:
             commodity = await find_commodity(commodity_wrapper, interaction)
             if commodity:
-                return await interaction.response.send_message(commodity, ephemeral=True)
+                return await interaction.edit_original_response(content=f'✅ {commodity}')
             else:
-                return await interaction.response.send_message(f'No such commodity found for: "{commodity_search_term}".', ephemeral=True)
+                return await interaction.edit_original_response(content=f'❌ No such commodity found for: "{commodity_search_term}".')
         except Exception as e:
             # Catch any exception
             print(e)
