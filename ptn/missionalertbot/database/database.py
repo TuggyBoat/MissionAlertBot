@@ -57,9 +57,10 @@ carriers_table_columns = ['p_ID', 'shortname', 'longname', 'cid', 'discordchanne
 # commodities table creation
 commodities_table_create = '''
     CREATE TABLE commodities(
-        entry_id INTEGERY NOT NULL PRIMARY KEY AUTOINCREMENT,
+        entry_id INTEGER PRIMARY KEY AUTOINCREMENT,
         commodity TEXT NOT NULL
-    )'''
+    )
+    '''
 commodities_table_columns = ['entry_id', 'commodity']
 
 webhooks_table_create = '''
@@ -888,4 +889,4 @@ async def find_commodity(mission_params, interaction):
     if commodity: # only if this is successful is returnflag set so mission gen will continue
         print(f"Found commodity {commodity.name}")
         mission_params.commodity_name = commodity.name
-    return
+    return commodity
