@@ -23,7 +23,7 @@ from ptn.missionalertbot.database.database import CarrierDbFields, carrier_db, m
 
 
 # monitor reddit comments
-@tasks.loop(seconds=10)
+@tasks.loop(seconds=60)
 async def _monitor_reddit_comments():
     print("Reddit monitor started")
     while True:
