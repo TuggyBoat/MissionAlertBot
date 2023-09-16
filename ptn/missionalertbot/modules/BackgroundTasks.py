@@ -25,8 +25,8 @@ from ptn.missionalertbot.database.database import CarrierDbFields, carrier_db, m
 # monitor reddit comments
 @tasks.loop(seconds=10)
 async def _monitor_reddit_comments():
+    print("Reddit monitor started")
     while True:
-        print("Reddit monitor started")
         try:
             # TODO: what happens if there's an error in this process, e.g. reddit is down?
 
