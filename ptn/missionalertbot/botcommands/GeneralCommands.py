@@ -135,11 +135,6 @@ class GeneralCommands(commands.Cog):
     async def on_disconnect(self):
         print(f'Mission Alert Bot has disconnected from discord server, version: {__version__}.')
 
-        # Stop Reddit listener
-        if _monitor_reddit_comments.is_running():
-            print("Closing reddit listener")
-            _monitor_reddit_comments.cancel()
-
 
     # pin listener
     @commands.Cog.listener()

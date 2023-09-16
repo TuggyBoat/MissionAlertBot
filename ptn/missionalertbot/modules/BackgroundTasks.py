@@ -31,7 +31,6 @@ async def _monitor_reddit_comments():
             # TODO: what happens if there's an error in this process, e.g. reddit is down?
 
             comment_channel = bot.get_channel(reddit_channel())
-            print(comment_channel)
             # establish a comment stream to the subreddit using async praw
             reddit = await get_reddit()
             subreddit = await reddit.subreddit(sub_reddit())
