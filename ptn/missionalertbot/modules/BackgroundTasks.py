@@ -23,13 +23,15 @@ from ptn.missionalertbot.database.database import CarrierDbFields, carrier_db, m
 
 
 # monitor reddit comments
+@tasks.loop(seconds=10)
 async def _monitor_reddit_comments():
-    print("Reddit monitor started")
     while True:
+        print("Reddit monitor started")
         try:
             # TODO: what happens if there's an error in this process, e.g. reddit is down?
 
             comment_channel = bot.get_channel(reddit_channel())
+            print(comment_channel)
             # establish a comment stream to the subreddit using async praw
             reddit = await get_reddit()
             subreddit = await reddit.subreddit(sub_reddit())
@@ -72,7 +74,6 @@ async def _monitor_reddit_comments():
                                             description=f"This mission is **IN PROGRESS**.\n\nComment by **{comment.author}**\n{comment.body}"
                                                         f"\n\nTo view this comment click here:\nhttps://www.reddit.com{comment.permalink}",
                                                         color=constants.EMBED_COLOUR_REDDIT)
-
                     await comment_channel.send(embed=embed)
                     print("Sent comment to channel")
         except Exception as e:

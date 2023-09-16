@@ -121,20 +121,24 @@ class GeneralCommands(commands.Cog):
         embed.set_image(url=random.choice(constants.hello_gifs))
         await devchannel.send(embed=embed)
 
-        # define our background tasks
-        reddit_task = asyncio.create_task(_monitor_reddit_comments())
         # Check if any trade channels were not deleted before bot restart/stop
         await check_trade_channels_on_startup()
         # start the lasttrade_cron loop.
-        await lasttrade_cron.start()
+        lasttrade_cron.start()
         # start monitoring reddit comments
-        await reddit_task
+        if not _monitor_reddit_comments.is_running():
+            _monitor_reddit_comments.start()
 
 
     # processed on disconnect
     @commands.Cog.listener()
     async def on_disconnect(self):
         print(f'Mission Alert Bot has disconnected from discord server, version: {__version__}.')
+
+        # Stop Reddit listener
+        if _monitor_reddit_comments.is_running():
+            print("Closing reddit listener")
+            _monitor_reddit_comments.cancel()
 
 
     # pin listener
