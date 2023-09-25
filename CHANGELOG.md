@@ -1,6 +1,7 @@
 # Changelog
 
-## 2.2.6 (unpublished)
+
+## 2.2.6
 - [#50](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/50) Logic to create commodities table from scratch
 - Logic to add new commodities
 - [#580](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/580) Check background tasks aren't running before starting them from `on_ready`
