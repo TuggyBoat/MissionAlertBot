@@ -1049,7 +1049,7 @@ async def prepare_for_gen_mission(interaction: discord.Interaction, mission_para
 
 
 # mission generator called by loading/unloading commands
-async def gen_mission(interaction: discord.Interaction, mission_params):
+async def gen_mission(interaction: discord.Interaction, mission_params: MissionParams):
     # generate a timestamp for mission creation
     mission_params.timestamp = get_formatted_date_string()[2]
 
@@ -1095,7 +1095,7 @@ async def gen_mission(interaction: discord.Interaction, mission_params):
                 if not submit_mission: # error condition, cleanup after ourselves
                     cleanup_temp_image_file(mission_params.discord_img_name)
                     if mission_params.mission_temp_channel_id:
-                        await remove_carrier_channel(mission_params.mission_temp_channel_id, seconds_short)
+                        await remove_carrier_channel(interaction, mission_params.mission_temp_channel_id, seconds_short)
 
             if "r" in mission_params.sendflags and not mission_params.edmc_off: # send to subreddit
                 async with interaction.channel.typing():
@@ -1189,7 +1189,7 @@ async def gen_mission(interaction: discord.Interaction, mission_params):
         except Exception as e:
             print(e)
         if mission_params.mission_temp_channel_id:
-            await remove_carrier_channel(mission_params.mission_temp_channel_id, seconds_short)
+            await remove_carrier_channel(interaction, mission_params.mission_temp_channel_id, seconds_short)
 
 
 async def create_mission_temp_channel(interaction, mission_params):

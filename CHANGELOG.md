@@ -1,6 +1,8 @@
 # Changelog
 
 ## 2.2.7
+- [#575](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/575) Error handling for channel deletion sequence upon mission complete
+- [#565](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/565) Update carrier channel mission embed creation to use guild user avatar rather than global
 - [#564](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/564) Archiving community channels now checks for successful permission sync and retries on failure
 - [#563](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/563) Fixed month not updating for image choice purposes
 - [#566](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/566) Fixed unloads showing carrier supply as if it was station demand
