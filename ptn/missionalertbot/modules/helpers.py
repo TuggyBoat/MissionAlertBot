@@ -427,7 +427,7 @@ async def _delete_cc_channel(interaction, button_self):
     return
 
 # helper function for /remove_community_channel
-async def _archive_cc_channel(interaction, embed, button_self, attempt):
+async def _archive_cc_channel(interaction: discord.Interaction, embed: discord.Embed, button_self, attempt):
     archive_category = discord.utils.get(interaction.guild.categories, id=archive_cat())
 
     try: # there's probably a better way to do this using an if statement
@@ -446,6 +446,7 @@ async def _archive_cc_channel(interaction, embed, button_self, attempt):
             await _archive_cc_channel_delay(interaction, embed, button_self, attempt)
         print("moved channel to archive")
         # now make sure it has the default permissions for the archive category
+        await asyncio.sleep(2)
         await interaction.channel.edit(sync_permissions=True)
         print("Synced permissions")
 
@@ -464,7 +465,7 @@ async def _archive_cc_channel_delay(interaction, embed, button_self, attempt):
     print(f"Channel not moved yet. Number of attempts so far: {attempt}")
     attempt = attempt + 1
     print(f"Beginning attempt {attempt}")
-    if attempt <= 5:
+    if attempt <= 10:
         await asyncio.sleep(2)
         await _archive_cc_channel(interaction, embed, button_self, attempt) # we probably don't need to attempt the channel edit again but is there a disadvantage to doing so?
     else: # still nothing after 10 seconds, give up I guess
