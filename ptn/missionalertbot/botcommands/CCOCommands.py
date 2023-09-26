@@ -75,7 +75,7 @@ async def toggle_cco_trainee(interaction:  discord.Interaction, member: discord.
             await member.add_roles(cco_trainee_role_object)
          
             # feed back to the command user
-            embed, bot_spam_embed = role_granted_embed(interaction, member, cco_trainee_role_object)
+            embed, bot_spam_embed = role_granted_embed(interaction, member, None, cco_trainee_role_object)
             await interaction.edit_original_response(embed=embed)
             await spamchannel.send(embed=bot_spam_embed)
 

@@ -75,7 +75,7 @@ async def verify_member(interaction:  discord.Interaction, message: discord.Mess
             await message.add_reaction(fc_complete_reaction)
             
             # feed back to the command user
-            embed, bot_spam_embed = role_granted_embed(interaction, member, vm_role)
+            embed, bot_spam_embed = role_granted_embed(interaction, member, message, vm_role)
             await interaction.edit_original_response(embed=embed)
             await spamchannel.send(embed=bot_spam_embed)
 
@@ -123,7 +123,7 @@ async def toggle_event_organiser(interaction:  discord.Interaction, member: disc
             await member.add_roles(eo_role)
          
             # feed back to the command user
-            embed, bot_spam_embed = role_granted_embed(interaction, member, eo_role)
+            embed, bot_spam_embed = role_granted_embed(interaction, member, None, eo_role)
             await interaction.edit_original_response(embed=embed)
             await spamchannel.send(embed=bot_spam_embed)
 

@@ -173,10 +173,10 @@ def event_organiser_embed():
     return embed
 
 # embed to feedback that a user was granted a role
-def role_granted_embed(interaction: discord.Interaction, user, role):
+def role_granted_embed(interaction: discord.Interaction, user: discord.Member, message: discord.Message, role):
     print("Called role_granted_embed")
     desc = f"""
-    ✅ Gave <@{user.id}> the <@&{role.id}> role from {interaction.message.jump_url}.
+    ✅ Gave <@{user.id}> the <@&{role.id}> role.
     """
     embed = discord.Embed (
         description=desc,
@@ -190,7 +190,12 @@ def role_granted_embed(interaction: discord.Interaction, user, role):
         print("Command name not accessible")
         command_name = ""
 
-    desc = f"<@{interaction.user.id}> gave the <@&{role.id}> role to <@{user.id}>" + command_name
+    if message:
+        message_phrase = f" for {message.jump_url}"
+    else:
+        message_phrase = ""
+
+    desc = f"<@{interaction.user.id}> gave the <@&{role.id}> role to <@{user.id}>" + message_phrase + command_name
     bot_spam_embed = discord.Embed (
         description=desc,
         color=constants.EMBED_COLOUR_OK
