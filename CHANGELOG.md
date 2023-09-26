@@ -8,6 +8,8 @@
 - [#564](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/564) Archiving community channels now checks for successful permission sync and retries on failure
 - [#563](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/563) Fixed month not updating for image choice purposes
 - [#566](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/566) Fixed unloads showing carrier supply as if it was station demand
+- [#561](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/561) `m.complete` now includes an interactible link for `/mission complete`
+- [#560](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/560) Verify Member now includes a jumpurl in the bot-spam notification
 
 
 ## 2.2.6
