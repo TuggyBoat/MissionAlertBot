@@ -1,6 +1,7 @@
 # Changelog
 
 ## 2.2.7
+- [#572](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/572) `/cco complete` now resolves carrier search term against carriers db instead of missions db. (This will make it consistent with all other instances of using a specific search term to look for a carrier.)
 - Converted bot-spam notices for `/create_community_channel`, `/restore_community_channel`, `/remove_community_channel` to embeds
 - [#575](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/575) Error handling for channel deletion sequence upon mission complete
 - [#565](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/565) Update carrier channel mission embed creation to use guild user avatar rather than global
