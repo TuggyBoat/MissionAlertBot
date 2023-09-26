@@ -15,7 +15,6 @@ import discord
 from discord.ext import commands
 from dotenv import load_dotenv
 from PIL import ImageFont
-from time import strftime
 
 
 # Define whether the bot is in testing or live mode. Default is testing mode.
@@ -104,6 +103,7 @@ PROD_ARCHIVE_CAT = 1048957416781393970 # Archive category on live server
 PROD_SECONDS_VERY_SHORT = 10 # time between channel deletion trigger and actual deletion (10)
 PROD_SECONDS_SHORT = 120 # time before calling channel cleanup on failed mission gen (120)
 PROD_SECONDS_LONG = 900 # time before calling channel cleanup on successful mission closure (900)
+PROD_MCOMPLETE_ID = 849040914948554764 # /mission complete slash ID
 # Training mode - production
 PROD_TRAINING_CATEGORY = 1120269131476901938 # training mode category ID
 PROD_TRAINING_MISSION_COMMAND_CHANNEL = 1120269354949419030 # training mode mission gen channel ID
@@ -157,6 +157,7 @@ TEST_ARCHIVE_CAT = 877244591579992144 # Archive category on live server
 TEST_SECONDS_VERY_SHORT = 10 # time between channel deletion trigger and actual deletion
 TEST_SECONDS_SHORT = 5 # time before calling channel cleanup on failed mission gen
 TEST_SECONDS_LONG = 10 # time before calling channel cleanup on successful mission closure
+TEST_MCOMPLETE_ID = 1119206091163709441 # /mission complete slash ID
 # Training mode - test
 TEST_TRAINING_CATEGORY = 1120268080912810014 # training mode category ID
 TEST_TRAINING_MISSION_COMMAND_CHANNEL = 1120268484455174215 # training mode mission gen channel ID
@@ -254,7 +255,6 @@ shush_gifs = [
     'https://media.tenor.com/PgAtcM06qBQAAAAC/secret-lover.gif' # it's our secret wink
 ]
 
-current_month = strftime('%B')
 
 # logo URLs from website
 PTN_LOGO_DARK_TEXT_TRANSPARENT = 'https://pilotstradenetwork.com/wp-content/uploads/2021/08/PTN_Dark_wText.png'
@@ -263,17 +263,17 @@ PTN_LOGO_PRIDE_TEXT_TRANSPARENT = 'https://pilotstradenetwork.com/wp-content/upl
 PTN_LOGO_DISCORD_BG = 'https://pilotstradenetwork.com/wp-content/uploads/2021/08/PTN_Discord_Icon.png'
 PTN_LOGO_DISCORD_BG_PRIDE = 'https://pilotstradenetwork.com/wp-content/uploads/2023/06/discord-logo-pride-2023-cropped.png'
 
-def ptn_logo_full():
+def ptn_logo_full(current_month):
   return PTN_LOGO_PRIDE_TEXT_TRANSPARENT if current_month == 'June' else PTN_LOGO_DARK_TEXT_TRANSPARENT
 
-def ptn_logo_discord():
+def ptn_logo_discord(current_month):
   return PTN_LOGO_DISCORD_BG_PRIDE if current_month == 'June' else PTN_LOGO_DISCORD_BG
 
 # mission template filenames
 reddit_template = 'reddit_template.png'
 reddit_template_pride = 'reddit_template_pride.png'
 
-def mission_template_filename():
+def mission_template_filename(current_month):
   return reddit_template_pride if current_month == 'June' else reddit_template
 
 DISCORD_TEMPLATE = 'discord_template.png'
@@ -433,6 +433,10 @@ def seconds_short():
 def seconds_long():
   return PROD_SECONDS_LONG if _production else TEST_SECONDS_LONG
 
+def mcomplete_id():
+  return PROD_MCOMPLETE_ID if _production else TEST_MCOMPLETE_ID
+
+
 def training_cat():
   return PROD_TRAINING_CATEGORY if _production else TEST_TRAINING_CATEGORY
 
@@ -456,7 +460,6 @@ def training_reddit_in_progress():
   
 def training_reddit_completed():
   return TEST_FLAIR_MISSION_STOP # presently using the testing subreddit for training purposes
-
 
 
 

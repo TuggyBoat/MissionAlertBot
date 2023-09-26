@@ -75,7 +75,7 @@ async def verify_member(interaction:  discord.Interaction, message: discord.Mess
             await message.add_reaction(fc_complete_reaction)
             
             # feed back to the command user
-            embed, bot_spam_embed = role_granted_embed(interaction, member, vm_role)
+            embed, bot_spam_embed = role_granted_embed(interaction, member, message, vm_role)
             await interaction.edit_original_response(embed=embed)
             await spamchannel.send(embed=bot_spam_embed)
 
@@ -123,7 +123,7 @@ async def toggle_event_organiser(interaction:  discord.Interaction, member: disc
             await member.add_roles(eo_role)
          
             # feed back to the command user
-            embed, bot_spam_embed = role_granted_embed(interaction, member, eo_role)
+            embed, bot_spam_embed = role_granted_embed(interaction, member, None, eo_role)
             await interaction.edit_original_response(embed=embed)
             await spamchannel.send(embed=bot_spam_embed)
 
@@ -359,7 +359,13 @@ class CTeamCommands(commands.Cog):
 
         # add a note in bot_spam
         spamchannel = bot.get_channel(bot_spam_channel())
-        await spamchannel.send(f"{interaction.user} used `/create_community_channel` in <#{interaction.channel.id}> to add {owner.display_name} as a Community channel owner with channel <#{new_channel.id}>")
+
+        embed = discord.Embed(
+            description=f"{interaction.user} used `/create_community_channel` in <#{interaction.channel.id}> to add {owner.display_name} as a Community channel owner with channel <#{new_channel.id}>",
+            color=constants.EMBED_COLOUR_OK
+        )
+
+        await spamchannel.send(embed=embed)
 
         return
 
@@ -408,7 +414,13 @@ class CTeamCommands(commands.Cog):
 
         # add a note in bot_spam
         spamchannel = bot.get_channel(bot_spam_channel())
-        await spamchannel.send(f"{interaction.user} used `/restore_community_channel` in <#{interaction.channel.id}> and granted ownership to {owner.display_name}.")
+
+        embed = discord.Embed(
+            description=f"{interaction.user} used `/restore_community_channel` in <#{interaction.channel.id}> and granted ownership to {owner.display_name}.",
+            color=constants.EMBED_COLOUR_OK
+        )
+
+        await spamchannel.send(embed=embed)
 
         return
 

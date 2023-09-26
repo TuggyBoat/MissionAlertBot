@@ -15,6 +15,8 @@ import pickle
 from PIL import Image
 import random
 import typing
+from time import strftime
+
 
 # import discord.py
 import discord
@@ -439,7 +441,8 @@ async def return_discord_channel_embeds(mission_params):
     # generates embeds used for the PTN carrier channel as well as any webhooks
 
     # define owner avatar
-    owner = await bot.fetch_user(mission_params.carrier_data.ownerid)
+    guild: discord.Guild = await get_guild()
+    owner: discord.Member = guild.get_member(mission_params.carrier_data.ownerid)
     owner_name = owner.display_name
     owner_avatar = owner.display_avatar
     pads = "**LARGE**" if 'l' in mission_params.pads.lower() else "**MEDIUM**"
@@ -459,7 +462,7 @@ async def return_discord_channel_embeds(mission_params):
                          f"\n💰 Profit: **{mission_params.profit}K PER TON**" \
                          f"\n📥 Demand: **{mission_params.demand}K TONS**"
         
-        sell_thumb = ptn_logo_discord()
+        sell_thumb = ptn_logo_discord(strftime('%B'))
 
         embed_colour = constants.EMBED_COLOUR_LOADING
 
@@ -467,14 +470,14 @@ async def return_discord_channel_embeds(mission_params):
         buy_description=f"🎯 Fleet Carrier: **{mission_params.carrier_data.carrier_long_name}**" \
                         f"\n🔢 Carrier ID: **{mission_params.carrier_data.carrier_identifier}**" \
                         f"\n🌟 System: **{mission_params.system.upper()}**" \
-                        f"\n📦 Commodity: **{mission_params.commodity_name.upper()}**"
+                        f"\n📦 Commodity: **{mission_params.commodity_name.upper()}**" \
+                         f"\n📤 Supply: **{mission_params.demand}K TONS**"
 
-        buy_thumb = ptn_logo_discord()
+        buy_thumb = ptn_logo_discord(strftime('%B'))
 
         sell_description=f"📌 Station: **{mission_params.station.upper()}**" \
                          f"\n🛬 Landing Pad: {pads}" \
                          f"\n💰 Profit: **{mission_params.profit}K PER TON**" \
-                         f"\n📥 Demand: **{mission_params.demand}K TONS**"
         
         sell_thumb = constants.ICON_SELL
 
@@ -1046,7 +1049,7 @@ async def prepare_for_gen_mission(interaction: discord.Interaction, mission_para
 
 
 # mission generator called by loading/unloading commands
-async def gen_mission(interaction: discord.Interaction, mission_params):
+async def gen_mission(interaction: discord.Interaction, mission_params: MissionParams):
     # generate a timestamp for mission creation
     mission_params.timestamp = get_formatted_date_string()[2]
 
@@ -1092,7 +1095,7 @@ async def gen_mission(interaction: discord.Interaction, mission_params):
                 if not submit_mission: # error condition, cleanup after ourselves
                     cleanup_temp_image_file(mission_params.discord_img_name)
                     if mission_params.mission_temp_channel_id:
-                        await remove_carrier_channel(mission_params.mission_temp_channel_id, seconds_short)
+                        await remove_carrier_channel(interaction, mission_params.mission_temp_channel_id, seconds_short)
 
             if "r" in mission_params.sendflags and not mission_params.edmc_off: # send to subreddit
                 async with interaction.channel.typing():
@@ -1186,7 +1189,7 @@ async def gen_mission(interaction: discord.Interaction, mission_params):
         except Exception as e:
             print(e)
         if mission_params.mission_temp_channel_id:
-            await remove_carrier_channel(mission_params.mission_temp_channel_id, seconds_short)
+            await remove_carrier_channel(interaction, mission_params.mission_temp_channel_id, seconds_short)
 
 
 async def create_mission_temp_channel(interaction, mission_params):

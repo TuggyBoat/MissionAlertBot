@@ -22,7 +22,7 @@ from ptn.missionalertbot.classes.Views import MissionCompleteView
 from ptn.missionalertbot._metadata import __version__
 import ptn.missionalertbot.constants as constants
 from ptn.missionalertbot.constants import bot, bot_command_channel, bot_dev_channel, cmentor_role, certcarrier_role, \
-    admin_role, dev_role, trade_alerts_channel, mod_role, cpillar_role, bot_spam_channel, bot_role
+    admin_role, dev_role, trade_alerts_channel, mod_role, cpillar_role, bot_spam_channel, bot_role, mcomplete_id
 
 # local modules
 from ptn.missionalertbot.database.database import backup_database, find_carrier, find_mission, _is_carrier_channel, \
@@ -333,7 +333,7 @@ class GeneralCommands(commands.Cog):
     @commands.command(name='complete', help="Deprecated, do not use.")
     async def mcomplete(self, ctx):
         embed = discord.Embed(
-            description="Deprecated. Please use `/mission complete` instead!",
+            description=f"Deprecated. Please use </mission complete:{mcomplete_id()}> instead!",
             color=constants.EMBED_COLOUR_ERROR
         )
         embed.set_image(url='https://pilotstradenetwork.com/wp-content/uploads/2023/06/hm-upgrades.gif')
