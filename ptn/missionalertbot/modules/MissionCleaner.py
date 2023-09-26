@@ -141,7 +141,7 @@ async def _cleanup_completed_mission(interaction: discord.Interaction, mission_d
                                                                     f"{mission_params.commodity_name} from **{mission_params.station}** in **{mission_params.system}**.",
                                                         color=constants.EMBED_COLOUR_QU)
                                 embed.set_footer(text=f"Join {constants.DISCORD_INVITE_URL} for more trade opportunities.")
-                                embed.set_thumbnail(url=ptn_logo_discord())
+                                embed.set_thumbnail(url=ptn_logo_discord(strftime('%B')))
                                 await webhook_msg.remove_attachments(webhook_msg.attachments)
                                 await webhook_msg.edit(embed=embed)
 

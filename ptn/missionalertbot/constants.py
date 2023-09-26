@@ -15,7 +15,6 @@ import discord
 from discord.ext import commands
 from dotenv import load_dotenv
 from PIL import ImageFont
-from time import strftime
 
 
 # Define whether the bot is in testing or live mode. Default is testing mode.
@@ -254,7 +253,6 @@ shush_gifs = [
     'https://media.tenor.com/PgAtcM06qBQAAAAC/secret-lover.gif' # it's our secret wink
 ]
 
-current_month = strftime('%B')
 
 # logo URLs from website
 PTN_LOGO_DARK_TEXT_TRANSPARENT = 'https://pilotstradenetwork.com/wp-content/uploads/2021/08/PTN_Dark_wText.png'
@@ -263,17 +261,17 @@ PTN_LOGO_PRIDE_TEXT_TRANSPARENT = 'https://pilotstradenetwork.com/wp-content/upl
 PTN_LOGO_DISCORD_BG = 'https://pilotstradenetwork.com/wp-content/uploads/2021/08/PTN_Discord_Icon.png'
 PTN_LOGO_DISCORD_BG_PRIDE = 'https://pilotstradenetwork.com/wp-content/uploads/2023/06/discord-logo-pride-2023-cropped.png'
 
-def ptn_logo_full():
+def ptn_logo_full(current_month):
   return PTN_LOGO_PRIDE_TEXT_TRANSPARENT if current_month == 'June' else PTN_LOGO_DARK_TEXT_TRANSPARENT
 
-def ptn_logo_discord():
+def ptn_logo_discord(current_month):
   return PTN_LOGO_DISCORD_BG_PRIDE if current_month == 'June' else PTN_LOGO_DISCORD_BG
 
 # mission template filenames
 reddit_template = 'reddit_template.png'
 reddit_template_pride = 'reddit_template_pride.png'
 
-def mission_template_filename():
+def mission_template_filename(current_month):
   return reddit_template_pride if current_month == 'June' else reddit_template
 
 DISCORD_TEMPLATE = 'discord_template.png'

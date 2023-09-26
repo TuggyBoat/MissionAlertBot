@@ -459,7 +459,7 @@ async def return_discord_channel_embeds(mission_params):
                          f"\n💰 Profit: **{mission_params.profit}K PER TON**" \
                          f"\n📥 Demand: **{mission_params.demand}K TONS**"
         
-        sell_thumb = ptn_logo_discord()
+        sell_thumb = ptn_logo_discord(strftime('%B'))
 
         embed_colour = constants.EMBED_COLOUR_LOADING
 
@@ -469,7 +469,7 @@ async def return_discord_channel_embeds(mission_params):
                         f"\n🌟 System: **{mission_params.system.upper()}**" \
                         f"\n📦 Commodity: **{mission_params.commodity_name.upper()}**"
 
-        buy_thumb = ptn_logo_discord()
+        buy_thumb = ptn_logo_discord(strftime('%B'))
 
         sell_description=f"📌 Station: **{mission_params.station.upper()}**" \
                          f"\n🛬 Landing Pad: {pads}" \

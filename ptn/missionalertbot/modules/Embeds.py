@@ -7,6 +7,7 @@ STATUS: This file is complete, but needs to be imported into modules that use it
 # import libraries
 import os
 from datetime import timezone, datetime
+from time import strftime
 
 # import discord.py
 import discord
@@ -152,7 +153,7 @@ def verified_member_embed(message):
         description=desc,
         color=constants.EMBED_COLOUR_OK
     )
-    embed.set_thumbnail(url=ptn_logo_discord())
+    embed.set_thumbnail(url=ptn_logo_discord(strftime('%B')))
 
     return embed
 
@@ -167,7 +168,7 @@ def event_organiser_embed():
         description=desc,
         color=constants.EMBED_COLOUR_OK
     )
-    embed.set_thumbnail(url=ptn_logo_discord())
+    embed.set_thumbnail(url=ptn_logo_discord(strftime('%B')))
 
     return embed
 
