@@ -173,10 +173,10 @@ def event_organiser_embed():
     return embed
 
 # embed to feedback that a user was granted a role
-def role_granted_embed(interaction, user, role):
+def role_granted_embed(interaction: discord.Interaction, user, role):
     print("Called role_granted_embed")
     desc = f"""
-    ✅ Gave <@{user.id}> the <@&{role.id}> role.
+    ✅ Gave <@{user.id}> the <@&{role.id}> role from {interaction.message.jump_url}.
     """
     embed = discord.Embed (
         description=desc,
