@@ -1,6 +1,7 @@
 # Changelog
 
 ## 2.2.7
+- Converted bot-spam notices for `/create_community_channel`, `/restore_community_channel`, `/remove_community_channel` to embeds
 - [#575](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/575) Error handling for channel deletion sequence upon mission complete
 - [#565](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/565) Update carrier channel mission embed creation to use guild user avatar rather than global
 - [#564](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/564) Archiving community channels now checks for successful permission sync and retries on failure

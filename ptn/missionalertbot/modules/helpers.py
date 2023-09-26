@@ -321,7 +321,7 @@ Helpers for /remove_community_channel
 """
 
 # function called by button responses to process channel deletion
-async def _remove_cc_manager(interaction, delete_channel, button_self):
+async def _remove_cc_manager(interaction: discord.Interaction, delete_channel, button_self):
     # get the carrier data again because I can't figure out how to penetrate callbacks with additional variables or vice versa
     carrier_db.execute(f"SELECT * FROM community_carriers WHERE "
                     f"channelid = {interaction.channel.id}")
@@ -372,7 +372,13 @@ async def _remove_cc_manager(interaction, delete_channel, button_self):
     # notify bot-spam
     print("Notifying bot-spam...")
     spamchannel = bot.get_channel(bot_spam_channel())
-    await spamchannel.send(f"{interaction.user} used `/remove_community_channel` in <#{interaction.channel.id}>, removing {owner.name} as a Community channel owner.")
+
+    embed = discord.Embed(
+        description=f"{interaction.user} used `/remove_community_channel` in <#{interaction.channel.id}>, removing {owner.name} as a Community channel owner.",
+        color=constants.EMBED_COLOUR_OK
+    )
+
+    await spamchannel.send(embed=embed)
 
     # all done
     print("_remove_cc_manager done.")

@@ -359,7 +359,13 @@ class CTeamCommands(commands.Cog):
 
         # add a note in bot_spam
         spamchannel = bot.get_channel(bot_spam_channel())
-        await spamchannel.send(f"{interaction.user} used `/create_community_channel` in <#{interaction.channel.id}> to add {owner.display_name} as a Community channel owner with channel <#{new_channel.id}>")
+
+        embed = discord.Embed(
+            description=f"{interaction.user} used `/create_community_channel` in <#{interaction.channel.id}> to add {owner.display_name} as a Community channel owner with channel <#{new_channel.id}>",
+            color=constants.EMBED_COLOUR_OK
+        )
+
+        await spamchannel.send(embed=embed)
 
         return
 
@@ -408,7 +414,13 @@ class CTeamCommands(commands.Cog):
 
         # add a note in bot_spam
         spamchannel = bot.get_channel(bot_spam_channel())
-        await spamchannel.send(f"{interaction.user} used `/restore_community_channel` in <#{interaction.channel.id}> and granted ownership to {owner.display_name}.")
+
+        embed = discord.Embed(
+            description=f"{interaction.user} used `/restore_community_channel` in <#{interaction.channel.id}> and granted ownership to {owner.display_name}.",
+            color=constants.EMBED_COLOUR_OK
+        )
+
+        await spamchannel.send(embed=embed)
 
         return
 
