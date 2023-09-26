@@ -103,6 +103,7 @@ PROD_ARCHIVE_CAT = 1048957416781393970 # Archive category on live server
 PROD_SECONDS_VERY_SHORT = 10 # time between channel deletion trigger and actual deletion (10)
 PROD_SECONDS_SHORT = 120 # time before calling channel cleanup on failed mission gen (120)
 PROD_SECONDS_LONG = 900 # time before calling channel cleanup on successful mission closure (900)
+PROD_MCOMPLETE_ID = 849040914948554764 # /mission complete slash ID
 # Training mode - production
 PROD_TRAINING_CATEGORY = 1120269131476901938 # training mode category ID
 PROD_TRAINING_MISSION_COMMAND_CHANNEL = 1120269354949419030 # training mode mission gen channel ID
@@ -156,6 +157,7 @@ TEST_ARCHIVE_CAT = 877244591579992144 # Archive category on live server
 TEST_SECONDS_VERY_SHORT = 10 # time between channel deletion trigger and actual deletion
 TEST_SECONDS_SHORT = 5 # time before calling channel cleanup on failed mission gen
 TEST_SECONDS_LONG = 10 # time before calling channel cleanup on successful mission closure
+TEST_MCOMPLETE_ID = 1119206091163709441 # /mission complete slash ID
 # Training mode - test
 TEST_TRAINING_CATEGORY = 1120268080912810014 # training mode category ID
 TEST_TRAINING_MISSION_COMMAND_CHANNEL = 1120268484455174215 # training mode mission gen channel ID
@@ -431,6 +433,10 @@ def seconds_short():
 def seconds_long():
   return PROD_SECONDS_LONG if _production else TEST_SECONDS_LONG
 
+def mcomplete_id():
+  return PROD_MCOMPLETE_ID if _production else TEST_MCOMPLETE_ID
+
+
 def training_cat():
   return PROD_TRAINING_CATEGORY if _production else TEST_TRAINING_CATEGORY
 
@@ -454,7 +460,6 @@ def training_reddit_in_progress():
   
 def training_reddit_completed():
   return TEST_FLAIR_MISSION_STOP # presently using the testing subreddit for training purposes
-
 
 
 
