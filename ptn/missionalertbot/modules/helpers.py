@@ -496,7 +496,7 @@ Open/close community channels helper
 
 
 # helper function for open and closing community channel commands
-async def _openclose_community_channel(interaction, open):
+async def _openclose_community_channel(interaction: discord.Interaction, open):
 
     status_text_verb = "open" if open else "close"
     status_text_adj = "open" if open else "closed"
