@@ -15,6 +15,8 @@ import pickle
 from PIL import Image
 import random
 import typing
+from time import strftime
+
 
 # import discord.py
 import discord
@@ -467,14 +469,14 @@ async def return_discord_channel_embeds(mission_params):
         buy_description=f"🎯 Fleet Carrier: **{mission_params.carrier_data.carrier_long_name}**" \
                         f"\n🔢 Carrier ID: **{mission_params.carrier_data.carrier_identifier}**" \
                         f"\n🌟 System: **{mission_params.system.upper()}**" \
-                        f"\n📦 Commodity: **{mission_params.commodity_name.upper()}**"
+                        f"\n📦 Commodity: **{mission_params.commodity_name.upper()}**" \
+                         f"\n📤 Supply: **{mission_params.demand}K TONS**"
 
         buy_thumb = ptn_logo_discord(strftime('%B'))
 
         sell_description=f"📌 Station: **{mission_params.station.upper()}**" \
                          f"\n🛬 Landing Pad: {pads}" \
                          f"\n💰 Profit: **{mission_params.profit}K PER TON**" \
-                         f"\n📥 Demand: **{mission_params.demand}K TONS**"
         
         sell_thumb = constants.ICON_SELL
 

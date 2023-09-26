@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.2.7
+- [#563](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/563) Fixed month not updating for image choice purposes
+- [#566](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/566) Fixed unloads showing carrier supply as if it was station demand
+
 
 ## 2.2.6
 - [#50](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/50) Logic to create commodities table from scratch

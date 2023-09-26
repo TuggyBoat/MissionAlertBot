@@ -10,6 +10,7 @@ Dependencies: constants, database, helpers
 import aiohttp
 import asyncio
 import random
+from time import strftime
 
 # import discord.py
 import discord
