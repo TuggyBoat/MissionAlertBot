@@ -428,48 +428,82 @@ async def _delete_cc_channel(interaction, button_self):
 
 # helper function for /remove_community_channel
 async def _archive_cc_channel(interaction: discord.Interaction, embed: discord.Embed, button_self, attempt):
-    archive_category = discord.utils.get(interaction.guild.categories, id=archive_cat())
+    async with interaction.channel.typing():
+        archive_category = discord.utils.get(interaction.guild.categories, id=archive_cat())
 
-    try: # there's probably a better way to do this using an if statement
-        button_self.clear_items()
-        await interaction.response.edit_message(view=button_self)
-        await interaction.delete_original_response()
-    except:
-        pass
+        try: # there's probably a better way to do this using an if statement
+            button_self.clear_items()
+            await interaction.response.edit_message(view=button_self)
+            await interaction.delete_original_response()
+        except:
+            pass
 
-    try:
-        await interaction.channel.edit(category=archive_category)
-        # this interaction seems to take some time on the live server.
-        # let's try adding a check that it's completed before proceeding
         if not interaction.channel.category == archive_category:
-            attempt = attempt + 1
-            await _archive_cc_channel_delay(interaction, embed, button_self, attempt)
-        print("moved channel to archive")
-        # now make sure it has the default permissions for the archive category
-        await asyncio.sleep(2)
-        await interaction.channel.edit(sync_permissions=True)
-        print("Synced permissions")
+            print("⏳ Attempting to move channel to archive category...")
+
+            try:
+                await interaction.channel.edit(category=archive_category)
+                # this interaction seems to take some time on the live server.
+                # let's try adding a check that it's completed before proceeding
+                if not interaction.channel.category == archive_category:
+                    attempt = attempt + 1
+                    await _archive_cc_channel_delay(interaction, embed, button_self, attempt)
+                else: # reset attempts if we're successful
+                    attempt = 0
+                    print("✅ Moved channel to archive.")
+
+            except Exception as e:
+                print(e)
+                embed.add_field(name="Channel", value=f"**Failed archiving <#{interaction.channel.id}>**: {e}", inline=False)
+
+        else:
+            attempt = 0
+            print("✅ Moved channel to archive")
+
+        try:
+            print("⏳ Attemping permissions sync with archive category...")
+            # now make sure it has the default permissions for the archive category
+            await asyncio.sleep(1) # wait a moment for the channel move to be processed
+            await interaction.channel.edit(sync_permissions=True)
+            await asyncio.sleep(1)
+            if not interaction.channel.permissions_synced: # permission sync hasn't worked, try again
+                await _archive_cc_channel_perms_delay(interaction, embed, button_self, attempt)
+            else:
+                print("✅ Synced permissions")
+
+        except Exception as e:
+            print(e)
+            embed.add_field(name="Channel", value=f"**Failed setting permissions for <#{interaction.channel.id}>**: {e}", inline=False)
 
         print(embed.fields)
 
         if len(embed.fields)==1: embed.add_field(name="Channel", value=f"<#{interaction.channel.id}> moved to Archives.", inline=False)
 
-    except Exception as e:
-        print(e)
-        embed.add_field(name="Channel", value=f"**Failed archiving <#{interaction.channel.id}>**: {e}", inline=False)
+        return embed
+
+# helper function for archive function
+async def _archive_cc_channel_delay(interaction, embed, button_self, attempt):
+    print(f"⚠ Channel not moved yet. Number of attempts so far: {attempt}")
+    attempt = attempt + 1
+    print(f"⏳ Beginning attempt {attempt}")
+    if attempt <= 10:
+        await asyncio.sleep(2)
+        await _archive_cc_channel(interaction, embed, button_self, attempt)
+    else: # still nothing after 10 seconds, give up I guess
+        embed.add_field(name="Channel", value=f"**Failed archiving <#{interaction.channel.id}>**: channel does not appear to be moved after {attempt} attempts.", inline=False)
 
     return embed
 
 # helper function for archive function
-async def _archive_cc_channel_delay(interaction, embed, button_self, attempt):
-    print(f"Channel not moved yet. Number of attempts so far: {attempt}")
+async def _archive_cc_channel_perms_delay(interaction, embed, button_self, attempt):
+    print(f"⚠ Permissions not synced yet. Number of attempts so far: {attempt}")
     attempt = attempt + 1
-    print(f"Beginning attempt {attempt}")
+    print(f"⏳ Beginning attempt {attempt}")
     if attempt <= 10:
         await asyncio.sleep(2)
         await _archive_cc_channel(interaction, embed, button_self, attempt) # we probably don't need to attempt the channel edit again but is there a disadvantage to doing so?
     else: # still nothing after 10 seconds, give up I guess
-        embed.add_field(name="Channel", value=f"**Failed archiving <#{interaction.channel.id}>**: channel does not appear to be moved after {attempt} attempts.", inline=False)
+        embed.add_field(name="Channel", value=f"**Failed setting permissions for <#{interaction.channel.id}>**: permissions do not appear to be synced after {attempt} attempts.", inline=False)
 
     return embed
 

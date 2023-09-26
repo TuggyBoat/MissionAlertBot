@@ -44,7 +44,7 @@ setup(
         # 'chardet==4.0.0',
         'DateTime==4.3',
         'discord==1.0.1',
-        'discord.py==2.3.0',
+        'discord.py>=2.3.0',
         # 'idna==3.1',
         # 'multidict==5.1.0',
         'Pillow==9.3.0',
