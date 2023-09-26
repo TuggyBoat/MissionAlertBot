@@ -441,7 +441,8 @@ async def return_discord_channel_embeds(mission_params):
     # generates embeds used for the PTN carrier channel as well as any webhooks
 
     # define owner avatar
-    owner = await bot.fetch_user(mission_params.carrier_data.ownerid)
+    guild: discord.Guild = get_guild()
+    owner: discord.Member = await guild.get_member(mission_params.carrier_data.ownerid)
     owner_name = owner.display_name
     owner_avatar = owner.display_avatar
     pads = "**LARGE**" if 'l' in mission_params.pads.lower() else "**MEDIUM**"
