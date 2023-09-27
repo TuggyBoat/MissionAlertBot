@@ -98,7 +98,6 @@ PROD_MOD_ROLE = 813814494563401780 # Mod role ID on Live
 PROD_VERIFIED_ROLE = 867820916331118622 # Verified Member
 PROD_EVENT_ORGANISER_ROLE = 1023296182639939594 # Event Organiser
 PROD_BOT_ROLE = 802523214809923596 # General Bot role on live (Robot Overlords)
-PROD_ALUM_ROLE = 1086777372981858404 # Council Alumni role on live
 PROD_TRADE_CAT = 801558838414409738 # Trade Carrier category on live server
 PROD_ARCHIVE_CAT = 1048957416781393970 # Archive category on live server
 PROD_SECONDS_VERY_SHORT = 10 # time between channel deletion trigger and actual deletion (10)
@@ -153,7 +152,6 @@ TEST_DEV_ROLE = 1048913812163678278 # Dev role ID on test
 TEST_VERIFIED_ROLE = 903289848427851847 # Verified Member
 TEST_EVENT_ORGANISER_ROLE = 1121748430650355822 # Event Organiser
 TEST_BOT_ROLE = 842524877051133963 # TestingAlertBot role only - need a generic bot role on test
-TEST_ALUM_ROLE = 1156729563188035664 # Alumni role on test server
 TEST_TRADE_CAT = 876569219259580436 # Trade Carrier category on live server
 TEST_ARCHIVE_CAT = 877244591579992144 # Archive category on live server
 TEST_SECONDS_VERY_SHORT = 10 # time between channel deletion trigger and actual deletion
@@ -419,9 +417,6 @@ def event_organiser_role():
 
 def bot_role():
   return PROD_BOT_ROLE if _production else TEST_BOT_ROLE
-
-def alum_role():
-    return PROD_ALUM_ROLE if _production else TEST_ALUM_ROLE
 
 def trade_cat():
   return PROD_TRADE_CAT if _production else TEST_TRADE_CAT
