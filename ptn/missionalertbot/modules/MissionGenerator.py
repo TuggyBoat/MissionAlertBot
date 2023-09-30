@@ -14,6 +14,7 @@ import os
 import pickle
 from PIL import Image
 import random
+import traceback
 import typing
 from time import strftime
 
@@ -721,6 +722,7 @@ async def send_mission_to_subreddit(interaction, mission_params):
         return
     except Exception as e:
         print(f"Error posting to Reddit: {e}")
+        traceback.print_exc()
         reddit_error_embed = discord.Embed(
             description=f"❌ Could not send to Reddit. {e}",
             color=constants.EMBED_COLOUR_ERROR
