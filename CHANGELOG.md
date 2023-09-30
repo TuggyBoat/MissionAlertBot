@@ -1,5 +1,8 @@
 # Changelog
 
+## 2.2.8
+
+
 ## 2.2.7
 - [#590](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/590) (Temporary?) workaround for PRAW websocket error; bumped praw versions
 - [#572](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/572) `/cco complete` now resolves carrier search term against carriers db instead of missions db. (This will make it consistent with all other instances of using a specific search term to look for a carrier.)
@@ -9,8 +12,9 @@
 - [#564](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/564) Archiving community channels now checks for successful permission sync and retries on failure
 - [#563](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/563) Fixed month not updating for image choice purposes
 - [#566](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/566) Fixed unloads showing carrier supply as if it was station demand
-- [#561](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/561) `m.complete` now includes an interactible link for `/mission complete`
+- [#561](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/561) `m.complete` now includes an interactable link for `/mission complete`
 - [#560](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/560) Verify Member now includes a jumpurl in the bot-spam notification
+- [#569](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/569) Handle errors caused by users blocking DMs for all role-grant commands
 
 
 ## 2.2.6
