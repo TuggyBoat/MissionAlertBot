@@ -55,8 +55,8 @@ setup(
         # 'zope.interface==5.2.0',
         # 'update-checker==0.18.0',
         # 'aiofiles==0.6.0',
-        'asyncpraw==7.2.0',
-        'asyncprawcore==2.0.1',
+        'asyncpraw==7.7.0',
+        'asyncprawcore==2.3.0',
         'python-dateutil>=2.8.1',
         'emoji>=2.2.0'
     ],
