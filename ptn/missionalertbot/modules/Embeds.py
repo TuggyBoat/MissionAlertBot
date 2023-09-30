@@ -264,3 +264,11 @@ def role_removed_embed(interaction, user, role):
 
     print("Returning embed")
     return embed, bot_spam_embed
+
+def dm_forbidden_embed(user: discord.Member):
+    print("Called dm_forbidden embed")
+    embed = discord.Embed(
+        description=f"↩ Skipped sending notification Direct Message to <@{user.id}>: user is not accepting DMs from this source.",
+        color=constants.EMBED_COLOUR_QU
+    )
+    return embed
