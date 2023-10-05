@@ -79,6 +79,7 @@ PROD_ROLEAPPS_CHANNEL = 867820665515147293 # role-applications on the live serve
 PROD_UPVOTE_EMOJI = 828287733227192403 # upvote emoji on live server
 PROD_O7_EMOJI = 806138784294371368 # o7 emoji on live server
 PROD_FC_COMPLETE_EMOJI = 878216234653605968 # fc_complete emoji
+PROD_FC_EMPTY_EMOJI = 878216288525242388 # fc_empty emoji
 PROD_DISCORD_EMOJI = 1122605426844905503 # Discord emoji on live
 PROD_HAULER_ROLE = 875313960834965544 # hauler role ID on live server
 PROD_WINELOADER_ROLE = 881809680765165578 # wine loader role on live
@@ -135,6 +136,7 @@ TEST_ROLEAPPS_CHANNEL = 1121736676247609394 # role-applications on the test serv
 TEST_UPVOTE_EMOJI = 849388681382068225 # upvote emoji on test server
 TEST_O7_EMOJI = 903744117144698950 # o7 emoji on test server
 TEST_FC_COMPLETE_EMOJI = 884673510067286076 # fc_complete emoji
+TEST_FC_EMPTY_EMOJI = 974747678183424050 # fc_empty emoji
 TEST_DISCORD_EMOJI = 1122605718198026300 # Discord emoji on live
 TEST_HAULER_ROLE = 875439909102575647 # hauler role ID on test server
 TEST_WINELOADER_ROLE = 1119189364522623068 # wine loader role on test
@@ -364,6 +366,9 @@ def o7_emoji():
 
 def fc_complete_emoji():
   return PROD_FC_COMPLETE_EMOJI if _production else TEST_FC_COMPLETE_EMOJI
+
+def fc_empty_emoji():
+  return PROD_FC_EMPTY_EMOJI if _production else TEST_FC_EMPTY_EMOJI
 
 def discord_emoji():
   return PROD_DISCORD_EMOJI if _production else TEST_DISCORD_EMOJI

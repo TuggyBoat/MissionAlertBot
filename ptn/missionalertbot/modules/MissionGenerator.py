@@ -41,7 +41,7 @@ from ptn.missionalertbot.database.database import backup_database, mission_db, m
     find_commodity, find_mission, carrier_db, carriers_conn, find_webhook_from_owner
 from ptn.missionalertbot.modules.DateString import get_formatted_date_string
 from ptn.missionalertbot.modules.Embeds import _mission_summary_embed
-from ptn.missionalertbot.modules.ErrorHandler import on_generic_error, CustomError
+from ptn.missionalertbot.modules.ErrorHandler import on_generic_error, CustomError, AsyncioTimeoutError
 from ptn.missionalertbot.modules.helpers import lock_mission_channel, unlock_mission_channel, check_mission_channel_lock
 from ptn.missionalertbot.modules.ImageHandling import assign_carrier_image, create_carrier_reddit_mission_image, create_carrier_discord_mission_image
 from ptn.missionalertbot.modules.MissionCleaner import remove_carrier_channel
@@ -706,14 +706,16 @@ async def send_mission_to_subreddit(interaction, mission_params):
                 
             await asyncio.wait_for(_post_submission_to_reddit(), timeout=reddit_timeout())
 
-        except TimeoutError: # TODO move to error handler
-            print("❌ Reddit post send timed out")
-            reddit_error_embed = discord.Embed(
-                description=f"❌ Timed out while trying to send to Reddit.",
-                color=constants.EMBED_COLOUR_ERROR
-            )
-            reddit_error_embed.set_footer(text="Attempting to continue with other sends.")
-            await interaction.channel.send(embed=reddit_error_embed)
+        except asyncio.TimeoutError:
+            print("❌⏲ Reddit post send timed out.")
+            await message_send.delete()
+            error = "Timed out while trying to send to Reddit."
+            try:
+                raise AsyncioTimeoutError(error, False)
+            except Exception as e:
+                await on_generic_error(interaction, e)
+            return
+
         except Exception as e:
             print(f"❌ Error posting to Reddit: {e}")
             traceback.print_exc()
@@ -736,14 +738,15 @@ async def send_mission_to_subreddit(interaction, mission_params):
 
             submission = await asyncio.wait_for(_get_new_reddit_post(), timeout=reddit_timeout())
 
-        except TimeoutError: # TODO move to error handler
-            print("❌ Reddit post retrieval timed out")
-            reddit_error_embed = discord.Embed(
-                description=f"❌ Timed out while trying to send to Reddit.",
-                color=constants.EMBED_COLOUR_ERROR
-            )
-            reddit_error_embed.set_footer(text="Attempting to continue with other sends.")
-            await interaction.channel.send(embed=reddit_error_embed)
+        except asyncio.TimeoutError:
+            print("❌⏲ Reddit post retrieval timed out")
+            await message_send.delete()
+            error = "Timed out while trying to get Reddit post link. Reddit URL will not be saved to missions database."
+            try:
+                raise AsyncioTimeoutError(error, False)
+            except Exception as e:
+                await on_generic_error(interaction, e)
+            return
 
 
         mission_params.reddit_post_url = submission.permalink
@@ -795,6 +798,7 @@ async def send_mission_to_subreddit(interaction, mission_params):
         )
         reddit_error_embed.set_footer(text="Attempting to continue with other sends.")
         await interaction.channel.send(embed=reddit_error_embed)
+        await message_send.delete()
 
 
 async def send_mission_to_webhook(interaction, mission_params):
