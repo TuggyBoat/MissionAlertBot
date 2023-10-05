@@ -502,18 +502,7 @@ class CTeamCommands(commands.Cog):
     async def _rename_community_channel(self, interaction:  discord.Interaction, new_name: str, new_emoji: str = None):
         print(f"{interaction.user.name} used /rename_community_channel in {interaction.channel.name}")
 
-        message = None
-        print("Assigned message as None")
-
-        try:
-            print("Fetching non-existant message...")
-            message = await interaction.original_response()
-        except Exception as e:
-            print(f"Couldn't assign message: {e}")
-            await interaction.response.send_message("Hello")
-        print(message)
-        await interaction.response.send_message("Hello")
-        return
+        # TODO respond
 
         old_channel_name = interaction.channel.name
 
