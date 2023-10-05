@@ -138,22 +138,21 @@ class ConfirmRemoveRoleView(View):
         )
         return await interaction.response.edit_message(embed=self.embed, view=None)
 
-    async def on_timeout(self):
+    async def on_timeout(self): 
         # remove buttons
         self.clear_items()
+        print("View timed out")
 
-        if not self.embed:
         # return a message to the user that the interaction has timed out
-            timeout_embed = discord.Embed(
-                description="Timed out.",
-                color=constants.EMBED_COLOUR_ERROR
-            )
-            self.embed = timeout_embed
+        timeout_embed = discord.Embed(
+            description="Timed out.",
+            color=constants.EMBED_COLOUR_ERROR
+        )
 
         try:
-            await self.message.edit(embed=self.embed, view=self)
+            await self.message.edit(embed=timeout_embed, view=self)
         except Exception as e:
-            print(e)
+            print(f'Failed applying timeout: {e}')
 
 
 # buttons for community channel rename
@@ -183,11 +182,13 @@ class ConfirmRenameCC(View):
             # rename channel
             action = 'channel'
             await interaction.channel.edit(name=self.new_channel_name)
+            print("Renamed channel")
 
             # rename role
             action = 'role'
             role = discord.utils.get(interaction.guild.roles, id=self.community_carrier.role_id)
             await role.edit(name=self.new_channel_name)
+            print("Renamed role")
 
         except Exception as e:
             error = f'Failed to rename {action}: {e}'
@@ -208,23 +209,21 @@ class ConfirmRenameCC(View):
             except Exception as e:
                 await on_generic_error(interaction, e)
 
-
-    async def on_timeout(self):
+    async def on_timeout(self): 
         # remove buttons
         self.clear_items()
+        print("View timed out")
 
-        if not self.embed:
         # return a message to the user that the interaction has timed out
-            timeout_embed = discord.Embed(
-                description="Timed out.",
-                color=constants.EMBED_COLOUR_ERROR
-            )
-            self.embed = timeout_embed
+        timeout_embed = discord.Embed(
+            description="Timed out.",
+            color=constants.EMBED_COLOUR_ERROR
+        )
 
         try:
-            await self.message.edit(embed=self.embed, view=self)
+            await self.message.edit(embed=timeout_embed, view=self)
         except Exception as e:
-            print(e)
+            print(f'Failed applying timeout: {e}')
 
 # buttons for mission manual delete
 class MissionDeleteView(View):

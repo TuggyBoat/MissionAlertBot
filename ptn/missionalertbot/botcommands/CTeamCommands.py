@@ -5,6 +5,7 @@ Cog for Community Team commands
 
 # import libaries
 import os
+import traceback
 
 # import discord.py
 import discord
@@ -23,7 +24,7 @@ from ptn.missionalertbot.constants import bot, cmentor_role, admin_role, cc_role
 
 # import local modules
 from ptn.missionalertbot.database.database import carrier_db
-from ptn.missionalertbot.modules.ErrorHandler import on_app_command_error, GenericError, on_generic_error
+from ptn.missionalertbot.modules.ErrorHandler import on_app_command_error, GenericError, on_generic_error, CustomError
 from ptn.missionalertbot.modules.helpers import check_roles, _regex_alphanumeric_with_hyphens, _cc_owner_check, _cc_role_create_check, \
     _cc_create_channel, _cc_role_create, _cc_assign_permissions, _cc_db_enter, _remove_cc_role_from_owner, _cc_role_delete, _openclose_community_channel, \
     _community_channel_owner_check, check_command_channel, _cc_name_string_check
@@ -501,25 +502,55 @@ class CTeamCommands(commands.Cog):
     @check_roles([cmentor_role(), admin_role(), cc_role()]) # allow owners to open/close their own channels
     async def _rename_community_channel(self, interaction:  discord.Interaction, new_name: str, new_emoji: str = None):
         print(f"{interaction.user.name} used /rename_community_channel in {interaction.channel.name}")
+        try:
+            old_channel_name = interaction.channel.name
 
-        old_channel_name = interaction.channel.name
+            embed = discord.Embed(
+                description="⏳ Please wait a moment...",
+                color=constants.EMBED_COLOUR_QU
+            )
+            await interaction.response.send_message(embed=embed, ephemeral=True) # tell the user we're working on it
 
-        embed = discord.Embed(
-            description="⏳ Please wait a moment...",
-            color=constants.EMBED_COLOUR_QU
-        )
-        await interaction.response.send_message(embed=embed, view=None) # tell the user we're working on it
+            # check the user has authority to do this
+            community_carrier = await _community_channel_owner_check(interaction)
+            if not community_carrier: return
 
-        # check the user has authority to do this
-        community_carrier = await _community_channel_owner_check(interaction)
-        if not community_carrier: return
+            # process the new channel/role name
+            new_channel_name = await _cc_name_string_check(interaction, new_emoji, new_name)
 
-        # process the new channel/role name
-        new_channel_name = await _cc_name_string_check(interaction, new_emoji, new_name)
+            # check it's not in use
+            existing_channel = discord.utils.get(interaction.guild.channels, name=new_channel_name)
+            if existing_channel:
+                error=f'<#{existing_channel.id}> already exists. Please choose another.'
+                try:
+                    raise CustomError(error)
+                except Exception as e:
+                    return await on_generic_error(interaction, e)
+            existing_role = discord.utils.get(interaction.guild.roles, name=new_channel_name)
+            if existing_role:
+                error=f'<@&{existing_role.id}> already exists. Please choose another.'
+                try:
+                    raise CustomError(error)
+                except Exception as e:
+                    return await on_generic_error(interaction, e)
 
-        # confirm user choice
-        view = ConfirmRenameCC(community_carrier, old_channel_name, new_channel_name)
+            # confirm user choice
+            view = ConfirmRenameCC(community_carrier, old_channel_name, new_channel_name)
 
+            embed = discord.Embed(
+                title='Confirm Rename',
+                description=f"`{old_channel_name}` ▶ `{new_channel_name}`",
+                color=constants.EMBED_COLOUR_QU
+            )
+            await interaction.edit_original_response(embed=embed, view=view)
+            view.message = await interaction.original_response()
+
+        except Exception as e:
+            traceback.print_exc()
+            try:
+                raise GenericError(e)
+            except Exception as e:
+                await on_generic_error(interaction, e)
 
     # send a notice from a Community Carrier owner to their 'crew' - this is the long form command using a modal
     @app_commands.command(name="send_notice",
