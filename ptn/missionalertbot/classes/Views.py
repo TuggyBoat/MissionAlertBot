@@ -17,11 +17,14 @@ from discord.ui import View, Modal
 import ptn.missionalertbot.constants as constants
 from ptn.missionalertbot.constants import seconds_long, o7_emoji, bot_spam_channel, bot
 
+# import local classes
+import ptn.missionalertbot.classes.CommunityCarrierData as CommunityCarrierData
+
 # import local modules
 from ptn.missionalertbot.database.database import delete_nominee_from_db, delete_carrier_from_db, _update_carrier_details_in_database, find_carrier, CarrierDbFields, mission_db, missions_conn
 from ptn.missionalertbot.modules.DateString import get_mission_delete_hammertime
-from ptn.missionalertbot.modules.Embeds import _configure_all_carrier_detail_embed, _generate_cc_notice_embed, role_removed_embed, role_granted_embed
-from ptn.missionalertbot.modules.ErrorHandler import GenericError, on_generic_error
+from ptn.missionalertbot.modules.Embeds import _configure_all_carrier_detail_embed, _generate_cc_notice_embed, role_removed_embed, role_granted_embed, cc_renamed_embed
+from ptn.missionalertbot.modules.ErrorHandler import GenericError, on_generic_error, CustomError
 from ptn.missionalertbot.modules.helpers import _remove_cc_manager
 from ptn.missionalertbot.modules.MissionCleaner import _cleanup_completed_mission
 
@@ -106,7 +109,7 @@ class ConfirmRemoveRoleView(View):
         super().__init__(timeout=timeout)
 
     @discord.ui.button(label="Remove", style=discord.ButtonStyle.danger, emoji="💥", custom_id="remove")
-    async def remove_role_button(self, interaction, button):
+    async def remove_role_button(self, interaction: discord.Interaction, button):
         print(f"{interaction.user} confirms remove {self.role.name} role")
 
         embed = discord.Embed(
@@ -118,7 +121,7 @@ class ConfirmRemoveRoleView(View):
         try:
             await self.member.remove_roles(self.role)
             self.embed, spam_embed = role_removed_embed(interaction, self.member, self.role)
-            await self.message.edit(embed=self.embed, view=None)
+            await interaction.response.edit_message(embed=self.embed, view=None)
             await self.spamchannel.send(embed=spam_embed)
         except Exception as e:
             try:
@@ -127,7 +130,7 @@ class ConfirmRemoveRoleView(View):
                 await on_generic_error(interaction, e)
 
     @discord.ui.button(label="Cancel", style=discord.ButtonStyle.secondary, emoji="✖", custom_id="cancel")
-    async def cancel_remove_role_button(self, interaction, button):
+    async def cancel_remove_role_button(self, interaction: discord.Interaction, button):
         print(f"{interaction.user} cancelled remove {self.role.name} role")
         self.embed = discord.Embed(
             description="Cancelled.",
@@ -152,6 +155,76 @@ class ConfirmRemoveRoleView(View):
         except Exception as e:
             print(e)
 
+
+# buttons for community channel rename
+class ConfirmRenameCC(View):
+    def __init__(self, community_carrier, old_channel_name, new_channel_name, timeout=30):
+        print("ConfirmRenameCC init")
+        self.community_carrier: CommunityCarrierData = community_carrier
+        self.new_channel_name = new_channel_name
+        self.old_channel_name = old_channel_name
+        self.spamchannel: discord.TextChannel = bot.get_channel(bot_spam_channel())
+        super().__init__(timeout=timeout)
+
+    @discord.ui.button(label="✗ Cancel", style=discord.ButtonStyle.secondary, custom_id="cancel_rename_cc")
+    async def cancel_rename_cc_button(self, interaction: discord.Interaction, button):
+        print(f"{interaction.user} cancelled renaming CC")
+        self.embed = discord.Embed(
+            description="Cancelled.",
+            color=constants.EMBED_COLOUR_OK
+        )
+        return await interaction.response.edit_message(embed=self.embed, view=None)
+
+    @discord.ui.button(label="✔ Confirm", style=discord.ButtonStyle.primary, custom_id="confirm_rename_cc")
+    async def confirm_rename_cc_button(self, interaction: discord.Interaction, button):
+        print(f"{interaction.user} confirmed renaming CC")
+
+        try:
+            # rename channel
+            action = 'channel'
+            await interaction.channel.edit(name=self.new_channel_name)
+
+            # rename role
+            action = 'role'
+            role = discord.utils.get(interaction.guild.roles, id=self.community_carrier.role_id)
+            await role.edit(name=self.new_channel_name)
+
+        except Exception as e:
+            error = f'Failed to rename {action}: {e}'
+            print(error)
+            try:
+                raise CustomError(error)
+            except Exception as e:
+                await on_generic_error(interaction, e)
+
+        try:
+            self.embed, spam_embed = cc_renamed_embed(interaction, self.old_channel_name, self.community_carrier)
+            await interaction.response.edit_message(embed=self.embed, view=None)
+            await self.spamchannel.send(embed=spam_embed)
+
+        except Exception as e:
+            try:
+                raise GenericError(e)
+            except Exception as e:
+                await on_generic_error(interaction, e)
+
+
+    async def on_timeout(self):
+        # remove buttons
+        self.clear_items()
+
+        if not self.embed:
+        # return a message to the user that the interaction has timed out
+            timeout_embed = discord.Embed(
+                description="Timed out.",
+                color=constants.EMBED_COLOUR_ERROR
+            )
+            self.embed = timeout_embed
+
+        try:
+            await self.message.edit(embed=self.embed, view=self)
+        except Exception as e:
+            print(e)
 
 # buttons for mission manual delete
 class MissionDeleteView(View):

@@ -8,6 +8,7 @@ Depends on: constants, ErrorHandler, database
 # import libraries
 import asyncio
 from datetime import datetime, timezone
+import emoji
 from functools import wraps
 import random
 import re
@@ -18,6 +19,7 @@ import discord
 from discord import Interaction, app_commands
 from discord.errors import HTTPException, Forbidden, NotFound
 from discord.ext import commands
+from discord.ui import View, Button
 
 # import local classes
 from ptn.missionalertbot.classes.CommunityCarrierData import CommunityCarrierData
@@ -31,7 +33,7 @@ from ptn.missionalertbot.constants import bot, cc_role, get_overwrite_perms, get
 
 # import local modules
 from ptn.missionalertbot.database.database import find_community_carrier, CCDbFields, carrier_db, carrier_db_lock, carriers_conn, delete_community_carrier_from_db
-from ptn.missionalertbot.modules.ErrorHandler import CommandChannelError, CommandRoleError
+from ptn.missionalertbot.modules.ErrorHandler import CommandChannelError, CommandRoleError, CustomError, on_generic_error
 
 
 # trio of helper functions to check a user's permission to run a command based on their roles, and return a helpful error if they don't have the correct role(s)
@@ -532,6 +534,38 @@ async def _cc_role_delete(interaction, role_id, embed):
 
 
 """
+Helper to assemble a community channel name from user input
+"""
+async def _cc_name_string_check(interaction: discord.Interaction, channel_emoji, channel_name):
+    # trim emojis to 1 character
+    emoji_string = channel_emoji[:1] if not channel_emoji == None else None
+
+    # PROCESS: check for valid emoji
+    print(emoji.is_emoji(emoji_string))
+    if not emoji.is_emoji(emoji_string) and not emoji_string == None:
+        embed = discord.Embed(description="❌ Invalid emoji supplied. Use a valid Unicode emoji from your emoji keyboard,"
+                                        f"or leave the field blank. **Discord custom emojis will not work**.", color=constants.EMBED_COLOUR_ERROR)
+        bu_link = Button(label="Full Emoji List", url="https://unicode.org/emoji/charts/full-emoji-list.html")
+        view = View()
+        view.add_item(bu_link)
+        return await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+
+    # PROCESS: remove unusable characters and render to lowercase
+    stripped_channel_name = _regex_alphanumeric_with_hyphens(channel_name.lower())
+
+    # check the channel name isn't too long
+    if len(stripped_channel_name) > 30:
+        embed = discord.Embed(description="❌ Channel name should be fewer than 30 characters. (Preferably a *lot* fewer.)", color=constants.EMBED_COLOUR_ERROR)
+        return await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    # join with the emoji
+    new_channel_name = emoji_string + stripped_channel_name if not emoji_string == None else stripped_channel_name
+    print(f"Candidate channel name: {new_channel_name}")
+
+    return new_channel_name
+
+
+"""
 Open/close community channels helper
 """
 
@@ -578,20 +612,23 @@ async def _openclose_community_channel(interaction: discord.Interaction, open):
 
 
 """
-send_notice helper
+CC authority checker
 """
 
-
-# helper function shared by the send_notice commands
-async def _send_notice_channel_check(interaction):
+# helper function shared by the various CC commands
+async def _community_channel_owner_check(interaction):
     # check if we're in a community channel
     carrier_db.execute(f"SELECT * FROM community_carriers WHERE "
                     f"channelid = {interaction.channel.id}")
     community_carrier = CommunityCarrierData(carrier_db.fetchone())
     # error if not
     if not community_carrier:
-        embed = discord.Embed(description=f"Error: This does not appear to be a community channel.", color=constants.EMBED_COLOUR_ERROR)
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+        error = "This does not appear to be a community channel."
+        print(f'❌ {error}')
+        try:
+            raise CustomError(error)
+        except Exception as e:
+            await on_generic_error(interaction, e)
         return
 
     elif community_carrier:
