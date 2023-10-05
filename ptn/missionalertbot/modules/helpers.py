@@ -543,20 +543,25 @@ async def _cc_name_string_check(interaction: discord.Interaction, channel_emoji,
     # PROCESS: check for valid emoji
     print(emoji.is_emoji(emoji_string))
     if not emoji.is_emoji(emoji_string) and not emoji_string == None:
-        embed = discord.Embed(description="❌ Invalid emoji supplied. Use a valid Unicode emoji from your emoji keyboard,"
-                                        f"or leave the field blank. **Discord custom emojis will not work**.", color=constants.EMBED_COLOUR_ERROR)
-        bu_link = Button(label="Full Emoji List", url="https://unicode.org/emoji/charts/full-emoji-list.html")
-        view = View()
-        view.add_item(bu_link)
-        return await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+        error = "Invalid emoji supplied. Use a valid Unicode emoji from your emoji keyboard, " \
+                "or leave the field blank. **Discord custom emojis will not work**"
+        print('Invalid emoji')
+        try:
+            raise CustomError(error)
+        except Exception as e:
+            return await on_generic_error(interaction, e)
 
     # PROCESS: remove unusable characters and render to lowercase
     stripped_channel_name = _regex_alphanumeric_with_hyphens(channel_name.lower())
 
     # check the channel name isn't too long
     if len(stripped_channel_name) > 30:
-        embed = discord.Embed(description="❌ Channel name should be fewer than 30 characters. (Preferably a *lot* fewer.)", color=constants.EMBED_COLOUR_ERROR)
-        return await interaction.response.send_message(embed=embed, ephemeral=True)
+        error = "Channel name should be fewer than 30 characters. (Preferably a *lot* fewer.)"
+        print('Channel name too long')
+        try:
+            raise CustomError(error)
+        except Exception as e:
+            return await on_generic_error(interaction, e)
 
     # join with the emoji
     new_channel_name = emoji_string + stripped_channel_name if not emoji_string == None else stripped_channel_name
@@ -628,8 +633,7 @@ async def _community_channel_owner_check(interaction):
         try:
             raise CustomError(error)
         except Exception as e:
-            await on_generic_error(interaction, e)
-        return
+            return await on_generic_error(interaction, e)
 
     elif community_carrier:
         print(f"Found data: {community_carrier.owner_id} owner of {community_carrier.channel_id}")

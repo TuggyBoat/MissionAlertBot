@@ -502,8 +502,6 @@ class CTeamCommands(commands.Cog):
     async def _rename_community_channel(self, interaction:  discord.Interaction, new_name: str, new_emoji: str = None):
         print(f"{interaction.user.name} used /rename_community_channel in {interaction.channel.name}")
 
-        # TODO respond
-
         old_channel_name = interaction.channel.name
 
         embed = discord.Embed(
