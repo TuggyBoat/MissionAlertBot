@@ -24,7 +24,7 @@ from ptn.missionalertbot.classes.Views import db_delete_View, BroadcastView, Car
 # local constants
 import ptn.missionalertbot.constants as constants
 from ptn.missionalertbot.constants import bot, cmentor_role, admin_role, cteam_bot_channel, cteam_bot_channel, bot_command_channel, cc_role, \
-    admin_role, mod_role
+    admin_role, mod_role, bot_spam_channel, fc_complete_emoji
 
 # local modules
 from ptn.missionalertbot.database.database import find_nominee_with_id, carrier_db, CarrierDbFields, find_carrier, backup_database, \
@@ -67,11 +67,12 @@ async def add_carrier(interaction:  discord.Interaction, message: discord.Messag
         owner_id = details['owner_id']
         channel_name = details['channel_name']
         print(f"Index {index} is '{long_name}' ({carrier_id}) with generated shortname {short_name}")
-        embed.add_field(name=f'Match {index+1}', value=f'Longname: `{long_name}` Shortname: `{short_name}` ID: `{carrier_id}` Owner: <@{owner_id}> ChannelName: `{channel_name}`', inline=False)
+        embed.add_field(name=f'Match {index+1}', value=f'Longname: `{long_name}` • Shortname: `{short_name}` • ID: `{carrier_id}` • Owner: <@{owner_id}> • ChannelName: #`{channel_name}`', inline=False)
 
     # TODO check no two fields are identical
 
     embed.title="🔎 CARRIER DETAILS FOUND IN MESSAGE"
+    embed.description=None
 
     view = AddCarrierButtons(message, carrier_details)
 
@@ -339,7 +340,17 @@ class DatabaseInteraction(commands.Cog):
 
         embeds = [info_embed, cp_embed]
 
-        return await interaction.response.send_message(embeds=embeds)
+        await interaction.response.send_message(embeds=embeds)
+
+        # notify bot-spam
+        spamchannel: discord.TextChannel = bot.get_channel(bot_spam_channel())
+        message: discord.Message = await interaction.original_response()
+        embed = discord.Embed(
+            description=f"<:fc_complete:{fc_complete_emoji()}> **NEW FLEET CARRIER** added by <@{interaction.user.id}> at {message.jump_url}",
+            color=constants.EMBED_COLOUR_OK
+        )
+        embed = _add_common_embed_fields(embed, carrier_data, interaction)
+        return await spamchannel.send(embed=embed)
 
 
     # remove FC from database

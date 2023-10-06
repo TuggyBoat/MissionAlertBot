@@ -17,7 +17,7 @@ from discord.ui import View, Modal
 
 # import local constants
 import ptn.missionalertbot.constants as constants
-from ptn.missionalertbot.constants import seconds_long, o7_emoji, bot_spam_channel, bot
+from ptn.missionalertbot.constants import seconds_long, o7_emoji, bot_spam_channel, bot, fc_complete_emoji, bot_command_channel
 
 # import local classes
 import ptn.missionalertbot.classes.CommunityCarrierData as CommunityCarrierData
@@ -834,7 +834,7 @@ class AddCarrierButtons(View):
 
                     cp_embed = discord.Embed(
                         title="Copy/Paste code for Stockbot",
-                        description=f"```;add_FC {carrier_data.carrier_identifier} {carrier_data.carrier_short_name} {carrier_data.ownerid}```",
+                        description=f"▶ <#{bot_command_channel()}>:\n```;add_FC {carrier_data.carrier_identifier} {carrier_data.carrier_short_name} {carrier_data.ownerid}```",
                         color=constants.EMBED_COLOUR_QU
                     )
 
@@ -843,6 +843,17 @@ class AddCarrierButtons(View):
                     # TODO link with existing add_carrier function to remove duplicate code
 
                     await interaction.followup.send(embeds=embeds)
+
+                    # notify bot-spam
+                    print("Notify bot-spam")
+                    spamchannel: discord.TextChannel = bot.get_channel(bot_spam_channel())
+                    print(spamchannel)
+                    embed = discord.Embed(
+                        description=f"<:fc_complete:{fc_complete_emoji()}> **NEW FLEET CARRIER** added by <@{interaction.user.id}> from {self.message.jump_url}",
+                        color=constants.EMBED_COLOUR_OK
+                    )
+                    embed = _add_common_embed_fields(embed, carrier_data, interaction)
+                    await spamchannel.send(embed=embed)
 
             except Exception as e:
                 error = f"Failed adding {details['ptn_string']}. Please add it manually. Error: {e}"
