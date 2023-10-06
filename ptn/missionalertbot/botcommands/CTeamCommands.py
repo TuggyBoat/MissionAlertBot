@@ -513,7 +513,9 @@ class CTeamCommands(commands.Cog):
 
             # check the user has authority to do this
             community_carrier = await _community_channel_owner_check(interaction)
-            if not community_carrier: return
+            if not community_carrier:
+                await interaction.delete_original_response()
+                return
 
             # process the new channel/role name
             new_channel_name = await _cc_name_string_check(interaction, new_emoji, new_name)
@@ -522,6 +524,7 @@ class CTeamCommands(commands.Cog):
             existing_channel = discord.utils.get(interaction.guild.channels, name=new_channel_name)
             if existing_channel:
                 error=f'<#{existing_channel.id}> already exists. Please choose another.'
+                await interaction.delete_original_response()
                 try:
                     raise CustomError(error)
                 except Exception as e:
@@ -529,6 +532,7 @@ class CTeamCommands(commands.Cog):
             existing_role = discord.utils.get(interaction.guild.roles, name=new_channel_name)
             if existing_role:
                 error=f'<@&{existing_role.id}> already exists. Please choose another.'
+                await interaction.delete_original_response()
                 try:
                     raise CustomError(error)
                 except Exception as e:
@@ -546,6 +550,7 @@ class CTeamCommands(commands.Cog):
             view.message = await interaction.original_response()
 
         except Exception as e:
+            await interaction.delete_original_response()
             traceback.print_exc()
             try:
                 raise GenericError(e)

@@ -6,11 +6,13 @@ Depends on: constants, database, Embeds, ErrorHandler, helpers, MissionCleaner
 """
 
 # import libraries
+import asyncio
 import os
 from datetime import datetime
 
 # import discord.py
 import discord
+from discord import HTTPException
 from discord.ui import View, Modal
 
 # import local constants
@@ -24,7 +26,7 @@ import ptn.missionalertbot.classes.CommunityCarrierData as CommunityCarrierData
 from ptn.missionalertbot.database.database import delete_nominee_from_db, delete_carrier_from_db, _update_carrier_details_in_database, find_carrier, CarrierDbFields, mission_db, missions_conn
 from ptn.missionalertbot.modules.DateString import get_mission_delete_hammertime
 from ptn.missionalertbot.modules.Embeds import _configure_all_carrier_detail_embed, _generate_cc_notice_embed, role_removed_embed, role_granted_embed, cc_renamed_embed
-from ptn.missionalertbot.modules.ErrorHandler import GenericError, on_generic_error, CustomError
+from ptn.missionalertbot.modules.ErrorHandler import GenericError, on_generic_error, CustomError, AsyncioTimeoutError
 from ptn.missionalertbot.modules.helpers import _remove_cc_manager
 from ptn.missionalertbot.modules.MissionCleaner import _cleanup_completed_mission
 
@@ -178,29 +180,67 @@ class ConfirmRenameCC(View):
     async def confirm_rename_cc_button(self, interaction: discord.Interaction, button):
         print(f"{interaction.user} confirmed renaming CC")
 
-        try:
-            # rename channel
-            action = 'channel'
-            await interaction.channel.edit(name=self.new_channel_name)
-            print("Renamed channel")
+        embed = discord.Embed(
+            description="⏳ Please wait a moment...",
+            color=constants.EMBED_COLOUR_QU
+        )
 
-            # rename role
-            action = 'role'
-            role = discord.utils.get(interaction.guild.roles, id=self.community_carrier.role_id)
-            await role.edit(name=self.new_channel_name)
-            print("Renamed role")
+        await interaction.response.edit_message(embed=embed, view=None)
 
-        except Exception as e:
-            error = f'Failed to rename {action}: {e}'
-            print(error)
+        failed_embed = discord.Embed(
+            description="❌ Failed.",
+            color=constants.EMBED_COLOUR_ERROR
+        )
+
+        timeout=15
+
+        # wrap this in an asyncio wait_for as sometimes this takes ages and fails for no reason
+        async def _rename_community_channel():
             try:
-                raise CustomError(error)
+                # rename channel
+                action = 'channel'
+                await interaction.channel.edit(name=self.new_channel_name)
+                print("Renamed channel")
+
+                # rename role
+                action = 'role'
+                role = discord.utils.get(interaction.guild.roles, id=self.community_carrier.role_id)
+                await role.edit(name=self.new_channel_name)
+                print("Renamed role")
+
+            except HTTPException as e:
+                error = f"Received HTTPException from Discord. We might be rate-limited. Please try again in 20-30 minutes.\n```{e}```"
+                await interaction.edit_original_response(embed=failed_embed, view=None)
+                try:
+                    raise CustomError(error)
+                except Exception as e:
+                    await on_generic_error(interaction, e)
+                return
+
+            except Exception as e:
+                error = f'Failed to rename {action}: {e}'
+                print(error)
+                await interaction.edit_original_response(embed=failed_embed, view=None)
+                try:
+                    raise CustomError(error)
+                except Exception as e:
+                    await on_generic_error(interaction, e)
+                return
+
+        try:
+            await asyncio.wait_for(_rename_community_channel(), timeout=timeout)
+        except asyncio.TimeoutError:
+            error = 'No response from Discord. We might be rate limited. Try again in 20-30 minutes.'
+            await interaction.edit_original_response(embed=failed_embed, view=None)
+            try:
+                raise AsyncioTimeoutError(error)
             except Exception as e:
                 await on_generic_error(interaction, e)
+            return
 
         try:
-            self.embed, spam_embed = cc_renamed_embed(interaction, self.old_channel_name, self.community_carrier)
-            await interaction.response.edit_message(embed=self.embed, view=None)
+            embed, spam_embed = cc_renamed_embed(interaction, self.old_channel_name, self.community_carrier)
+            await interaction.edit_original_response(embed=embed, view=None)
             await self.spamchannel.send(embed=spam_embed)
 
         except Exception as e:
