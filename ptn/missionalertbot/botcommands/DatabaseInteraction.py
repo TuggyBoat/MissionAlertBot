@@ -18,18 +18,64 @@ from discord.ext import commands
 # local classes
 from ptn.missionalertbot.classes.CommunityCarrierData import CommunityCarrierData
 from ptn.missionalertbot.classes.NomineesData import NomineesData
-from ptn.missionalertbot.classes.Views import db_delete_View, BroadcastView, CarrierEditView, MissionDeleteView
+from ptn.missionalertbot.classes.Views import db_delete_View, BroadcastView, CarrierEditView, MissionDeleteView, AddCarrierButtons
 
 # local constants
 import ptn.missionalertbot.constants as constants
-from ptn.missionalertbot.constants import bot, cmentor_role, admin_role, cteam_bot_channel, cteam_bot_channel, bot_command_channel, cc_role
+from ptn.missionalertbot.constants import bot, cmentor_role, admin_role, cteam_bot_channel, cteam_bot_channel, bot_command_channel, cc_role, \
+    admin_role, mod_role
 
 # local modules
 from ptn.missionalertbot.database.database import find_nominee_with_id, carrier_db, CarrierDbFields, CarrierData, find_carrier, backup_database, \
-     add_carrier_to_database, find_carriers_mult, find_commodity, find_community_carrier, CCDbFields, find_mission
-from ptn.missionalertbot.modules.ErrorHandler import on_app_command_error
-from ptn.missionalertbot.modules.helpers import check_roles, check_command_channel, _regex_alphanumeric_with_hyphens
+    add_carrier_to_database, find_carriers_mult, find_commodity, find_community_carrier, CCDbFields, find_mission
+from ptn.missionalertbot.modules.ErrorHandler import on_app_command_error, CustomError, on_generic_error
+from ptn.missionalertbot.modules.helpers import check_roles, check_command_channel, _regex_alphanumeric_with_hyphens, extract_carrier_ident_strings
 from ptn.missionalertbot.modules.Embeds import _add_common_embed_fields, _configure_all_carrier_detail_embed
+
+
+@bot.tree.context_menu(name='Add Carrier')
+@check_roles([admin_role(), mod_role()])
+async def add_carrier(interaction:  discord.Interaction, message: discord.Message):
+    print(f"add_carrier called by {interaction.user.display_name} for {message.author.display_name}")
+
+    embed = discord.Embed(
+        description="⏳ Please wait a moment...",
+        color=constants.EMBED_COLOUR_QU
+    )
+
+    await interaction.response.send_message(embed=embed)
+
+    # extract matching strings from message
+    carrier_details: dict = extract_carrier_ident_strings(message)
+
+    if not carrier_details:
+        try:
+            error = f"No valid carrier details found in {message.jump_url}. Details should be in format " \
+                     "`P.T.N. Full Name (ABC-123)` (Any variation on 'PTN' is fine)"
+            await interaction.delete_original_response()
+            raise CustomError(error, False)
+        except Exception as e:
+            return await on_generic_error(interaction, e)
+
+    # print the extracted values
+    for details in carrier_details:
+        long_name = details['long_name']
+        carrier_id = details['carrier_id']
+        short_name = details['short_name']
+        index = details['index']
+        owner_id = details['owner_id']
+        channel_name = details['channel_name']
+        print(f"Index {index} is '{long_name}' ({carrier_id}) with generated shortname {short_name}")
+        embed.add_field(name=f'Match {index+1}', value=f'Longname: `{long_name}` Shortname: `{short_name}` ID: `{carrier_id}` Owner: `{owner_id}` ChannelName: `{channel_name}`', inline=False)
+
+    # TODO check no two fields are identical
+
+    embed.description="Found matches:"
+
+    view = AddCarrierButtons(message, carrier_details)
+
+    await interaction.edit_original_response(embed=embed, view=view)
+    view.message = await interaction.original_response()
 
 
 

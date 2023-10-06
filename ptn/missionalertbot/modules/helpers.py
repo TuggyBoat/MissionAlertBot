@@ -693,6 +693,53 @@ def check_training_mode(interaction: discord.Interaction):
 
     return training, channel_defs
 
+# identify PTN carrier details from a string
+def extract_carrier_ident_strings(message: discord.Message):
+    """
+    Searches for matches to the format "PTN Carrier Name (IDX-NUM)
+
+    param message_content: the content of the message to search
+    returns: a list of matched pairs of name/ID
+    """
+    # regex to match the strings
+    pattern = r'(P\.?T\.?N\.?\s+[^)]+?)\s+\((\w{3}-\w{3})\)'
+    shortname_pattern = r'(P\.?T\.?N\.?)'
+
+    # find all matching occurrences in the message content
+    matches = re.findall(pattern, message.content)
+
+    # extract the matched strings into separate variables
+    extracted_strings = []
+
+    index = 0
+
+    # make sure each match is a pair
+    for match in matches:
+        if len(match) == 2:
+            ptn_string = str(match[0])
+            bracket_string = str(match[1])
+            print(f'Found matching pair in message: {ptn_string} ({bracket_string})')
+            # extract a shortname
+            shortname_string = re.sub(shortname_pattern, '', ptn_string)
+            shortname_string = shortname_string.lower().replace(" ", "")
+
+            # create a channel name
+            stripped_name = _regex_alphanumeric_with_hyphens(ptn_string).lower()
+
+            # attach to list as a dict
+            extracted_strings.append({
+                'index': index,
+                'long_name': ptn_string.upper(),
+                'carrier_id': bracket_string.upper(),
+                'short_name': shortname_string.lower(),
+                'channel_name': stripped_name.lower(),
+                'owner_id': message.author.id
+            })
+            index += 1
+        else:
+            print(f'Ignoring {match}: no pair found')
+
+    return extracted_strings
 
 # presently unused
 # TODO: remove or incorporate

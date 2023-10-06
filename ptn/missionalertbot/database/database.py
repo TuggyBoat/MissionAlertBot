@@ -596,7 +596,7 @@ def find_carriers_mult(searchterm, searchfield):
     :rtype: list[CarrierData]
     """
     carrier_db.execute(
-        f"SELECT * FROM carriers WHERE {searchfield} LIKE (?)", (f'%{searchterm}%',)
+        f"SELECT * FROM carriers WHERE {searchfield} LIKE (?) AND shortname != ownerid", (f'%{searchterm}%',)
     )
     carrier_data = [CarrierData(carrier) for carrier in carrier_db.fetchall()]
     for carrier in carrier_data:
