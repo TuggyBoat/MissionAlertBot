@@ -28,8 +28,8 @@ from ptn.missionalertbot.constants import bot, cmentor_role, admin_role, cteam_b
 
 # local modules
 from ptn.missionalertbot.database.database import find_nominee_with_id, carrier_db, CarrierDbFields, find_carrier, backup_database, \
-    add_carrier_to_database, find_carriers_mult, find_commodity, find_community_carrier, CCDbFields, find_mission
-from ptn.missionalertbot.modules.ErrorHandler import on_app_command_error, CustomError, on_generic_error
+    add_carrier_to_database, find_carriers_mult, find_commodity, find_community_carrier, CCDbFields, find_mission, find_opt_ins
+from ptn.missionalertbot.modules.ErrorHandler import on_app_command_error, CustomError, on_generic_error, GenericError
 from ptn.missionalertbot.modules.helpers import check_roles, check_command_channel, _regex_alphanumeric_with_hyphens, extract_carrier_ident_strings
 from ptn.missionalertbot.modules.Embeds import _add_common_embed_fields, _configure_all_carrier_detail_embed
 
@@ -325,7 +325,7 @@ class DatabaseInteraction(commands.Cog):
 
         # finally, send all the info to the db
         # TODO: merge with Add Carrier
-        await add_carrier_to_database(short_name, long_name, carrier_id, stripped_name.lower(), 0, owner_id)
+        await add_carrier_to_database(short_name.lower(), long_name.upper(), carrier_id.upper(), stripped_name.lower(), 0, owner_id)
 
         carrier_data = find_carrier(long_name, CarrierDbFields.longname.name)
         info_embed = discord.Embed(title="Fleet Carrier successfully added to database",
@@ -838,6 +838,44 @@ class DatabaseInteraction(commands.Cog):
 
         except TypeError as e:
             print('Error: {}'.format(e))
+
+
+    # monitor CCO opt-ins
+    @app_commands.command(name="admin_opt_in",
+                          description="Private command: Use to view CCO active opt-ins.")
+    async def _admin_opt_in(self, interaction: discord.Interaction):
+
+        try:
+            print('⏳ Searching for opt-in markers in db...')
+            # look for matches for the owner ID in the carrier DB
+            carrier_list = find_opt_ins()
+
+            if not carrier_list:
+                await interaction.response.send_message(f"No opt-ins found.", ephemeral=True)
+                return print(f"✖ No opt-ins found.")
+
+            else:
+                print("▶ Returning list of opt-ins")
+                embed = discord.Embed(
+                    title=f"⚡ LISTING CCO OPT-INS",
+                    color=constants.EMBED_COLOUR_OK
+                )
+
+                await interaction.response.send_message(embed=embed, ephemeral=True)
+
+                for carrier_data in carrier_list:
+                    embed = discord.Embed(
+                        description=f'User **{carrier_data.carrier_long_name}** opted-in until <t:{carrier_data.lasttrade}> (<t:{carrier_data.lasttrade}:R>)',
+                        color=constants.EMBED_COLOUR_QU
+                    )
+                    await interaction.followup.send(embed=embed, ephemeral=True)
+                    await asyncio.sleep(1) # lip service to try to avoid a rate limit
+
+        except Exception as e:
+            try:
+                raise GenericError(e)
+            except Exception as e:
+                await on_generic_error(interaction, e)
 
 
     """

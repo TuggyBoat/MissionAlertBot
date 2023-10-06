@@ -284,6 +284,8 @@ def mission_template_filename(current_month):
 
 DISCORD_TEMPLATE = 'discord_template.png'
 
+OPT_IN_ID = 'OPT-INX'
+
 # images and icons used in mission embeds
 BLANKLINE_400PX = 'https://pilotstradenetwork.com/wp-content/uploads/2023/01/400x1-00000000.png'
 ICON_BUY = 'https://pilotstradenetwork.com/wp-content/uploads/2023/05/Trade.png'

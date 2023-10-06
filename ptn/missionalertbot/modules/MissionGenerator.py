@@ -39,7 +39,7 @@ from ptn.missionalertbot.constants import bot, get_reddit, seconds_short, upvote
 
 # import local modules
 from ptn.missionalertbot.database.database import backup_database, mission_db, missions_conn, find_carrier, CarrierDbFields, \
-    find_commodity, find_mission, carrier_db, carriers_conn, find_webhook_from_owner
+    find_commodity, find_mission, carrier_db, carriers_conn, find_webhook_from_owner, _update_carrier_last_trade
 from ptn.missionalertbot.modules.DateString import get_formatted_date_string
 from ptn.missionalertbot.modules.Embeds import _mission_summary_embed
 from ptn.missionalertbot.modules.ErrorHandler import on_generic_error, CustomError, AsyncioTimeoutError
@@ -1419,8 +1419,7 @@ async def mission_add(mission_params):
     print("Mission added to db")
 
     print("Updating last trade timestamp for carrier")
-    carrier_db.execute(''' UPDATE carriers SET lasttrade=strftime('%s','now') WHERE p_ID=? ''', ( [ mission_params.carrier_data.pid ] ))
-    carriers_conn.commit()
+    await _update_carrier_last_trade(mission_params.carrier_data.pid)
 
     spamchannel = bot.get_channel(bot_spam_channel())
 
