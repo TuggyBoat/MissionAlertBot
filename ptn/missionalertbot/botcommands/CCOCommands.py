@@ -28,7 +28,7 @@ from ptn.missionalertbot.database.database import find_mission, find_webhook_fro
 from ptn.missionalertbot.modules.DateString import get_mission_delete_hammertime, get_inactive_hammertime
 from ptn.missionalertbot.modules.Embeds import role_granted_embed, confirm_remove_role_embed, role_already_embed, confirm_grant_role_embed
 from ptn.missionalertbot.modules.ErrorHandler import on_app_command_error, on_generic_error, GenericError, CustomError
-from ptn.missionalertbot.modules.helpers import convert_str_to_float_or_int, check_command_channel, check_roles, check_training_mode
+from ptn.missionalertbot.modules.helpers import convert_str_to_float_or_int, check_command_channel, check_roles, check_training_mode, flexible_carrier_search_term
 from ptn.missionalertbot.modules.ImageHandling import assign_carrier_image
 from ptn.missionalertbot.modules.MissionGenerator import confirm_send_mission_via_button
 from ptn.missionalertbot.modules.MissionCleaner import _cleanup_completed_mission
@@ -156,7 +156,7 @@ async def cco_mission_complete(interaction, carrier, is_complete, message):
         f'{current_channel}')
 
     # resolve the carrier from the carriers db
-    carrier_data = find_carrier(carrier, CarrierDbFields.longname.name)
+    carrier_data = carrier_data = flexible_carrier_search_term(carrier)
     if not carrier_data:  # error condition
         try:
             error = f"No carrier found for '**{carrier}**.'"

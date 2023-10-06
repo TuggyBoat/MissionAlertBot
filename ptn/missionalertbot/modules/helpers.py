@@ -32,7 +32,8 @@ from ptn.missionalertbot.constants import bot, cc_role, get_overwrite_perms, get
     reddit_flair_mission_start, reddit_flair_mission_stop
 
 # import local modules
-from ptn.missionalertbot.database.database import find_community_carrier, CCDbFields, carrier_db, carrier_db_lock, carriers_conn, delete_community_carrier_from_db
+from ptn.missionalertbot.database.database import find_community_carrier, CCDbFields, carrier_db, carrier_db_lock, carriers_conn, delete_community_carrier_from_db, \
+    find_carrier, CarrierDbFields
 from ptn.missionalertbot.modules.ErrorHandler import CommandChannelError, CommandRoleError, CustomError, on_generic_error
 
 
@@ -740,6 +741,38 @@ def extract_carrier_ident_strings(message: discord.Message):
             print(f'Ignoring {match}: no pair found')
 
     return extracted_strings
+
+
+# find a carrier by successively searching ID, long name, and short name
+def flexible_carrier_search_term(search_term):
+    # check if the carrier can be found, exit gracefully if not
+    int_search_term = None
+    carrier_data = None
+
+    if re.match(r"\w{3}-\w{3}", search_term):
+        print("⏳ Carrier Registration format matched, searching by cid...")
+        carrier_data = find_carrier(search_term, CarrierDbFields.cid.name)
+
+    else:
+        try:
+            # check if its an int that can represent a database entry ID
+            int_search_term = int(search_term)
+        except ValueError:
+            print("❕ Searchterm is not a db ID")
+            pass
+
+        if int_search_term:
+            print("⏳ Searching for carrier by database entry ID")
+            carrier_data = find_carrier(search_term, CarrierDbFields.p_id.name)
+
+        else:
+            print("⏳ Searching for carrier by full name fragment")
+            carrier_data = find_carrier(search_term, CarrierDbFields.longname.name)
+            if not carrier_data:
+                print("⏳ Not found. Searching again by shortname...")
+                carrier_data = find_carrier(search_term, CarrierDbFields.shortname.name)
+
+    return carrier_data
 
 # presently unused
 # TODO: remove or incorporate

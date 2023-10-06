@@ -5,9 +5,10 @@ New commands:
 - [#579](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/579) `/cco active` - toggles Active status for CCOs; CCOs set to active this way will not have the role removed for at least 28 days. Permissions: CCO, Fleet Reserve.
 - [#577](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/577) `/rename_community_channel` - used in a Community Channel to rename both the channel and the role. Permissions: Community Mentor, Community Channel Owner.
 - [#597](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/597) `Add Carrier` - Context Menu -> Message. Attempts to match PTN carrier name/ID format from a message and give the option of adding them to the database. Permissions: Council.
-- `/admin_opt_in` - List all CCO opt-ins. Permissions: Council.
+- `/admin_opt_in` - List all CCO opt-ins. (This is for database maintenance purposes.) Permissions: Council. 
 
 Other changes:
+- [#578](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/578) `/cco load` `/cco unload` `/cco image` `/cco complete` will now accept any of the following as carrier search terms: full name partial string (as per default behaviour prior to 2.3.0); shortname; carrier registration (e.g. K8Y-T2G); carrier database entry number (discoverable via `/find`)
 - [#596](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/596) Fixed TimeoutError -> asyncio.TimeoutError
 - [#593](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/593) All Reddit interactions will now abandon and return appropriate errors after a certain amount of time
 - More errors moved to error handler; better handling of certain errors

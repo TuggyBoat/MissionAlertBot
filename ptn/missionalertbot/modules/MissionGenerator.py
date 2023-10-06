@@ -33,9 +33,8 @@ from ptn.missionalertbot.classes.MissionParams import MissionParams
 
 # import local constants
 import ptn.missionalertbot.constants as constants
-from ptn.missionalertbot.constants import bot, get_reddit, seconds_short, upvote_emoji, hauler_role, trainee_role, \
-    get_guild, get_overwrite_perms, ptn_logo_discord, wineloader_role, o7_emoji, bot_spam_channel, discord_emoji, training_cat, trade_cat, \
-    reddit_timeout
+from ptn.missionalertbot.constants import bot, get_reddit, seconds_short, upvote_emoji, hauler_role, trainee_role, reddit_timeout, \
+    get_guild, get_overwrite_perms, ptn_logo_discord, wineloader_role, o7_emoji, bot_spam_channel, discord_emoji, training_cat, trade_cat
 
 # import local modules
 from ptn.missionalertbot.database.database import backup_database, mission_db, missions_conn, find_carrier, CarrierDbFields, \
@@ -43,7 +42,7 @@ from ptn.missionalertbot.database.database import backup_database, mission_db, m
 from ptn.missionalertbot.modules.DateString import get_formatted_date_string
 from ptn.missionalertbot.modules.Embeds import _mission_summary_embed
 from ptn.missionalertbot.modules.ErrorHandler import on_generic_error, CustomError, AsyncioTimeoutError
-from ptn.missionalertbot.modules.helpers import lock_mission_channel, unlock_mission_channel, check_mission_channel_lock
+from ptn.missionalertbot.modules.helpers import lock_mission_channel, unlock_mission_channel, check_mission_channel_lock, flexible_carrier_search_term
 from ptn.missionalertbot.modules.ImageHandling import assign_carrier_image, create_carrier_reddit_mission_image, create_carrier_discord_mission_image
 from ptn.missionalertbot.modules.MissionCleaner import remove_carrier_channel
 from ptn.missionalertbot.modules.TextGen import txt_create_discord, txt_create_reddit_body, txt_create_reddit_title
@@ -1026,7 +1025,7 @@ async def confirm_send_mission_via_button(interaction: discord.Interaction, miss
         view.message = await interaction.original_response()
 
 
-async def prepare_for_gen_mission(interaction: discord.Interaction, mission_params):
+async def prepare_for_gen_mission(interaction: discord.Interaction, mission_params: MissionParams):
 
     """
     - check validity of inputs
@@ -1047,7 +1046,8 @@ async def prepare_for_gen_mission(interaction: discord.Interaction, mission_para
     print(f"Returnflag status: {mission_params.returnflag}")
 
     # check if the carrier can be found, exit gracefully if not
-    carrier_data = find_carrier(mission_params.carrier_name_search_term, CarrierDbFields.longname.name)
+    carrier_data = flexible_carrier_search_term(mission_params.carrier_name_search_term)
+    
     if not carrier_data:  # error condition
         carrier_error_embed = discord.Embed(
             description=f"❌ No carrier found for '**{mission_params.carrier_name_search_term}**'. Use `/owner` to see a list of your carriers. If it's not in the list, ask an Admin to add it for you.",
