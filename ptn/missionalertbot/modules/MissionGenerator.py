@@ -27,22 +27,22 @@ from discord.errors import HTTPException, Forbidden, NotFound
 from discord.ui import View, Modal, Select
 
 # import local classes
+from ptn.missionalertbot.classes.CarrierData import CarrierData
 from ptn.missionalertbot.classes.MissionData import MissionData
 from ptn.missionalertbot.classes.MissionParams import MissionParams
 
 # import local constants
 import ptn.missionalertbot.constants as constants
-from ptn.missionalertbot.constants import bot, get_reddit, seconds_short, upvote_emoji, hauler_role, trainee_role, \
-    get_guild, get_overwrite_perms, ptn_logo_discord, wineloader_role, o7_emoji, bot_spam_channel, discord_emoji, training_cat, trade_cat, \
-    reddit_timeout
+from ptn.missionalertbot.constants import bot, get_reddit, seconds_short, upvote_emoji, hauler_role, trainee_role, reddit_timeout, \
+    get_guild, get_overwrite_perms, ptn_logo_discord, wineloader_role, o7_emoji, bot_spam_channel, discord_emoji, training_cat, trade_cat
 
 # import local modules
 from ptn.missionalertbot.database.database import backup_database, mission_db, missions_conn, find_carrier, CarrierDbFields, \
-    find_commodity, find_mission, carrier_db, carriers_conn, find_webhook_from_owner
+    find_commodity, find_mission, carrier_db, carriers_conn, find_webhook_from_owner, _update_carrier_last_trade
 from ptn.missionalertbot.modules.DateString import get_formatted_date_string
 from ptn.missionalertbot.modules.Embeds import _mission_summary_embed
-from ptn.missionalertbot.modules.ErrorHandler import on_generic_error, CustomError
-from ptn.missionalertbot.modules.helpers import lock_mission_channel, unlock_mission_channel, check_mission_channel_lock
+from ptn.missionalertbot.modules.ErrorHandler import on_generic_error, CustomError, AsyncioTimeoutError
+from ptn.missionalertbot.modules.helpers import lock_mission_channel, unlock_mission_channel, check_mission_channel_lock, flexible_carrier_search_term
 from ptn.missionalertbot.modules.ImageHandling import assign_carrier_image, create_carrier_reddit_mission_image, create_carrier_discord_mission_image
 from ptn.missionalertbot.modules.MissionCleaner import remove_carrier_channel
 from ptn.missionalertbot.modules.TextGen import txt_create_discord, txt_create_reddit_body, txt_create_reddit_title
@@ -429,7 +429,7 @@ async def define_commodity(interaction: discord.Interaction, mission_params):
                 await on_generic_error(interaction, e)
 
 
-async def return_discord_alert_embed(interaction, mission_params):
+async def return_discord_alert_embed(interaction, mission_params: MissionParams):
     if mission_params.mission_type == 'load':
         embed = discord.Embed(description=mission_params.discord_text, color=constants.EMBED_COLOUR_LOADING)
     else:
@@ -438,13 +438,14 @@ async def return_discord_alert_embed(interaction, mission_params):
     return embed
 
 
-async def return_discord_channel_embeds(mission_params):
+async def return_discord_channel_embeds(mission_params: MissionParams):
+    carrier_data: CarrierData = mission_params.carrier_data
     print("Called return_discord_channel_embeds")
     # generates embeds used for the PTN carrier channel as well as any webhooks
 
     # define owner avatar
     guild: discord.Guild = await get_guild()
-    owner: discord.Member = guild.get_member(mission_params.carrier_data.ownerid)
+    owner: discord.Member = guild.get_member(carrier_data.ownerid)
     owner_name = owner.display_name
     owner_avatar = owner.display_avatar
     pads = "**LARGE**" if 'l' in mission_params.pads.lower() else "**MEDIUM**"
@@ -459,8 +460,8 @@ async def return_discord_channel_embeds(mission_params):
         
         buy_thumb = constants.ICON_BUY
 
-        sell_description=f"🎯 Fleet Carrier: **{mission_params.carrier_data.carrier_long_name}**" \
-                         f"\n🔢 Carrier ID: **{mission_params.carrier_data.carrier_identifier}**" \
+        sell_description=f"🎯 Fleet Carrier: **{carrier_data.carrier_long_name}**" \
+                         f"\n🔢 Carrier ID: **{carrier_data.carrier_identifier}**" \
                          f"\n💰 Profit: **{mission_params.profit}K PER TON**" \
                          f"\n📥 Demand: **{mission_params.demand}K TONS**"
         
@@ -469,8 +470,8 @@ async def return_discord_channel_embeds(mission_params):
         embed_colour = constants.EMBED_COLOUR_LOADING
 
     else: # embeds for an unloading mission
-        buy_description=f"🎯 Fleet Carrier: **{mission_params.carrier_data.carrier_long_name}**" \
-                        f"\n🔢 Carrier ID: **{mission_params.carrier_data.carrier_identifier}**" \
+        buy_description=f"🎯 Fleet Carrier: **{carrier_data.carrier_long_name}**" \
+                        f"\n🔢 Carrier ID: **{carrier_data.carrier_identifier}**" \
                         f"\n🌟 System: **{mission_params.system.upper()}**" \
                         f"\n📦 Commodity: **{mission_params.commodity_name.upper()}**" \
                          f"\n📤 Supply: **{mission_params.demand}K TONS**"
@@ -487,24 +488,25 @@ async def return_discord_channel_embeds(mission_params):
 
     print("Define sell embed")
     # desc used by the local PTN additional info embed
-    additional_info_description = f"💎 Carrier Owner: <@{mission_params.carrier_data.ownerid}>" \
+    additional_info_description = f"💎 Carrier Owner: <@{carrier_data.ownerid}>" \
                                   f"\n🔤 Carrier information: </info:849040914948554766>" \
-                                  f"\n📊 Stock information: `;stock {mission_params.carrier_data.carrier_short_name}`\n\n"
+                                  f"\n📊 Stock information: `;stock {carrier_data.carrier_short_name}`\n\n"
 
     print("Define help embed (local)")
     # desc used by the local PTN help embed
-    edmc_off_text = ""
     if mission_params.edmc_off:
-        edmc_off_text = "\n\n🤫 This mission is flagged **EDMC-OFF**. Please disable/quit **all journal reporting apps** such as EDMC, EDDiscovery, etc."
+        edmc_text = "\n\n🤫 This mission is flagged **EDMC-OFF**. Please disable/quit **all journal reporting apps** such as EDMC, EDDiscovery, etc."
+    else:
+        edmc_text = f"\n\n:warning: cAPI stock is updated once per hour. Run EDMC and use `;stock {carrier_data.carrier_short_name} inara` for more accurate stock tracking."
     help_description = "✅ Use </mission complete:849040914948554764> in this channel if the mission is completed, or unable to be completed (e.g. because of a station price change, or supply exhaustion)." \
-                      f"\n\n💡 Need help? Here's our [complete guide to PTN trade missions](https://pilotstradenetwork.com/fleet-carrier-trade-missions/).{edmc_off_text}"
+                      f"\n\n💡 Need help? Here's our [complete guide to PTN trade missions](https://pilotstradenetwork.com/fleet-carrier-trade-missions/).{edmc_text}"
 
     print("Define descs")
     # desc used for sending cco_message_text
     owner_text_description = mission_params.cco_message_text
 
     # desc used by the webhook additional info embed    
-    webhook_info_description = f"💎 Carrier Owner: <@{mission_params.carrier_data.ownerid}>" \
+    webhook_info_description = f"💎 Carrier Owner: <@{carrier_data.ownerid}>" \
                                f"\n🔤 [PTN Discord](https://discord.gg/ptn)" \
                                 "\n💡 [PTN trade mission guide](https://pilotstradenetwork.com/fleet-carrier-trade-missions/)"
 
@@ -706,14 +708,16 @@ async def send_mission_to_subreddit(interaction, mission_params):
                 
             await asyncio.wait_for(_post_submission_to_reddit(), timeout=reddit_timeout())
 
-        except TimeoutError: # TODO move to error handler
-            print("❌ Reddit post send timed out")
-            reddit_error_embed = discord.Embed(
-                description=f"❌ Timed out while trying to send to Reddit.",
-                color=constants.EMBED_COLOUR_ERROR
-            )
-            reddit_error_embed.set_footer(text="Attempting to continue with other sends.")
-            await interaction.channel.send(embed=reddit_error_embed)
+        except asyncio.TimeoutError:
+            print("❌⏲ Reddit post send timed out.")
+            await message_send.delete()
+            error = "Timed out while trying to send to Reddit."
+            try:
+                raise AsyncioTimeoutError(error, False)
+            except Exception as e:
+                await on_generic_error(interaction, e)
+            return
+
         except Exception as e:
             print(f"❌ Error posting to Reddit: {e}")
             traceback.print_exc()
@@ -736,14 +740,15 @@ async def send_mission_to_subreddit(interaction, mission_params):
 
             submission = await asyncio.wait_for(_get_new_reddit_post(), timeout=reddit_timeout())
 
-        except TimeoutError: # TODO move to error handler
-            print("❌ Reddit post retrieval timed out")
-            reddit_error_embed = discord.Embed(
-                description=f"❌ Timed out while trying to send to Reddit.",
-                color=constants.EMBED_COLOUR_ERROR
-            )
-            reddit_error_embed.set_footer(text="Attempting to continue with other sends.")
-            await interaction.channel.send(embed=reddit_error_embed)
+        except asyncio.TimeoutError:
+            print("❌⏲ Reddit post retrieval timed out")
+            await message_send.delete()
+            error = "Timed out while trying to get Reddit post link. Reddit URL will not be saved to missions database."
+            try:
+                raise AsyncioTimeoutError(error, False)
+            except Exception as e:
+                await on_generic_error(interaction, e)
+            return
 
 
         mission_params.reddit_post_url = submission.permalink
@@ -795,6 +800,7 @@ async def send_mission_to_subreddit(interaction, mission_params):
         )
         reddit_error_embed.set_footer(text="Attempting to continue with other sends.")
         await interaction.channel.send(embed=reddit_error_embed)
+        await message_send.delete()
 
 
 async def send_mission_to_webhook(interaction, mission_params):
@@ -1019,7 +1025,7 @@ async def confirm_send_mission_via_button(interaction: discord.Interaction, miss
         view.message = await interaction.original_response()
 
 
-async def prepare_for_gen_mission(interaction: discord.Interaction, mission_params):
+async def prepare_for_gen_mission(interaction: discord.Interaction, mission_params: MissionParams):
 
     """
     - check validity of inputs
@@ -1040,7 +1046,8 @@ async def prepare_for_gen_mission(interaction: discord.Interaction, mission_para
     print(f"Returnflag status: {mission_params.returnflag}")
 
     # check if the carrier can be found, exit gracefully if not
-    carrier_data = find_carrier(mission_params.carrier_name_search_term, CarrierDbFields.longname.name)
+    carrier_data = flexible_carrier_search_term(mission_params.carrier_name_search_term)
+    
     if not carrier_data:  # error condition
         carrier_error_embed = discord.Embed(
             description=f"❌ No carrier found for '**{mission_params.carrier_name_search_term}**'. Use `/owner` to see a list of your carriers. If it's not in the list, ask an Admin to add it for you.",
@@ -1412,8 +1419,7 @@ async def mission_add(mission_params):
     print("Mission added to db")
 
     print("Updating last trade timestamp for carrier")
-    carrier_db.execute(''' UPDATE carriers SET lasttrade=strftime('%s','now') WHERE p_ID=? ''', ( [ mission_params.carrier_data.pid ] ))
-    carriers_conn.commit()
+    await _update_carrier_last_trade(mission_params.carrier_data.pid)
 
     spamchannel = bot.get_channel(bot_spam_channel())
 

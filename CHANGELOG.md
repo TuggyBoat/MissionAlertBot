@@ -1,6 +1,18 @@
 # Changelog
 
-## 2.2.8
+## 2.3.0
+New commands:
+- [#579](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/579) `/cco active` - toggles Active status for CCOs; CCOs set to active this way will not have the role removed for at least 28 days. Permissions: CCO, Fleet Reserve.
+- [#577](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/577) `/rename_community_channel` - used in a Community Channel to rename both the channel and the role. Permissions: Community Mentor, Community Channel Owner.
+- [#597](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/597) `Add Carrier` - Context Menu -> Message. Attempts to match PTN carrier name/ID format from a message and give the option of adding them to the database. Permissions: Council.
+- `/admin_opt_in` - List all CCO opt-ins. (This is for database maintenance purposes.) Permissions: Council. 
+
+Other changes:
+- [#578](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/578) `/cco load` `/cco unload` `/cco image` `/cco complete` will now accept any of the following as carrier search terms: full name partial string (as per default behaviour prior to 2.3.0); shortname; carrier registration (e.g. K8Y-T2G); carrier database entry number (discoverable via `/find`)
+- [#596](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/596) Fixed TimeoutError -> asyncio.TimeoutError
+- [#593](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/593) All Reddit interactions will now abandon and return appropriate errors after a certain amount of time
+- More errors moved to error handler; better handling of certain errors
+- [#588](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/588) Added cAPI information and ;stock inara command to local mission information embed, unless mission is flagged EDMC-OFF
 
 
 ## 2.2.7
@@ -11,7 +23,7 @@
 - [#565](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/565) Update carrier channel mission embed creation to use guild user avatar rather than global
 - [#564](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/564) Archiving community channels now checks for successful permission sync and retries on failure
 - [#563](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/563) Fixed month not updating for image choice purposes
-- [#566](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/566) Fixed unloads showing carrier supply as if it was station demand
+- [#566](https://github.com/PilotsTradeNetwork/MissionAlertBot/ifssues/566) Fixed unloads showing carrier supply as if it was station demand
 - [#561](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/561) `m.complete` now includes an interactable link for `/mission complete`
 - [#560](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/560) Verify Member now includes a jumpurl in the bot-spam notification
 - [#569](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/569) Handle errors caused by users blocking DMs for all role-grant commands

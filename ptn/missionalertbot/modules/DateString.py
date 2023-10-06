@@ -45,3 +45,10 @@ def get_final_delete_hammertime():
     posix_time_string = posix_time_string + seconds_very_short()
     hammertime = f"<t:{posix_time_string}:R>"
     return hammertime
+
+def get_inactive_hammertime():
+    posix_time_string = get_formatted_date_string()[2]
+    days = 28*24*60*60
+    posix_time_string = posix_time_string + days
+    hammertime = f"<t:{posix_time_string}:F>"
+    return hammertime
