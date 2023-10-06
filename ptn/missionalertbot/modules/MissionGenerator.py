@@ -27,6 +27,7 @@ from discord.errors import HTTPException, Forbidden, NotFound
 from discord.ui import View, Modal, Select
 
 # import local classes
+from ptn.missionalertbot.classes.CarrierData import CarrierData
 from ptn.missionalertbot.classes.MissionData import MissionData
 from ptn.missionalertbot.classes.MissionParams import MissionParams
 
@@ -429,7 +430,7 @@ async def define_commodity(interaction: discord.Interaction, mission_params):
                 await on_generic_error(interaction, e)
 
 
-async def return_discord_alert_embed(interaction, mission_params):
+async def return_discord_alert_embed(interaction, mission_params: MissionParams):
     if mission_params.mission_type == 'load':
         embed = discord.Embed(description=mission_params.discord_text, color=constants.EMBED_COLOUR_LOADING)
     else:
@@ -438,13 +439,14 @@ async def return_discord_alert_embed(interaction, mission_params):
     return embed
 
 
-async def return_discord_channel_embeds(mission_params):
+async def return_discord_channel_embeds(mission_params: MissionParams):
+    carrier_data: CarrierData = mission_params.carrier_data
     print("Called return_discord_channel_embeds")
     # generates embeds used for the PTN carrier channel as well as any webhooks
 
     # define owner avatar
     guild: discord.Guild = await get_guild()
-    owner: discord.Member = guild.get_member(mission_params.carrier_data.ownerid)
+    owner: discord.Member = guild.get_member(carrier_data.ownerid)
     owner_name = owner.display_name
     owner_avatar = owner.display_avatar
     pads = "**LARGE**" if 'l' in mission_params.pads.lower() else "**MEDIUM**"
@@ -459,8 +461,8 @@ async def return_discord_channel_embeds(mission_params):
         
         buy_thumb = constants.ICON_BUY
 
-        sell_description=f"🎯 Fleet Carrier: **{mission_params.carrier_data.carrier_long_name}**" \
-                         f"\n🔢 Carrier ID: **{mission_params.carrier_data.carrier_identifier}**" \
+        sell_description=f"🎯 Fleet Carrier: **{carrier_data.carrier_long_name}**" \
+                         f"\n🔢 Carrier ID: **{carrier_data.carrier_identifier}**" \
                          f"\n💰 Profit: **{mission_params.profit}K PER TON**" \
                          f"\n📥 Demand: **{mission_params.demand}K TONS**"
         
@@ -469,8 +471,8 @@ async def return_discord_channel_embeds(mission_params):
         embed_colour = constants.EMBED_COLOUR_LOADING
 
     else: # embeds for an unloading mission
-        buy_description=f"🎯 Fleet Carrier: **{mission_params.carrier_data.carrier_long_name}**" \
-                        f"\n🔢 Carrier ID: **{mission_params.carrier_data.carrier_identifier}**" \
+        buy_description=f"🎯 Fleet Carrier: **{carrier_data.carrier_long_name}**" \
+                        f"\n🔢 Carrier ID: **{carrier_data.carrier_identifier}**" \
                         f"\n🌟 System: **{mission_params.system.upper()}**" \
                         f"\n📦 Commodity: **{mission_params.commodity_name.upper()}**" \
                          f"\n📤 Supply: **{mission_params.demand}K TONS**"
@@ -487,24 +489,25 @@ async def return_discord_channel_embeds(mission_params):
 
     print("Define sell embed")
     # desc used by the local PTN additional info embed
-    additional_info_description = f"💎 Carrier Owner: <@{mission_params.carrier_data.ownerid}>" \
+    additional_info_description = f"💎 Carrier Owner: <@{carrier_data.ownerid}>" \
                                   f"\n🔤 Carrier information: </info:849040914948554766>" \
-                                  f"\n📊 Stock information: `;stock {mission_params.carrier_data.carrier_short_name}`\n\n"
+                                  f"\n📊 Stock information: `;stock {carrier_data.carrier_short_name}`\n\n"
 
     print("Define help embed (local)")
     # desc used by the local PTN help embed
-    edmc_off_text = ""
     if mission_params.edmc_off:
-        edmc_off_text = "\n\n🤫 This mission is flagged **EDMC-OFF**. Please disable/quit **all journal reporting apps** such as EDMC, EDDiscovery, etc."
+        edmc_text = "\n\n🤫 This mission is flagged **EDMC-OFF**. Please disable/quit **all journal reporting apps** such as EDMC, EDDiscovery, etc."
+    else:
+        edmc_text = f"\n\n:warning: cAPI stock is updated once per hour. Run EDMC and use `;stock {carrier_data.carrier_short_name} inara` for more accurate stock tracking."
     help_description = "✅ Use </mission complete:849040914948554764> in this channel if the mission is completed, or unable to be completed (e.g. because of a station price change, or supply exhaustion)." \
-                      f"\n\n💡 Need help? Here's our [complete guide to PTN trade missions](https://pilotstradenetwork.com/fleet-carrier-trade-missions/).{edmc_off_text}"
+                      f"\n\n💡 Need help? Here's our [complete guide to PTN trade missions](https://pilotstradenetwork.com/fleet-carrier-trade-missions/).{edmc_text}"
 
     print("Define descs")
     # desc used for sending cco_message_text
     owner_text_description = mission_params.cco_message_text
 
     # desc used by the webhook additional info embed    
-    webhook_info_description = f"💎 Carrier Owner: <@{mission_params.carrier_data.ownerid}>" \
+    webhook_info_description = f"💎 Carrier Owner: <@{carrier_data.ownerid}>" \
                                f"\n🔤 [PTN Discord](https://discord.gg/ptn)" \
                                 "\n💡 [PTN trade mission guide](https://pilotstradenetwork.com/fleet-carrier-trade-missions/)"
 

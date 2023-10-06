@@ -1,6 +1,15 @@
 # Changelog
 
-## 2.2.8
+## 2.3.0
+New commands:
+- [#577](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/577) `/rename_community_channel` - used in a Community Channel to rename both the channel and the role. Permissions: Community Mentor, Community Channel Owner
+- [#597](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/597) `Add Carrier` - Context Menu -> Message. Attempts to match PTN carrier name/ID format from a message and give the option of adding them to the database. Permissions: Council.
+
+Other changes:
+- [#596](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/596) Fixed TimeoutError -> asyncio.TimeoutError
+- [#593](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/593) All Reddit interactions will now abandon and return appropriate errors after a certain amount of time
+- More errors moved to error handler; better handling of certain errors
+- [#588](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/588) Added cAPI information and ;stock inara command to local mission information embed, unless mission is flagged EDMC-OFF
 
 
 ## 2.2.7

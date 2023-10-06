@@ -16,6 +16,7 @@ from discord import app_commands
 from discord.ext import commands
 
 # local classes
+from ptn.missionalertbot.classes.CarrierData import CarrierData
 from ptn.missionalertbot.classes.CommunityCarrierData import CommunityCarrierData
 from ptn.missionalertbot.classes.NomineesData import NomineesData
 from ptn.missionalertbot.classes.Views import db_delete_View, BroadcastView, CarrierEditView, MissionDeleteView, AddCarrierButtons
@@ -26,7 +27,7 @@ from ptn.missionalertbot.constants import bot, cmentor_role, admin_role, cteam_b
     admin_role, mod_role
 
 # local modules
-from ptn.missionalertbot.database.database import find_nominee_with_id, carrier_db, CarrierDbFields, CarrierData, find_carrier, backup_database, \
+from ptn.missionalertbot.database.database import find_nominee_with_id, carrier_db, CarrierDbFields, find_carrier, backup_database, \
     add_carrier_to_database, find_carriers_mult, find_commodity, find_community_carrier, CCDbFields, find_mission
 from ptn.missionalertbot.modules.ErrorHandler import on_app_command_error, CustomError, on_generic_error
 from ptn.missionalertbot.modules.helpers import check_roles, check_command_channel, _regex_alphanumeric_with_hyphens, extract_carrier_ident_strings
@@ -34,7 +35,7 @@ from ptn.missionalertbot.modules.Embeds import _add_common_embed_fields, _config
 
 
 @bot.tree.context_menu(name='Add Carrier')
-@check_roles([admin_role(), mod_role()])
+@check_roles([admin_role()])
 async def add_carrier(interaction:  discord.Interaction, message: discord.Message):
     print(f"add_carrier called by {interaction.user.display_name} for {message.author.display_name}")
 
@@ -66,11 +67,11 @@ async def add_carrier(interaction:  discord.Interaction, message: discord.Messag
         owner_id = details['owner_id']
         channel_name = details['channel_name']
         print(f"Index {index} is '{long_name}' ({carrier_id}) with generated shortname {short_name}")
-        embed.add_field(name=f'Match {index+1}', value=f'Longname: `{long_name}` Shortname: `{short_name}` ID: `{carrier_id}` Owner: `{owner_id}` ChannelName: `{channel_name}`', inline=False)
+        embed.add_field(name=f'Match {index+1}', value=f'Longname: `{long_name}` Shortname: `{short_name}` ID: `{carrier_id}` Owner: <@{owner_id}> ChannelName: `{channel_name}`', inline=False)
 
     # TODO check no two fields are identical
 
-    embed.description="Found matches:"
+    embed.title="🔎 CARRIER DETAILS FOUND IN MESSAGE"
 
     view = AddCarrierButtons(message, carrier_details)
 
@@ -297,6 +298,7 @@ class DatabaseInteraction(commands.Cog):
             return await interaction.response.send_message(f'ERROR: Invalid owner ID. Expected an ID in the format `824243421145333770`, received `{owner_id}`.', ephemeral=True)
 
         # Only add to the carrier DB if it does not exist, if it does exist then the user should not be adding it.
+        # TODO: merge with Add Carrier
         carrier_data = find_carrier(long_name, CarrierDbFields.longname.name)
         if carrier_data:
             # Carrier exists already, go skip it.
@@ -312,8 +314,8 @@ class DatabaseInteraction(commands.Cog):
         # now generate a string to use for the carrier's channel name based on its long name
         stripped_name = _regex_alphanumeric_with_hyphens(long_name)
 
-        # find carrier owner as a user object
-
+        # find carrier owner as a user object so we know they're a valid user
+        # TODO: move error to handler
         try:
             owner = await bot.fetch_user(owner_id)
             print(f"Owner identified as {owner.display_name}")
@@ -321,6 +323,7 @@ class DatabaseInteraction(commands.Cog):
             raise EnvironmentError(f'Could not find Discord user matching ID {owner_id}')
 
         # finally, send all the info to the db
+        # TODO: merge with Add Carrier
         await add_carrier_to_database(short_name, long_name, carrier_id, stripped_name.lower(), 0, owner_id)
 
         carrier_data = find_carrier(long_name, CarrierDbFields.longname.name)
