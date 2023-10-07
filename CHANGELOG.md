@@ -7,17 +7,25 @@ New commands:
 - [#597](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/597) `Add Carrier` - Context Menu -> Message. Attempts to match PTN carrier name/ID format from a message and give the option of adding any matches to the database. Permissions: Council.
 - `/admin_opt_in` - List all CCO opt-ins. (This is for database maintenance purposes.) Permissions: Council. 
 
-Other changes:
+CCO command behaviour changes:
 - [#578](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/578) `/cco load` `/cco unload` `/cco image` `/cco complete` will now accept any of the following as carrier search terms: full name partial string (as per default behaviour prior to 2.3.0); shortname; carrier registration (e.g. K8Y-T2G); carrier database entry number (discoverable via `/find`)
 - `/cco load` `/cco unload` mission send select menu has been replaced with buttons:
-    - Buttons provide visual feedback as to which sends are seleted: enabled sends are blue, disabled are grey
+    - Buttons provide visual feedback as to which sends are seleted: selected sends are blue, deselected are grey, disabled are greyed out (faded and not clickable)
     - Default sends remain the same
     - Buttons can be clicked to toggle a send on/off
-    - Clicking the EDMC-OFF button will toggle the EDMC off option, and reset send options to default for the currently active profile (i.e. EDMC-OFF: ping, no external sends, EDMC-ON: ping, external sends)
-    - Clicking the Send button will send using all enabled sends, rather than sending to all by default
-    - Option to send to webhooks will be greyed out if user has no registered webhooks
+    - Clicking the "EDMC-OFF" button will toggle the EDMC-off option, and reset send options to default for the currently active profile (i.e. EDMC-OFF: ping, no external sends, EDMC-ON: ping, external sends)
+    - Clicking the "Send" button will send using all enabled sends, rather than sending to all by default
+    - Option to select Webhook sends will be greyed out if user has no registered webhooks
+    - External sends (Reddit, Webhooks) will be greyed out if profit is < 10k
+    - A warning will display when profit is < 10k
+    - "Notify Haulers" will be available but deselected by default if profit is < 10k
 - [#600](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/600) The 'Set Message' button for `/cco load` `/cco unload` `/cco edit` now remembers your message, if any. It can also be submitted blank to erase the currently-set message.
     - Better feedback from 'Set Message': The message will now display continuously after being set, rather than disappearing if the user changes options.
+- `/cco edit` will now re-send Discord alerts and messages if found to be missing
+- [#593](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/593) All Reddit interactions will now abandon and return appropriate errors after a certain amount of time
+- [#588](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/588) Added cAPI information and ;stock inara command to local mission information embed, unless mission is flagged EDMC-OFF
+
+CCO Wine load changes:
 - Wine loads are no longer prohibited from external sends
 - Wine loads no longer skip Hauler pings
 - Wine loads will now send to regular trade-alerts unless the #wine-cellar-loading channel is open, in which case it will use #wine-cellar-loading instead and notify the user that this will be the case
@@ -25,10 +33,11 @@ Other changes:
 - [#570](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/570) BC Wine load format changed to BC standard format
         - BC Wine load alerts no longer use embeds
 - [#445](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/445) CCO Message Text will now display directly after BC wine loads as a temporary solution until [#20](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/20) is implemented, to allow posting of Wine + Tritium loads in #wine-cellar-loading
+- [#259](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/259) Wine alerts channel automatically selected based on BC status
+
+Error message changes:
 - [#596](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/596) Fixed TimeoutError -> asyncio.TimeoutError. TimeoutErrors now handled by ErrorHandler.py via their own error class.
-- [#593](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/593) All Reddit interactions will now abandon and return appropriate errors after a certain amount of time
 - More errors moved to error handler; better handling of certain errors
-- [#588](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/588) Added cAPI information and ;stock inara command to local mission information embed, unless mission is flagged EDMC-OFF
 
 
 ## 2.2.7
