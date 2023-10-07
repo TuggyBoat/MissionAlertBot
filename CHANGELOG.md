@@ -10,14 +10,21 @@ New commands:
 Other changes:
 - [#578](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/578) `/cco load` `/cco unload` `/cco image` `/cco complete` will now accept any of the following as carrier search terms: full name partial string (as per default behaviour prior to 2.3.0); shortname; carrier registration (e.g. K8Y-T2G); carrier database entry number (discoverable via `/find`)
 - `/cco load` `/cco unload` mission send select menu has been replaced with buttons:
-    - Buttons will be coloured blue if a send is enabled, grey if not
+    - Buttons provide visual feedback as to which sends are seleted: enabled sends are blue, disabled are grey
     - Default sends remain the same
     - Buttons can be clicked to toggle a send on/off
     - Clicking the EDMC-OFF button will toggle the EDMC off option, and reset send options to default for the currently active profile (i.e. EDMC-OFF: ping, no external sends, EDMC-ON: ping, external sends)
     - Clicking the Send button will send using all enabled sends, rather than sending to all by default
     - Option to send to webhooks will be greyed out if user has no registered webhooks
-- [#600](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/600) The 'Set Message' button for `/cco load` `/cco unload` now remembers your message, if any. It can also be submitted blank to erase the currently-set message.
+- [#600](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/600) The 'Set Message' button for `/cco load` `/cco unload` `/cco edit` now remembers your message, if any. It can also be submitted blank to erase the currently-set message.
     - Better feedback from 'Set Message': The message will now display continuously after being set, rather than disappearing if the user changes options.
+- Wine loads are no longer prohibited from external sends
+- Wine loads no longer skip Hauler pings
+- Wine loads will now send to regular trade-alerts unless the #wine-cellar-loading channel is open, in which case it will use #wine-cellar-loading instead and notify the user that this will be the case
+- EDMC-OFF option disabled for BC Wine loads
+- [#570](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/570) BC Wine load format changed to BC standard format
+        - BC Wine load alerts no longer use embeds
+- [#445](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/445) CCO Message Text will now display directly after BC wine loads as a temporary solution until [#20](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/20) is implemented, to allow posting of Wine + Tritium loads in #wine-cellar-loading
 - [#596](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/596) Fixed TimeoutError -> asyncio.TimeoutError. TimeoutErrors now handled by ErrorHandler.py via their own error class.
 - [#593](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/593) All Reddit interactions will now abandon and return appropriate errors after a certain amount of time
 - More errors moved to error handler; better handling of certain errors

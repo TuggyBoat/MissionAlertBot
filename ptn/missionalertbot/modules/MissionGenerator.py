@@ -79,9 +79,12 @@ class MissionSendView(View):
         self.edmc_off_button.style=discord.ButtonStyle.primary if 'e' in self.mission_params.sendflags else discord.ButtonStyle.secondary
         self.message_button.style=discord.ButtonStyle.primary if self.mission_params.cco_message_text else discord.ButtonStyle.secondary
         # remove the webhook button if user has no webhooks
-        if not mission_params.webhook_names:
+        if not self.mission_params.webhook_names:
             self.webhooks_send_select_button.disabled = True
             self.webhooks_send_select_button.style=discord.ButtonStyle.secondary
+        # disable EDMC-OFF button for wine loads during BC
+        if self.mission_params.booze_cruise:
+            self.edmc_off_button.disabled = True
 
     # row 0
     """@discord.ui.button(label="Discord", style=discord.ButtonStyle.primary, emoji=f"<:discord:{discord_emoji()}>", custom_id="send_discord", row=0, disabled=True)
@@ -279,7 +282,7 @@ class AddMessageModal(Modal):
             else:
                 self.mission_params.cco_message_text = None
 
-                message_embed.title="✖ MESSAGE REMOVED"
+                message_embed.title="🗑 MESSAGE REMOVED"
 
             embeds.append(message_embed)
 
@@ -514,12 +517,12 @@ async def return_discord_channel_embeds(mission_params: MissionParams):
     return discord_embeds
 
 
-async def send_mission_to_discord(interaction, mission_params):
+async def send_mission_to_discord(interaction: discord.Interaction, mission_params: MissionParams):
     print("User used option d, creating mission channel")
 
     mission_params.discord_img_name = await create_carrier_discord_mission_image(mission_params)
     if not mission_params.discord_text:
-        discord_text = txt_create_discord(mission_params)
+        discord_text = txt_create_discord(interaction, mission_params)
         mission_params.discord_text = discord_text
     print("Defined discord elements")
 
@@ -529,11 +532,11 @@ async def send_mission_to_discord(interaction, mission_params):
     mission_temp_channel = bot.get_channel(mission_params.mission_temp_channel_id)
 
     # Recreate this text since we know the channel id
-    mission_params.discord_text = txt_create_discord(mission_params)
+    mission_params.discord_text = txt_create_discord(interaction, mission_params)
     message_send = await interaction.channel.send("**Sending to Discord...**")
     try:
-        # send trade alert to trade alerts channel, or to wine alerts channel if loading wine
-        if mission_params.commodity_name.title() == "Wine":
+        # send trade alert to trade alerts channel, or to wine alerts channel if loading wine for the BC
+        if mission_params.booze_cruise:
             if mission_params.mission_type == 'load':
                 alerts_channel = bot.get_channel(mission_params.channel_defs.wine_loading_channel_actual)
             else:   # unloading block
@@ -541,9 +544,11 @@ async def send_mission_to_discord(interaction, mission_params):
         else:
             alerts_channel = bot.get_channel(mission_params.channel_defs.alerts_channel_actual)
 
-        embed = await return_discord_alert_embed(interaction, mission_params)
-
-        trade_alert_msg = await alerts_channel.send(embed=embed)
+        if not mission_params.booze_cruise: # BC channels don't use embeds
+            embed = await return_discord_alert_embed(interaction, mission_params)
+            trade_alert_msg = await alerts_channel.send(embed=embed)
+        else:
+            trade_alert_msg = await alerts_channel.send(mission_params.discord_text, suppress_embeds=True)
         mission_params.discord_alert_id = trade_alert_msg.id
 
         if mission_params.edmc_off: # add in EDMC OFF header image
@@ -830,10 +835,11 @@ async def send_mission_to_webhook(interaction, mission_params):
     await message_send.delete()
 
 
-async def notify_hauler_role(interaction, mission_params, mission_temp_channel):
+async def notify_hauler_role(interaction: discord.Interaction, mission_params: MissionParams, mission_temp_channel):
     print("User used option n")
 
-    if mission_params.commodity_name == 'Wine':
+    if mission_params.booze_cruise:
+        # TODO BC
         embed = discord.Embed(
             description=f"Skipped hauler ping for Wine load."
         )
@@ -844,7 +850,7 @@ async def notify_hauler_role(interaction, mission_params, mission_temp_channel):
     if mission_params.training:
         ping_role_id = trainee_role()
     else:
-        ping_role_id = wineloader_role() if mission_params.commodity_name == 'Wine' else hauler_role()
+        ping_role_id = wineloader_role() if mission_params.booze_cruise else hauler_role()
     notify_msg = await mission_temp_channel.send(f"<@&{ping_role_id}>: {mission_params.discord_text}")
     mission_params.notify_msg_id = notify_msg.id
 
@@ -861,7 +867,7 @@ async def send_mission_text_to_user(interaction, mission_params):
 
     if not mission_params.reddit_title: await define_reddit_texts(mission_params)
     if not mission_params.discord_text:
-        discord_text = txt_create_discord(mission_params)
+        discord_text = txt_create_discord(interaction, mission_params)
         mission_params.discord_text = discord_text
 
     embed = discord.Embed(
@@ -931,7 +937,7 @@ Mission generation
 The core of MAB: its mission generator
 
 """
-async def confirm_send_mission_via_button(interaction: discord.Interaction, mission_params):
+async def confirm_send_mission_via_button(interaction: discord.Interaction, mission_params: MissionParams):
     # this function does initial checks and returns send options to the user
 
     mission_params.returnflag = True # set the returnflag to true, any errors will change it to false
@@ -959,9 +965,19 @@ async def confirm_send_mission_via_button(interaction: discord.Interaction, miss
 
             webhook_embed = None
 
+            bc_embed = None
+
+            if mission_params.booze_cruise:
+                mission_params.sendflags = ['d'] # default BC sendflags are just Discord
+                bc_embed = discord.Embed(
+                    title=f"🍷 Booze Cruise channels open",
+                    description=f"Wine loads will be sent to <#{mission_params.channel_defs.wine_loading_channel_actual}>",
+                    color=constants.EMBED_COLOUR_DISCORD
+                )
+
             if mission_params.webhook_names:
                 webhook_embed = discord.Embed(
-                    title=f"Webhooks found for {interaction.user.display_name}",
+                    title=f"🌐 Webhooks found for {interaction.user.display_name}",
                     description="- Webhooks are saved to your user ID and therefore shared between all your registered Fleet Carriers.\n" \
                                 "- Sending with the `🌐 Webhooks` option enabled (default) will send to *all* webhooks registered to your user.",
                     color=constants.EMBED_COLOUR_DISCORD
@@ -970,7 +986,8 @@ async def confirm_send_mission_via_button(interaction: discord.Interaction, miss
                     webhook_embed.add_field(name="Webhook found", value=webhook_name)
                 webhook_embed.set_thumbnail(url=constants.ICON_WEBHOOK_PTN)
 
-            if webhook_embed: mission_params.original_message_embeds.append(webhook_embed)
+            if bc_embed: mission_params.original_message_embeds.append(bc_embed) # append the BC embed if active
+            if webhook_embed: mission_params.original_message_embeds.append(webhook_embed) # append the webhooks embed if user has any
             mission_params.original_message_embeds.append(confirm_embed)
 
             view = MissionSendView(mission_params, interaction.user) # buttons to add
@@ -995,6 +1012,7 @@ async def prepare_for_gen_mission(interaction: discord.Interaction, mission_para
     - check if carrier data can be found
     - check if carrier is on a mission
     - return webhooks and commodity data
+    - return wine channel status if wine load
     - check if carrier has a valid mission image
     """
 
@@ -1073,6 +1091,11 @@ async def prepare_for_gen_mission(interaction: discord.Interaction, mission_para
     # define commodity
     await define_commodity(interaction, mission_params)
     print(f"define_commodity returnflag status: {mission_params.returnflag}")
+
+    if mission_params.commodity_name.title() == 'Wine':
+        winechannel = bot.get_channel(mission_params.channel_defs.wine_loading_channel_actual)
+        mission_params.booze_cruise = winechannel.permissions_for(interaction.guild.default_role).view_channel
+        # this only returns true if commodity is wine AND the BC channels are open, otherwise it is false
 
     # add any webhooks to mission_params
     webhook_data = find_webhook_from_owner(interaction.user.id)
@@ -1183,6 +1206,7 @@ async def gen_mission(interaction: discord.Interaction, mission_params: MissionP
     except Exception as e:
         print("Error on mission generation:")
         print(e)
+        traceback.print_exc()
         mission_data = None
         try:
             mission_data = find_mission(mission_params.carrier_data.carrier_long_name, "carrier")
