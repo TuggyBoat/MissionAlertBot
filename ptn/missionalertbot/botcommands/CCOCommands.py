@@ -4,6 +4,7 @@ Commands for use by CCOs
 """
 # import libraries
 import aiohttp
+import traceback
 from typing import Union
 
 # import discord.py
@@ -279,7 +280,13 @@ class CCOCommands(commands.Cog):
 
         mission_params.print_values()
 
-        await confirm_send_mission_via_button(interaction, mission_params)
+        try:
+
+            await confirm_send_mission_via_button(interaction, mission_params)
+
+        except Exception as e:
+            print(e)
+            traceback.print_exc()
 
 
     # unload subcommand
@@ -329,7 +336,13 @@ class CCOCommands(commands.Cog):
 
         mission_params.print_values()
 
-        await confirm_send_mission_via_button(interaction, mission_params)
+        try:
+
+            await confirm_send_mission_via_button(interaction, mission_params)
+
+        except Exception as e:
+            print(e)
+            traceback.print_exc()
 
 
     @cco_group.command(name='edit', description='Enter the details you wish to change for a mission in progress.')

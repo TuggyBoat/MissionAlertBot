@@ -19,6 +19,9 @@ from discord.ui import View, Modal
 import ptn.missionalertbot.constants as constants
 from ptn.missionalertbot.constants import bot, bot_spam_channel, get_reddit, upvote_emoji, wineloader_role, hauler_role
 
+# import local classes
+from ptn.missionalertbot.classes.MissionParams import MissionParams
+
 # import local modules
 from ptn.missionalertbot.database.database import _update_mission_in_database
 from ptn.missionalertbot.modules.ImageHandling import create_carrier_reddit_mission_image, create_carrier_discord_mission_image
@@ -29,12 +32,13 @@ from ptn.missionalertbot.modules.TextGen import txt_create_discord, txt_create_r
 
 class EditConfirmView(View):
     def __init__(self, mission_params, original_type, confirm_embed, author: typing.Union[discord.Member, discord.User], timeout=300):
-        self.spamchannel = bot.get_channel(bot_spam_channel())
+        self.spamchannel: discord.TextChannel = bot.get_channel(bot_spam_channel())
         self.confirm_embed = confirm_embed
         self.author = author
         self.original_type = original_type
-        self.mission_params = mission_params
+        self.mission_params: MissionParams = mission_params
         super().__init__(timeout=timeout)
+        self.message_button.style=discord.ButtonStyle.primary if self.mission_params.cco_message_text else discord.ButtonStyle.secondary
 
     @discord.ui.button(label="Confirm", style=discord.ButtonStyle.success, emoji="📢", custom_id="confirm")
     async def confirm_button(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -86,7 +90,7 @@ class EditConfirmView(View):
     async def message_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         print(f"{interaction.user.display_name} wants to add a message to their mission")
     
-        await interaction.response.send_modal(AddMessageModal(self.mission_params, self.confirm_embed, view=self))
+        await interaction.response.send_modal(AddMessageModal(self.mission_params, self.original_type, self.confirm_embed, self.author))
 
     @discord.ui.button(label="Remove Message", style=discord.ButtonStyle.secondary, emoji="🗑", custom_id="remove", row=2)
     async def remove_message_button(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -164,44 +168,56 @@ class EditConfirmView(View):
 
 # modal for message button
 class AddMessageModal(Modal):
-    def __init__(self, mission_params, confirm_embed, view, title = 'Add message to mission', timeout = None) -> None:
+    def __init__(self, mission_params, original_type, confirm_embed, author, title = 'Add message to mission', timeout = None) -> None:
+        self.mission_params: MissionParams = mission_params
+        self.original_type = original_type
         self.confirm_embed = confirm_embed
-        self.mission_params = mission_params
-        self.view = view
+        self.author = author
+        self.message.default = self.mission_params.cco_message_text if self.mission_params.cco_message_text else None
         super().__init__(title=title, timeout=timeout)
 
     message = discord.ui.TextInput(
         label='Enter your message below.',
         style=discord.TextStyle.long,
         placeholder='Normal Discord markdown works, but mentions and custom emojis require full code.',
-        required=True,
+        required=False,
         max_length=4000,
     )
 
     async def on_submit(self, interaction: discord.Interaction):
         print("Message submitted")
         print(self.message.value)
-        self.mission_params.cco_message_text = self.message.value
-        """
-        While self.message returns the inputted text if printed, it is actually a class holding
-        all the attributes of the TextInput. View shows only the text the user inputted.
-
-        This is important because it is a weak instance and cannot be pickled with mission_params,
-        and we only want the value pickled anyway
-        """
-        print(self.mission_params.cco_message_text)
+        
         message_embed = discord.Embed(
-            title="Message added",
-            description=self.mission_params.cco_message_text,
             color=constants.EMBED_COLOUR_RP
         )
+
+        if self.message.value:
+            self.mission_params.cco_message_text = str(self.message.value)
+            """
+            While self.message returns the inputted text if printed, it is actually a class holding
+            all the attributes of the TextInput. View shows only the text the user inputted.
+
+            This is important because it is a weak instance and cannot be pickled with mission_params,
+            and we only want the value pickled anyway
+            """
+            print(self.mission_params.cco_message_text)
+            message_embed.title="✍ MESSAGE SET"
+            message_embed.description=self.mission_params.cco_message_text
+
+        else:
+            self.mission_params.cco_message_text = None
+
+            message_embed.title="✖ MESSAGE REMOVED"
 
         embeds = []
         embeds.append(self.confirm_embed)
         embeds.append(message_embed)
 
+        view = EditConfirmView(self.mission_params, self.original_type, self.confirm_embed, self.author)
+
         try:
-            await interaction.response.edit_message(embeds=embeds, view=self.view)
+            await interaction.response.edit_message(embeds=embeds, view=view)
 
         except Exception as e:
             print(e)
@@ -264,13 +280,13 @@ async def edit_active_mission(interaction: discord.Interaction, mission_params, 
 
 
 
-async def edit_discord_alerts(interaction: discord.Interaction, mission_params, spamchannel, original_type):
+async def edit_discord_alerts(interaction: discord.Interaction, mission_params: MissionParams, spamchannel, original_type):
     print("Updating Discord alert...")
 
     async with interaction.channel.typing():
         try:
             # find alerts channel
-            if mission_params.commodity_name.title() == "Wine":
+            if mission_params.booze_cruise:
                 if mission_params.mission_type == 'load':
                     alerts_channel = bot.get_channel(mission_params.channel_defs.wine_loading_channel_actual)
                 else:   # unloading block
@@ -287,13 +303,14 @@ async def edit_discord_alerts(interaction: discord.Interaction, mission_params, 
 
             # get new trade alert message
             print("Create new alert text and embed")
-            mission_params.discord_text = txt_create_discord(mission_params)
-            embed = await return_discord_alert_embed(interaction, mission_params)
+            mission_params.discord_text = txt_create_discord(interaction, mission_params)
+            if not mission_params.booze_cruise:
+                embed = await return_discord_alert_embed(interaction, mission_params)
 
             # edit in new trade alert message
             try:
                 print("Edit alert message")
-                await discord_alert_msg.edit(embed=embed)
+                await discord_alert_msg.edit(content=mission_params.discord_text, suppress=True) if mission_params.booze_cruise else await discord_alert_msg.edit(embed=embed) 
             except Exception as e:
                 print(e)
                 embed=discord.Embed(description=f"Error editing discord alert: {e}", color=constants.EMBED_COLOUR_ERROR)
