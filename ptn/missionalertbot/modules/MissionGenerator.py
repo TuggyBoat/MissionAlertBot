@@ -85,6 +85,11 @@ class MissionSendView(View):
         # disable EDMC-OFF button for wine loads during BC
         if self.mission_params.booze_cruise:
             self.edmc_off_button.disabled = True
+        if self.mission_params.profit < 10: # disable external sends for low profit loads
+            self.reddit_send_select_button.disabled = True
+            self.reddit_send_select_button.style=discord.ButtonStyle.secondary
+            self.webhooks_send_select_button.disabled = True
+            self.webhooks_send_select_button.style=discord.ButtonStyle.secondary
 
     # row 0
     """@discord.ui.button(label="Discord", style=discord.ButtonStyle.primary, emoji=f"<:discord:{discord_emoji()}>", custom_id="send_discord", row=0, disabled=True)
@@ -520,83 +525,21 @@ async def return_discord_channel_embeds(mission_params: MissionParams):
 async def send_mission_to_discord(interaction: discord.Interaction, mission_params: MissionParams):
     print("User used option d, creating mission channel")
 
-    mission_params.discord_img_name = await create_carrier_discord_mission_image(mission_params)
-    if not mission_params.discord_text:
-        discord_text = txt_create_discord(interaction, mission_params)
-        mission_params.discord_text = discord_text
-    print("Defined discord elements")
-
     # beyond this point we need to release channel lock if mission creation fails
 
     mission_params.mission_temp_channel_id = await create_mission_temp_channel(interaction, mission_params)
     mission_temp_channel = bot.get_channel(mission_params.mission_temp_channel_id)
 
-    # Recreate this text since we know the channel id
-    mission_params.discord_text = txt_create_discord(interaction, mission_params)
     message_send = await interaction.channel.send("**Sending to Discord...**")
     try:
+        # TRADE ALERT
         # send trade alert to trade alerts channel, or to wine alerts channel if loading wine for the BC
-        if mission_params.booze_cruise:
-            if mission_params.mission_type == 'load':
-                alerts_channel = bot.get_channel(mission_params.channel_defs.wine_loading_channel_actual)
-            else:   # unloading block
-                alerts_channel = bot.get_channel(mission_params.channel_defs.wine_unloading_channel_actual)
-        else:
-            alerts_channel = bot.get_channel(mission_params.channel_defs.alerts_channel_actual)
+        alerts_channel, submit_mission = await send_discord_alert(interaction, mission_params)
+        if not submit_mission: return
 
-        if not mission_params.booze_cruise: # BC channels don't use embeds
-            embed = await return_discord_alert_embed(interaction, mission_params)
-            trade_alert_msg = await alerts_channel.send(embed=embed)
-        else:
-            trade_alert_msg = await alerts_channel.send(mission_params.discord_text, suppress_embeds=True)
-        mission_params.discord_alert_id = trade_alert_msg.id
-
-        if mission_params.edmc_off: # add in EDMC OFF header image
-            edmc_off_banner_file = discord.File(constants.BANNER_EDMC_OFF, filename="image.png")
-            await mission_temp_channel.send(file=edmc_off_banner_file)
-
-        discord_file = discord.File(mission_params.discord_img_name, filename="image.png")
-
-        print("Defining Discord embeds...")
-        discord_embeds = await return_discord_channel_embeds(mission_params)
-
-        send_embeds = [discord_embeds.buy_embed, discord_embeds.sell_embed, discord_embeds.info_embed, discord_embeds.help_embed]
-
-        print("Checking for cco_message_text status...")
-        if mission_params.cco_message_text is not None: send_embeds.append(discord_embeds.owner_text_embed)
-
-        print("Sending image and embeds...")
-        # pin the carrier trade msg sent by the bot
-        pin_msg = await mission_temp_channel.send(content=mission_params.discord_msg_content, file=discord_file, embeds=send_embeds)
-        mission_params.discord_msg_id = pin_msg.id
-        print("Pinning sent message...")
-        await pin_msg.pin()
-
-        if mission_params.edmc_off: # add in EDMC OFF embed
-            print('Sending EDMC OFF messages to haulers')
-            embed = discord.Embed(title='PLEASE STOP ALL 3RD PARTY SOFTWARE: EDMC, EDDISCOVERY, ETC',
-                    description=("Maximising our haulers' profits for this mission means keeping market data at this station"
-                            " **a secret**! For this reason **please disable/exit all journal reporting plugins/programs**"
-                           f" and leave them off until all missions at this location are complete. Thanks CMDRs! <:o7:{o7_emoji()}>"),
-                    color=constants.EMBED_COLOUR_REDDIT)
-
-            # attach a random shush gif
-            edmc_off_gif_url = random.choice(constants.shush_gifs)
-            embed.set_image(url=edmc_off_gif_url)
-
-            # send and pin message
-            pin_edmc = await mission_temp_channel.send(embed=embed)
-            await pin_edmc.pin()
-
-            embed = discord.Embed(title=f"EDMC OFF messages sent for {mission_params.carrier_data.carrier_long_name}", description='External posts (Reddit, Webhooks) will be skipped.',
-                        color=constants.EMBED_COLOUR_DISCORD)
-            embed.set_thumbnail(url=constants.EMOJI_SHUSH)
-            await interaction.channel.send(embed=embed)
-
-            print('Reacting to #official-trade-alerts message with EDMC OFF')
-            for r in ["🇪","🇩","🇲","🇨","📴"]:
-                await trade_alert_msg.add_reaction(r)
-        # --- end of EDMC-OFF section ---
+        # CHANNEL MESSAGE
+        submit_mission = await send_discord_channel_message(interaction, mission_params, mission_temp_channel)
+        if not submit_mission: return
 
         print("Feeding back to user...")
         embed = discord.Embed(
@@ -617,6 +560,93 @@ async def send_mission_to_discord(interaction: discord.Interaction, mission_para
         await interaction.channel.send(f"❌ Could not send to Discord, mission generation aborted: {e}")
         return
 
+
+async def send_discord_alert(interaction: discord.Interaction, mission_params: MissionParams):
+    # generate alert text
+    mission_params.discord_text = txt_create_discord(interaction, mission_params)
+
+    try:
+        if mission_params.booze_cruise:
+            if mission_params.mission_type == 'load':
+                alerts_channel = bot.get_channel(mission_params.channel_defs.wine_loading_channel_actual)
+            else:   # unloading block
+                alerts_channel = bot.get_channel(mission_params.channel_defs.wine_unloading_channel_actual)
+        else:
+            alerts_channel = bot.get_channel(mission_params.channel_defs.alerts_channel_actual)
+
+        if not mission_params.booze_cruise: # BC channels don't use embeds
+            embed = await return_discord_alert_embed(interaction, mission_params)
+            trade_alert_msg = await alerts_channel.send(embed=embed)
+        else:
+            trade_alert_msg = await alerts_channel.send(mission_params.discord_text, suppress_embeds=True)
+        mission_params.discord_alert_id = trade_alert_msg.id
+
+        if mission_params.edmc_off:
+            print('Reacting to #official-trade-alerts message with EDMC OFF')
+            for r in ["🇪","🇩","🇲","🇨","📴"]:
+                await trade_alert_msg.add_reaction(r)
+
+        return alerts_channel, True
+
+    except Exception as e:
+        print(f"Error sending to Discord: {e}")
+        await interaction.channel.send(f"❌ Could not send to Discord, mission generation aborted: {e}")
+        return alerts_channel, True
+
+
+async def send_discord_channel_message(interaction: discord.Interaction, mission_params: MissionParams, mission_temp_channel: discord.TextChannel):
+    try:
+        if mission_params.edmc_off: # add in EDMC OFF header image
+            edmc_off_banner_file = discord.File(constants.BANNER_EDMC_OFF, filename="image.png")
+            await mission_temp_channel.send(file=edmc_off_banner_file)
+
+        mission_params.discord_img_name = await create_carrier_discord_mission_image(mission_params)
+        discord_file = discord.File(mission_params.discord_img_name, filename="image.png")
+
+        print("Defining Discord embeds...")
+        discord_embeds = await return_discord_channel_embeds(mission_params)
+
+        send_embeds = [discord_embeds.buy_embed, discord_embeds.sell_embed, discord_embeds.info_embed, discord_embeds.help_embed]
+
+        print("Checking for cco_message_text status...")
+        if mission_params.cco_message_text is not None: send_embeds.append(discord_embeds.owner_text_embed)
+
+        print("Sending image and embeds...")
+        # pin the carrier trade msg sent by the bot
+        pin_msg = await mission_temp_channel.send(content=mission_params.discord_msg_content, file=discord_file, embeds=send_embeds)
+        mission_params.discord_msg_id = pin_msg.id
+        print("Pinning sent message...")
+        await pin_msg.pin()
+
+        # EDMC OFF section
+        if mission_params.edmc_off: # add in EDMC OFF embed
+            print('Sending EDMC OFF messages to haulers')
+            embed = discord.Embed(title='PLEASE STOP ALL 3RD PARTY SOFTWARE: EDMC, EDDISCOVERY, ETC',
+                    description=("Maximising our haulers' profits for this mission means keeping market data at this station"
+                            " **a secret**! For this reason **please disable/exit all journal reporting plugins/programs**"
+                           f" and leave them off until all missions at this location are complete. Thanks CMDRs! <:o7:{o7_emoji()}>"),
+                    color=constants.EMBED_COLOUR_REDDIT)
+
+            # attach a random shush gif
+            edmc_off_gif_url = random.choice(constants.shush_gifs)
+            embed.set_image(url=edmc_off_gif_url)
+
+            # send and pin message
+            pin_edmc = await mission_temp_channel.send(embed=embed)
+            await pin_edmc.pin()
+
+            # notify user
+            embed = discord.Embed(title=f"EDMC OFF messages sent for {mission_params.carrier_data.carrier_long_name}", description='External posts (Reddit, Webhooks) will be skipped.',
+                        color=constants.EMBED_COLOUR_DISCORD)
+            embed.set_thumbnail(url=constants.EMOJI_SHUSH)
+            await interaction.channel.send(embed=embed)
+
+        return True
+
+    except Exception as e:
+        print(f"Error sending to Discord: {e}")
+        await interaction.channel.send(f"❌ Could not send to Discord, mission generation aborted: {e}")
+        return False
 
 async def check_profit_margin_on_external_send(interaction, mission_params):
     # check profit is above 10k/ton minimum
@@ -963,19 +993,29 @@ async def confirm_send_mission_via_button(interaction: discord.Interaction, miss
 
             confirm_embed = _mission_summary_embed(mission_params, confirm_embed)
 
+            low_profit_embed = None
+
             webhook_embed = None
 
             bc_embed = None
+
+            if mission_params.profit < 10: # low profit load detection
+                mission_params.sendflags = ['d']
+                low_profit_embed = discord.Embed(
+                    title=f"📉 Low-profit load detected",
+                    description="External sends are disabled for missions offering under 10k/ton profit.",
+                    color=constants.EMBED_COLOUR_WARNING
+                )
 
             if mission_params.booze_cruise:
                 mission_params.sendflags = ['d'] # default BC sendflags are just Discord
                 bc_embed = discord.Embed(
                     title=f"🍷 Booze Cruise channels open",
                     description=f"Wine loads will be sent to <#{mission_params.channel_defs.wine_loading_channel_actual}>",
-                    color=constants.EMBED_COLOUR_DISCORD
+                    color=constants.EMBED_COLOUR_WARNING
                 )
 
-            if mission_params.webhook_names:
+            if mission_params.webhook_names and mission_params.profit > 10:
                 webhook_embed = discord.Embed(
                     title=f"🌐 Webhooks found for {interaction.user.display_name}",
                     description="- Webhooks are saved to your user ID and therefore shared between all your registered Fleet Carriers.\n" \
@@ -986,6 +1026,7 @@ async def confirm_send_mission_via_button(interaction: discord.Interaction, miss
                     webhook_embed.add_field(name="Webhook found", value=webhook_name)
                 webhook_embed.set_thumbnail(url=constants.ICON_WEBHOOK_PTN)
 
+            if low_profit_embed: mission_params.original_message_embeds.append(low_profit_embed) # append the low profit embed
             if bc_embed: mission_params.original_message_embeds.append(bc_embed) # append the BC embed if active
             if webhook_embed: mission_params.original_message_embeds.append(webhook_embed) # append the webhooks embed if user has any
             mission_params.original_message_embeds.append(confirm_embed)

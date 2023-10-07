@@ -181,6 +181,7 @@ EMBED_COLOUR_RP = 0xe63946              # PTN red
 EMBED_COLOUR_ERROR = 0x800000           # dark red
 EMBED_COLOUR_QU = 0x00d9ff              # que?
 EMBED_COLOUR_OK = 0x80ff80              # we're good here thanks, how are you?
+EMBED_COLOUR_WARNING = 0xFFD700         # and it was all yellow
 
 
 # defining fonts for pillow use
