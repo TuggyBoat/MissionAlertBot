@@ -493,7 +493,7 @@ class CCOCommands(commands.Cog):
 
 
     # set active status
-    @cco_group.command(name='active', description='Set active status and receive the CCO role for at least 28 days.')
+    @cco_group.command(name='active', description='Toggle active CCO status; becoming active grants the CCO role for at least 28 days.')
     @check_roles([certcarrier_role(), rescarrier_role()])
     async def cco_active(self, interaction: discord.Interaction):
         print(f"{interaction.user} called /cco active")

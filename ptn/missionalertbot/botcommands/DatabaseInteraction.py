@@ -4,7 +4,6 @@ A Cog for commands that are primarily concerned with the bot's databases.
 """
 
 # import libraries
-import aiohttp
 import asyncio
 import copy
 import os
@@ -32,6 +31,7 @@ from ptn.missionalertbot.database.database import find_nominee_with_id, carrier_
 from ptn.missionalertbot.modules.ErrorHandler import on_app_command_error, CustomError, on_generic_error, GenericError
 from ptn.missionalertbot.modules.helpers import check_roles, check_command_channel, _regex_alphanumeric_with_hyphens, extract_carrier_ident_strings
 from ptn.missionalertbot.modules.Embeds import _add_common_embed_fields, _configure_all_carrier_detail_embed
+from ptn.missionalertbot.modules.DateString import get_inactive_hammertime
 
 
 @bot.tree.context_menu(name='Add Carrier')
@@ -841,9 +841,9 @@ class DatabaseInteraction(commands.Cog):
 
 
     # monitor CCO opt-ins
-    @app_commands.command(name="admin_opt_in",
+    @app_commands.command(name="admin_list_optins",
                           description="Private command: Use to view CCO active opt-ins.")
-    async def _admin_opt_in(self, interaction: discord.Interaction):
+    async def _admin_list_optins(self, interaction: discord.Interaction):
 
         try:
             print('⏳ Searching for opt-in markers in db...')
@@ -864,8 +864,10 @@ class DatabaseInteraction(commands.Cog):
                 await interaction.response.send_message(embed=embed, ephemeral=True)
 
                 for carrier_data in carrier_list:
+                    hammertime = get_inactive_hammertime(carrier_data.lasttrade)
                     embed = discord.Embed(
-                        description=f'User **{carrier_data.carrier_long_name}** opted-in until <t:{carrier_data.lasttrade}> (<t:{carrier_data.lasttrade}:R>)',
+                        description=f'User **{carrier_data.carrier_long_name}** <@{carrier_data.ownerid}> at DBID {carrier_data.pid}' \
+                                    f' opted-in at <t:{carrier_data.lasttrade}>. Expires {hammertime}.',
                         color=constants.EMBED_COLOUR_QU
                     )
                     await interaction.followup.send(embed=embed, ephemeral=True)
