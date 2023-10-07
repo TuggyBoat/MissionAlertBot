@@ -146,6 +146,10 @@ class MissionSendView(View):
         button.disabled=True
         print(f"▶ {interaction.user.display_name} is sending their mission with flags {self.mission_params.sendflags}")
 
+        # this isn't really necessary but it's tidier
+        if not self.mission_params.webhook_names:
+            self.mission_params.sendflags.remove('w')
+
         try: # there's probably a better way to do this using an if statement
             self.clear_items()
             await interaction.response.edit_message(embeds=self.mission_params.original_message_embeds, view=self)
@@ -160,7 +164,7 @@ class MissionSendView(View):
         if 'e' in self.mission_params.sendflags:
             print(f"{interaction.user.display_name} is deselecting EDMC-OFF")
             # reset sendflags to default
-            self.mission_params.sendflags = ['d', 'r', 'n', 'w']
+            self.mission_params.sendflags = ['d', 'n', 'r', 'w']
         else:
             print(f"{interaction.user.display_name} is selecting EDMC-OFF send profile")
             # reset our sendflags to edmc-off
@@ -749,7 +753,7 @@ async def send_mission_to_subreddit(interaction, mission_params):
 
 
 async def send_mission_to_webhook(interaction, mission_params):
-    print("User used option w")
+    print("Processing option w")
 
     print("Checking if user has any webhooks...")
 
