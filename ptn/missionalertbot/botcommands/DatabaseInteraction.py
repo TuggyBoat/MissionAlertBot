@@ -5,7 +5,6 @@ A Cog for commands that are primarily concerned with the bot's databases.
 
 # import libraries
 import asyncio
-from datetime import timedelta
 import copy
 import os
 import re
