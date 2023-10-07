@@ -51,11 +51,12 @@ class MissionParams:
         self.discord_msg_id = info_dict.get('discord_msg_id', None) # ID of the message sent to the carrier channel
         self.mission_temp_channel_id = info_dict.get('mission_temp_channel_id', None) # the channel ID of the Discord carrier mission channel
         self.notify_msg_id = info_dict.get('notify_msg_id', None) # ID of the message notifying haulers
-        self.webhook_urls = info_dict.get('webhook_urls', []) # a list of the URLs for any webhooks used
-        self.webhook_names = info_dict.get('webhook_names', []) # identifiers for webhook URLs
-        self.webhook_msg_ids = info_dict.get('webhook_msg_ids', []) # a list of the IDs of any messages sent via webhook
-        self.webhook_jump_urls = info_dict.get('webhook_jump_urls', []) # webhook jump URL
-        self.original_message_embeds = info_dict.get('original_message_embeds', []) # embeds to attach to original response
+        self.webhook_urls: list = info_dict.get('webhook_urls', []) # a list of the URLs for any webhooks used
+        self.webhook_names: list = info_dict.get('webhook_names', []) # identifiers for webhook URLs
+        self.webhook_msg_ids: list = info_dict.get('webhook_msg_ids', []) # a list of the IDs of any messages sent via webhook
+        self.webhook_jump_urls: list = info_dict.get('webhook_jump_urls', []) # webhook jump URL
+        self.original_message_embeds: list = info_dict.get('original_message_embeds', []) # embeds to attach to original response
+        self.sendflags: list = info_dict.get('sendflags', ['d', 'n', 'r', 'w']) # mission send flags in the form of a list. Defaults are discord, notify haulers, reddit, webhooks
 
 
     def print_values(self):
@@ -73,7 +74,7 @@ class MissionParams:
             print(f"mission_type: {self.mission_type}")
             print(f"edmc_off: {self.edmc_off}")
             print(f"carrier_data: {self.carrier_data}")
-            print(f"commodity_data: {self.commodity_data}")
+            print(f"commodity_name: {self.commodity_name}")
             print(f"reddit_img_name: {self.reddit_img_name}")
             print(f"discord_img_name: {self.discord_img_name}")
             print(f"cco_message_text: {self.cco_message_text}")
@@ -93,8 +94,8 @@ class MissionParams:
             print(f"webhook_urls: {self.webhook_urls}")
             print(f"webhook_msg_ids: {self.webhook_msg_ids}")
             print(f"webhook_jump_urls: {self.webhook_jump_urls}")
+            print(f"sendflags: {self.sendflags}")
         except: pass # for values which haven't been incorporated yet
-
 
     def to_dictionary(self):
         """
@@ -109,6 +110,49 @@ class MissionParams:
                 response[key] = value
         return response
 
+    def __str__(self):
+        """
+        Overloads str to return a readable object
+
+        :rtype: str
+        """
+        return (
+            "⏩ Mission Params:\n"
+            f"channel_defs: {self.channel_defs}\n"
+            f"copypaste_embed: {self.copypaste_embed}\n"
+            f"carrier_name_search_term: {self.carrier_name_search_term}\n"
+            f"commodity_search_term: {self.commodity_search_term}\n"
+            f"system: {self.system}\n"
+            f"station: {self.station}\n"
+            f"profit_raw: {self.profit_raw}\n"
+            f"profit: {self.profit}\n"
+            f"pads: {self.pads}\n"
+            f"demand: {self.demand}\n"
+            f"mission_type: {self.mission_type}\n"
+            f"edmc_off: {self.edmc_off}\n"
+            f"carrier_data: {self.carrier_data}\n"
+            f"commodity_name: {self.commodity_name}\n"
+            f"reddit_img_name: {self.reddit_img_name}\n"
+            f"discord_img_name: {self.discord_img_name}\n"
+            f"cco_message_text: {self.cco_message_text}\n"
+            f"timestamp: {self.timestamp}\n"
+            f"reddit_title: {self.reddit_title}\n"
+            f"reddit_body: {self.reddit_body}\n"
+            f"reddit_post_id: {self.reddit_post_id}\n"
+            f"reddit_post_url: {self.reddit_post_url}\n"
+            f"reddit_comment_id: {self.reddit_comment_id}\n"
+            f"reddit_comment_url: {self.reddit_comment_url}\n"
+            f"discord_text: {self.discord_text}\n"
+            f"discord_msg_content: {self.discord_msg_content}\n"
+            f"discord_alert_id: {self.discord_alert_id}\n"
+            f"discord_msg_id: {self.discord_msg_id}\n"
+            f"mission_temp_channel_id: {self.mission_temp_channel_id}\n"
+            f"notify_msg_id: {self.notify_msg_id}\n"
+            f"webhook_urls: {self.webhook_urls}\n"
+            f"webhook_msg_ids: {self.webhook_msg_ids}\n"
+            f"webhook_jump_urls: {self.webhook_jump_urls}\n"
+            f"sendflags: {self.sendflags}"
+        )
 
     def __bool__(self):
         """
