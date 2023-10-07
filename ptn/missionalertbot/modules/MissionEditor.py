@@ -325,8 +325,11 @@ async def edit_discord_alerts(interaction: discord.Interaction, mission_params: 
                 try:
                     print("Send new alert")
                     alerts_channel, submit_mission = await send_discord_alert(interaction, mission_params)
+
+                    discord_alert_msg = await alerts_channel.fetch_message(mission_params.discord_alert_id)
+
                     embed = discord.Embed(
-                        description=f"Original alert not found. Replacement sent to <#{alerts_channel.id}>",
+                        description=f"Original alert not found. Replacement sent to {discord_alert_msg.jump_url}",
                         color=constants.EMBED_COLOUR_WARNING
                     )
                     await interaction.channel.send(embed=embed)
