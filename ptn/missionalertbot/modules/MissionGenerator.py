@@ -22,9 +22,8 @@ from time import strftime
 # import discord.py
 import discord
 from discord import Webhook
-from discord.components import SelectOption
 from discord.errors import HTTPException, Forbidden, NotFound
-from discord.ui import View, Modal, Select
+from discord.ui import View, Modal
 
 # import local classes
 from ptn.missionalertbot.classes.CarrierData import CarrierData
@@ -79,6 +78,10 @@ class MissionSendView(View):
         self.text_gen_select_button.style=discord.ButtonStyle.primary if 't' in self.mission_params.sendflags else discord.ButtonStyle.secondary
         self.edmc_off_button.style=discord.ButtonStyle.primary if 'e' in self.mission_params.sendflags else discord.ButtonStyle.secondary
         self.message_button.style=discord.ButtonStyle.primary if self.mission_params.cco_message_text else discord.ButtonStyle.secondary
+        # remove the webhook button if user has no webhooks
+        if not mission_params.webhook_names:
+            self.webhooks_send_select_button.disabled = True
+            self.webhooks_send_select_button.style=discord.ButtonStyle.secondary
 
     # row 0
     """@discord.ui.button(label="Discord", style=discord.ButtonStyle.primary, emoji=f"<:discord:{discord_emoji()}>", custom_id="send_discord", row=0, disabled=True)
@@ -956,7 +959,7 @@ async def confirm_send_mission_via_button(interaction: discord.Interaction, miss
                 webhook_embed = discord.Embed(
                     title=f"Webhooks found for {interaction.user.display_name}",
                     description="- Webhooks are saved to your user ID and therefore shared between all your registered Fleet Carriers.\n" \
-                                "- Clicking `📢 Send All` or choosing the `🌐 Webhooks` option from the Send Menu will send to *all* webhooks registered to your user.",
+                                "- Sending with the `🌐 Webhooks` option enabled (default) will send to *all* webhooks registered to your user.",
                     color=constants.EMBED_COLOUR_DISCORD
                 )
                 for webhook_name in mission_params.webhook_names:

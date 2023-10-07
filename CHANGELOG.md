@@ -9,6 +9,15 @@ New commands:
 
 Other changes:
 - [#578](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/578) `/cco load` `/cco unload` `/cco image` `/cco complete` will now accept any of the following as carrier search terms: full name partial string (as per default behaviour prior to 2.3.0); shortname; carrier registration (e.g. K8Y-T2G); carrier database entry number (discoverable via `/find`)
+- `/cco load` `/cco unload` mission send select menu has been replaced with buttons:
+    - Buttons will be coloured blue if a send is enabled, grey if not
+    - Default sends remain the same
+    - Buttons can be clicked to toggle a send on/off
+    - Clicking the EDMC-OFF button will toggle the EDMC off option, and reset send options to default for the currently active profile (i.e. EDMC-OFF: ping, no external sends, EDMC-ON: ping, external sends)
+    - Clicking the Send button will send using all enabled sends, rather than sending to all by default
+    - Option to send to webhooks will be greyed out if user has no registered webhooks
+- [#600](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/600) The 'Set Message' button for `/cco load` `/cco unload` now remembers your message, if any. It can also be submitted blank to erase the currently-set message.
+    - Better feedback from 'Set Message': The message will now display continuously after being set, rather than disappearing if the user changes options.
 - [#596](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/596) Fixed TimeoutError -> asyncio.TimeoutError. TimeoutErrors now handled by ErrorHandler.py via their own error class.
 - [#593](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/593) All Reddit interactions will now abandon and return appropriate errors after a certain amount of time
 - More errors moved to error handler; better handling of certain errors
