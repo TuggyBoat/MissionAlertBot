@@ -309,6 +309,7 @@ class AddMessageModal(Modal):
     def __init__(self, mission_params, view, title = 'Add message to mission', timeout = None) -> None:
         self.mission_params = mission_params
         self.view = view
+        self.message.default = self.mission_params.cco_message_text if self.mission_params.cco_message_text else None
         super().__init__(title=title, timeout=timeout)
 
     message = discord.ui.TextInput(
