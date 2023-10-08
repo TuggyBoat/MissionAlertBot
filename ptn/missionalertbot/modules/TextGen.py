@@ -26,19 +26,19 @@ TEXT GEN FUNCTIONS
 def txt_create_discord(interaction: Interaction, mission_params: MissionParams):
     discord_channel_id = mission_params.mission_temp_channel_id if mission_params.mission_temp_channel_id else mission_params.carrier_data.discord_channel
     discord_channel = f"<#{discord_channel_id}>"
-    if hasattr(mission_params, "booze_cruise"): # pre-2.3.0 backwards compatibility
-        if mission_params.booze_cruise:
-            # **[Carriername (CAR-IDX)]** | @[Cmdr Name] | [Loading System]/[Loading Station] - **[Amount of Wine]k** :wine_glass:+ **[Amount of Tritium]**:oil: @[Purchase Price of Tritium above Gal Avg]k/t
-            discord_text = (
-                f"{'**★ EDMC-OFF MISSION! ★** : ' if mission_params.edmc_off else ''}"
-                f"**[{mission_params.carrier_data.carrier_long_name}](https://discord.com/channels/{interaction.guild.id}/{discord_channel_id})** "
-                f"**({mission_params.carrier_data.carrier_identifier})** | "
-                f" <@{mission_params.carrier_data.ownerid}> | {mission_params.system.title()}/{mission_params.station.title()} - "
-                f"**{mission_params.demand}k :wine_glass:**"
-                f"{mission_params.cco_message_text if mission_params.cco_message_text else ''}"
-            )
-
+    if hasattr(mission_params, "booze_cruise") and mission_params.booze_cruise: # pre-2.3.0 backwards compatibility
+        print("Generating BC wine alert...")
+        # **[Carriername (CAR-IDX)]** | @[Cmdr Name] | [Loading System]/[Loading Station] - **[Amount of Wine]k** :wine_glass:+ **[Amount of Tritium]**:oil: @[Purchase Price of Tritium above Gal Avg]k/t
+        discord_text = (
+            f"{'**★ EDMC-OFF MISSION! ★** : ' if mission_params.edmc_off else ''}"
+            f"**[{mission_params.carrier_data.carrier_long_name}](https://discord.com/channels/{interaction.guild.id}/{discord_channel_id})** "
+            f"**({mission_params.carrier_data.carrier_identifier})** | "
+            f" <@{mission_params.carrier_data.ownerid}> | {mission_params.system.title()}/{mission_params.station.title()} - "
+            f"**{mission_params.demand}k :wine_glass:**"
+            f"{mission_params.cco_message_text if mission_params.cco_message_text else ''}"
+        )
     else:
+        print("Generating trade alert...")
         discord_text = (
             f"{'**★ EDMC-OFF MISSION! ★** : ' if mission_params.edmc_off else ''}"
             f"{discord_channel} {'load' if mission_params.mission_type == 'load' else 'unload'}ing "
@@ -47,7 +47,9 @@ def txt_create_discord(interaction: Interaction, mission_params: MissionParams):
             f"**{mission_params.system.upper()}** : {mission_params.profit}k per unit profit : "
             f"{mission_params.demand}k {'demand' if mission_params.mission_type == 'load' else 'supply'} : {mission_params.pads.upper()}-pads."
         )
-    print("Defined discord trade alert text")
+
+    print(f"Defined discord trade alert text:")
+    print(discord_text)
     return discord_text
 
 
