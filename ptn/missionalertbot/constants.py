@@ -96,6 +96,7 @@ PROD_RECRUIT_ROLE = 800681823575343116 # CCO Recruit role
 PROD_CPILLAR_ROLE = 863789660425027624 # Community Pillar role on live server
 PROD_DEV_ROLE = 812988180210909214 # Developer role ID on live
 PROD_MOD_ROLE = 813814494563401780 # Mod role ID on Live
+PROD_SOMM_ROLE = 838520893181263872 # Sommelier role ID on live
 PROD_VERIFIED_ROLE = 867820916331118622 # Verified Member
 PROD_EVENT_ORGANISER_ROLE = 1023296182639939594 # Event Organiser
 PROD_BOT_ROLE = 802523214809923596 # General Bot role on live (Robot Overlords)
@@ -144,6 +145,7 @@ TEST_CC_ROLE = 877220476827619399 # CC role on test server
 TEST_CC_CAT = 877108931699310592 # Community Carrier category on test server
 TEST_ADMIN_ROLE = 836367194979041351 # Bot Admin role on test server
 TEST_MOD_ROLE = 903292469049974845 # Mod role on test server
+TEST_SOMM_ROLE = 849907019502059530 # Sommeliers on test server
 TEST_CMENTOR_ROLE = 877586763672072193 # Community Mentor role on test server
 TEST_CERTCARRIER_ROLE = 822999970012463154 # Certified Carrier role on test server
 TEST_RESCARRIER_ROLE = 947520552766152744 # Fleet Reserve Carrier role on test server
@@ -393,6 +395,9 @@ def admin_role():
 
 def mod_role():
   return PROD_MOD_ROLE if _production else TEST_MOD_ROLE
+
+def somm_role():
+  return PROD_SOMM_ROLE if _production else TEST_SOMM_ROLE
 
 def cmentor_role():
   return PROD_CMENTOR_ROLE if _production else TEST_CMENTOR_ROLE
