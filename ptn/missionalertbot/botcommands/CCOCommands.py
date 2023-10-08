@@ -157,7 +157,7 @@ async def cco_mission_complete(interaction, carrier, is_complete, message):
         f'{current_channel}')
 
     # resolve the carrier from the carriers db
-    carrier_data = carrier_data = flexible_carrier_search_term(carrier)
+    carrier_data = flexible_carrier_search_term(carrier)
     if not carrier_data:  # error condition
         try:
             error = f"No carrier found for '**{carrier}**.'"
@@ -373,7 +373,7 @@ class CCOCommands(commands.Cog):
             # find the target carrier
             print("Looking for carrier data")
             try:
-                carrier_data = find_carrier(carrier, CarrierDbFields.longname.name)
+                carrier_data = flexible_carrier_search_term(carrier)
                 if not carrier_data:
                     raise CustomError(f"No carrier found matching {carrier}.")
             except CustomError as e:

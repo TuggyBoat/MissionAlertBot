@@ -211,7 +211,7 @@ async def _cleanup_completed_mission(interaction: discord.Interaction, mission_d
             # command feedback
             print("Log usage in bot spam")
             spamchannel = bot.get_channel(bot_spam_channel())
-            reason = f"\n\nReason given: `{message}`" if not message == None else ""
+            reason = f"\n\nReason given: `{message}`" if not message == None else "" # TODO what the unholy fuck is this Sihmm
             embed = discord.Embed(title=f"Mission {status} for {mission_data.carrier_name}",
                                 description=f"<@{interaction.user.id}> reported in <#{interaction.channel.id}> ({interaction.channel.name}).{reason}",
                                 color=constants.EMBED_COLOUR_OK)
@@ -220,7 +220,7 @@ async def _cleanup_completed_mission(interaction: discord.Interaction, mission_d
 
             if cco: # tells us whether /cco complete was used or /mission complete
                 print("Send feedback to the CCO")
-                message_text = f':\n>>>{message}' if message else ''
+                message_text = f':\nReason given: `{message}`' if message else ''
                 feedback_embed = discord.Embed(
                     description=f"{emoji} **MISSION {status.upper()}** for **{mission_data.carrier_name}**{message_text}",
                     color=constants.EMBED_COLOUR_OK

@@ -314,10 +314,11 @@ async def edit_discord_alerts(interaction: discord.Interaction, mission_params: 
             # get new trade alert message
             print("Create new alert text and embed")
             mission_params.discord_text = txt_create_discord(interaction, mission_params)
-            if hasattr(mission_params, "booze_cruise"): # pre-2.3.0 backwards compatibility
-                if not mission_params.booze_cruise:
-                    embed = await return_discord_alert_embed(interaction, mission_params)
+            if hasattr(mission_params, "booze_cruise") and not mission_params.booze_cruise: # pre-2.3.0 backwards compatibility
+                # TRUE if the BC flag is present, but not set (i.e. no BC state active)
+                embed = await return_discord_alert_embed(interaction, mission_params)
             else:
+                # these few lines of code are super dumb but basically just skip the embed generation if it's not needed :|
                 embed = await return_discord_alert_embed(interaction, mission_params)
 
             # edit in new trade alert message
@@ -335,12 +336,10 @@ async def edit_discord_alerts(interaction: discord.Interaction, mission_params: 
             else:
                 try:
                     print("Send new alert")
-                    alerts_channel, submit_mission = await send_discord_alert(interaction, mission_params)
-
-                    discord_alert_msg = await alerts_channel.fetch_message(mission_params.discord_alert_id)
+                    submit_mission = await send_discord_alert(interaction, mission_params)
 
                     embed = discord.Embed(
-                        description=f"Original alert not found. Replacement sent to {discord_alert_msg.jump_url}",
+                        description=f"Original alert not found. Replacement sent to <#{mission_params.channel_alerts_actual}>",
                         color=constants.EMBED_COLOUR_WARNING
                     )
                     await interaction.channel.send(embed=embed)
@@ -380,7 +379,7 @@ async def edit_discord_alerts(interaction: discord.Interaction, mission_params: 
                         ping_role_id = mission_params.role_ping_actual
                     else: # pre-2.3.0 compatibility
                         ping_role_id = wineloader_role() if mission_params.commodity_name.title == 'Wine' else hauler_role()
-                    await discord_notify_msg.edit(content=f"<@&{ping_role_id}>: {mission_params.discord_text}")
+                    await discord_notify_msg.edit(content=f"<@&{ping_role_id}>: {mission_params.discord_text}", suppress=True)
 
                 print("Checking mission_type status...")
                 if original_type != mission_params.mission_type:
