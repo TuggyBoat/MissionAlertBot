@@ -32,8 +32,8 @@ CCO Wine load changes:
     - closed is considered "BC inactive"
 - Wine loads posted under BC inactive conditions are considered normal trades and will send to #official-trade-alerts
 - Wine loads are no longer prohibited from external sends
-- Wine loads no longer skip Hauler pings
-    - BC Wine loads have the option to ping either the Hauler or BubbleWineLoader role. Default state is to ping neither.
+- Non-BC Wine loads no longer skip Hauler pings
+    - Pings are disabled for BC Wine loads
 - EDMC-OFF option disabled for BC Wine loads
 - [#570](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/570) BC Wine load format changed to BC standard format
     - BC Wine load alerts no longer use embeds
