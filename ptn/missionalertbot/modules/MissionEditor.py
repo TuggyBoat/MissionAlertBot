@@ -369,7 +369,7 @@ async def edit_discord_alerts(interaction: discord.Interaction, mission_params: 
                 print("Checking for cco_message_text status...")
                 if mission_params.cco_message_text is not None: send_embeds.append(discord_embeds.owner_text_embed)
 
-                if mission_params.notify_msg_id: # TODO store role ID in params
+                if mission_params.notify_msg_id: 
                     if hasattr(mission_params, "booze_cruise"): # 2.3.0+
                         ping_role_id = mission_params.role_ping_actual
                     else: # pre-2.3.0 compatibility

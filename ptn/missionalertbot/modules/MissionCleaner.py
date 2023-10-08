@@ -49,27 +49,16 @@ async def _cleanup_completed_mission(interaction: discord.Interaction, mission_d
         
         print(status)
 
-        try: # for backwards compatibility with missions created before the new column was added
+        try:
             mission_params: MissionParams = mission_data.mission_params
             print("Found mission_params")
         except:
             print("No mission_params found, mission created pre-2.1.0?")
-
-        if not mission_params:
-            print("instantiating mission_params with channel defs")
-            # instantiate a fresh instance of mission params with just channel_defs for channel definitions
-            channel_defs = ChannelDefs(
-                trade_cat(),
-                trade_alerts_channel(),
-                mission_command_channel(),
-                channel_upvotes(),
-                wine_alerts_loading_channel(),
-                wine_alerts_unloading_channel(),
-                sub_reddit(),
-                reddit_flair_mission_start(),
-                reddit_flair_mission_stop()
-            )
-            mission_params = MissionParams(dict(channel_defs = channel_defs))
+            try:
+                error = 'No MissionParams found, unable to continue. Contact an Admin for manual mission cleanup.'
+                raise CustomError(error)
+            except Exception as e:
+                await on_generic_error(interaction, e)
 
         async with interaction.channel.typing():
             completed_mission_channel = bot.get_channel(mission_data.channel_id)
