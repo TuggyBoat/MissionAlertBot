@@ -314,14 +314,20 @@ async def edit_discord_alerts(interaction: discord.Interaction, mission_params: 
             # get new trade alert message
             print("Create new alert text and embed")
             mission_params.discord_text = txt_create_discord(interaction, mission_params)
-            if not mission_params.booze_cruise:
+            if hasattr(mission_params, "booze_cruise"): # pre-2.3.0 backwards compatibility
+                if not mission_params.booze_cruise:
+                    embed = await return_discord_alert_embed(interaction, mission_params)
+            else:
                 embed = await return_discord_alert_embed(interaction, mission_params)
 
             # edit in new trade alert message
             if discord_alert_msg:
                 try:
                     print("Edit alert message")
-                    await discord_alert_msg.edit(content=mission_params.discord_text, suppress=True) if mission_params.booze_cruise else await discord_alert_msg.edit(embed=embed) 
+                    if hasattr(mission_params, "booze_cruise"): # pre-2.3.0 backwards compatibility
+                        await discord_alert_msg.edit(content=mission_params.discord_text, suppress=True) if mission_params.booze_cruise else await discord_alert_msg.edit(embed=embed) 
+                    else:
+                        await discord_alert_msg.edit(embed=embed) 
                 except Exception as e:
                     print(e)
                     embed=discord.Embed(description=f"Error editing discord alert: {e}", color=constants.EMBED_COLOUR_ERROR)
