@@ -35,7 +35,10 @@ CCO Wine load changes:
 - [#445](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/445) CCO Message Text will now display directly after BC wine loads as a temporary solution until [#20](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/20) is implemented, to allow posting of Wine + Tritium loads in #wine-cellar-loading
 - [#259](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/259) Wine alerts channel automatically selected based on BC status
 
-Error message changes:
+Other changes:
+- If a role ping is used by `/cco load` or `/cco unload`, the role's ID will be stored in mission_params. This makes mission editing more straightforward.
+- The trade alert channel used by `/cco load` and `/cco unload` is now stored in mission_params. This makes mission cleanup/editing more straightforward.
+- Version number at time of mission creation added to MissionParams to aid with future backwards compatibility tests.
 - [#596](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/596) Fixed TimeoutError -> asyncio.TimeoutError. TimeoutErrors now handled by ErrorHandler.py via their own error class.
 - More errors moved to error handler; better handling of certain errors
 
