@@ -534,7 +534,7 @@ async def send_mission_to_discord(interaction: discord.Interaction, mission_para
     try:
         # TRADE ALERT
         # send trade alert to trade alerts channel, or to wine alerts channel if loading wine for the BC
-        alerts_channel, submit_mission = await send_discord_alert(interaction, mission_params)
+        submit_mission = await send_discord_alert(interaction, mission_params)
         if not submit_mission: return
 
         # CHANNEL MESSAGE
@@ -544,7 +544,7 @@ async def send_mission_to_discord(interaction: discord.Interaction, mission_para
         print("Feeding back to user...")
         embed = discord.Embed(
             title=f"Discord trade alerts sent for {mission_params.carrier_data.carrier_long_name}",
-            description=f"Check <#{alerts_channel.id}> for trade alert and "
+            description=f"Check <#{mission_params.channel_alerts_actual.id}> for trade alert and "
                         f"<#{mission_params.mission_temp_channel_id}> for carrier channel alert.",
             color=constants.EMBED_COLOUR_DISCORD)
         embed.set_thumbnail(url=constants.ICON_DISCORD_CIRCLE)
@@ -568,17 +568,17 @@ async def send_discord_alert(interaction: discord.Interaction, mission_params: M
     try:
         if mission_params.booze_cruise:
             if mission_params.mission_type == 'load':
-                alerts_channel = bot.get_channel(mission_params.channel_defs.wine_loading_channel_actual)
+                mission_params.channel_alerts_actual = bot.get_channel(mission_params.channel_defs.wine_loading_channel_actual)
             else:   # unloading block
-                alerts_channel = bot.get_channel(mission_params.channel_defs.wine_unloading_channel_actual)
+                mission_params.channel_alerts_actual = bot.get_channel(mission_params.channel_defs.wine_unloading_channel_actual)
         else:
-            alerts_channel = bot.get_channel(mission_params.channel_defs.alerts_channel_actual)
+            mission_params.channel_alerts_actual = bot.get_channel(mission_params.channel_defs.mission_params.channel_alerts_actual_actual)
 
         if not mission_params.booze_cruise: # BC channels don't use embeds
             embed = await return_discord_alert_embed(interaction, mission_params)
-            trade_alert_msg = await alerts_channel.send(embed=embed)
+            trade_alert_msg = await mission_params.channel_alerts_actual.send(embed=embed)
         else:
-            trade_alert_msg = await alerts_channel.send(mission_params.discord_text, suppress_embeds=True)
+            trade_alert_msg = await mission_params.channel_alerts_actual.send(mission_params.discord_text, suppress_embeds=True)
         mission_params.discord_alert_id = trade_alert_msg.id
 
         if mission_params.edmc_off:
@@ -586,12 +586,12 @@ async def send_discord_alert(interaction: discord.Interaction, mission_params: M
             for r in ["🇪","🇩","🇲","🇨","📴"]:
                 await trade_alert_msg.add_reaction(r)
 
-        return alerts_channel, True
+        return True
 
     except Exception as e:
         print(f"Error sending to Discord: {e}")
         await interaction.channel.send(f"❌ Could not send to Discord, mission generation aborted: {e}")
-        return alerts_channel, True
+        return True
 
 
 async def send_discord_channel_message(interaction: discord.Interaction, mission_params: MissionParams, mission_temp_channel: discord.TextChannel):
@@ -865,28 +865,28 @@ async def send_mission_to_webhook(interaction, mission_params):
     await message_send.delete()
 
 
-async def notify_hauler_role(interaction: discord.Interaction, mission_params: MissionParams, mission_temp_channel):
+async def notify_hauler_role(interaction: discord.Interaction, mission_params: MissionParams, mission_temp_channel: discord.TextChannel):
     print("User used option n")
 
-    if mission_params.booze_cruise:
+    """if mission_params.booze_cruise:
         # TODO BC
         embed = discord.Embed(
             description=f"Skipped hauler ping for Wine load."
         )
         embed.set_footer(text="As our glorious tipsy overlords, the Sommeliers, have decreed o7")
         embed.set_thumbnail(url=constants.ICON_FC_EMPTY)
-        return await interaction.channel.send(embed=embed)
+        return await interaction.channel.send(embed=embed)"""
 
     if mission_params.training:
-        ping_role_id = trainee_role()
+        mission_params.role_ping_actual = trainee_role()
     else:
-        ping_role_id = wineloader_role() if mission_params.booze_cruise else hauler_role()
-    notify_msg = await mission_temp_channel.send(f"<@&{ping_role_id}>: {mission_params.discord_text}")
+        mission_params.role_ping_actual = wineloader_role() if mission_params.booze_cruise else hauler_role()
+    notify_msg = await mission_temp_channel.send(f"<@&{mission_params.role_ping_actual}>: {mission_params.discord_text}")
     mission_params.notify_msg_id = notify_msg.id
 
     embed = discord.Embed(
         title=f"Mission notification sent for {mission_params.carrier_data.carrier_long_name}",
-        description=f"Pinged <@&{ping_role_id}> in <#{mission_params.mission_temp_channel_id}>.",
+        description=f"Pinged <@&{mission_params.role_ping_actual}> in <#{mission_params.mission_temp_channel_id}>.",
         color=constants.EMBED_COLOUR_DISCORD)
     embed.set_thumbnail(url=constants.ICON_DISCORD_PING)
     await interaction.channel.send(embed=embed)

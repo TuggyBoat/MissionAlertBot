@@ -9,7 +9,6 @@ Depends on: constants, ErrorHandler, database
 import asyncio
 from datetime import datetime, timezone
 import emoji
-from functools import wraps
 import random
 import re
 import sys
@@ -19,9 +18,9 @@ import discord
 from discord import Interaction, app_commands
 from discord.errors import HTTPException, Forbidden, NotFound
 from discord.ext import commands
-from discord.ui import View, Button
 
 # import local classes
+from ptn.missionalertbot.classes.ChannelDefs import ChannelDefs
 from ptn.missionalertbot.classes.CommunityCarrierData import CommunityCarrierData
 
 # import local constants
@@ -665,19 +664,6 @@ def convert_str_to_float_or_int(element: any) -> bool: # this code turns a STR i
         print(f"We can't float {element}")
         return False
 
-
-# a class to hold channel definitions for training mode
-class ChannelDefs:
-    def __init__(self, category_actual, alerts_channel_actual, mission_command_channel_actual, upvotes_channel_actual, wine_loading_channel_actual, wine_unloading_channel_actual, sub_reddit_actual, reddit_flair_in_progress, reddit_flair_completed):
-        self.category_actual = category_actual
-        self.alerts_channel_actual = alerts_channel_actual
-        self.mission_command_channel_actual = mission_command_channel_actual
-        self.upvotes_channel_actual = upvotes_channel_actual
-        self.wine_loading_channel_actual = wine_loading_channel_actual
-        self.wine_unloading_channel_actual = wine_unloading_channel_actual
-        self.sub_reddit_actual = sub_reddit_actual
-        self.reddit_flair_in_progress = reddit_flair_in_progress
-        self.reddit_flair_completed = reddit_flair_completed
 
 # check whether CCO command is being used in training or live categories
 def check_training_mode(interaction: discord.Interaction):
