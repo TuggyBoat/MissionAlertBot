@@ -590,7 +590,11 @@ async def send_discord_alert(interaction: discord.Interaction, mission_params: M
     mission_params.discord_text = txt_create_discord(interaction, mission_params)
 
     try:
-        if mission_params.booze_cruise:
+        if (
+            (hasattr(mission_params, 'booze_cruise') and mission_params.booze_cruise)
+            or
+            (not hasattr(mission_params, 'booze_cruise') and mission_params.commodity_name.title() == 'Wine') # pre-2.3.0 compatibility
+        ): # condition for a BC wine load
             if mission_params.mission_type == 'load':
                 alerts_channel = bot.get_channel(mission_params.channel_defs.wine_loading_channel_actual)
             else:   # unloading block
@@ -598,10 +602,14 @@ async def send_discord_alert(interaction: discord.Interaction, mission_params: M
         else:
             alerts_channel = bot.get_channel(mission_params.channel_defs.alerts_channel_actual)
 
-        if not mission_params.booze_cruise: # BC channels don't use embeds
+        if (
+            (hasattr(mission_params, 'booze_cruise') and not mission_params.booze_cruise)
+            or
+            (not hasattr(mission_params, 'booze_cruise') and mission_params.commodity_name.title() != 'Wine') # pre-2.3.0 compatibility
+        ): # condition for if subject is not a BC wine load
             embed = await return_discord_alert_embed(interaction, mission_params)
             trade_alert_msg = await alerts_channel.send(embed=embed)
-        else:
+        else: # BC channels don't use embeds
             trade_alert_msg = await alerts_channel.send(mission_params.discord_text, suppress_embeds=True)
         mission_params.discord_alert_id = trade_alert_msg.id
 
