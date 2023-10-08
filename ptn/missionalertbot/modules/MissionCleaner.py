@@ -39,7 +39,7 @@ MISSION COMPLETE & CLEANUP
 """
 
 # clean up a completed mission
-async def _cleanup_completed_mission(interaction: discord.Interaction, mission_data, reddit_complete_text, discord_complete_embed: discord.Embed, message, is_complete):
+async def _cleanup_completed_mission(interaction: discord.Interaction, mission_data: MissionData, reddit_complete_text, discord_complete_embed: discord.Embed, message, is_complete):
     async with interaction.channel.typing():
         print("called _cleanup_completed_mission")
 
@@ -49,27 +49,16 @@ async def _cleanup_completed_mission(interaction: discord.Interaction, mission_d
         
         print(status)
 
-        try: # for backwards compatibility with missions created before the new column was added
-            mission_params = mission_data.mission_params
+        try:
+            mission_params: MissionParams = mission_data.mission_params
             print("Found mission_params")
         except:
             print("No mission_params found, mission created pre-2.1.0?")
-
-        if not mission_params:
-            print("instantiating mission_params with channel defs")
-            # instantiate a fresh instance of mission params with just channel_defs for channel definitions
-            channel_defs = ChannelDefs(
-                trade_cat(),
-                trade_alerts_channel(),
-                mission_command_channel(),
-                channel_upvotes(),
-                wine_alerts_loading_channel(),
-                wine_alerts_unloading_channel(),
-                sub_reddit(),
-                reddit_flair_mission_start(),
-                reddit_flair_mission_stop()
-            )
-            mission_params = MissionParams(dict(channel_defs = channel_defs))
+            try:
+                error = 'No MissionParams found, unable to continue. Contact an Admin for manual mission cleanup.'
+                raise CustomError(error)
+            except Exception as e:
+                await on_generic_error(interaction, e)
 
         async with interaction.channel.typing():
             completed_mission_channel = bot.get_channel(mission_data.channel_id)
@@ -84,19 +73,23 @@ async def _cleanup_completed_mission(interaction: discord.Interaction, mission_d
                 try:  # try in case it's already been deleted, which doesn't matter to us in the slightest but we don't
                     # want it messing up the rest of the function
 
-                    # first check if it's Wine, in which case it went to the booze cruise channel
-                    if mission_data.commodity.title() == "Wine":
+                    if hasattr(mission_params, "booze_cruise"): # missions from 2.3.0 have this attribute
+                        # 2.3.0 stores alerts channel used in params so we don't have to figure it out, just retrieve it
+                        alerts_channel = bot.get_channel(mission_params.channel_alerts_actual)
+
+                    elif mission_data.commodity.title() == 'Wine': # pre-2.3.0 wine loads were always sent to the cellar
                         if mission_data.mission_type == 'load':
-                            alert_channel = bot.get_channel(mission_params.channel_defs.wine_loading_channel_actual)
+                            alerts_channel = bot.get_channel(mission_params.channel_defs.wine_loading_channel_actual)
                         else:
-                            alert_channel = bot.get_channel(mission_params.channel_defs.wine_unloading_channel_actual)
-                    else:
-                        alert_channel = bot.get_channel(mission_params.channel_defs.alerts_channel_actual)
+                            alerts_channel = bot.get_channel(mission_params.channel_defs.wine_unloading_channel_actual)
+
+                    else: # pre-2.3.0 non-wine loads
+                        alerts_channel = bot.get_channel(mission_params.channel_defs.alerts_channel_actual)
 
                     discord_alert_id = mission_data.discord_alert_id
 
                     try:
-                        msg = await alert_channel.fetch_message(discord_alert_id)
+                        msg = await alerts_channel.fetch_message(discord_alert_id)
                         await msg.delete()
                     except:
                         print("No alert found, maybe user deleted it?")

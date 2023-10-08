@@ -1,4 +1,6 @@
 from ptn.missionalertbot.classes.CarrierData import CarrierData
+from ptn.missionalertbot.classes.ChannelDefs import ChannelDefs
+from ptn.missionalertbot._metadata import __version__
 
 class MissionParams:
     """
@@ -20,9 +22,12 @@ class MissionParams:
         else:
             info_dict = dict()
 
+        self.mission_version = info_dict.get('mission_version', __version__) # the version of MAB the mission was generated under
         self.returnflag: bool = info_dict.get('returnflag', True) # used in various places during mission gen to indicate an error if false
         self.training: bool = info_dict.get('training', False) # whether this is a training mission or not
-        self.channel_defs = info_dict.get('channel_defs', None) # defines channels used by mission generator
+        self.channel_defs: ChannelDefs = info_dict.get('channel_defs', None) # defines channels used by mission generator
+        self.channel_alerts_actual: int = info_dict.get('channel_alerts_actual', None) # ID of alerts channel used when sending mission, as defined from ChannelDefs
+        self.role_ping_actual: int = info_dict.get('channel_alerts_actual', None) # ID of role ping used by bot when sending mission
         self.copypaste_embed = info_dict.get('copypaste_embed', None) # embed containing the copy/paste string for the command used
         self.carrier_name_search_term: str = info_dict.get('carrier_name_search_term', None) # the carrier name fragment to search for
         self.commodity_search_term: str = info_dict.get('commodity_search_term', None) # the commodity name fragment to search for
@@ -65,9 +70,12 @@ class MissionParams:
 
     def print_values(self):
         try:
+            print(f"version: {self.version}")
             print(f"returnflag: {self.returnflag}")
             print(f"training: {self.training}")
             print(f"channel_defs: {self.channel_defs}")
+            print(f"channel_alerts_actual: {self.channel_alerts_actual}")
+            print(f"role_ping_actual: {self.role_ping_actual}")
             print(f"copypaste_embed: {self.copypaste_embed}")
             print(f"carrier_name_search_term: {self.carrier_name_search_term}")
             print(f"commodity_search_term: {self.commodity_search_term}")
@@ -125,9 +133,12 @@ class MissionParams:
         """
         return (
             "⏩ Mission Params:\n"
+            f"version: {self.version}\n"
             f"returnflag: {self.returnflag}\n"
             f"training: {self.training}\n"
             f"channel_defs: {self.channel_defs}\n"
+            f"channel_alerts_actual: {self.channel_alerts_actual}\n"
+            f"role_ping_actual: {self.role_ping_actual}\n"
             f"copypaste_embed: {self.copypaste_embed}\n"
             f"carrier_name_search_term: {self.carrier_name_search_term}\n"
             f"commodity_search_term: {self.commodity_search_term}\n"

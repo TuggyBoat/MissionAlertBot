@@ -26,16 +26,26 @@ CCO command behaviour changes:
 - [#588](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/588) Added cAPI information and ;stock inara command to local mission information embed, unless mission is flagged EDMC-OFF
 
 CCO Wine load changes:
+- Wine loads are now affected by the state of the Booze Cruise #wine-cellar-loading channel
+    - open is considered "BC active"
+        - a notice appears when posting a Wine load under BC conditions
+    - closed is considered "BC inactive"
+- Wine loads posted under BC inactive conditions are considered normal trades and will send to #official-trade-alerts
 - Wine loads are no longer prohibited from external sends
 - Wine loads no longer skip Hauler pings
-- Wine loads will now send to regular trade-alerts unless the #wine-cellar-loading channel is open, in which case it will use #wine-cellar-loading instead and notify the user that this will be the case
+    - BC Wine loads have the option to ping either the Hauler or BubbleWineLoader role. Default state is to ping neither.
 - EDMC-OFF option disabled for BC Wine loads
 - [#570](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/570) BC Wine load format changed to BC standard format
-        - BC Wine load alerts no longer use embeds
+    - BC Wine load alerts no longer use embeds
 - [#445](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/445) CCO Message Text will now display directly after BC wine loads as a temporary solution until [#20](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/20) is implemented, to allow posting of Wine + Tritium loads in #wine-cellar-loading
 - [#259](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/259) Wine alerts channel automatically selected based on BC status
 
-Error message changes:
+Technical changes:
+- ChannelDefs now stored in classes/ChannelDefs.py and relevant type annotation added to MissionParams
+- More type annotation throughout
+- If a role ping is used by `/cco load` or `/cco unload`, the role's ID will be stored in mission_params. This makes mission editing more straightforward.
+- The trade alert channel used by `/cco load` and `/cco unload` is now stored in mission_params. This makes mission cleanup/editing more straightforward.
+- Version number at time of mission creation added to MissionParams to aid with future backwards compatibility tests.
 - [#596](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/596) Fixed TimeoutError -> asyncio.TimeoutError. TimeoutErrors now handled by ErrorHandler.py via their own error class.
 - More errors moved to error handler; better handling of certain errors
 

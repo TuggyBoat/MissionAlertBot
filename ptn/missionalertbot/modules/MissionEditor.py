@@ -287,13 +287,18 @@ async def edit_discord_alerts(interaction: discord.Interaction, mission_params: 
     async with interaction.channel.typing():
         try:
             # find alerts channel
-            if mission_params.booze_cruise:
+            if hasattr(mission_params, "booze_cruise"): # missions from 2.3.0 have this attribute
+                # 2.3.0 stores alerts channel used in params so we don't have to figure it out, just retrieve it
+                alerts_channel = bot.get_channel(mission_params.channel_alerts_actual)
+
+            elif mission_params.commodity_name.title() == 'Wine': # pre-2.3.0 wine missions always went to cellar
                 if mission_params.mission_type == 'load':
                     alerts_channel = bot.get_channel(mission_params.channel_defs.wine_loading_channel_actual)
                 else:   # unloading block
                     alerts_channel = bot.get_channel(mission_params.channel_defs.wine_unloading_channel_actual)
-            else:
-                alerts_channel = bot.get_channel(mission_params.channel_defs.alerts_channel_actual)
+
+            else: # pre-2.3.0 non-wine loads
+                alerts_channel = bot.get_channel(mission_params.channel_defs.alerts_channel_actual)            
 
             print(alerts_channel)
             print(mission_params.discord_alert_id)
@@ -309,14 +314,20 @@ async def edit_discord_alerts(interaction: discord.Interaction, mission_params: 
             # get new trade alert message
             print("Create new alert text and embed")
             mission_params.discord_text = txt_create_discord(interaction, mission_params)
-            if not mission_params.booze_cruise:
+            if hasattr(mission_params, "booze_cruise"): # pre-2.3.0 backwards compatibility
+                if not mission_params.booze_cruise:
+                    embed = await return_discord_alert_embed(interaction, mission_params)
+            else:
                 embed = await return_discord_alert_embed(interaction, mission_params)
 
             # edit in new trade alert message
             if discord_alert_msg:
                 try:
                     print("Edit alert message")
-                    await discord_alert_msg.edit(content=mission_params.discord_text, suppress=True) if mission_params.booze_cruise else await discord_alert_msg.edit(embed=embed) 
+                    if hasattr(mission_params, "booze_cruise"): # pre-2.3.0 backwards compatibility
+                        await discord_alert_msg.edit(content=mission_params.discord_text, suppress=True) if mission_params.booze_cruise else await discord_alert_msg.edit(embed=embed) 
+                    else:
+                        await discord_alert_msg.edit(embed=embed) 
                 except Exception as e:
                     print(e)
                     embed=discord.Embed(description=f"Error editing discord alert: {e}", color=constants.EMBED_COLOUR_ERROR)
@@ -364,8 +375,11 @@ async def edit_discord_alerts(interaction: discord.Interaction, mission_params: 
                 print("Checking for cco_message_text status...")
                 if mission_params.cco_message_text is not None: send_embeds.append(discord_embeds.owner_text_embed)
 
-                if mission_params.notify_msg_id:
-                    ping_role_id = wineloader_role() if mission_params.commodity_name == 'Wine' else hauler_role()
+                if mission_params.notify_msg_id: 
+                    if hasattr(mission_params, "booze_cruise"): # 2.3.0+
+                        ping_role_id = mission_params.role_ping_actual
+                    else: # pre-2.3.0 compatibility
+                        ping_role_id = wineloader_role() if mission_params.commodity_name.title == 'Wine' else hauler_role()
                     await discord_notify_msg.edit(content=f"<@&{ping_role_id}>: {mission_params.discord_text}")
 
                 print("Checking mission_type status...")

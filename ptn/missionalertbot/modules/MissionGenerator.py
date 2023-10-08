@@ -34,7 +34,7 @@ from ptn.missionalertbot.classes.MissionParams import MissionParams
 import ptn.missionalertbot.constants as constants
 from ptn.missionalertbot.constants import bot, get_reddit, seconds_short, upvote_emoji, hauler_role, trainee_role, reddit_timeout, \
     get_guild, get_overwrite_perms, ptn_logo_discord, wineloader_role, o7_emoji, bot_spam_channel, discord_emoji, training_cat, \
-    trade_cat, mcomplete_id
+    trade_cat, mcomplete_id, somm_role
 
 # import local modules
 from ptn.missionalertbot.database.database import backup_database, mission_db, missions_conn, find_carrier, CarrierDbFields, \
@@ -73,19 +73,28 @@ class MissionSendView(View):
         print(f"Sendflags: {self.mission_params.sendflags}")
         # set button styles based on input status
         self.notify_haulers_select_button.style=discord.ButtonStyle.primary if 'n' in self.mission_params.sendflags else discord.ButtonStyle.secondary
+        self.notify_wine_loader_select_button.style=discord.ButtonStyle.primary if 'b' in self.mission_params.sendflags else discord.ButtonStyle.secondary
         self.reddit_send_select_button.style=discord.ButtonStyle.primary if 'r' in self.mission_params.sendflags else discord.ButtonStyle.secondary
         self.webhooks_send_select_button.style=discord.ButtonStyle.primary if 'w' in self.mission_params.sendflags else discord.ButtonStyle.secondary
         self.text_gen_select_button.style=discord.ButtonStyle.primary if 't' in self.mission_params.sendflags else discord.ButtonStyle.secondary
         self.edmc_off_button.style=discord.ButtonStyle.primary if 'e' in self.mission_params.sendflags else discord.ButtonStyle.secondary
         self.message_button.style=discord.ButtonStyle.primary if self.mission_params.cco_message_text else discord.ButtonStyle.secondary
+
         # remove the webhook button if user has no webhooks
         if not self.mission_params.webhook_names:
             self.webhooks_send_select_button.disabled = True
             self.webhooks_send_select_button.style=discord.ButtonStyle.secondary
+
         # disable EDMC-OFF button for wine loads during BC
         if self.mission_params.booze_cruise:
             self.edmc_off_button.disabled = True
-        if self.mission_params.profit < 10: # disable external sends for low profit loads
+
+         # only show the wine loader ping button if BC condition is active
+        else:
+            self.remove_item(self.notify_wine_loader_select_button)
+
+        # disable external sends for low profit loads
+        if self.mission_params.profit < 10:
             self.reddit_send_select_button.disabled = True
             self.reddit_send_select_button.style=discord.ButtonStyle.secondary
             self.webhooks_send_select_button.disabled = True
@@ -96,7 +105,7 @@ class MissionSendView(View):
     async def discord_send_select_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         pass"""
 
-    @discord.ui.button(label="Notify Haulers", style=discord.ButtonStyle.primary, emoji="🔔", custom_id="notify_haulers", row=0)
+    @discord.ui.button(label="Notify Haulers", style=discord.ButtonStyle.secondary, emoji="🔔", custom_id="notify_haulers", row=0)
     async def notify_haulers_select_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         if 'n' in self.mission_params.sendflags:
             print(f"{interaction.user.display_name} is deselecting Notify Haulers")
@@ -104,12 +113,27 @@ class MissionSendView(View):
         else:
             print(f"{interaction.user.display_name} is selecting Notify Haulers")
             self.mission_params.sendflags.append('n')
+            if 'b' in self.mission_params.sendflags: self.mission_params.sendflags.remove('b') # don't allow pinging both haulers and BubbleWineLoaders
 
         # update our button view - the button colors will automatically change
         view = MissionSendView(self.mission_params, self.author)
         await interaction.response.edit_message(embeds=self.mission_params.original_message_embeds, view=view)
 
-    @discord.ui.button(label="Reddit", style=discord.ButtonStyle.primary, emoji=f"<:upvote:{upvote_emoji()}>", custom_id="send_reddit", row=0)
+    @discord.ui.button(label="Notify Wine Loaders", style=discord.ButtonStyle.secondary, emoji="🍷", custom_id="notify_wine_loaders", row=0)
+    async def notify_wine_loader_select_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if 'b' in self.mission_params.sendflags:
+            print(f"{interaction.user.display_name} is deselecting Notify Wine Loaders")
+            self.mission_params.sendflags.remove('b')
+        else:
+            print(f"{interaction.user.display_name} is selecting Notify Wine Loaders")
+            self.mission_params.sendflags.append('b')
+            if 'n' in self.mission_params.sendflags: self.mission_params.sendflags.remove('n') # don't allow pinging both haulers and BubbleWineLoaders
+
+        # update our button view - the button colors will automatically change
+        view = MissionSendView(self.mission_params, self.author)
+        await interaction.response.edit_message(embeds=self.mission_params.original_message_embeds, view=view)
+
+    @discord.ui.button(label="Reddit", style=discord.ButtonStyle.secondary, emoji=f"<:upvote:{upvote_emoji()}>", custom_id="send_reddit", row=0)
     async def reddit_send_select_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         if 'r' in self.mission_params.sendflags:
             print(f"{interaction.user.display_name} is deselecting Reddit send")
@@ -122,7 +146,7 @@ class MissionSendView(View):
         view = MissionSendView(self.mission_params, self.author)
         await interaction.response.edit_message(embeds=self.mission_params.original_message_embeds, view=view)
 
-    @discord.ui.button(label="Webhooks", style=discord.ButtonStyle.primary, emoji="🌐", custom_id="send_webhooks", row=0)
+    @discord.ui.button(label="Webhooks", style=discord.ButtonStyle.secondary, emoji="🌐", custom_id="send_webhooks", row=0)
     async def webhooks_send_select_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         if 'w' in self.mission_params.sendflags:
             print(f"{interaction.user.display_name} is deselecting Webhooks send")
@@ -534,7 +558,7 @@ async def send_mission_to_discord(interaction: discord.Interaction, mission_para
     try:
         # TRADE ALERT
         # send trade alert to trade alerts channel, or to wine alerts channel if loading wine for the BC
-        alerts_channel, submit_mission = await send_discord_alert(interaction, mission_params)
+        submit_mission = await send_discord_alert(interaction, mission_params)
         if not submit_mission: return
 
         # CHANNEL MESSAGE
@@ -544,7 +568,7 @@ async def send_mission_to_discord(interaction: discord.Interaction, mission_para
         print("Feeding back to user...")
         embed = discord.Embed(
             title=f"Discord trade alerts sent for {mission_params.carrier_data.carrier_long_name}",
-            description=f"Check <#{alerts_channel.id}> for trade alert and "
+            description=f"Check <#{mission_params.channel_alerts_actual}> for trade alert and "
                         f"<#{mission_params.mission_temp_channel_id}> for carrier channel alert.",
             color=constants.EMBED_COLOUR_DISCORD)
         embed.set_thumbnail(url=constants.ICON_DISCORD_CIRCLE)
@@ -586,12 +610,14 @@ async def send_discord_alert(interaction: discord.Interaction, mission_params: M
             for r in ["🇪","🇩","🇲","🇨","📴"]:
                 await trade_alert_msg.add_reaction(r)
 
-        return alerts_channel, True
+        mission_params.channel_alerts_actual = alerts_channel.id
+
+        return True
 
     except Exception as e:
         print(f"Error sending to Discord: {e}")
         await interaction.channel.send(f"❌ Could not send to Discord, mission generation aborted: {e}")
-        return alerts_channel, True
+        return True
 
 
 async def send_discord_channel_message(interaction: discord.Interaction, mission_params: MissionParams, mission_temp_channel: discord.TextChannel):
@@ -865,34 +891,38 @@ async def send_mission_to_webhook(interaction, mission_params):
     await message_send.delete()
 
 
-async def notify_hauler_role(interaction: discord.Interaction, mission_params: MissionParams, mission_temp_channel):
-    print("User used option n")
+async def notify_hauler_role(interaction: discord.Interaction, mission_params: MissionParams, mission_temp_channel: discord.TextChannel):
+    print("User used option n or b")
 
-    if mission_params.booze_cruise:
-        # TODO BC
+    """if mission_params.booze_cruise:
+        # this code is a relic of when role pings weren't allowed for BC, we'll keep it around for a while 🤪
         embed = discord.Embed(
             description=f"Skipped hauler ping for Wine load."
         )
         embed.set_footer(text="As our glorious tipsy overlords, the Sommeliers, have decreed o7")
         embed.set_thumbnail(url=constants.ICON_FC_EMPTY)
-        return await interaction.channel.send(embed=embed)
+        return await interaction.channel.send(embed=embed)"""
 
-    if mission_params.training:
-        ping_role_id = trainee_role()
-    else:
-        ping_role_id = wineloader_role() if mission_params.booze_cruise else hauler_role()
-    notify_msg = await mission_temp_channel.send(f"<@&{ping_role_id}>: {mission_params.discord_text}")
+    # define role to be pinged
+    if mission_params.training: # trainee role
+        mission_params.role_ping_actual = trainee_role()
+    elif 'n' in mission_params.sendflags: # Hauler role
+        mission_params.role_ping_actual = hauler_role()
+    elif 'b' in mission_params.sendflags: # BubbleWineLoader role
+        mission_params.role_ping_actual = wineloader_role()
+
+    notify_msg = await mission_temp_channel.send(f"<@&{mission_params.role_ping_actual}>: {mission_params.discord_text}", suppress_embeds=True)
     mission_params.notify_msg_id = notify_msg.id
 
     embed = discord.Embed(
         title=f"Mission notification sent for {mission_params.carrier_data.carrier_long_name}",
-        description=f"Pinged <@&{ping_role_id}> in <#{mission_params.mission_temp_channel_id}>.",
+        description=f"Pinged <@&{mission_params.role_ping_actual}> in <#{mission_params.mission_temp_channel_id}>.",
         color=constants.EMBED_COLOUR_DISCORD)
     embed.set_thumbnail(url=constants.ICON_DISCORD_PING)
     await interaction.channel.send(embed=embed)
 
 
-async def send_mission_text_to_user(interaction, mission_params):
+async def send_mission_text_to_user(interaction: discord.Interaction, mission_params: MissionParams):
     print("User used option t")
 
     if not mission_params.reddit_title: await define_reddit_texts(mission_params)
@@ -1011,7 +1041,8 @@ async def confirm_send_mission_via_button(interaction: discord.Interaction, miss
                 mission_params.sendflags = ['d'] # default BC sendflags are just Discord
                 bc_embed = discord.Embed(
                     title=f"🍷 Booze Cruise channels open",
-                    description=f"Wine loads will be sent to <#{mission_params.channel_defs.wine_loading_channel_actual}>",
+                    description=f"Wine loads will be sent to <#{mission_params.channel_defs.wine_loading_channel_actual}>. "
+                                f"With <@&{somm_role()}> approval, you can choose to notify *either* the <@&{hauler_role()}> *or* <@&{wineloader_role()}> roles.",
                     color=constants.EMBED_COLOUR_WARNING
                 )
 
@@ -1207,7 +1238,7 @@ async def gen_mission(interaction: discord.Interaction, mission_params: MissionP
                 async with interaction.channel.typing():
                     await send_mission_to_webhook(interaction, mission_params)
 
-            if "n" in mission_params.sendflags and "d" in mission_params.sendflags: # notify haulers with role ping
+            if ("n" in mission_params.sendflags or "b" in mission_params.sendflags) and "d" in mission_params.sendflags: # notify role ping
                 async with interaction.channel.typing():
                     await notify_hauler_role(interaction, mission_params, mission_temp_channel)
 
