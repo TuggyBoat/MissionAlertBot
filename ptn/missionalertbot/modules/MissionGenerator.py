@@ -78,14 +78,22 @@ class MissionSendView(View):
         self.text_gen_select_button.style=discord.ButtonStyle.primary if 't' in self.mission_params.sendflags else discord.ButtonStyle.secondary
         self.edmc_off_button.style=discord.ButtonStyle.primary if 'e' in self.mission_params.sendflags else discord.ButtonStyle.secondary
         self.message_button.style=discord.ButtonStyle.primary if self.mission_params.cco_message_text else discord.ButtonStyle.secondary
+
         # remove the webhook button if user has no webhooks
         if not self.mission_params.webhook_names:
             self.webhooks_send_select_button.disabled = True
             self.webhooks_send_select_button.style=discord.ButtonStyle.secondary
+
         # disable EDMC-OFF button for wine loads during BC
         if self.mission_params.booze_cruise:
             self.edmc_off_button.disabled = True
-        if self.mission_params.profit < 10: # disable external sends for low profit loads
+
+         # only show the wine loader ping button if BC condition is active
+        else:
+            self.remove_item(self.notify_wineloader_select_button)
+
+        # disable external sends for low profit loads
+        if self.mission_params.profit < 10:
             self.reddit_send_select_button.disabled = True
             self.reddit_send_select_button.style=discord.ButtonStyle.secondary
             self.webhooks_send_select_button.disabled = True
@@ -104,6 +112,21 @@ class MissionSendView(View):
         else:
             print(f"{interaction.user.display_name} is selecting Notify Haulers")
             self.mission_params.sendflags.append('n')
+            self.mission_params.sendflags.remove('b') # don't allow pinging both haulers and BubbleWineLoaders
+
+        # update our button view - the button colors will automatically change
+        view = MissionSendView(self.mission_params, self.author)
+        await interaction.response.edit_message(embeds=self.mission_params.original_message_embeds, view=view)
+
+    @discord.ui.button(label="Notify Wine Loaders", style=discord.ButtonStyle.primary, emoji="🍷", custom_id="notify_haulers", row=0)
+    async def notify_wineloader_select_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if 'n' in self.mission_params.sendflags:
+            print(f"{interaction.user.display_name} is deselecting Notify Wine Loaders")
+            self.mission_params.sendflags.remove('b')
+        else:
+            print(f"{interaction.user.display_name} is selecting Notify Wine Loaders")
+            self.mission_params.sendflags.append('b')
+            self.mission_params.sendflags.remove('n') # don't allow pinging both haulers and BubbleWineLoaders
 
         # update our button view - the button colors will automatically change
         view = MissionSendView(self.mission_params, self.author)
@@ -866,10 +889,10 @@ async def send_mission_to_webhook(interaction, mission_params):
 
 
 async def notify_hauler_role(interaction: discord.Interaction, mission_params: MissionParams, mission_temp_channel: discord.TextChannel):
-    print("User used option n")
+    print("User used option n or b")
 
     """if mission_params.booze_cruise:
-        # TODO BC
+        # this code is a relic of when role pings weren't allowed for BC, we'll keep it around for a while 🤪
         embed = discord.Embed(
             description=f"Skipped hauler ping for Wine load."
         )
@@ -877,10 +900,14 @@ async def notify_hauler_role(interaction: discord.Interaction, mission_params: M
         embed.set_thumbnail(url=constants.ICON_FC_EMPTY)
         return await interaction.channel.send(embed=embed)"""
 
-    if mission_params.training:
+    # define role to be pinged
+    if mission_params.training: # trainee role
         mission_params.role_ping_actual = trainee_role()
-    else:
-        mission_params.role_ping_actual = wineloader_role() if mission_params.booze_cruise else hauler_role()
+    elif 'n' in mission_params.sendflags: # Hauler role
+        mission_params.role_ping_actual = hauler_role()
+    elif 'b' in mission_params.sendflags: # BubbleWineLoader role
+        mission_params.role_ping_actual = wineloader_role()
+
     notify_msg = await mission_temp_channel.send(f"<@&{mission_params.role_ping_actual}>: {mission_params.discord_text}")
     mission_params.notify_msg_id = notify_msg.id
 
@@ -892,7 +919,7 @@ async def notify_hauler_role(interaction: discord.Interaction, mission_params: M
     await interaction.channel.send(embed=embed)
 
 
-async def send_mission_text_to_user(interaction, mission_params):
+async def send_mission_text_to_user(interaction: discord.Interaction, mission_params: MissionParams):
     print("User used option t")
 
     if not mission_params.reddit_title: await define_reddit_texts(mission_params)
@@ -1207,7 +1234,7 @@ async def gen_mission(interaction: discord.Interaction, mission_params: MissionP
                 async with interaction.channel.typing():
                     await send_mission_to_webhook(interaction, mission_params)
 
-            if "n" in mission_params.sendflags and "d" in mission_params.sendflags: # notify haulers with role ping
+            if ("n" in mission_params.sendflags or "b" in mission_params.sendflags) and "d" in mission_params.sendflags: # notify role ping
                 async with interaction.channel.typing():
                     await notify_hauler_role(interaction, mission_params, mission_temp_channel)
 
