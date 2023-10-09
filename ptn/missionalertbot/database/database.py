@@ -34,6 +34,19 @@ from ptn.missionalertbot.modules.DateString import get_formatted_date_string
 from ptn.missionalertbot.modules.ErrorHandler import CustomError, on_generic_error
 
 
+# ensure all paths function for a clean install
+def build_directory_structure_on_startup():
+    print("Building directory structure...")
+    os.makedirs(constants.DB_PATH, exist_ok=True) # /database - the main database files
+    os.makedirs(constants.IMAGE_PATH, exist_ok=True) # /images - carrier images
+    os.makedirs(f"{constants.IMAGE_PATH}/old", exist_ok=True) # /images/old - backed up carrier images
+    os.makedirs(constants.SQL_PATH, exist_ok=True) # /database/db_sql - DB SQL dumps
+    os.makedirs(constants.BACKUP_DB_PATH, exist_ok=True) # /database/backups - db backups
+    os.makedirs(constants.CC_IMAGE_PATH, exist_ok=True) # /images/cc - CC thumbnail images
+
+build_directory_structure_on_startup() # build directory structure
+
+
 # connect to sqlite carrier database
 carriers_conn = sqlite3.connect(constants.CARRIERS_DB_PATH)
 carriers_conn.row_factory = sqlite3.Row
@@ -284,17 +297,6 @@ def create_missing_column(table, column, existing, db_name, db_obj, db_conn, cre
     print('Operation complete.')
     db_conn.commit()
     return
-
-
-# ensure all paths function for a clean install
-def build_directory_structure_on_startup():
-    print("Building directory structure...")
-    os.makedirs(constants.DB_PATH, exist_ok=True) # /database - the main database files
-    os.makedirs(constants.IMAGE_PATH, exist_ok=True) # /images - carrier images
-    os.makedirs(f"{constants.IMAGE_PATH}/old", exist_ok=True) # /images/old - backed up carrier images
-    os.makedirs(constants.SQL_PATH, exist_ok=True) # /database/db_sql - DB SQL dumps
-    os.makedirs(constants.BACKUP_DB_PATH, exist_ok=True) # /database/backups - db backups
-    os.makedirs(constants.CC_IMAGE_PATH, exist_ok=True) # /images/cc - CC thumbnail images
 
 
 # build the databases, from scratch if needed
