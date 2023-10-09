@@ -406,11 +406,13 @@ async def define_commodity(interaction: discord.Interaction, mission_params):
                 await on_generic_error(interaction, e)
 
 
-async def return_discord_alert_embed(interaction, mission_params: MissionParams):
+async def return_discord_alert_embed(interaction: discord.Interaction, mission_params: MissionParams):
     if mission_params.mission_type == 'load':
         embed = discord.Embed(description=mission_params.discord_text, color=constants.EMBED_COLOUR_LOADING)
+        embed.set_thumbnail(url=constants.ICON_FC_LOADING)
     else:
         embed = discord.Embed(description=mission_params.discord_text, color=constants.EMBED_COLOUR_UNLOADING)
+        embed.set_thumbnail(url=constants.ICON_FC_UNLOADING)
     embed.set_author(name=interaction.user.display_name, icon_url=interaction.user.display_avatar)
     return embed
 
@@ -1019,15 +1021,20 @@ async def confirm_send_mission_via_button(interaction: discord.Interaction, miss
 
         try:
             # check the details with the user
-            confirm_embed = discord.Embed(
+            """confirm_embed = discord.Embed(
                 title=f"{mission_params.mission_type.upper()}ING: {mission_params.carrier_data.carrier_long_name}",
                 description=f"Confirm mission details and choose send targets for {mission_params.carrier_data.carrier_long_name}.",
                 color=constants.EMBED_COLOUR_QU
             )
             thumb_url = constants.ICON_FC_LOADING if mission_params.mission_type == 'load' else constants.ICON_FC_UNLOADING
-            confirm_embed.set_thumbnail(url=thumb_url)
+            confirm_embed.set_thumbnail(url=thumb_url)"""
 
-            confirm_embed = _mission_summary_embed(mission_params, confirm_embed)
+            # confirm_embed = _mission_summary_embed(mission_params, confirm_embed)
+
+            mission_params.discord_text = txt_create_discord(interaction, mission_params, preview=True)
+            preview_embed = await return_discord_alert_embed(interaction, mission_params)
+            preview_embed.title = '🔎 CONFIRM MISSION DETAILS AND SELECT SENDS'
+            preview_embed.set_author = None # TODO
 
             low_profit_embed = None
 
@@ -1066,7 +1073,8 @@ async def confirm_send_mission_via_button(interaction: discord.Interaction, miss
             if low_profit_embed: mission_params.original_message_embeds.append(low_profit_embed) # append the low profit embed
             if bc_embed: mission_params.original_message_embeds.append(bc_embed) # append the BC embed if active
             if webhook_embed: mission_params.original_message_embeds.append(webhook_embed) # append the webhooks embed if user has any
-            mission_params.original_message_embeds.append(confirm_embed)
+            mission_params.original_message_embeds.append(preview_embed)
+            # mission_params.original_message_embeds.append(confirm_embed)
 
             view = MissionSendView(mission_params, interaction.user) # buttons to add
 
