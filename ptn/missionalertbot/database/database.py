@@ -44,7 +44,7 @@ def build_directory_structure_on_startup():
     os.makedirs(constants.BACKUP_DB_PATH, exist_ok=True) # /database/backups - db backups
     os.makedirs(constants.CC_IMAGE_PATH, exist_ok=True) # /images/cc - CC thumbnail images
 
-build_directory_structure_on_startup() # build directory structure
+build_directory_structure_on_startup() # build directory structure when bot first starts
 
 
 # connect to sqlite carrier database
