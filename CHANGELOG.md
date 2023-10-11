@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.3.3
+- [#620](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/620) `Add Carrier`'s initial response is now edited rather than deleted, to enhance clarity for observers.
+- [#619](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/619) `Add Carrier` now sends the stockbot command to #bot-commands, with a ping for the command user.
+- [#618](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/618) Bugfix: `build_directory_structure_on_startup()` now runs in `database.py` instead of `application.py`.
+
+
 ## 2.3.2
 - Hotfix for missions not sending if user has no webhooks saved
 - Mission preview now uses trade alert preview
