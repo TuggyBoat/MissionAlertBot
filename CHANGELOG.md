@@ -3,6 +3,7 @@
 ## 2.3.3
 - [#620](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/620) `Add Carrier`'s initial response is now edited rather than deleted, to enhance clarity for observers.
 - [#619](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/619) `Add Carrier` now sends the stockbot command to #bot-commands, with a ping for the command user.
+- `Add Carrier` is now plural-aware.
 - [#621](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/621) Mission summary for `/cco load`, `/cco unload`, and `/cco edit` now uses the alert text instead of embed with fields.
 - Renamed `✍ Set Message` on `/cco edit` to `✍ Set or Remove Message`+
 - Removed the `🗑 Remove Message` button from `/cco edit` and conformed `✍ Set or Remove Message` behaviour to match `✍ Set Message` on `/cco load` and `/cco unload`. 
