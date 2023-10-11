@@ -20,6 +20,7 @@ from datetime import timezone
 from ptn.missionalertbot.classes.CarrierData import CarrierData
 from ptn.missionalertbot.classes.Commodity import Commodity
 from ptn.missionalertbot.classes.MissionData import MissionData
+from ptn.missionalertbot.classes.MissionParams import MissionParams
 from ptn.missionalertbot.classes.CommunityCarrierData import CommunityCarrierData
 from ptn.missionalertbot.classes.NomineesData import NomineesData
 from ptn.missionalertbot.classes.WebhookData import WebhookData
@@ -750,7 +751,7 @@ def find_mission(searchterm, searchfield):
     # unpickle the mission_params object if it exists
     if mission_data.mission_params:
         print("Found mission_params, enumerating...")
-        mission_data.mission_params = pickle.loads(mission_data.mission_params)
+        mission_data.mission_params: MissionParams = pickle.loads(mission_data.mission_params)
         mission_data.mission_params.print_values()
     else:
         print("No mission_params found")
