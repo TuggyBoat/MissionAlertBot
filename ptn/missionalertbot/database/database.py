@@ -20,6 +20,7 @@ from datetime import timezone
 from ptn.missionalertbot.classes.CarrierData import CarrierData
 from ptn.missionalertbot.classes.Commodity import Commodity
 from ptn.missionalertbot.classes.MissionData import MissionData
+from ptn.missionalertbot.classes.MissionParams import MissionParams
 from ptn.missionalertbot.classes.CommunityCarrierData import CommunityCarrierData
 from ptn.missionalertbot.classes.NomineesData import NomineesData
 from ptn.missionalertbot.classes.WebhookData import WebhookData
@@ -32,6 +33,19 @@ from ptn.missionalertbot.database.Commodities import commodities_all
 # local modules
 from ptn.missionalertbot.modules.DateString import get_formatted_date_string
 from ptn.missionalertbot.modules.ErrorHandler import CustomError, on_generic_error
+
+
+# ensure all paths function for a clean install
+def build_directory_structure_on_startup():
+    print("Building directory structure...")
+    os.makedirs(constants.DB_PATH, exist_ok=True) # /database - the main database files
+    os.makedirs(constants.IMAGE_PATH, exist_ok=True) # /images - carrier images
+    os.makedirs(f"{constants.IMAGE_PATH}/old", exist_ok=True) # /images/old - backed up carrier images
+    os.makedirs(constants.SQL_PATH, exist_ok=True) # /database/db_sql - DB SQL dumps
+    os.makedirs(constants.BACKUP_DB_PATH, exist_ok=True) # /database/backups - db backups
+    os.makedirs(constants.CC_IMAGE_PATH, exist_ok=True) # /images/cc - CC thumbnail images
+
+build_directory_structure_on_startup() # build directory structure when bot first starts
 
 
 # connect to sqlite carrier database
@@ -286,17 +300,6 @@ def create_missing_column(table, column, existing, db_name, db_obj, db_conn, cre
     return
 
 
-# ensure all paths function for a clean install
-def build_directory_structure_on_startup():
-    print("Building directory structure...")
-    os.makedirs(constants.DB_PATH, exist_ok=True) # /database - the main database files
-    os.makedirs(constants.IMAGE_PATH, exist_ok=True) # /images - carrier images
-    os.makedirs(f"{constants.IMAGE_PATH}/old", exist_ok=True) # /images/old - backed up carrier images
-    os.makedirs(constants.SQL_PATH, exist_ok=True) # /database/db_sql - DB SQL dumps
-    os.makedirs(constants.BACKUP_DB_PATH, exist_ok=True) # /database/backups - db backups
-    os.makedirs(constants.CC_IMAGE_PATH, exist_ok=True) # /images/cc - CC thumbnail images
-
-
 # build the databases, from scratch if needed
 def build_database_on_startup():
     print("Building databases...")
@@ -427,8 +430,9 @@ async def add_carrier_to_database(short_name, long_name, carrier_id, channel, ch
     await carrier_db_lock.acquire()
     try:
         carrier_db.execute(''' INSERT INTO carriers VALUES(NULL, ?, ?, ?, ?, ?, ?, strftime('%s','now')) ''',
-                           (short_name.lower(), long_name.upper(), carrier_id.upper(), channel, channel_id, owner_id))
+                           (short_name, long_name, carrier_id, channel, channel_id, owner_id))
         carriers_conn.commit()
+        print(f'Added {long_name} to database')
     finally:
         carrier_db_lock.release()
 
@@ -481,6 +485,19 @@ async def _update_carrier_details_in_database(carrier_data, original_name):
             WHERE longname LIKE (?) ''', data
         )
 
+        carriers_conn.commit()
+    finally:
+        carrier_db_lock.release()
+
+
+# update carrier last trade time
+async def _update_carrier_last_trade(pid):
+    await carrier_db_lock.acquire()
+    try:
+        carrier_db.execute(
+            ''' UPDATE carriers
+            SET lasttrade=strftime('%s','now')
+            WHERE p_ID=? ''', ( [ pid ] ))
         carriers_conn.commit()
     finally:
         carrier_db_lock.release()
@@ -596,13 +613,29 @@ def find_carriers_mult(searchterm, searchfield):
     :rtype: list[CarrierData]
     """
     carrier_db.execute(
-        f"SELECT * FROM carriers WHERE {searchfield} LIKE (?)", (f'%{searchterm}%',)
+        f"SELECT * FROM carriers WHERE {searchfield} LIKE (?) AND shortname != ownerid", (f'%{searchterm}%',)
     )
     carrier_data = [CarrierData(carrier) for carrier in carrier_db.fetchall()]
     for carrier in carrier_data:
         print(f"FC {carrier.pid} is {carrier.carrier_long_name} {carrier.carrier_identifier} called by "
               f"shortname {carrier.carrier_short_name} with channel <#{carrier.channel_id}> "
               f"and owner {carrier.ownerid} called from find_carriers_mult.")
+
+    return carrier_data
+
+
+def find_opt_ins():
+    """
+    Returns all carriers matching the opt-in marker designation.
+    """
+    carrier_db.execute(
+        f"SELECT * FROM carriers WHERE cid LIKE (?)", (f'%{constants.OPT_IN_ID}%',)
+    )
+    carrier_data = [CarrierData(carrier) for carrier in carrier_db.fetchall()]
+    for carrier in carrier_data:
+        print(f"FC {carrier.pid} is {carrier.carrier_long_name} {carrier.carrier_identifier} called by "
+              f"shortname {carrier.carrier_short_name} with channel <#{carrier.channel_id}> "
+              f"and owner {carrier.ownerid} called from find_opt_ins.")
 
     return carrier_data
 
@@ -718,7 +751,7 @@ def find_mission(searchterm, searchfield):
     # unpickle the mission_params object if it exists
     if mission_data.mission_params:
         print("Found mission_params, enumerating...")
-        mission_data.mission_params = pickle.loads(mission_data.mission_params)
+        mission_data.mission_params: MissionParams = pickle.loads(mission_data.mission_params)
         mission_data.mission_params.print_values()
     else:
         print("No mission_params found")

@@ -13,7 +13,9 @@ from time import strftime
 import discord
 
 # import local classes
-import ptn.missionalertbot.classes.CarrierData as CarrierData
+from ptn.missionalertbot.classes.CarrierData import CarrierData
+from ptn.missionalertbot.classes.CommunityCarrierData import CommunityCarrierData
+from ptn.missionalertbot.classes.MissionParams import MissionParams
 
 # import local constants
 import ptn.missionalertbot.constants as constants
@@ -21,6 +23,25 @@ from ptn.missionalertbot.constants import ptn_logo_discord
 
 #import local modules
 from ptn.missionalertbot.database.database import find_mission
+
+
+# confirm edit mission embed
+def _confirm_edit_mission_embed(mission_params: MissionParams):
+    """
+    Used by mission editor to confirm details with user before committing.
+
+    Param mission_params: ClassInstance of MissionParams
+    """
+    confirm_embed = discord.Embed(
+        title=f"{mission_params.mission_type.upper()}ING: {mission_params.carrier_data.carrier_long_name}",
+        description=f"Please confirm updated mission details for {mission_params.carrier_data.carrier_long_name}:\n\n" \
+                    f"{mission_params.discord_text}",
+        color=constants.EMBED_COLOUR_QU
+    )
+    thumb_url = constants.ICON_LOADING if mission_params.mission_type == 'load' else constants.ICON_UNLOADING
+    confirm_embed.set_thumbnail(url=thumb_url)
+
+    return confirm_embed
 
 
 # return an embed featuring either the active mission or the not found message
@@ -238,7 +259,7 @@ def confirm_grant_role_embed(user, role):
     return embed
 
 # embed to feedback that a user had a role removed
-def role_removed_embed(interaction, user, role):
+def role_removed_embed(interaction: discord.Interaction, user, role):
     print("Called role_removed_embed")
     desc = f"""
     ✅ Removed the <@&{role.id}> role from <@{user.id}>.
@@ -264,3 +285,39 @@ def role_removed_embed(interaction, user, role):
 
     print("Returning embed")
     return embed, bot_spam_embed
+
+# embeds to feed back CC channel rename
+def cc_renamed_embed(interaction, old_channel_name, community_carrier: CommunityCarrierData):
+    print("Called cc_renamed_embed")
+    desc = f"""
+    ✅ Updated names: <#{community_carrier.channel_id}> • <@&{community_carrier.role_id}>.
+    """
+    embed = discord.Embed (
+        description=desc,
+        color=constants.EMBED_COLOUR_OK
+    )
+
+    try:
+        print("Checking for command name...")
+        command_name = f" using `{interaction.command.name}`"
+    except:
+        print("Command name not accessible")
+        command_name = ""
+
+    desc = f"<@{interaction.user.id}> renamed <#{community_carrier.channel_id}> • <@&{community_carrier.role_id}> (was `{old_channel_name}`)" + command_name
+
+    bot_spam_embed = discord.Embed (
+        description=desc,
+        color=constants.EMBED_COLOUR_OK
+    )
+
+    print("Returning embed")
+    return embed, bot_spam_embed
+
+def dm_forbidden_embed(user: discord.Member):
+    print("Called dm_forbidden embed")
+    embed = discord.Embed(
+        description=f"↩ Skipped sending notification Direct Message to <@{user.id}>: user is not accepting DMs from this source.",
+        color=constants.EMBED_COLOUR_QU
+    )
+    return embed

@@ -78,7 +78,10 @@ PROD_DEV_CHANNEL = 827656814911815702 # Development channel for MAB on live
 PROD_ROLEAPPS_CHANNEL = 867820665515147293 # role-applications on the live server
 PROD_UPVOTE_EMOJI = 828287733227192403 # upvote emoji on live server
 PROD_O7_EMOJI = 806138784294371368 # o7 emoji on live server
+PROD_UNLOADING_ICON = 1160881163641049178 # unloading_icon on live
+PROD_LOADING_ICON = 1160871046786846780 # loading_icon on live
 PROD_FC_COMPLETE_EMOJI = 878216234653605968 # fc_complete emoji
+PROD_FC_EMPTY_EMOJI = 878216288525242388 # fc_empty emoji
 PROD_DISCORD_EMOJI = 1122605426844905503 # Discord emoji on live
 PROD_HAULER_ROLE = 875313960834965544 # hauler role ID on live server
 PROD_WINELOADER_ROLE = 881809680765165578 # wine loader role on live
@@ -95,7 +98,9 @@ PROD_RECRUIT_ROLE = 800681823575343116 # CCO Recruit role
 PROD_CPILLAR_ROLE = 863789660425027624 # Community Pillar role on live server
 PROD_DEV_ROLE = 812988180210909214 # Developer role ID on live
 PROD_MOD_ROLE = 813814494563401780 # Mod role ID on Live
+PROD_SOMM_ROLE = 838520893181263872 # Sommelier role ID on live
 PROD_VERIFIED_ROLE = 867820916331118622 # Verified Member
+PROD_PILOT_ROLE = 800396412217982999 # Pilot role
 PROD_EVENT_ORGANISER_ROLE = 1023296182639939594 # Event Organiser
 PROD_BOT_ROLE = 802523214809923596 # General Bot role on live (Robot Overlords)
 PROD_ALUM_ROLE = 1086777372981858404 # Council Alumni role on live
@@ -104,6 +109,7 @@ PROD_ARCHIVE_CAT = 1048957416781393970 # Archive category on live server
 PROD_SECONDS_VERY_SHORT = 10 # time between channel deletion trigger and actual deletion (10)
 PROD_SECONDS_SHORT = 120 # time before calling channel cleanup on failed mission gen (120)
 PROD_SECONDS_LONG = 900 # time before calling channel cleanup on successful mission closure (900)
+PROD_REDDIT_TIMEOUT = 30 # time before giving up on Reddit posting
 PROD_MCOMPLETE_ID = 849040914948554764 # /mission complete slash ID
 # Training mode - production
 PROD_TRAINING_CATEGORY = 1120269131476901938 # training mode category ID
@@ -133,7 +139,10 @@ TEST_DEV_CHANNEL = 1063765215457583164 # Development channel for MAB on test
 TEST_ROLEAPPS_CHANNEL = 1121736676247609394 # role-applications on the test server
 TEST_UPVOTE_EMOJI = 849388681382068225 # upvote emoji on test server
 TEST_O7_EMOJI = 903744117144698950 # o7 emoji on test server
+TEST_UNLOADING_ICON = 1160883198419542077 # unloading_icon on test
+TEST_LOADING_ICON = 1160883199833014362 # loading_icon on test
 TEST_FC_COMPLETE_EMOJI = 884673510067286076 # fc_complete emoji
+TEST_FC_EMPTY_EMOJI = 974747678183424050 # fc_empty emoji
 TEST_DISCORD_EMOJI = 1122605718198026300 # Discord emoji on live
 TEST_HAULER_ROLE = 875439909102575647 # hauler role ID on test server
 TEST_WINELOADER_ROLE = 1119189364522623068 # wine loader role on test
@@ -141,6 +150,7 @@ TEST_CC_ROLE = 877220476827619399 # CC role on test server
 TEST_CC_CAT = 877108931699310592 # Community Carrier category on test server
 TEST_ADMIN_ROLE = 836367194979041351 # Bot Admin role on test server
 TEST_MOD_ROLE = 903292469049974845 # Mod role on test server
+TEST_SOMM_ROLE = 849907019502059530 # Sommeliers on test server
 TEST_CMENTOR_ROLE = 877586763672072193 # Community Mentor role on test server
 TEST_CERTCARRIER_ROLE = 822999970012463154 # Certified Carrier role on test server
 TEST_RESCARRIER_ROLE = 947520552766152744 # Fleet Reserve Carrier role on test server
@@ -151,6 +161,7 @@ TEST_RECRUIT_ROLE = 1121916871088803871 # CCO Recruit role
 TEST_CPILLAR_ROLE = 903289927184314388 # Community Pillar role on test server
 TEST_DEV_ROLE = 1048913812163678278 # Dev role ID on test
 TEST_VERIFIED_ROLE = 903289848427851847 # Verified Member
+TEST_PILOT_ROLE = 818174614810787840 # Pilot role
 TEST_EVENT_ORGANISER_ROLE = 1121748430650355822 # Event Organiser
 TEST_BOT_ROLE = 842524877051133963 # TestingAlertBot role only - need a generic bot role on test
 TEST_ALUM_ROLE = 1156729563188035664 # Alumni role on test server
@@ -159,6 +170,7 @@ TEST_ARCHIVE_CAT = 877244591579992144 # Archive category on live server
 TEST_SECONDS_VERY_SHORT = 10 # time between channel deletion trigger and actual deletion
 TEST_SECONDS_SHORT = 5 # time before calling channel cleanup on failed mission gen
 TEST_SECONDS_LONG = 10 # time before calling channel cleanup on successful mission closure
+TEST_REDDIT_TIMEOUT = 10 # time before giving up on Reddit posting
 TEST_MCOMPLETE_ID = 1119206091163709441 # /mission complete slash ID
 # Training mode - test
 TEST_TRAINING_CATEGORY = 1120268080912810014 # training mode category ID
@@ -177,6 +189,7 @@ EMBED_COLOUR_RP = 0xe63946              # PTN red
 EMBED_COLOUR_ERROR = 0x800000           # dark red
 EMBED_COLOUR_QU = 0x00d9ff              # que?
 EMBED_COLOUR_OK = 0x80ff80              # we're good here thanks, how are you?
+EMBED_COLOUR_WARNING = 0xFFD700         # and it was all yellow
 
 
 # defining fonts for pillow use
@@ -280,17 +293,21 @@ def mission_template_filename(current_month):
 
 DISCORD_TEMPLATE = 'discord_template.png'
 
+OPT_IN_ID = 'OPT-INX'
+
 # images and icons used in mission embeds
 BLANKLINE_400PX = 'https://pilotstradenetwork.com/wp-content/uploads/2023/01/400x1-00000000.png'
-ICON_BUY = 'https://pilotstradenetwork.com/wp-content/uploads/2023/05/Trade.png'
-ICON_SELL = 'https://pilotstradenetwork.com/wp-content/uploads/2023/06/Credit.png'
+ICON_BUY_FROM_STATION = 'https://pilotstradenetwork.com/wp-content/uploads/2023/10/mab_buy_from_station.png'
+ICON_BUY_FROM_CARRIER = 'https://pilotstradenetwork.com/wp-content/uploads/2023/10/mab_buy_from_carrier.png'
+ICON_SELL_TO_STATION = 'https://pilotstradenetwork.com/wp-content/uploads/2023/10/mab_sell_to_station.png'
+ICON_SELL_TO_CARRIER = 'https://pilotstradenetwork.com/wp-content/uploads/2023/10/mab_sell_to_carrier.png'
 ICON_DATA = 'https://pilotstradenetwork.com/wp-content/uploads/2023/06/Data.png'
 ICON_DISCORD_CIRCLE = 'https://pilotstradenetwork.com/wp-content/uploads/2023/06/discord-icon-in-circle.png'
 ICON_DISCORD_PING = 'https://pilotstradenetwork.com/wp-content/uploads/2023/06/discord-notification-dot-icon.png'
 ICON_REDDIT = 'https://pilotstradenetwork.com/wp-content/uploads/2023/06/reddit-logo.png'
 ICON_WEBHOOK_PTN = 'https://pilotstradenetwork.com/wp-content/uploads/2023/06/discord-webhook-icon-in-circle.png'
-ICON_FC_LOADING = 'https://pilotstradenetwork.com/wp-content/uploads/2023/06/fc_loading_thick_sihmm.png'
-ICON_FC_UNLOADING = 'https://pilotstradenetwork.com/wp-content/uploads/2023/06/fc_unloading_thick_sihmm.png'
+ICON_LOADING = 'https://pilotstradenetwork.com/wp-content/uploads/2023/10/sim_loading_graphic_mab.png'
+ICON_UNLOADING = 'https://pilotstradenetwork.com/wp-content/uploads/2023/10/sim_unloading_graphic_mab.png'
 ICON_EDMC_OFF = 'https://pilotstradenetwork.com/wp-content/uploads/2023/06/edmc_off_2.jpg'
 ICON_FC_COMPLETE = 'https://pilotstradenetwork.com/wp-content/uploads/2023/05/fc_complete.png'
 ICON_FC_EMPTY = 'https://pilotstradenetwork.com/wp-content/uploads/2023/06/fc_empty.png'
@@ -360,8 +377,17 @@ def upvote_emoji():
 def o7_emoji():
   return PROD_O7_EMOJI if _production else TEST_O7_EMOJI
 
+def loading_emoji():
+  return PROD_LOADING_ICON if _production else TEST_LOADING_ICON
+
+def unloading_emoji():
+  return PROD_UNLOADING_ICON if _production else TEST_LOADING_ICON
+
 def fc_complete_emoji():
   return PROD_FC_COMPLETE_EMOJI if _production else TEST_FC_COMPLETE_EMOJI
+
+def fc_empty_emoji():
+  return PROD_FC_EMPTY_EMOJI if _production else TEST_FC_EMPTY_EMOJI
 
 def discord_emoji():
   return PROD_DISCORD_EMOJI if _production else TEST_DISCORD_EMOJI
@@ -383,6 +409,9 @@ def admin_role():
 
 def mod_role():
   return PROD_MOD_ROLE if _production else TEST_MOD_ROLE
+
+def somm_role():
+  return PROD_SOMM_ROLE if _production else TEST_SOMM_ROLE
 
 def cmentor_role():
   return PROD_CMENTOR_ROLE if _production else TEST_CMENTOR_ROLE
@@ -414,6 +443,9 @@ def dev_role():
 def verified_role():
   return PROD_VERIFIED_ROLE if _production else TEST_VERIFIED_ROLE
 
+def pilot_role():
+  return PROD_PILOT_ROLE if _production else TEST_PILOT_ROLE
+
 def event_organiser_role():
   return PROD_EVENT_ORGANISER_ROLE if _production else TEST_EVENT_ORGANISER_ROLE
 
@@ -437,6 +469,9 @@ def seconds_short():
 
 def seconds_long():
   return PROD_SECONDS_LONG if _production else TEST_SECONDS_LONG
+
+def reddit_timeout():
+  return PROD_REDDIT_TIMEOUT if _production else TEST_REDDIT_TIMEOUT
 
 def mcomplete_id():
   return PROD_MCOMPLETE_ID if _production else TEST_MCOMPLETE_ID
