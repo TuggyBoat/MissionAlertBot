@@ -104,6 +104,7 @@ PROD_PILOT_ROLE = 800396412217982999 # Pilot role
 PROD_EVENT_ORGANISER_ROLE = 1023296182639939594 # Event Organiser
 PROD_BOT_ROLE = 802523214809923596 # General Bot role on live (Robot Overlords)
 PROD_ALUM_ROLE = 1086777372981858404 # Council Alumni role on live
+PROD_CCO_COLOR_ROLE = 1166838944109957240 # CCO Color role on live
 PROD_TRADE_CAT = 801558838414409738 # Trade Carrier category on live server
 PROD_ARCHIVE_CAT = 1048957416781393970 # Archive category on live server
 PROD_SECONDS_VERY_SHORT = 10 # time between channel deletion trigger and actual deletion (10)
@@ -454,6 +455,9 @@ def bot_role():
 
 def alum_role():
     return PROD_ALUM_ROLE if _production else TEST_ALUM_ROLE
+
+def cco_color_role():
+    return PROD_CCO_COLOR_ROLE if _production else None # TODO: Need to add color role on PANTS
 
 def trade_cat():
   return PROD_TRADE_CAT if _production else TEST_TRADE_CAT
