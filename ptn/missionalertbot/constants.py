@@ -166,6 +166,7 @@ TEST_PILOT_ROLE = 818174614810787840 # Pilot role
 TEST_EVENT_ORGANISER_ROLE = 1121748430650355822 # Event Organiser
 TEST_BOT_ROLE = 842524877051133963 # TestingAlertBot role only - need a generic bot role on test
 TEST_ALUM_ROLE = 1156729563188035664 # Alumni role on test server
+TEST_CCO_COLOR_ROLE = 1168280960572334151 # CCO Color role on test server
 TEST_TRADE_CAT = 876569219259580436 # Trade Carrier category on live server
 TEST_ARCHIVE_CAT = 877244591579992144 # Archive category on live server
 TEST_SECONDS_VERY_SHORT = 10 # time between channel deletion trigger and actual deletion
@@ -457,7 +458,7 @@ def alum_role():
     return PROD_ALUM_ROLE if _production else TEST_ALUM_ROLE
 
 def cco_color_role():
-    return PROD_CCO_COLOR_ROLE if _production else None # TODO: Need to add color role on PANTS
+    return PROD_CCO_COLOR_ROLE if _production else TEST_CCO_COLOR_ROLE
 
 def trade_cat():
   return PROD_TRADE_CAT if _production else TEST_TRADE_CAT
