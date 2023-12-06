@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.3.5
+- [#632](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/632) Removed footer of `Add Carrier` summary embed (no longer needed)
+
+
 ## 2.3.4
 - [#629](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/629) Shortnames created via `Add Carrier` will no longer include non-alphanumeric characters
 - [#628](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/628) `Add Carrier`'s confirmation buttons now include a check for which user is attempting the interaction

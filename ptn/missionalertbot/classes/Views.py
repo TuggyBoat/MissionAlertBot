@@ -887,8 +887,6 @@ class AddCarrierButtons(View):
                 color=constants.EMBED_COLOUR_OK
             )
 
-            embed.set_footer(text=f"Called by {interaction.user.display_name} for {interaction.message.author.display_name}")
-
             await interaction.edit_original_response(embed=embed)
 
         except Exception as e:
