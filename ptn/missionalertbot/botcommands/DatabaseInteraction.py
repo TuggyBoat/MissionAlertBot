@@ -66,6 +66,18 @@ async def add_carrier(interaction:  discord.Interaction, message: discord.Messag
         index = details['index']
         owner_id = details['owner_id']
         channel_name = details['channel_name']
+
+        # check for incorrect formatting in the carrier id
+        if "o" in carrier_id.lower():
+            try:
+                error = (f'Your carrier id(s) given in the message {message.jump_url}contained an \'O\', '
+                         f'the letter \'O\' is not in ids, only the number 0 (zero). ({carrier_id})')
+                await interaction.delete_original_response()
+                raise CustomError(error, isprivate=False)
+            except Exception as e:
+                return await on_generic_error(interaction, e)
+
+
         print(f"Index {index} is '{long_name}' ({carrier_id}) with generated shortname {short_name}")
         embed.add_field(
             name=f"{f'Match {index+1}' if len(carrier_details) > 1 else 'Matched Details'}",
@@ -294,6 +306,12 @@ class DatabaseInteraction(commands.Cog):
         if not re.match(r"\w{3}-\w{3}", carrier_id):
             print(f'{interaction.user}, the carrier ID was invalid, XXX-XXX expected received, {carrier_id}.')
             return await interaction.response.send_message(f'ERROR: Invalid carrier ID. Expected: XXX-XXX, received `{carrier_id}`.', ephemeral=True)
+
+        # check the ID does not contain the letter 'O'
+        if "o" in carrier_id.lower():
+            return await interaction.response.send_message(
+                f'Your carrier id given contained an \'O\', the letter \'O\' is not in ids, only the number 0 (zero). '
+                f'({carrier_id})', ephemeral=True)
 
         # convert owner_id to int (slash commands have a cannot exceed the integer size limit, so we have to pass IDs as strings)
         # and check it is valid
