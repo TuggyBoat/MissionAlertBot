@@ -1225,6 +1225,8 @@ async def gen_mission(interaction: discord.Interaction, mission_params: MissionP
 
     submit_mission = False
 
+    mission_temp_channel = None
+
     print(f'Mission generation type: {mission_params.mission_type} requested by {interaction.user}. Request triggered from '
         f'channel {current_channel}.')
     
@@ -1257,7 +1259,10 @@ async def gen_mission(interaction: discord.Interaction, mission_params: MissionP
 
         if "d" in mission_params.sendflags: # send to discord and save to mission database
             async with interaction.channel.typing():
-                submit_mission, mission_temp_channel = await send_mission_to_discord(interaction, mission_params)
+                try:
+                    submit_mission, mission_temp_channel = await send_mission_to_discord(interaction, mission_params)
+                except:
+                    print("Error during send_mission_to_discord()")
                 if not submit_mission: # error condition, cleanup after ourselves
                     cleanup_temp_image_file(mission_params.discord_img_name)
                     if mission_params.mission_temp_channel_id:
@@ -1346,10 +1351,10 @@ async def gen_mission(interaction: discord.Interaction, mission_params: MissionP
             print("Releasing channel lock...")
             locked = check_mission_channel_lock(mission_params.carrier_data.discord_channel)
             if locked:
-                await unlock_mission_channel(mission_temp_channel.name)
+                await unlock_mission_channel(mission_params.carrier_data.discord_channel)
                 print("Channel lock released")
                 embed = discord.Embed(
-                    description=f"🔓 Released lock for `{mission_temp_channel.name}` (<#{mission_temp_channel.id}>) because of error in mission generation.",
+                    description=f"🔓 Released lock for `{mission_params.carrier_data.discord_channel}` (<#{mission_params.mission_temp_channel.id}>) because of error in mission generation.",
                     color=constants.EMBED_COLOUR_OK
                 )
                 await spamchannel.send(embed=embed)
@@ -1371,13 +1376,13 @@ async def create_mission_temp_channel(interaction, mission_params):
         color=constants.EMBED_COLOUR_QU
     )
     lockwait_msg = await interaction.channel.send(embed=embed)
+    spamchannel = bot.get_channel(bot_spam_channel())
     try:
         await asyncio.wait_for(lock_mission_channel(mission_params.carrier_data.discord_channel), timeout=20)
         embed = discord.Embed(
             description=f"🔒 Lock acquired for `{mission_params.carrier_data.discord_channel}` for mission creation.",
             color=constants.EMBED_COLOUR_QU
         )
-        spamchannel = bot.get_channel(bot_spam_channel())
         await spamchannel.send(embed=embed)
     except asyncio.TimeoutError as e:
         embed = discord.Embed(

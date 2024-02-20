@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.3.6
+- [#642](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/642) `spamchannel` now properly defined for failure state when member cannot be found during mission generation
+- [#642](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/642) `mission_temp_channel` now properly defined as `None` before `send_mission_to_discord()`, to avoid additional errors when said function returns early due to error
+- [#642](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/642) `find_mission` now properly returns `mission_data` as `None` if no mission is found, rather than a class filled entirely with `None`
+- [#642](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/642) Channel lock release should now work properly if the mission generator stops because of an error
+- [#643](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/643) `/admin_release_channel_lock` and `/admin_acquire_channel_lock` now properly notify the user if the lock status is already as desired
+
+
 ## 2.3.5
 - [#632](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/632) Removed footer of `Add Carrier` summary embed (no longer needed)
 
