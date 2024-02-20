@@ -1,6 +1,7 @@
 # Changelog
 
 ## 2.3.6
+- [#635](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/635) `/cco load`, `unload`, and `edit` now properly use the target carrier's owner for all relevant purposes (including webhooks and trade alert 'author') instead of the interaction user
 - [#642](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/642) `spamchannel` now properly defined for failure state when member cannot be found during mission generation
 - [#642](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/642) `mission_temp_channel` now properly defined as `None` before `send_mission_to_discord()`, to avoid additional errors when said function returns early due to error
 - [#642](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/642) `find_mission` now properly returns `mission_data` as `None` if no mission is found, rather than a class filled entirely with `None`
