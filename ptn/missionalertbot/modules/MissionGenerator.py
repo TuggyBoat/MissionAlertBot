@@ -1259,10 +1259,7 @@ async def gen_mission(interaction: discord.Interaction, mission_params: MissionP
 
         if "d" in mission_params.sendflags: # send to discord and save to mission database
             async with interaction.channel.typing():
-                try:
-                    submit_mission, mission_temp_channel = await send_mission_to_discord(interaction, mission_params)
-                except:
-                    print("Error during send_mission_to_discord()")
+                submit_mission, mission_temp_channel = await send_mission_to_discord(interaction, mission_params)
                 if not submit_mission: # error condition, cleanup after ourselves
                     cleanup_temp_image_file(mission_params.discord_img_name)
                     if mission_params.mission_temp_channel_id:
@@ -1446,6 +1443,7 @@ async def create_mission_temp_channel(interaction, mission_params):
         member = await guild.fetch_member(mission_params.carrier_data.ownerid)
         print(f"Owner identified as {member.display_name}")
     except:
+        print("Error resolving Discord member from owner")
         raise EnvironmentError(f'Could not find Discord user matching ID {mission_params.carrier_data.ownerid}')
 
     overwrite = await get_overwrite_perms()
