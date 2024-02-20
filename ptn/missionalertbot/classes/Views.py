@@ -10,6 +10,7 @@ import asyncio
 import os
 from datetime import datetime
 import traceback
+import typing
 
 # import discord.py
 import discord
@@ -753,7 +754,7 @@ class SendNoticeModal(Modal):
 
 # Buttons for Add Carrier interaction
 class AddCarrierButtons(View):
-    def __init__(self, message, carrier_details, author):
+    def __init__(self, message, carrier_details, author: typing.Union[discord.Member, discord.User]):
         self.message: discord.Message = message
         self.carrier_details: dict = carrier_details
         self.author = author
