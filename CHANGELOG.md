@@ -1,6 +1,7 @@
 # Changelog
 
 ## 2.3.6
+- [#639](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/639) Automatically replace the letter "O" with zero when encountered in Fleet Carrier registrations to add to database
 - [#637](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/637) Discord invites sent by MAB to Reddit now use the direct link: `https://discord.gg/ptn`
 - [#635](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/635) `/cco load`, `unload`, and `edit` now properly use the target carrier's owner for all relevant purposes (including webhooks and trade alert 'author') instead of the interaction user
 - [#642](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/642) `spamchannel` now properly defined for failure state when member cannot be found during mission generation
