@@ -20,6 +20,8 @@ class CarrierData:
         self.ownerid = info_dict.get('ownerid', None)
         self.lasttrade = info_dict.get('lasttrade', None)
         self.pid = info_dict.get('p_ID', None)
+        self.marketid = info_dict.get('marketid', None)
+        self.capi = info_dict.get('capi', None)
 
     def to_dictionary(self):
         """
@@ -42,8 +44,8 @@ class CarrierData:
         """
         return 'CarrierData: CarrierLongName:{0.carrier_long_name} CarrierShortName:{0.carrier_short_name} ' \
                'CarrierIdentifier:{0.carrier_identifier} DiscordChannel:{0.discord_channel} ' \
-               'DiscordChannelID:{0.channel_id} ' \
-               'OwnerID:{0.ownerid} CarrierPid:{0.pid} LastTrade:{0.lasttrade}'.format(self)
+               'DiscordChannelID:{0.channel_id} OwnerID:{0.ownerid} CarrierPid:{0.pid} ' \
+               'LastTrade:{0.lasttrade} MarketID:{0.marketid} cAPI: {0.capi} '.format(self)
 
     def __bool__(self):
         """

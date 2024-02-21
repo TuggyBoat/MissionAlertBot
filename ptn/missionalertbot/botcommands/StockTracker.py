@@ -3,16 +3,17 @@ Commands relating to carrier stock tracking.
 
 """
 
-
 # libraries
 import asyncio
 import json
 import re
 import requests
 from texttable import Texttable # TODO: remove this dependency
+import traceback
 
 # discord.py
 import discord
+from discord import app_commands
 from discord.app_commands import Group, command, describe
 from discord.ext import commands
 
@@ -22,8 +23,7 @@ from ptn.missionalertbot.constants import bot, certcarrier_role, trainee_role, r
 
 # local modules
 from ptn.missionalertbot.modules.helpers import check_roles, check_command_channel, flexible_carrier_search_term
-from ptn.missionalertbot.modules.StockHelpers import chunk, inara_fc_market_data, inara_find_fc_system, edsm_find_fc_system, save_carrier_data, \
-    get_fc_stock, get_fccode
+from ptn.missionalertbot.modules.StockHelpers import get_fc_stock
 from ptn.missionalertbot.modules.ErrorHandler import on_app_command_error, on_generic_error, CustomError, GenericError
 
 
@@ -46,256 +46,103 @@ class StockTracker(commands.Cog):
         tree.on_error = self._old_tree_error
 
 
-    track_group = Group(name='track', description='CCO stock tracking commands')
+    @app_commands.command(name='stock', description='Returns stock of a PTN carrier.')
+    @app_commands.describe(
+           carrier = "A unique fragment of the Fleet Carrier name you want to search for.",
+           source = "Choose data source between Frontier API or Inara. Defaults to Frontier API."
+        )
+    @app_commands.choices(source=[
+        discord.app_commands.Choice(name='Frontier API', value='capi'),
+        discord.app_commands.Choice(name='Inara', value='inara')
+        ])
+    async def stock(self, interaction: discord.Interaction, carrier: str = None, source: str = 'capi'):
+        carrier_string = f' for carrier {carrier}' if carrier else ''
+        source_string = f' from source {source}'
+        print(f"📈 Stock check called by {interaction.user} in {interaction.channel}" + carrier_string + source_string)
 
-    @track_group.command(name='enable', description='Enable stock tracking.')
-    @describe(carrier = "A unique fragment of the carrier name you want to search for.")
-    @check_roles([certcarrier_role(), trainee_role(), rescarrier_role()])
-    @check_command_channel([mission_command_channel(), training_mission_command_channel()])
-    async def track_enable(self, interaction: discord.Interaction, carrier):
-        print(f"▶ Stock tracking enable called by {interaction.user} for search term {carrier}")
-
-        # attempt to find matching carrier data
-        carrier_data = flexible_carrier_search_term(carrier)
-        
-        if not carrier_data:  # error condition
-            carrier_error_embed = discord.Embed(
-                description=f"❌ No carrier found for '**{carrier}**'. Use `/owner` to see a list of your carriers. If it's not in the list, ask an Admin to add it for you.",
-                color=constants.EMBED_COLOUR_ERROR
+        try:
+            embed = discord.Embed(
+                description="⏳ Please wait a moment...",
+                color=constants.EMBED_COLOUR_QU
             )
-            return await interaction.response.send_message(embed=carrier_error_embed)
 
-        # search EDSM to find carrier system. fallback to inara
-        search_data = None
-        try:
-            search_data = edsm_find_fc_system(carrier_data.carrier_identifier)
-        except:
-            try:
-                search_data = inara_find_fc_system(carrier_data.carrier_identifier)
-            except:
-                pass
+            await interaction.response.send_message(embed=embed)
 
-        if search_data is False:
+
+            # attempt to find matching carrier data
+            carrier_data = flexible_carrier_search_term(carrier)
+            
+            if not carrier_data:  # error condition
+                print(f"❌ No carrier found matching search term {carrier}")
+                carrier_error_embed = discord.Embed(
+                    description=f"❌ No carrier found for '**{carrier}**'. Use `/owner` to see a list of your carriers. If it's not in the list, ask an Admin to add it for you.",
+                    color=constants.EMBED_COLOUR_ERROR
+                )
+                return await interaction.edit_original_response(embed=carrier_error_embed)
+
+            # fetch stock levels
+
+            fcname = carrier_data.carrier_long_name
+
             try:
-                raise CustomError(f"Could not locate system for {carrier_data.carrier_long_name}. Please ensure you have used EDMC upload or journal import to log your carrier's location.")
+                stn_data = get_fc_stock(carrier_data.carrier_identifier, source)
             except Exception as e:
-                await on_generic_error(interaction, e)
-                return
-
-        elif search_data is not None:
-            fc_system = search_data['system']
-        try:
-            pmeters = {'systemName': fc_system, 'stationName': carrier_data.carrier_identifier}
-            r = requests.get('https://www.edsm.net/api-system-v1/stations/market', params=pmeters)
-            market_id = r.json()
-
-            if r.text=='{}':
                 try:
-                    raise CustomError(f"Could not locate system for {carrier_data.carrier_long_name}. Please ensure you have used EDMC upload or journal import to log your carrier's location.")
+                    error = f"Error getting data for carrier {carrier_data.carrier_identifier}: {e}"
+                    raise CustomError(error)
                 except Exception as e:
                     await on_generic_error(interaction, e)
-                    return
-            else:
-                embed = discord.Embed(
-                    description=f"✅ Found {carrier_data.carrier_long_name} ({carrier_data.carrier_identifier}) in {fc_system}"
-                )
-                await interaction.response.send_message(embed=embed)
-        except:
-            print("Failure getting edsm data")
-            try:
-                raise CustomError(f"Failed getting EDSM data, please try again.")
-            except Exception as e:
-                await on_generic_error(interaction, e)
+                    traceback.print_exc()
+                    stn_data = False
+
+            if stn_data is False:
+                embed.description = f"📉 No market data for {carrier_data.carrier_long_name}."
+                embed.color=constants.EMBED_COLOUR_QU
+                await interaction.edit_original_response(embed=embed)
                 return
 
-        print(market_id['marketId'])
-        market_id_string = str(market_id['marketId'])
+            com_data = stn_data['commodities']
+            loc_data = stn_data['name']
+            if com_data == []:
+                embed.description = f"📉 No market data for {carrier_data.carrier_long_name}."
+                embed.color=constants.EMBED_COLOUR_QU
+                await interaction.edit_original_response(embed=embed)
+                return
 
-        # save market ID to database
+            table = Texttable()
+            table.set_cols_align(["l", "r", "r"])
+            table.set_cols_valign(["m", "m", "m"])
+            table.set_cols_dtype(['t', 'i', 'i'])
+            #table.set_deco(Texttable.HEADER | Texttable.HLINES)
+            table.set_deco(Texttable.HEADER)
+            table.header(["Commodity", "Amount", "Demand"])
 
+            for com in com_data:
+                if com['stock'] != 0 or com['demand'] != 0:
+                    table.add_row([com['name'], com['stock'], com['demand']])
 
-@commands.command(name='add_FC', help='Add a fleet carrier for stock tracking.\n'
-                                 'FCCode: Carrier ID Code \n'
-                                 'FCSys: Carrier current system, use "auto", "auto-edsm", or "auto-inara" to search. ("auto" uses edsm)\n'
-                                 'FCName: The alias with which you want to refer to the carrier. Please use something '
-                                 'simple like "orion" or "9oclock", as this is what you use to call the stock command!'
-                                 '\n!!SYSTEMS WITH SPACES IN THE NAMES NEED TO BE "QUOTED LIKE THIS"!! ')
-@commands.has_any_role('Bot Handler', 'Admin', 'Mod')
-async def addFC(ctx, FCCode, FCSys, FCName):
-    # Checking if FC is already in the list, and if FC name is in correct format
-    # Stops if FC is already in list, or if incorrect name format
-    matched = re.match("[a-zA-Z0-9][a-zA-Z0-9][a-zA-Z0-9]-[a-zA-Z0-9][a-zA-Z0-9][a-zA-Z0-9]", FCCode)
-    isnt_match = not bool(matched)  # If it is NOT a match, we enter the Invalid FC Code condition
+            msg = "```%s```\n" % ( table.draw() )
 
-    if isnt_match:
-        await ctx.send(f'Invalid Fleet Carrier Code format! Format should look like XXX-YYY')
-        return
-    elif FCCode.upper() in FCDATA.keys():
-        await ctx.send(f'{FCCode} is a code that is already in the Carrier list!')
-        return
-    # iterate through our known carriers and check if the alias is already assigned.
-    for fc_code, fc_data in FCDATA.items():
-        if FCName.lower() in fc_data['FCName']:
-            await ctx.send(f'{FCName} is an alias that is already in the alias list belonging to carrier {fc_code}!')
-            return
+            embed = discord.Embed()
+            embed.add_field(name = f"{fcname} ({stn_data['sName']}) stock", value = msg, inline = False)
+            embed.add_field(name = 'FC Location', value = loc_data, inline = False)
+            embed.set_footer(text = f"Data last updated: {stn_data['market_updated']}\nNumbers out of wack? Ensure EDMC is running!")
 
-    print(f'Format is good... Checking database...')
+            await interaction.edit_original_response(embed=embed)
 
-    search_data = None
-    if FCSys == 'auto-inara':
-        search_data = inara_find_fc_system(FCCode)
-    elif FCSys == 'auto-edsm' or FCSys == 'auto':
-        search_data = edsm_find_fc_system(FCCode)
-    if search_data is False:
-        await ctx.send(f'Could not find the FC system. please manually supply system name')
-        return
-    elif search_data is not None:
-        FCSys = search_data['system']
-    try:
-        pmeters = {'systemName': FCSys, 'stationName': FCCode}
-        r = requests.get('https://www.edsm.net/api-system-v1/stations/market', params=pmeters)
-        market_id = r.json()
-
-        if r.text=='{}':
-            await ctx.send(f'FC does not exist in the EDSM database, check to make sure the inputs are correct!')
-            return
-        else:
-            await ctx.send(f'This FC is NOT a lie!')
-    except:
-        print("Failure getting edsm data")
-        await ctx.send(f'Failed getting EDSM data, please try again.')
-        return
-
-    print(market_id['marketId'])
-    market_id_string = str(market_id['marketId'])
-
-    # save market ID to database
-
-    FCDATA[FCCode.upper()] = {'FCName': FCName.lower(), 'FCMid': midstr, 'FCSys': FCSys.lower()}
-    save_carrier_data(FCDATA)
-
-    await ctx.send(f'Added {FCCode} to the FC list, under reference name {FCName}')
+        except Exception as e:
+            try:
+                raise GenericError(e)
+            except Exception as e:
+                traceback.print_exc()
+                await on_generic_error(interaction, e)
 
 
-@bot.command(name='APItest', help='Test EDSM API')
-@commands.has_role('Bot Handler')
-async def APITest(ctx, mark):
-    await ctx.send('Testing API with given marketId')
-    pmeters = {'marketId': mark}
-    r = requests.get('https://www.edsm.net/api-system-v1/stations/market',params=pmeters)
-    stn_data = r.json()
-
-    com_data = stn_data['commodities']
-    loc_data = stn_data['name']
-    if com_data == []:
-        await ctx.send(f"{stn_data['sName']} is empty!")
-        return
-
-    name_data = ["" for x in range(len(com_data))]
-    stock_data = ["" for x in range(len(com_data))]
-    dem_data = ["" for x in range(len(com_data))]
-
-    for i in range(len(com_data)):
-        name_data[i] = com_data[i]['name']
-        stock_data[i] = com_data[i]['stock']
-        dem_data[i] = com_data[i]['demand']
-
-    print('Creating embed...')
-    embed = discord.Embed(title=f"{stn_data['sName']} stock")
-    embed.add_field(name = 'Commodity', value = name_data, inline = True)
-    embed.add_field(name = 'Amount', value = stock_data, inline = True)
-    embed.add_field(name = 'FC Location', value = loc_data, inline= True)
-    print('Embed created!')
-    print(name_data)
-
-    await ctx.send(embed=embed)
-    print('Embed sent!')
 
 
-@bot.command(name='stock', help='Returns stock of a PTN carrier (carrier needs to be added first)\n'
-                                'source: Optional argument, one of "edsm" or "inara". Defaults to "edsm".')
-async def stock(ctx, fcname, source='edsm'):
-    fccode = get_fccode(fcname)
-    if fccode not in FCDATA:
-        await ctx.send('The requested carrier is not in the list! Add carriers using the add_FC command!')
-        return
-
-    await ctx.send(f'Fetching stock levels for **{fcname} ({fccode})**')
-
-    stn_data = get_fc_stock(fccode, source)
-    if stn_data is False:
-        await ctx.send(f"{fcname} has no current market data.")
-        return
-
-    com_data = stn_data['commodities']
-    loc_data = stn_data['name']
-    if com_data == []:
-        await ctx.send(f"{fcname} has no current market data.")
-        return
-
-    table = Texttable()
-    table.set_cols_align(["l", "r", "r"])
-    table.set_cols_valign(["m", "m", "m"])
-    table.set_cols_dtype(['t', 'i', 'i'])
-    #table.set_deco(Texttable.HEADER | Texttable.HLINES)
-    table.set_deco(Texttable.HEADER)
-    table.header(["Commodity", "Amount", "Demand"])
-
-    for com in com_data:
-        if com['stock'] != 0 or com['demand'] != 0:
-            table.add_row([com['name'], com['stock'], com['demand']])
-
-    msg = "```%s```\n" % ( table.draw() )
-    #print('Creating embed...')
-    embed = discord.Embed()
-    embed.add_field(name = f"{fcname} ({stn_data['sName']}) stock", value = msg, inline = False)
-    embed.add_field(name = 'FC Location', value = loc_data, inline = False)
-    embed.set_footer(text = f"Data last updated: {stn_data['market_updated']}\nNumbers out of wack? Ensure EDMC is running!")
-    #print('Embed created!')
-    await ctx.send(embed=embed)
-    #print('Embed sent!')
 
 
-@bot.command(name='del_FC', help='Delete a fleet carrier from the tracking database.\n'
-                                 'FCCode: Carrier ID Code')
-@commands.has_any_role('Bot Handler', 'Admin', 'Mod')
-async def delFC(ctx, FCCode):
-    FCCode = FCCode.upper()
-    matched = re.match("[a-zA-Z0-9][a-zA-Z0-9][a-zA-Z0-9]-[a-zA-Z0-9][a-zA-Z0-9][a-zA-Z0-9]", FCCode)
-    isnt_match = not bool(matched)  # If it is NOT a match, we enter the Invalid FC Code condition
-
-    if isnt_match:
-        await ctx.send(f'Invalid Fleet Carrier Code format! Format should look like XXX-YYY')
-        return
-    if FCCode in FCDATA.keys():
-        fcname = FCDATA[FCCode]['FCName']
-        FCDATA.pop(FCCode)
-        save_carrier_data(FCDATA)
-        await ctx.send(f'Carrier {fcname} ({FCCode}) has been removed from the list')
-
-
-@bot.command(name='rename_FC', help='Rename a Fleet Carrier alias. \n'
-                                    'FCCode: Carrier ID Code \n'
-                                    'FCName: new name for the Carrier ')
-@commands.has_any_role('Bot Handler', 'Admin', 'Mod')
-async def renameFC(ctx, FCCode, FCName):
-    FCCode = FCCode.upper()
-    FCName = FCName.lower()
-
-    matched = re.match("[a-zA-Z0-9][a-zA-Z0-9][a-zA-Z0-9]-[a-zA-Z0-9][a-zA-Z0-9][a-zA-Z0-9]", FCCode)
-    isnt_match = not bool(matched)  # If it is NOT a match, we enter the Invalid FC Code condition
-
-    if isnt_match:
-        await ctx.send(f'Invalid Fleet Carrier Code format! Format should look like XXX-YYY')
-        return
-    if FCCode in FCDATA.keys():
-        fcname_old = FCDATA[FCCode]['FCName']
-        FCDATA[FCCode]['FCName'] = FCName
-        save_carrier_data(FCDATA)
-        await ctx.send(f'Carrier {fcname_old} ({FCCode}) has been renamed to {FCName}')
-
-
-@bot.command(name='list', help='Lists all tracked carriers. \n'
+"""@bot.command(name='list', help='Lists all tracked carriers. \n'
                                'Filter: use "wmm" to show only wmm-tracked carriers.')
 async def fclist(ctx, Filter=None):
     names = []
@@ -381,3 +228,4 @@ async def fclist(ctx, Filter=None):
             await ctx.send(f'Closed the active carrier list request from: {ctx.author} due to no input in 60 seconds.')
             await message.delete()
             break
+"""

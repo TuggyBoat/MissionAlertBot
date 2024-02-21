@@ -64,7 +64,6 @@ carriers_table_create = '''
         channelid INT,
         ownerid INT,
         lasttrade INT NOT NULL DEFAULT (cast(strftime('%s','now') as int)),
-        track BOOLEAN DEFAULT 0,
         capi BOOLEAN DEFAULT 0
     )
     '''
@@ -321,14 +320,6 @@ def build_database_on_startup():
     #       type (str): type of column data
     new_column_map = {
         'capi': {
-            'db_name': 'carriers',
-            'table': 'carriers',
-            'obj': carrier_db,
-            'columns': carriers_table_columns,
-            'conn': carriers_conn,
-            'type': 'BOOLEAN DEFAULT 0'
-        },
-        'track': {
             'db_name': 'carriers',
             'table': 'carriers',
             'obj': carrier_db,
