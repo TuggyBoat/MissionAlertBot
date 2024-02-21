@@ -3,6 +3,7 @@ Commands relating to carrier stock tracking.
 
 """
 
+
 # libraries
 import asyncio
 import json
@@ -12,19 +13,108 @@ from texttable import Texttable # TODO: remove this dependency
 
 # discord.py
 import discord
+from discord.app_commands import Group, command, describe
 from discord.ext import commands
 
 # local constants
 import ptn.missionalertbot.constants as constants
-from ptn.missionalertbot.constants import bot
+from ptn.missionalertbot.constants import bot, certcarrier_role, trainee_role, rescarrier_role, mission_command_channel, training_mission_command_channel
 
 # local modules
+from ptn.missionalertbot.modules.helpers import check_roles, check_command_channel, flexible_carrier_search_term
 from ptn.missionalertbot.modules.StockHelpers import chunk, inara_fc_market_data, inara_find_fc_system, edsm_find_fc_system, save_carrier_data, \
     get_fc_stock, get_fccode
+from ptn.missionalertbot.modules.ErrorHandler import on_app_command_error, on_generic_error, CustomError, GenericError
 
 
+# initialise the Cog and attach our global error handler
+class StockTracker(commands.Cog):
+    def __init__(self, bot: commands.Bot):
+        self.bot = bot
 
-@bot.command(name='add_FC', help='Add a fleet carrier for stock tracking.\n'
+    # custom global error handler
+    # attaching the handler when the cog is loaded
+    # and storing the old handler
+    def cog_load(self):
+        tree = self.bot.tree
+        self._old_tree_error = tree.on_error
+        tree.on_error = on_app_command_error
+
+    # detaching the handler when the cog is unloaded
+    def cog_unload(self):
+        tree = self.bot.tree
+        tree.on_error = self._old_tree_error
+
+
+    track_group = Group(name='track', description='CCO stock tracking commands')
+
+    @track_group.command(name='enable', description='Enable stock tracking.')
+    @describe(carrier = "A unique fragment of the carrier name you want to search for.")
+    @check_roles([certcarrier_role(), trainee_role(), rescarrier_role()])
+    @check_command_channel([mission_command_channel(), training_mission_command_channel()])
+    async def track_enable(self, interaction: discord.Interaction, carrier):
+        print(f"▶ Stock tracking enable called by {interaction.user} for search term {carrier}")
+
+        # attempt to find matching carrier data
+        carrier_data = flexible_carrier_search_term(carrier)
+        
+        if not carrier_data:  # error condition
+            carrier_error_embed = discord.Embed(
+                description=f"❌ No carrier found for '**{carrier}**'. Use `/owner` to see a list of your carriers. If it's not in the list, ask an Admin to add it for you.",
+                color=constants.EMBED_COLOUR_ERROR
+            )
+            return await interaction.response.send_message(embed=carrier_error_embed)
+
+        # search EDSM to find carrier system. fallback to inara
+        search_data = None
+        try:
+            search_data = edsm_find_fc_system(carrier_data.carrier_identifier)
+        except:
+            try:
+                search_data = inara_find_fc_system(carrier_data.carrier_identifier)
+            except:
+                pass
+
+        if search_data is False:
+            try:
+                raise CustomError(f"Could not locate system for {carrier_data.carrier_long_name}. Please ensure you have used EDMC upload or journal import to log your carrier's location.")
+            except Exception as e:
+                await on_generic_error(interaction, e)
+                return
+
+        elif search_data is not None:
+            fc_system = search_data['system']
+        try:
+            pmeters = {'systemName': fc_system, 'stationName': carrier_data.carrier_identifier}
+            r = requests.get('https://www.edsm.net/api-system-v1/stations/market', params=pmeters)
+            market_id = r.json()
+
+            if r.text=='{}':
+                try:
+                    raise CustomError(f"Could not locate system for {carrier_data.carrier_long_name}. Please ensure you have used EDMC upload or journal import to log your carrier's location.")
+                except Exception as e:
+                    await on_generic_error(interaction, e)
+                    return
+            else:
+                embed = discord.Embed(
+                    description=f"✅ Found {carrier_data.carrier_long_name} ({carrier_data.carrier_identifier}) in {fc_system}"
+                )
+                await interaction.response.send_message(embed=embed)
+        except:
+            print("Failure getting edsm data")
+            try:
+                raise CustomError(f"Failed getting EDSM data, please try again.")
+            except Exception as e:
+                await on_generic_error(interaction, e)
+                return
+
+        print(market_id['marketId'])
+        market_id_string = str(market_id['marketId'])
+
+        # save market ID to database
+
+
+@commands.command(name='add_FC', help='Add a fleet carrier for stock tracking.\n'
                                  'FCCode: Carrier ID Code \n'
                                  'FCSys: Carrier current system, use "auto", "auto-edsm", or "auto-inara" to search. ("auto" uses edsm)\n'
                                  'FCName: The alias with which you want to refer to the carrier. Please use something '
@@ -64,7 +154,7 @@ async def addFC(ctx, FCCode, FCSys, FCName):
     try:
         pmeters = {'systemName': FCSys, 'stationName': FCCode}
         r = requests.get('https://www.edsm.net/api-system-v1/stations/market', params=pmeters)
-        mid = r.json()
+        market_id = r.json()
 
         if r.text=='{}':
             await ctx.send(f'FC does not exist in the EDSM database, check to make sure the inputs are correct!')
@@ -76,8 +166,10 @@ async def addFC(ctx, FCCode, FCSys, FCName):
         await ctx.send(f'Failed getting EDSM data, please try again.')
         return
 
-    print(mid['marketId'])
-    midstr = str(mid['marketId'])
+    print(market_id['marketId'])
+    market_id_string = str(market_id['marketId'])
+
+    # save market ID to database
 
     FCDATA[FCCode.upper()] = {'FCName': FCName.lower(), 'FCMid': midstr, 'FCSys': FCSys.lower()}
     save_carrier_data(FCDATA)

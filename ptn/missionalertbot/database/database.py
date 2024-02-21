@@ -63,7 +63,9 @@ carriers_table_create = '''
         discordchannel TEXT NOT NULL,
         channelid INT,
         ownerid INT,
-        lasttrade INT NOT NULL DEFAULT (cast(strftime('%s','now') as int))
+        lasttrade INT NOT NULL DEFAULT (cast(strftime('%s','now') as int)),
+        track BOOLEAN DEFAULT 0,
+        capi BOOLEAN DEFAULT 0
     )
     '''
 carriers_table_columns = ['p_ID', 'shortname', 'longname', 'cid', 'discordchannel', 'channelid', 'ownerid', 'lasttrade']
@@ -251,51 +253,33 @@ def create_missing_table(table, db_obj, create_stmt):
 
 
 # function to create a missing column
-def create_missing_column(table, column, existing, db_name, db_obj, db_conn, create_stmt):
-
+def create_missing_column(table, column, db_name, db_obj, db_conn, type):
     """
-    In order to create the new column, a new table has to be created because
-    SQLite does not allow adding a new column with a non-constant value.
-    We then copy data from table to table, and rename them into place.
-    We will leave the backup table in case something goes wrong.
-    There is not enough try/catch here to be perfect. sorry. (that's OK Durzo, thanks for the code!)
+    Inserts missing columns into the target database.
+    
+    Params:
 
-
-    :param str table: name of the table the new column should be created in
-    :param str column: name of the new column
-    :param list existing: list of all columns in table
-    :param str db_name: name of database
-    :param db_obj
-    :param sqlite.Connection.cursor db_obj: database cursor
-    :param sqlite.Connection db_conn: database connection
-    :param string create_stmt: table create command
-    :returns: return
-
+    table: name of the table to alter
+    column: name of new column to add
+    db_name: name of the database containing the target table
+    db_obj: the database object variable name used by database.py
+    db_conn: the database cursor variable name used by database.py
+    type: the type of column to create
     """
-    temp_ts = int(datetime.now(tz=timezone.utc).timestamp())
-    temp_database_table = f'{table}_newcolumn_{temp_ts}'
-    backup_database_table = f'{table}_backup_{temp_ts}'
 
-    print(f'{column} column missing from {db_name} database, creating new temp table: {temp_database_table}')
-    db_obj.execute(create_stmt.replace(table, temp_database_table))
+    print(f'{column} column missing from {db_name} database, inserting...')
 
-    # copy data from community_carriers table to new temp table.
-    print(f'Copying {table} data to new table.')
-    # new column won't exist, so remove it from the existing list
-    existing.remove(column)
-    db_obj.execute(f"INSERT INTO {temp_database_table} ({','.join(existing)}) select * from {table}")
+    # backup existing database
+    backup_database(table)
 
-    # rename old table and keep as backup just in case.
-    print(f'Renaming current {table} table to "{backup_database_table}"')
-    db_obj.execute(f'ALTER TABLE {table} RENAME TO {backup_database_table}')
+    statement = f'''ALTER TABLE {table} ADD COLUMN {column} {type}'''
 
+    try:
+        db_obj.execute(statement)
+    except Exception as e:
+        print(f"❌ Error adding {column} to {table}: {e}")
+        return
 
-    # rename temp table as original.
-    print(f'Renaming "{temp_database_table}" temp table to "{table}"')
-    db_obj.execute(f'ALTER TABLE {temp_database_table} RENAME TO {table}')
-
-
-    print('Operation complete.')
     db_conn.commit()
     return
 
@@ -334,38 +318,30 @@ def build_database_on_startup():
     #       obj (sqlite db obj): sqlite connection to db
     #       columns (list): list of existing column names
     #       conn (sqlite connection): connection to sqlitedb
-    #       create (str): sql create statement for table
+    #       type (str): type of column data
     new_column_map = {
-        'lasttrade': {
+        'capi': {
             'db_name': 'carriers',
             'table': 'carriers',
             'obj': carrier_db,
             'columns': carriers_table_columns,
             'conn': carriers_conn,
-            'create': carriers_table_create
+            'type': 'BOOLEAN DEFAULT 0'
         },
-        'roleid': {
+        'track': {
             'db_name': 'carriers',
-            'table': 'community_carriers',
+            'table': 'carriers',
             'obj': carrier_db,
-            'columns': community_carriers_table_columns,
+            'columns': carriers_table_columns,
             'conn': carriers_conn,
-            'create': community_carriers_table_create
+            'type': 'BOOLEAN DEFAULT 0'
         },
-        'mission_params': {
-            'db_name': 'missions',
-            'table': 'missions',
-            'obj': mission_db,
-            'columns': missions_tables_columns,
-            'conn': missions_conn,
-            'create': missions_table_create
-        }
     }
 
     for column_name in new_column_map:
         c = new_column_map[column_name]
         if not check_table_column_exists(column_name, c['table'], c['obj']):
-            create_missing_column(c['table'], column_name, c['columns'], c['db_name'], c['obj'], c['conn'], c['create'])
+            create_missing_column(c['table'], column_name, c['db_name'], c['obj'], c['conn'], c['type'])
         else:
             print(f'{column_name} exists, do nothing')
 
