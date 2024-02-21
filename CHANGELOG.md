@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.3.9
+- Add author check to interaction buttons for `/carrier purge`
+
+
 ## 2.3.8
 - All admin commands are now interactions in the 'admin' group:
     - `/admin_release_channel_lock` is now `/admin lock release`
