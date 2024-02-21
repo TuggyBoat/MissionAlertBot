@@ -988,6 +988,20 @@ class ConfirmPurgeView(View):
         await interaction.response.edit_message(embed=embed, view=None)
 
 
+    async def interaction_check(self, interaction: discord.Interaction): # only allow original command user to interact with buttons
+        if interaction.user.id == self.author.id:
+            return True
+        else:
+            embed = discord.Embed(
+                description="Only the command author may use these interactions.",
+                color=constants.EMBED_COLOUR_ERROR
+            )
+            embed.set_image(url='https://media1.tenor.com/images/939e397bf929b9768b24a8fa165301fe/tenor.gif?itemid=26077542')
+            embed.set_footer(text="Seriously, are you 4? 🙄")
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+            return False
+
+
     async def on_timeout(self): 
         # remove buttons
         self.clear_items()
