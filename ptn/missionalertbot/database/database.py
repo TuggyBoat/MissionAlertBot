@@ -396,8 +396,8 @@ async def add_carrier_to_database(short_name, long_name, carrier_id, channel, ch
     """
     await carrier_db_lock.acquire()
     try:
-        carrier_db.execute(''' INSERT INTO carriers VALUES(NULL, ?, ?, ?, ?, ?, ?, strftime('%s','now')) ''',
-                           (short_name, long_name, carrier_id, channel, channel_id, owner_id))
+        carrier_db.execute(''' INSERT INTO carriers VALUES(NULL, ?, ?, ?, ?, ?, ?, ?, strftime('%s','now')) ''',
+                           (short_name, long_name, carrier_id, channel, channel_id, owner_id, 0))
         carriers_conn.commit()
         print(f'Added {long_name} to database')
     finally:
