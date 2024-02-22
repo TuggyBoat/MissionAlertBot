@@ -32,6 +32,7 @@ RESOURCE_DIR = os.getenv('PTN_MAB_RESOURCE_DIR', TESTING_RESOURCE_PATH)
 DB_PATH = os.path.join(DATA_DIR, 'database')
 CARRIERS_DB_PATH = os.path.join(DATA_DIR, 'database', 'carriers.db')
 MISSIONS_DB_PATH = os.path.join(DATA_DIR, 'database', 'missions.db')
+WMM_DB_PATH = os.path.join(DATA_DIR, 'database', 'wmm.db')
 BACKUP_DB_PATH = os.path.join(DATA_DIR, 'database', 'backups')
 SQL_PATH = os.path.join(DATA_DIR, 'database', 'db_sql')
 

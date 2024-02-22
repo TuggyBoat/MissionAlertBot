@@ -20,12 +20,15 @@ from discord import app_commands
 from discord.app_commands import Group, command, describe
 from discord.ext import commands
 
+# local classes
+from ptn.missionalertbot.classes.MissionParams import MissionParams
+
 # local constants
 import ptn.missionalertbot.constants as constants
 from ptn.missionalertbot.constants import bot, certcarrier_role, trainee_role, rescarrier_role, mission_command_channel, training_mission_command_channel
 
 # local modules
-from ptn.missionalertbot.database.database import find_carrier
+from ptn.missionalertbot.database.database import find_carrier, find_mission
 from ptn.missionalertbot.modules.helpers import check_roles, check_command_channel, flexible_carrier_search_term
 from ptn.missionalertbot.modules.StockHelpers import get_fc_stock
 from ptn.missionalertbot.modules.ErrorHandler import on_app_command_error, on_generic_error, CustomError, GenericError
@@ -62,6 +65,7 @@ class StockTracker(commands.Cog):
     async def stock(self, interaction: discord.Interaction, carrier: str = None, source: str = 'capi'):
         carrier_string = f' for carrier {carrier}' if carrier else ''
         source_string = f' from source {source}'
+        source_formal = 'Frontier API' if source == 'capi' else 'Inara.cz'
         print(f"📈 Stock check called by {interaction.user} in {interaction.channel}" + carrier_string + source_string)
 
         try:
@@ -97,6 +101,15 @@ class StockTracker(commands.Cog):
                     )
                     return await interaction.edit_original_response(embed=carrier_error_embed)
 
+            # decide what to say about EDMC in the response footer
+            edmc_string = "Run EDMC for more accurate and up-to-date stock information."
+            mission_data = find_mission(carrier_data.carrier_long_name, "carrier")
+            if mission_data:
+                print(f"{carrier_data.carrier_long_name} is on a mission: {mission_data}")
+                mission_params: MissionParams = mission_data.mission_params
+                if mission_params.edmc_off:
+                    edmc_string = "⚠ Please keep EDMC disabled for this mission. ⚠"
+
             # fetch stock levels
             fcname = carrier_data.carrier_long_name
 
@@ -114,6 +127,7 @@ class StockTracker(commands.Cog):
             if stn_data is False:
                 embed.description = f"📉 No market data for {carrier_data.carrier_long_name}."
                 embed.color=constants.EMBED_COLOUR_QU
+                embed.set_footer(text = f"Data source: {source_formal}" + (f"\n{edmc_string}" if source == 'inara' else ""))
                 await interaction.edit_original_response(embed=embed)
                 return
 
@@ -122,6 +136,7 @@ class StockTracker(commands.Cog):
             if com_data == []:
                 embed.description = f"📉 No market data for {carrier_data.carrier_long_name}."
                 embed.color=constants.EMBED_COLOUR_QU
+                embed.set_footer(text = f"Data source: {source_formal}" + (f"\n{edmc_string}" if source == 'inara' else ""))
                 await interaction.edit_original_response(embed=embed)
                 return
 
@@ -142,7 +157,8 @@ class StockTracker(commands.Cog):
             embed = discord.Embed()
             embed.add_field(name = f"{fcname} ({stn_data['sName']}) stock", value = msg, inline = False)
             embed.add_field(name = 'FC Location', value = loc_data, inline = False)
-            embed.set_footer(text = f"Data last updated: {stn_data['market_updated']}\nNumbers out of wack? Ensure EDMC is running!")
+            embed.set_footer(text = f"Data last updated: {stn_data['market_updated']}\nData source: {source_formal}\n" \
+                             + (f"\n{edmc_string}" if source == 'inara' else ""))
 
             await interaction.edit_original_response(embed=embed)
 

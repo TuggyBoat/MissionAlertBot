@@ -24,6 +24,7 @@ from ptn.missionalertbot.classes.MissionParams import MissionParams
 from ptn.missionalertbot.classes.CommunityCarrierData import CommunityCarrierData
 from ptn.missionalertbot.classes.NomineesData import NomineesData
 from ptn.missionalertbot.classes.WebhookData import WebhookData
+from ptn.missionalertbot.classes.WMMData import WMMData
 
 # local constants
 import ptn.missionalertbot.constants as constants
@@ -140,9 +141,27 @@ missions_tables_columns = ['carrier', 'cid', 'channelid', 'commodity', 'missiont
 channel_cleanup_table_delete = "DROP TABLE IF EXISTS channel_cleanup"
 
 
+# connect to sqlite wmm database
+wmm_conn = sqlite3.connect(constants.WMM_DB_PATH)
+wmm_conn.row_factory = sqlite3.Row
+wmm_db = wmm_conn.cursor()
+
+# wmm database creation
+wmm_table_create = '''
+    CREATE TABLE wmm(
+        "carrier"   TEXT NOT NULL UNIQUE,
+        "cid"   TEXT NOT NULL UNIQUE,
+        "location"   TEXT,
+        "notify"    TEXT DEFAULT NULL
+    )
+    '''
+
+wmm_table_columns = ['carrier', 'cid', 'location', 'notify']
+
 # We need some locks while we wait on the DB queries
 carrier_db_lock = asyncio.Lock()
 mission_db_lock = asyncio.Lock()
+wmm_db_lock = asyncio.Lock()
 
 
 # dump db to .sql file
@@ -163,6 +182,8 @@ def dump_database_test(database_name):
         connection = missions_conn
     elif database_name == 'carriers':
         connection = carriers_conn
+    elif database_name == 'wmm':
+        connection = wmm_conn
     else:
         raise ValueError(f'Unknown DB dump handling for: {database_name}')
 
@@ -298,7 +319,8 @@ def build_database_on_startup():
         'webhooks' : {'obj': carrier_db, 'create': webhooks_table_create},
         'community_carriers': {'obj': carrier_db, 'create': community_carriers_table_create},
         'nominees': {'obj': carrier_db, 'create': nominees_table_create},
-        'missions': {'obj': mission_db, 'create': missions_table_create}
+        'missions': {'obj': mission_db, 'create': missions_table_create},
+        'wmm': {'obj': wmm_db, 'create': wmm_table_create}
     }
 
     # check database exists, create from scratch if needed
@@ -472,7 +494,7 @@ async def _update_carrier_last_trade(pid):
 
 # update carrier cAPI flag
 async def _update_carrier_capi(pid, capi):
-    print("Setting capi to %s for carrier ID %s", [ capi, pid ])
+    print("Setting capi to %s for carrier ID %s" % ( capi, pid ))
     await carrier_db_lock.acquire()
     try:
         carrier_db.execute('''
@@ -912,3 +934,79 @@ async def find_commodity(mission_params, interaction):
         print(f"Found commodity {commodity.name}")
         mission_params.commodity_name = commodity.name
     return commodity
+
+
+# WMM find carrier
+def find_wmm_carrier(searchterm, searchfield):
+    print("called find_wmm_carrier for %s (%s)" % ( searchterm, searchfield ))
+    """
+    Searches the wmm database for a single matching entry
+
+    :param str searchterm: the searchterm to match
+    :param str searchfield: the DB column to match against
+    :returns: class instance WMMData
+    """
+    wmm_db.execute(f'''SELECT * FROM wmm WHERE {searchfield} LIKE (?)''',
+                        (f'%{searchterm}%',))
+    row = wmm_db.fetchone()
+
+    # check whether row exists
+    if row is None:
+        print(f'No entry found for {searchterm} in {searchfield}')
+        wmm_data = None
+        return wmm_data
+    else:
+        wmm_data = WMMData(row)
+        print(f'Found mission data: {wmm_data}')
+        return wmm_data
+
+
+# WMM start tracking
+async def _add_to_wmm_db(carrier, cid, location):
+    print("Called _add_to_wmm_db for %s (%s), %s" % ( carrier, cid, location ))
+
+    # define variables
+    sql = f"INSERT INTO wmm VALUES (?, ?, ?, ?)"
+    values = [carrier, cid, location, None]
+
+    # write to database
+    try:
+        await wmm_db_lock.acquire()
+        wmm_db.execute(sql, values)
+        wmm_conn.commit()
+    finally:
+        wmm_db_lock.release()
+
+
+# WMM remove carrier
+async def _remove_from_wmm_db(cid):
+    print("Called _remove_from_wmm_db for %s" % ( cid ))
+    try:
+        await wmm_db_lock.acquire()
+        sql = "DELETE FROM wmm WHERE cid = (?)"
+        wmm_db.execute(sql, (cid,))
+        wmm_conn.commit()
+    finally:
+        wmm_db_lock.release()
+    return print("Deleted")
+
+
+"""
+# WMM generic database edit function
+def _wmm_database_insert(data):
+
+    A function to write data into the WMM database.
+
+    :param dict data: a dict containing the column names and values
+
+    # Construct the SQL query from the dict
+    columns = ', '.join(data.keys())
+    placeholders = ', '.join('?' * len(data))
+    sql = f"INSERT INTO wmm ({columns}) VALUES ({placeholders})"
+
+    # Extract the values from the data dictionary
+    values = list(data.values())
+
+    # write to the db
+    wmm_db.execute(sql, values)
+"""

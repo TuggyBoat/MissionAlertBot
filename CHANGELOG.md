@@ -1,15 +1,29 @@
 # Changelog
 
 ## 2.4.0
-- Integrated stockbot features (with thanks to DudeInCorner and Durzo):
- - `/stock`:
-  - can be used in a carrier channel without parameters to check stock of that carrier
-  - can be used with carrier as a parameter to check stock for any carrier
-  - can optionally specificy inara or capi as source; default is capi
-  - removed EDMC notice for EDMC-off missions
-  - added information as to stock source
- - `/cco capi enable` will send the target carrier owner a DM with OAuth link and explanation, and flag the carrier as capi-enabled
- - `/cco capi disable` will flag the carrier as capi-disabled and prevent capi stock checks
+Integrated stock tracking features from stockbot (with thanks to DudeInCorner and Durzo):
+- `/stock`:
+ - can be used in a carrier channel without parameters to check stock of that carrier
+ - can be used with carrier as a parameter to check stock for any carrier
+ - can optionally specificy inara or capi as source; default is capi
+ - added information in footer as to stock source
+ - EDMC data notice is now context-sensitive:
+  - EDMC notice will only show when source is 'inara'
+  - EDMC-off missions will show a reminder to disable EDMC, instead of the reminder to use it
+- `/cco capi enable` will send the target carrier owner a DM with OAuth link and explanation, and flag the carrier as capi-enabled
+- `/cco capi disable` will flag the carrier as capi-disabled and prevent capi stock checks
+
+Integrated WMM tracking features from stockbot (with thanks to Durzo):
+- `/cco wmm enable`: adds a carrier to WMM tracking
+- `/cco wmm disable`: removes a carrier from WMM tracking
+TODO:
+- `/cco wmm list`: lists all carriers being tracked for WMMs
+- WMM background task using wmm_db
+- WMM interval view and change
+- wmm_status         Check the wmm background task status
+- wmm_stock          Manually trigger the wmm stock update without changing t...
+- wmm_stop           Stop the wmm background task
+
 
 
 ## 2.3.8

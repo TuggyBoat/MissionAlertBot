@@ -135,3 +135,6 @@ async def lasttrade_cron():
     except Exception as e:
         print(f"last trade cron failed: {e}")
         pass
+
+
+# WMM loop
