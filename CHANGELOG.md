@@ -5,7 +5,7 @@ Integrated stock tracking features from stockbot (with thanks to DudeInCorner an
 - `/stock`:
  - can be used in a carrier channel without parameters to check stock of that carrier
  - can be used with carrier as a parameter to check stock for any carrier
- - can optionally specificy inara or capi as source; default is capi
+ - can optionally specify inara or capi as source; default is capi
  - added information in footer as to stock source
  - EDMC data notice is now context-sensitive:
   - EDMC notice will only show when source is 'inara'
@@ -23,7 +23,6 @@ TODO:
 - wmm_status         Check the wmm background task status
 - wmm_stock          Manually trigger the wmm stock update without changing t...
 - wmm_stop           Stop the wmm background task
-
 
 
 ## 2.3.8
