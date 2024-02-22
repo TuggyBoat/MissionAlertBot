@@ -1,5 +1,17 @@
 # Changelog
 
+## 2.4.0
+- Integrated stockbot features (with thanks to DudeInCorner and Durzo):
+ - `/stock`:
+  - can be used in a carrier channel without parameters to check stock of that carrier
+  - can be used with carrier as a parameter to check stock for any carrier
+  - can optionally specificy inara or capi as source; default is capi
+  - removed EDMC notice for EDMC-off missions
+  - added information as to stock source
+ - `/cco capi enable` will send the target carrier owner a DM with OAuth link and explanation, and flag the carrier as capi-enabled
+ - `/cco capi disable` will flag the carrier as capi-disabled and prevent capi stock checks
+
+
 ## 2.3.8
 - All admin commands are now interactions in the 'admin' group:
     - `/admin_release_channel_lock` is now `/admin lock release`

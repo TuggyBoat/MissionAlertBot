@@ -6,11 +6,12 @@ Commands for use by CCOs
 import aiohttp
 import requests
 import traceback
+from time import strftime
 from typing import Union
 
 # import discord.py
 import discord
-from discord import app_commands, Webhook
+from discord import app_commands, Webhook, Forbidden
 from discord.app_commands import Group, command, describe
 from discord.ext import commands
 from discord.ext.commands import GroupCog
@@ -18,7 +19,8 @@ from discord.ext.commands import GroupCog
 # import local constants
 import ptn.missionalertbot.constants as constants
 from ptn.missionalertbot.constants import bot, mission_command_channel, certcarrier_role, trainee_role, seconds_long, rescarrier_role, commodities_common, \
-    bot_spam_channel, training_mission_command_channel, seconds_very_short, admin_role, mod_role, cco_mentor_role, aco_role, recruit_role, cco_color_role
+    bot_spam_channel, training_mission_command_channel, seconds_very_short, admin_role, mod_role, cco_mentor_role, aco_role, recruit_role, cco_color_role, \
+    API_HOST, ptn_logo_discord
 
 # import local classes
 from ptn.missionalertbot.classes.MissionParams import MissionParams
@@ -26,15 +28,16 @@ from ptn.missionalertbot.classes.Views import ConfirmRemoveRoleView, ConfirmGran
 
 # import local modules
 from ptn.missionalertbot.database.database import find_mission, find_webhook_from_owner, add_webhook_to_database, find_webhook_by_name, delete_webhook_by_name, \
-    CarrierDbFields, find_carrier, _update_carrier_last_trade, add_carrier_to_database
+    CarrierDbFields, find_carrier, _update_carrier_last_trade, add_carrier_to_database, _update_carrier_capi
 from ptn.missionalertbot.modules.DateString import get_mission_delete_hammertime, get_inactive_hammertime
-from ptn.missionalertbot.modules.Embeds import role_granted_embed, confirm_remove_role_embed, role_already_embed, confirm_grant_role_embed
+from ptn.missionalertbot.modules.Embeds import role_granted_embed, confirm_remove_role_embed, role_already_embed, confirm_grant_role_embed, please_wait_embed
 from ptn.missionalertbot.modules.ErrorHandler import on_app_command_error, on_generic_error, GenericError, CustomError
 from ptn.missionalertbot.modules.helpers import convert_str_to_float_or_int, check_command_channel, check_roles, check_training_mode, flexible_carrier_search_term
 from ptn.missionalertbot.modules.ImageHandling import assign_carrier_image
 from ptn.missionalertbot.modules.MissionGenerator import confirm_send_mission_via_button
 from ptn.missionalertbot.modules.MissionCleaner import _cleanup_completed_mission
 from ptn.missionalertbot.modules.MissionEditor import edit_active_mission
+from ptn.missionalertbot.modules.StockHelpers import capi, oauth_new
 
 
 """
@@ -517,11 +520,7 @@ class CCOCommands(commands.Cog):
 
         try:
 
-            embed = discord.Embed(
-                description="⏳ Please wait a moment...",
-                color=constants.EMBED_COLOUR_QU
-            )
-
+            embed: discord.Embed = please_wait_embed()
             await interaction.response.send_message(embed=embed, ephemeral=True)
 
             # check if they have the CCO role
@@ -750,6 +749,143 @@ class CCOCommands(commands.Cog):
     """
     Stock tracker
     """
+    
+    @capi_group.command(name='enable', description='Enable stock tracking via the Frontier API.')
+    @describe(carrier = "A unique fragment of the carrier name you want to search for.")
+    @check_roles([certcarrier_role(), trainee_role(), rescarrier_role()])
+    @check_command_channel([mission_command_channel(), training_mission_command_channel()])
+    async def track_enable(self, interaction: discord.Interaction, carrier: str):
+        print(f"▶ cAPI tracking enable called by {interaction.user} for search term {carrier}")
+
+        try:
+            embed: discord.Embed = please_wait_embed()
+
+            await interaction.response.send_message(embed=embed)
+
+            # attempt to find matching carrier data
+            carrier_data = flexible_carrier_search_term(carrier)
+            
+            if not carrier_data:  # error condition
+                print(f"❌ No carrier found matching search term {carrier}")
+                carrier_error_embed = discord.Embed(
+                    description=f"❌ No carrier found for '**{carrier}**'. Use `/owner` to see a list of your carriers. If it's not in the list, ask an Admin to add it for you.",
+                    color=constants.EMBED_COLOUR_ERROR
+                )
+                return await interaction.edit_original_response(embed=carrier_error_embed)
+
+            fccode = carrier_data.carrier_identifier
+
+            # do we have an existing auth?
+            capi_response = capi(fccode)
+            if capi_response.status_code != 200:
+                r = oauth_new(fccode)
+                oauth_response = r.json()
+                print(f"capi_enable response {r.status_code} - {oauth_response}")
+                if 'token' in oauth_response:
+                    try:
+                        # DM the carrier owner with oauth link
+                        owner = await bot.fetch_user(carrier_data.ownerid)
+
+                        oauth_url = f"{API_HOST}/generate/{fccode}?token={oauth_response['token']}"
+
+                        oauth_embed = discord.Embed(
+                            title="🔗 Frontier Account Link Request",
+                            description=f"Use the link below to **sign in to the Frontier Account** associated with {carrier_data.carrier_long_name} ({carrier_data.carrier_identifier})."
+                                        f" This will authorise <@{bot.user.id}> to query this account for stock tracking purposes.\n\n"
+                                        f"**[✅ Yes, authorise cAPI stock tracking for {carrier_data.carrier_long_name}]({oauth_url})**",
+                            color=constants.EMBED_COLOUR_QU
+                        )
+
+                        oauth_embed.set_thumbnail(url=ptn_logo_discord(strftime('%B')))
+
+                        await owner.send(embed=oauth_embed)
+
+                    except Forbidden:
+                        print(f"Couldn't message {owner}- DMs are blocked (403 Forbidden).")
+                        try:
+                            error = "Error 403 (Forbidden) while attempting to send your OAuth link. " \
+                                   f"Please make sure you have allowed direct messages from <@{bot.user.id}> and try again."
+                            raise CustomError(error)
+                        except Exception as e:
+                            return await on_generic_error(interaction, e)
+
+                    embed.description=f"🔑 Please check <@{owner.id}>'s direct messages for Frontier account authorisation link."
+
+                    await interaction.edit_original_response(embed=embed)
+
+                else:
+                    try:
+                        error = f"Could not generate auth URL for {carrier_data.carrier_long_name} ({carrier_data.carrier_identifier}): {e}"
+                        raise CustomError(error)
+                    except Exception as e:
+                        return await on_generic_error(interaction, e)
+
+            else:
+                embed.description=f"✅ cAPI auth already exists for {carrier_data.carrier_long_name} ({carrier_data.carrier_identifier}), enabling stock fetching."
+                await interaction.edit_original_response(embed=embed)
+
+            await _update_carrier_capi(carrier_data.pid, 1)
+
+        except Exception as e:
+            try:
+                raise GenericError(e)
+            except Exception as e:
+                await on_generic_error(interaction, e)
+
+
+    @capi_group.command(name='disable', description='Disable stock tracking via the Frontier API.')
+    @describe(carrier = "A unique fragment of the carrier name you want to search for.")
+    @check_roles([certcarrier_role(), trainee_role(), rescarrier_role()])
+    @check_command_channel([mission_command_channel(), training_mission_command_channel()])
+    async def track_disable(self, interaction: discord.Interaction, carrier: str):
+        print(f"▶ cAPI tracking disable called by {interaction.user} for search term {carrier}")
+
+        try:
+            embed: discord.Embed = please_wait_embed()
+
+            await interaction.response.send_message(embed=embed)
+
+            # attempt to find matching carrier data
+            carrier_data = flexible_carrier_search_term(carrier)
+            
+            if not carrier_data:  # error condition
+                print(f"❌ No carrier found matching search term {carrier}")
+                carrier_error_embed = discord.Embed(
+                    description=f"❌ No carrier found for '**{carrier}**'. Use `/owner` to see a list of your carriers. If it's not in the list, ask an Admin to add it for you.",
+                    color=constants.EMBED_COLOUR_ERROR
+                )
+                return await interaction.edit_original_response(embed=carrier_error_embed)
+
+            if not carrier_data.capi:
+                print(f"cAPI already disabled for {carrier_data.carrier_long_name}")
+
+                embed.description=f"✅ Frontier API stock tracking is already disabled for **{carrier_data.carrier_long_name}** ({carrier_data.carrier_identifier})."
+                embed.color=constants.EMBED_COLOUR_OK
+
+                return await interaction.edit_original_response(embed=embed)
+
+            try:
+                print(f"⏳ Disabling cAPI for {carrier_data.carrier_long_name}...")
+
+                await _update_carrier_capi(carrier_data.pid, 0)
+
+                embed.description=f"✅ Frontier API stock tracking disabled for **{carrier_data.carrier_long_name}** ({carrier_data.carrier_identifier})."
+                embed.color=constants.EMBED_COLOUR_OK
+
+                await interaction.edit_original_response(embed=embed)
+
+            except Exception as e:
+                try:
+                    error = f"Unable to disable cAPI for **{carrier_data.carrier_long_name}** ({carrier_data.carrier_identifier}): {e}"
+                    raise CustomError(error)
+                except Exception as e:
+                    return await on_generic_error(interaction, e)
+
+        except Exception as e:
+            try:
+                raise GenericError(e)
+            except Exception as e:
+                await on_generic_error(interaction, e)
 
     # found I was using an old version of stockbot's code. sigh. below no longer necessary, probably
     """@track_group.command(name='enable', description='Enable stock tracking.')

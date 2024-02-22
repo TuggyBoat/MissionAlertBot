@@ -55,9 +55,12 @@ load_dotenv(os.path.join(DATA_DIR, '.env'))
 # define bot token
 TOKEN = os.getenv('MAB_BOT_DISCORD_TOKEN_PROD') if _production else os.getenv('MAB_BOT_DISCORD_TOKEN_TESTING')
 
-
 # define bot object
 bot = commands.Bot(command_prefix='m.', intents=discord.Intents.all())
+
+# PTN2FDevOAuth for cAPI communication
+API_HOST = os.getenv('API_HOST')
+API_TOKEN = os.getenv('API_TOKEN')
 
 
 # Production variables

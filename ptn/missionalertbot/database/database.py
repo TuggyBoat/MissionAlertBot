@@ -396,7 +396,7 @@ async def add_carrier_to_database(short_name, long_name, carrier_id, channel, ch
     """
     await carrier_db_lock.acquire()
     try:
-        carrier_db.execute(''' INSERT INTO carriers VALUES(NULL, ?, ?, ?, ?, ?, ?, ?, strftime('%s','now')) ''',
+        carrier_db.execute(''' INSERT INTO carriers VALUES(NULL, ?, ?, ?, ?, ?, ?, strftime('%s','now'), ?) ''',
                            (short_name, long_name, carrier_id, channel, channel_id, owner_id, 0))
         carriers_conn.commit()
         print(f'Added {long_name} to database')
@@ -465,6 +465,21 @@ async def _update_carrier_last_trade(pid):
             ''' UPDATE carriers
             SET lasttrade=strftime('%s','now')
             WHERE p_ID=? ''', ( [ pid ] ))
+        carriers_conn.commit()
+    finally:
+        carrier_db_lock.release()
+
+
+# update carrier cAPI flag
+async def _update_carrier_capi(pid, capi):
+    print("Setting capi to %s for carrier ID %s", [ capi, pid ])
+    await carrier_db_lock.acquire()
+    try:
+        carrier_db.execute('''
+            UPDATE carriers
+            SET capi=?
+            WHERE p_ID=?
+            ''', ( [ capi, pid ] ))
         carriers_conn.commit()
     finally:
         carrier_db_lock.release()

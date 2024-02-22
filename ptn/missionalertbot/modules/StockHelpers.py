@@ -18,7 +18,7 @@ from ptn.missionalertbot.classes.CarrierData import CarrierData
 
 # import local constants
 import ptn.missionalertbot.constants as constants
-from ptn.missionalertbot.constants import bot
+from ptn.missionalertbot.constants import bot, API_TOKEN, API_HOST
 
 # import local modules
 from ptn.missionalertbot.modules.ErrorHandler import CommandChannelError, CommandRoleError, CustomError, GenericError, on_generic_error
@@ -45,27 +45,6 @@ def inara_find_fc_system(fcid):
     except Exception as e:
         print("No results from inara for %s, aborting search. Error: %s" % (fcid, e))
         return False
-
-
-"""def edsm_find_fc_system(fcid):
-    #print("Searching edsm for carrier %s" % ( fcid ))
-    URL = "https://www.edsm.net/en/search/stations/index/name/%s/sortBy/distanceSol/type/31" % ( fcid )
-    try:
-        page = requests.get(URL)
-        soup = BeautifulSoup(page.content, "html.parser")
-        results = soup.find("table", class_="table table-hover").find("tbody").find_all("a")
-        carrier = results[0].get_text()
-        system = results[1].get_text()
-        market_updated = results[6].find("i").attrs.get("title")[27:]
-        if fcid == carrier:
-            #print("Carrier: %s is at system: %s" % (carrier, system))
-            return {'system': system, 'market_updated': market_updated}
-        else:
-            #print("Could not find exact match, aborting inara search")
-            return False
-    except:
-        print("No results from edsm for %s, aborting search." % fcid)
-        return False"""
 
 
 def inara_fc_market_data(fcid):
@@ -113,6 +92,7 @@ def inara_fc_market_data(fcid):
         data['sName'] = fcid
         data['market_updated'] = updated
         data['commodities'] = marketdata
+        print("✅ Success") if data else print("❌ Failed")
         return data
     except Exception as e:
         print("Exception getting inara data for carrier: %s" % fcid)
@@ -121,7 +101,7 @@ def inara_fc_market_data(fcid):
         return False
 
 
-"""def capi_fc_market_data(fcid):
+def capi_fc_market_data(fcid):
     # get stocks from capi and format as inara data.
     capi_response = capi(fcid)
     if capi_response.status_code != 200:
@@ -139,22 +119,25 @@ def inara_fc_market_data(fcid):
         # this is a bug in the CAPI data.
         # then sort by name alphabetically.
         stn_data['commodities'] = sorted([c for c in stn_data['market']['commodities'] if c['name'] != 'Drones'], key=lambda d: d['name'])
-    return stn_data"""
+        print("✅ Success") if stn_data else print("❌ Failed")
+    return stn_data
 
 
 def get_fc_stock(fccode, source='inara'):
     if source == 'inara':
+        print("⏳ Attempting to fetch inara stock data for %s", [ fccode ])
         stn_data = inara_fc_market_data(fccode)
         if not stn_data:
             return False
     elif source == 'capi':
-        # stn_data = capi_fc_market_data(fccode)
+        print("⏳ Attempting to fetch capi stock data for %s", [ fccode ])
+        stn_data = capi_fc_market_data(fccode)
         if not stn_data:
             return False
     return stn_data
 
 
-"""def oauth_new(carrierid, force=False):
+def oauth_new(carrierid, force=False):
     pmeters = {'token': API_TOKEN}
     if force:
         pmeters['force'] = "true"
@@ -167,7 +150,7 @@ def capi(carrierid, dev=False):
     if dev:
         pmeters['dev'] = "true"
     r = requests.get(f"{API_HOST}/capi/{carrierid}",params=pmeters)
-    return r"""
+    return r
 
 
 # function taken from FCMS

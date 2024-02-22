@@ -35,7 +35,7 @@ setup(
         ],
     description='Pilots Trade Network Mission Alert Bot',
     long_description=long_description,
-    author='Charles Tosh',
+    author='Charlie Tosh',
     url='',
     install_requires=[
         # 'aiohttp==3.7.4.post0',

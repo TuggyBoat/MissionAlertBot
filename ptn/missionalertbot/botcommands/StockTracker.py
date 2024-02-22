@@ -1,6 +1,9 @@
 """
 Commands relating to carrier stock tracking.
 
+Dependencies: Constants, Database, Helpers, StockHelpers, ErrorHandler
+
+Stock tracker original code by DudeInCorner and Durzo
 """
 
 # libraries
@@ -22,6 +25,7 @@ import ptn.missionalertbot.constants as constants
 from ptn.missionalertbot.constants import bot, certcarrier_role, trainee_role, rescarrier_role, mission_command_channel, training_mission_command_channel
 
 # local modules
+from ptn.missionalertbot.database.database import find_carrier
 from ptn.missionalertbot.modules.helpers import check_roles, check_command_channel, flexible_carrier_search_term
 from ptn.missionalertbot.modules.StockHelpers import get_fc_stock
 from ptn.missionalertbot.modules.ErrorHandler import on_app_command_error, on_generic_error, CustomError, GenericError
@@ -70,18 +74,30 @@ class StockTracker(commands.Cog):
 
 
             # attempt to find matching carrier data
-            carrier_data = flexible_carrier_search_term(carrier)
-            
-            if not carrier_data:  # error condition
-                print(f"❌ No carrier found matching search term {carrier}")
-                carrier_error_embed = discord.Embed(
-                    description=f"❌ No carrier found for '**{carrier}**'. Use `/owner` to see a list of your carriers. If it's not in the list, ask an Admin to add it for you.",
-                    color=constants.EMBED_COLOUR_ERROR
-                )
-                return await interaction.edit_original_response(embed=carrier_error_embed)
+            if not carrier:
+                # check if we're in a carrier's channel
+                carrier_data = find_carrier(interaction.channel.name, "discordchannel")
+
+                if not carrier_data:
+                    # no carrier data found, return a helpful error
+                    embed.description="❌ Please try again in a Trade Carrier's channel, or use the 'carrier' option to input the name of the carrier you wish to check the stock for."
+                    embed.color=constants.EMBED_COLOUR_ERROR
+
+                    return await interaction.edit_original_response(embed=embed)
+                
+            else:
+                # check for carriers by given search term
+                carrier_data = flexible_carrier_search_term(carrier)
+                
+                if not carrier_data:  # error condition
+                    print(f"❌ No carrier found matching search term {carrier}")
+                    carrier_error_embed = discord.Embed(
+                        description=f"❌ No carrier found for '**{carrier}**'. Use `/owner` to see a list of your carriers. If it's not in the list, ask an Admin to add it for you.",
+                        color=constants.EMBED_COLOUR_ERROR
+                    )
+                    return await interaction.edit_original_response(embed=carrier_error_embed)
 
             # fetch stock levels
-
             fcname = carrier_data.carrier_long_name
 
             try:
@@ -136,96 +152,3 @@ class StockTracker(commands.Cog):
             except Exception as e:
                 traceback.print_exc()
                 await on_generic_error(interaction, e)
-
-
-
-
-
-
-"""@bot.command(name='list', help='Lists all tracked carriers. \n'
-                               'Filter: use "wmm" to show only wmm-tracked carriers.')
-async def fclist(ctx, Filter=None):
-    names = []
-    for fc_code, fc_data in FCDATA.items():
-        if Filter and 'wmm' not in fc_data:
-            continue
-        if 'wmm' in fc_data:
-            names.append("%s (%s) - WMM" % ( fc_data['FCName'], fc_code))
-        else:
-            names.append("%s (%s)" % ( fc_data['FCName'], fc_code))
-    if not names:
-        names = ['No Fleet Carriers are being tracked, add one!']
-    print('Listing active carriers')
-
-    carriers = sorted(names)  # Joining the list with newline as the delimeter
-
-    def validate_response(react, user):
-        return user == ctx.author and str(react.emoji) in ["◀️", "▶️"]
-        # This makes sure nobody except the command sender can interact with the "menu"
-
-    pages = [page for page in chunk(carriers)]
-
-    max_pages = len(pages)
-    current_page = 1
-
-    embed = discord.Embed(title=f"{len(carriers)} Tracked Fleet Carriers, Page: #{current_page} of {max_pages}")
-    embed.add_field(name = 'Carrier Names', value = '\n'.join(pages[0]))
-
-    # Now go send it and wait on a reaction
-    message = await ctx.send(embed=embed)
-
-    # From page 0 we can only go forwards
-    if max_pages > 1:
-        await message.add_reaction("▶️")
-
-    # 60 seconds time out gets raised by Asyncio
-    while True:
-        try:
-            reaction, user = await bot.wait_for('reaction_add', timeout=60, check=validate_response)
-            if str(reaction.emoji) == "▶️" and current_page != max_pages:
-
-                print(f'{ctx.author} requested to go forward a page.')
-                current_page += 1   # Forward a page
-                new_embed = discord.Embed(title=f"{len(carriers)} Tracked Fleet Carriers, Page: #{current_page} of {max_pages}")
-                new_embed.add_field(name='Carrier Names', value='\n'.join(pages[current_page-1]))
-                await message.edit(embed=new_embed)
-
-                await message.add_reaction("◀️")
-                if current_page == 2:
-                    await message.clear_reaction("▶️")
-                    await message.add_reaction("▶️")
-                elif current_page == max_pages:
-                    await message.clear_reaction("▶️")
-                else:
-                    await message.remove_reaction(reaction, user)
-
-            elif str(reaction.emoji) == "◀️" and current_page > 1:
-                print(f'{ctx.author} requested to go back a page.')
-                current_page -= 1   # Go back a page
-
-                new_embed = discord.Embed(title=f"{len(carriers)} Tracked Fleet Carriers, Page: #{current_page} of {max_pages}")
-                new_embed.add_field(name='Carrier Names', value='\n'.join(pages[current_page-1]))
-
-
-                await message.edit(embed=new_embed)
-                # Ok now we can go forwards, check if we can also go backwards still
-                if current_page == 1:
-                    await message.clear_reaction("◀️")
-
-                await message.remove_reaction(reaction, user)
-                await message.add_reaction("▶️")
-            else:
-                # It should be impossible to hit this part, but lets gate it just in case.
-                print(f'HAL9000 error: {ctx.author} ended in a random state while trying to handle: {reaction.emoji} '
-                      f'and on page: {current_page}.')
-                # HAl-9000 error response.
-                error_embed = discord.Embed(title=f"I'm sorry {ctx.author}, I'm afraid I can't do that.")
-                await message.edit(embed=error_embed)
-                await message.remove_reaction(reaction, user)
-
-        except asyncio.TimeoutError:
-            print(f'Timeout hit during carrier request by: {ctx.author}')
-            await ctx.send(f'Closed the active carrier list request from: {ctx.author} due to no input in 60 seconds.')
-            await message.delete()
-            break
-"""

@@ -334,3 +334,11 @@ def orphaned_carrier_summary_embed(summary_text):
         color=constants.EMBED_COLOUR_QU
     )
     return embed
+
+# generic "please wait" embed
+def please_wait_embed():
+    embed = discord.Embed(
+        description="⏳ Please wait a moment...",
+        color=constants.EMBED_COLOUR_QU
+    )
+    return embed
