@@ -208,8 +208,6 @@ class GeneralCommands(commands.Cog):
 
     lock_group = Group(parent=admin_group, name='lock', description='Channel Lock override commmands')
 
-    mission_group = Group(parent=admin_group, name='mission', description='Mission admin commands')
-
     wmm_group = Group(parent=admin_group, name='wmm', description='WMM admin commands')
 
     # manually release a channel lock
@@ -332,7 +330,7 @@ class GeneralCommands(commands.Cog):
             lasttrade_cron.restart()
         else:
             nextrun = int(lasttrade_cron.next_iteration.timestamp())
-            embed.description=f'⏲ `lasttrade` cron task is running. Next run <t:{nextrun}:T> (<t:{nextrun}:R>)'
+            embed.description=f':timer: `lasttrade` cron task is running. Next run <t:{nextrun}:T> (<t:{nextrun}:R>)'
             embed.color=constants.EMBED_COLOUR_OK
             await interaction.response.send_message(embed=embed)
 
@@ -362,7 +360,7 @@ class GeneralCommands(commands.Cog):
 
 
     # manually delete a carrier trade mission from the database
-    @mission_group.command(name='delete', description='Manually remove a carrier trade mission from the database.')
+    @admin_group.command(name='delete_mission', description='Manually remove a carrier trade mission from the database.')
     @describe(carrier='Carrier name to search for in the missions database.')
     @check_roles([admin_role()])
     @check_command_channel(bot_command_channel())
@@ -468,7 +466,7 @@ class GeneralCommands(commands.Cog):
     @wmm_group.command(name='status', description='Check the status of the WMM stock background task.')
     @check_roles([admin_role()])
     @check_command_channel(bot_command_channel())
-    async def wmm_update(self, interaction: discord.Interaction):
+    async def wmm_status(self, interaction: discord.Interaction):
         print(f"▶ WMM task check called by {interaction.user}")
         try:
 
@@ -479,20 +477,11 @@ class GeneralCommands(commands.Cog):
             if not wmm_stock.is_running() or wmm_stock.failed():
 
                 embed = discord.Embed(
-                    description=f"⚠ WMM stock background task was not running. Attempting to restart.",
+                    description=f":warning: WMM stock background task is not running; WMM stock will not update. Restart it with `/admin wmm start`.",
                     color=constants.EMBED_COLOUR_WARNING
                 )
 
                 await interaction.edit_original_response(embed=embed)
-
-                await start_wmm_task()
-
-                embed = discord.Embed(
-                    description="✅ WMM background task restarted.",
-                    color=constants.EMBED_COLOUR_OK
-                )
-
-                await interaction.followup.send(embed=embed)
 
             else:
                 embed = discord.Embed(
@@ -507,6 +496,123 @@ class GeneralCommands(commands.Cog):
                 raise GenericError(e)
             except Exception as e:
                 await on_generic_error(interaction, e)
+
+
+    @wmm_group.command(name='stop', description='Stop the WMM background tasks; WMM status will not update.')
+    @check_roles([admin_role()])
+    @check_command_channel(bot_command_channel())
+    async def wmm_stop(self, interaction: discord.Interaction):
+        print(f"⚠ WMM task STOP called by {interaction.user}")
+        try:
+
+            wmm_stock.cancel()
+            print("Stopped WMM task.")
+
+            embed = discord.Embed(
+                description=f":warning: WMM stock background task has been halted. **WMM stock will NOT update until restarted**."
+                             " Use `/admin wmm start` to restart the background task.",
+                color=constants.EMBED_COLOUR_WARNING
+            )
+
+            await interaction.response.send_message(embed=embed)
+
+        except Exception as e:
+            try:
+                raise GenericError(e)
+            except Exception as e:
+                await on_generic_error(interaction, e)
+
+
+    @wmm_group.command(name='start', description='Start the WMM background task if it is not running.')
+    @check_roles([admin_role()])
+    @check_command_channel(bot_command_channel())
+    async def wmm_start(self, interaction: discord.Interaction):
+        print(f"⚠ WMM task START called by {interaction.user}")
+
+        embed = please_wait_embed()
+
+        await interaction.response.send_message(embed=embed)
+
+        try:
+
+            if not wmm_stock.is_running():
+                print("WMM task was not running. Restarting...")
+                await start_wmm_task()
+
+                embed = discord.Embed(
+                    description="✅ WMM background task started.",
+                    color=constants.EMBED_COLOUR_OK
+                )
+
+                await interaction.edit_original_response(embed=embed)
+
+            else: # TODO this should restart the task
+
+                embed = discord.Embed(
+                    description="✅ WMM background task is already running.",
+                    color=constants.EMBED_COLOUR_OK
+                )
+
+                await interaction.edit_original_response(embed=embed)
+
+        except Exception as e:
+            try:
+                raise GenericError(e)
+            except Exception as e:
+                await on_generic_error(interaction, e)
+
+
+
+    @wmm_group.command(name='set_interval', description='Set the interval for WMM stock updates in minutes. Default: 60 minutes.')
+    @check_roles([admin_role()])
+    @check_command_channel(bot_command_channel())
+    async def wmm_interval_set(self, interaction: discord.Interaction, interval: int):
+        print(f"⚠ WMM task interval called by {interaction.user} for value {interval} minutes")
+        try:
+            # convert to seconds
+            seconds = int(interval*60)
+            print(f"{interval} minutes is {seconds} seconds")
+
+            # update variable
+            constants.WMM_INTERVAL = seconds
+
+            # notify user
+
+            embed = discord.Embed(
+                description=f":timer: WMM stock will now update every {interval} minutes.",
+                color=constants.EMBED_COLOUR_OK
+            )
+
+            await interaction.response.send_message(embed=embed)
+        except Exception as e:
+            try:
+                raise GenericError(e)
+            except Exception as e:
+                await on_generic_error(interaction, e)
+
+
+    @wmm_group.command(name='check_interval', description='View the current WMM update interval. Default: 60 minutes.')
+    @check_roles([admin_role()])
+    @check_command_channel(bot_command_channel())
+    async def wmm_interval_check(self, interaction: discord.Interaction):
+        try:
+            # convert to minutes
+            minutes = int(constants.WMM_INTERVAL/60)
+
+            # notify user
+
+            embed = discord.Embed(
+                description=f":timer: WMM stock update interval currently {minutes} minutes.",
+                color=constants.EMBED_COLOUR_OK
+            )
+
+            await interaction.response.send_message(embed=embed)
+        except Exception as e:
+            try:
+                raise GenericError(e)
+            except Exception as e:
+                await on_generic_error(interaction, e)
+
 
 
     # forceably quit the bot

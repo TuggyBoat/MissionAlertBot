@@ -15,20 +15,21 @@ Integrated stock tracking features from stockbot (with thanks to DudeInCorner an
 - Adding carriers to Mission Alert Bot will no longer prompt the user to add to stockbot
 
 Integrated WMM tracking features from stockbot (with thanks to Durzo):
+- WMM stock display in #wmm-stock and #cco-wmm-supplies
 - `/cco wmm enable`: adds a carrier to WMM tracking
 - `/cco wmm disable`: removes a carrier from WMM tracking
 - `/admin wmm update`: trigger manual refresh of WMM stock
+- `/admin wmm status`: check the status of the WMM background task
+- `/admin wmm stop`: stop the WMM background task
+- `/admin wmm start`: start or restart the WMM background task
+- `/admin wmm check_interval`: view the current WMM update interval in minutes
+- `/admin wmm set_interval`: set the WMM update interval in minutes
 
 
 TODO:
 - `/cco wmm list`: lists all carriers being tracked for WMMs
-- WMM interval view and change
-- wmm_status         Check the wmm background task status
-- wmm_stock          Manually trigger the wmm stock update without changing t...
-- wmm_stop           Stop the wmm background task
+- restart on wmm start when already running
 
-Other:
-- `/admin delete_mission` is now `/admin mission delete`
 
 ## 2.3.8
 - All admin commands are now interactions in the 'admin' group:

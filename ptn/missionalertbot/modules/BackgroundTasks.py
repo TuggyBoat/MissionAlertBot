@@ -29,7 +29,7 @@ from ptn.missionalertbot.classes.WMMData import WMMData
 # import local constants
 import ptn.missionalertbot.constants as constants
 from ptn.missionalertbot.constants import get_reddit, reddit_channel, sub_reddit, bot_guild, certcarrier_role, rescarrier_role, \
-    bot_spam_channel, cco_color_role, commodities_wmm, channel_cco_wmm_supplies, WMM_INTERVAL, channel_wmm_stock
+    bot_spam_channel, cco_color_role, commodities_wmm, channel_cco_wmm_supplies, channel_wmm_stock
 
 # import local modules
 from ptn.missionalertbot.database.database import CarrierDbFields, carrier_db, mission_db, find_carrier, bot, _fetch_wmm_carriers, \
@@ -412,15 +412,15 @@ async def wmm_stock(message, wmm_channel, ccochannel):
             await ccochannel.send('\n'.join(page))
 
     # the following code allows us to change sleep time dynamically
-    # waiting at least 10 seconds before checking wmm_interval again
+    # waiting at least 10 seconds before checking constants.WMM_INTERVAL again
     # This also checks for the trigger to manually update.
     slept_for = 0
-    while slept_for < WMM_INTERVAL:
+    while slept_for < constants.WMM_INTERVAL:
         # wmm_trigger is set by ;wmm_stock command
         if constants.wmm_trigger:
             print("Manual WMM stock refresh triggered.")
             constants.wmm_trigger = False
-            slept_for = WMM_INTERVAL
+            slept_for = constants.WMM_INTERVAL
         else:
             await asyncio.sleep(10)
             slept_for = slept_for + 10
