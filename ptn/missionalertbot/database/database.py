@@ -1045,6 +1045,7 @@ async def _update_wmm_carrier(wmm_data: WMMData):
     
     :param WMMData wmm_data: The updated dataset
     """
+    print("Received data: %s %s %s %s" % ( wmm_data.carrier_location, wmm_data.notification_status, wmm_data.capi, wmm_data.carrier_identifier ))
     await wmm_db_lock.acquire()
 
     try:
@@ -1057,7 +1058,7 @@ async def _update_wmm_carrier(wmm_data: WMMData):
         )
 
         sql = '''
-            UPDATE carriers
+            UPDATE wmm
             SET location = ?,
                 notify = ?,
                 capi = ?
@@ -1066,5 +1067,6 @@ async def _update_wmm_carrier(wmm_data: WMMData):
 
         wmm_db.execute(sql, values)
         wmm_conn.commit()
+
     finally:
         wmm_db_lock.release()

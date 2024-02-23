@@ -10,6 +10,7 @@ constants -> database -> helpers/embeds -> Views -> commands
 # libraries
 import ast
 import asyncpraw
+import asyncio
 import os
 import discord
 from discord.ext import commands
@@ -234,6 +235,9 @@ commodities_wmm = [
   "Silver"
 ]
 
+wmm_trigger_event = asyncio.Event()
+
+wmm_trigger = False
 
 # random gifs and images
 
@@ -343,7 +347,7 @@ REDDIT_DISCORD_LINK_URL = \
     'https://discord.gg/ptn'
 
 # default WMM tracking interval
-WMM_INTERVAL = 3600
+WMM_INTERVAL = 3600 # 1 hour
 
 # define constants based on prod or test environment
 def reddit_flair_mission_start():

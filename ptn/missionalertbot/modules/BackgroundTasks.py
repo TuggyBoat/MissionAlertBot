@@ -38,8 +38,6 @@ from ptn.missionalertbot.modules.helpers import clear_history
 from ptn.missionalertbot.modules.StockHelpers import capi, get_fc_stock, chunk, notify_wmm_owner
 
 
-
-
 # monitor reddit comments
 @tasks.loop(seconds=60)
 async def _monitor_reddit_comments():
@@ -165,7 +163,7 @@ async def start_wmm_task():
     print("Clearing last stock update message in #%s" % wmm_channel)
     await clear_history(wmm_channel)
     print("Starting WMM stock background task")
-    message = await wmm_channel.send('Stock Bot initialized, preparing for WMM stock update.')
+    message = await wmm_channel.send('⌛ WMM stock tracking initialized, preparing for update.')
     wmm_stock.start(message, wmm_channel, ccochannel)
 
 
@@ -173,8 +171,9 @@ async def start_wmm_task():
 # TODO: introduce tracking of status and errors to bot-spam
 @tasks.loop(seconds=30)
 async def wmm_stock(message, wmm_channel, ccochannel):
+    print("▶ Starting WMM stock check loop.")
+
     #print(f"wmm_stock function start")
-    global wmm_trigger
     wmm_systems = []
 
     # retrieve all WMM carriers
@@ -204,10 +203,11 @@ async def wmm_stock(message, wmm_channel, ccochannel):
     wmm_station_stock = {}
 
     for carrier in wmm_carriers:
+        print(f"Interrogating {carrier} for stock...")
         carrier_has_stock = False
         if carrier.capi:
             print(f"Calling CAPI for {carrier.carrier_name}")
-            capi_response = capi(carrier.carrier_name)
+            capi_response = capi(carrier.carrier_identifier)
             stn_data = capi_response.json()
 
             print(f"capi response: {capi_response.status_code}")
@@ -226,6 +226,7 @@ async def wmm_stock(message, wmm_channel, ccochannel):
                     await asyncio.sleep(60)
                     return
                 elif capi_response.status_code == 400 or capi_response.status_code == 401:
+                    print(f"cAPI auth failed for {carrier.carrier_name}")
 
                     # User needs to re-auth. (400 = EGS, 401 = Expired Token)
 
@@ -276,6 +277,7 @@ async def wmm_stock(message, wmm_channel, ccochannel):
 
         # now we interrogate the carrier's stock levels
         com_data = stn_data['market']['commodities']
+        print("Market data for %s: %s" % ( carrier.carrier_name, com_data ))
 
         # check for if market is empty
         if com_data == []:
@@ -296,7 +298,7 @@ async def wmm_stock(message, wmm_channel, ccochannel):
                 wmm_station_stock[stn_data['currentStarSystem']][carrier.carrier_location] = {}
 
             # add commodity to the master list if not already there
-            if com['name'].lower() not in commodities_wmm:
+            if com['name'].title() not in commodities_wmm:
                 continue
 
             # if carrier has stock of the commodity
@@ -409,18 +411,19 @@ async def wmm_stock(message, wmm_channel, ccochannel):
             page.insert(0, ':')
             await ccochannel.send('\n'.join(page))
 
-"""    # the following code allows us to change sleep time dynamically
+    # the following code allows us to change sleep time dynamically
     # waiting at least 10 seconds before checking wmm_interval again
     # This also checks for the trigger to manually update.
     slept_for = 0
     while slept_for < WMM_INTERVAL:
         # wmm_trigger is set by ;wmm_stock command
-        if wmm_trigger:
-            wmm_trigger = False
+        if constants.wmm_trigger:
+            print("Manual WMM stock refresh triggered.")
+            constants.wmm_trigger = False
             slept_for = WMM_INTERVAL
         else:
             await asyncio.sleep(10)
-            slept_for = slept_for + 10"""
+            slept_for = slept_for + 10
 
 @wmm_stock.after_loop
 async def wmm_after_loop():

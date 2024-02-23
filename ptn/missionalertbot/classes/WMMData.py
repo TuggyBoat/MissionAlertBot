@@ -41,7 +41,7 @@ class WMMData:
         """
         return 'WMMData: CarrierLongName:{0.carrier_name} CarrierIdentifier:{0.carrier_identifier} ' \
                'CarrierLocation:{0.carrier_location} NotificationStatus:{0.notification_status} ' \
-               'Owner: {0.owner} CAPI:{0.capi}'.format(self)
+               'Owner: {0.carrier_owner} CAPI:{0.capi}'.format(self)
 
     def __bool__(self):
         """

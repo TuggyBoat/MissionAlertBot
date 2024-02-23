@@ -28,7 +28,7 @@ from ptn.missionalertbot.constants import bot, bot_command_channel, bot_dev_chan
 from ptn.missionalertbot.database.database import backup_database, find_carrier, find_mission, _is_carrier_channel, \
     mission_db, carrier_db, carrier_db_lock, carriers_conn, find_nominator_with_id, delete_nominee_by_nominator, find_community_carrier, \
     CCDbFields, find_opt_ins
-from ptn.missionalertbot.modules.Embeds import _is_mission_active_embed, _format_missions_embed
+from ptn.missionalertbot.modules.Embeds import _is_mission_active_embed, _format_missions_embed, please_wait_embed
 from ptn.missionalertbot.modules.ErrorHandler import on_app_command_error, GenericError, CustomError, on_generic_error
 from ptn.missionalertbot.modules.helpers import bot_exit, check_roles, check_command_channel, unlock_mission_channel, lock_mission_channel, \
     check_mission_channel_lock, list_active_locks
@@ -208,6 +208,10 @@ class GeneralCommands(commands.Cog):
 
     lock_group = Group(parent=admin_group, name='lock', description='Channel Lock override commmands')
 
+    mission_group = Group(parent=admin_group, name='mission', description='Mission admin commands')
+
+    wmm_group = Group(parent=admin_group, name='wmm', description='WMM admin commands')
+
     # manually release a channel lock
     @lock_group.command(name='release', description='Manually release a designated channel lock object.')
     @describe(channelname='The exact name of the channel as it appears in the settings dialog e.g. ptn-starscape-olympus')
@@ -358,7 +362,7 @@ class GeneralCommands(commands.Cog):
 
 
     # manually delete a carrier trade mission from the database
-    @admin_group.command(name='delete_mission', description='Manually remove a carrier trade mission from the database.')
+    @mission_group.command(name='delete', description='Manually remove a carrier trade mission from the database.')
     @describe(carrier='Carrier name to search for in the missions database.')
     @check_roles([admin_role()])
     @check_command_channel(bot_command_channel())
@@ -420,6 +424,83 @@ class GeneralCommands(commands.Cog):
                     )
                     await interaction.followup.send(embed=embed, ephemeral=True)
                     await asyncio.sleep(1) # lip service to try to avoid a rate limit
+
+        except Exception as e:
+            try:
+                raise GenericError(e)
+            except Exception as e:
+                await on_generic_error(interaction, e)
+
+
+    @wmm_group.command(name='update', description='Refresh WMM stock without changing the update interval.')
+    @check_roles([admin_role()])
+    @check_command_channel(bot_command_channel())
+    async def wmm_update(self, interaction: discord.Interaction):
+        print(f"▶ Manual WMM refresh called by {interaction.user}")
+        try:
+            constants.wmm_trigger = True
+            embed = discord.Embed(
+                description=f"⏳ WMM stock update requested. Please wait a moment before checking <#{constants.channel_wmm_stock()}>.",
+                color=constants.EMBED_COLOUR_QU
+            )
+
+            await interaction.response.send_message(embed=embed)
+
+            if not wmm_stock.is_running() or wmm_stock.failed():
+                print("wmm_stock task has failed, restarting.")
+
+                embed = discord.Embed(
+                description="⚠ WMM stock background task was not running. Restarting now.",
+                color=constants.EMBED_COLOUR_WARNING
+                )
+
+                await interaction.followup.send(embed=embed)
+
+                await start_wmm_task()
+
+        except Exception as e:
+            try:
+                raise GenericError(e)
+            except Exception as e:
+                await on_generic_error(interaction, e)
+
+
+    @wmm_group.command(name='status', description='Check the status of the WMM stock background task.')
+    @check_roles([admin_role()])
+    @check_command_channel(bot_command_channel())
+    async def wmm_update(self, interaction: discord.Interaction):
+        print(f"▶ WMM task check called by {interaction.user}")
+        try:
+
+            embed = please_wait_embed()
+
+            await interaction.response.send_message(embed=embed)
+
+            if not wmm_stock.is_running() or wmm_stock.failed():
+
+                embed = discord.Embed(
+                    description=f"⚠ WMM stock background task was not running. Attempting to restart.",
+                    color=constants.EMBED_COLOUR_WARNING
+                )
+
+                await interaction.edit_original_response(embed=embed)
+
+                await start_wmm_task()
+
+                embed = discord.Embed(
+                    description="✅ WMM background task restarted.",
+                    color=constants.EMBED_COLOUR_OK
+                )
+
+                await interaction.followup.send(embed=embed)
+
+            else:
+                embed = discord.Embed(
+                    description="✅ WMM background task is running.",
+                    color=constants.EMBED_COLOUR_OK
+                )
+
+            await interaction.edit_original_response(embed=embed)
 
         except Exception as e:
             try:

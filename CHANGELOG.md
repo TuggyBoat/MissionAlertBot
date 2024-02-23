@@ -12,18 +12,23 @@ Integrated stock tracking features from stockbot (with thanks to DudeInCorner an
   - EDMC-off missions will show a reminder to disable EDMC, instead of the reminder to use it
 - `/cco capi enable` will send the target carrier owner a DM with OAuth link and explanation, and flag the carrier as capi-enabled
 - `/cco capi disable` will flag the carrier as capi-disabled and prevent capi stock checks
+- Adding carriers to Mission Alert Bot will no longer prompt the user to add to stockbot
 
 Integrated WMM tracking features from stockbot (with thanks to Durzo):
 - `/cco wmm enable`: adds a carrier to WMM tracking
 - `/cco wmm disable`: removes a carrier from WMM tracking
+- `/admin wmm update`: trigger manual refresh of WMM stock
+
+
 TODO:
 - `/cco wmm list`: lists all carriers being tracked for WMMs
-- WMM background task using wmm_db
 - WMM interval view and change
 - wmm_status         Check the wmm background task status
 - wmm_stock          Manually trigger the wmm stock update without changing t...
 - wmm_stop           Stop the wmm background task
 
+Other:
+- `/admin delete_mission` is now `/admin mission delete`
 
 ## 2.3.8
 - All admin commands are now interactions in the 'admin' group:

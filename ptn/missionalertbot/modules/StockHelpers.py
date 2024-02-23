@@ -182,9 +182,9 @@ async def notify_wmm_owner(carrier_data: WMMData, embed, message):
     # notify the owner
     owner = await bot.fetch_user(carrier_data.carrier_owner)
     try:
-        owner.send(embed=embed)
+        await owner.send(embed=embed)
     except Forbidden:
         # ping the owner in-channel
         ccochannel = bot.get_channel(channel_cco_wmm_talk())
-        ccochannel.send(message)
+        await ccochannel.send(message)
 

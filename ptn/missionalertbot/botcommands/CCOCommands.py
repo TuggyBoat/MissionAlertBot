@@ -779,6 +779,7 @@ class CCOCommands(commands.Cog):
             fccode = carrier_data.carrier_identifier
 
             capi_response = capi(fccode)
+            print(f"capi response: {capi_response.status_code}")
             if capi_response.status_code != 200:
                 r = oauth_new(fccode)
                 oauth_response = r.json()
@@ -837,10 +838,13 @@ class CCOCommands(commands.Cog):
                 wmm_data.capi = 1
                 await _update_wmm_carrier(wmm_data)
 
+            print("Finished updating cAPI flag.")
+
         except Exception as e:
             try:
                 raise GenericError(e)
             except Exception as e:
+                traceback.print_exc()
                 await on_generic_error(interaction, e)
 
 
@@ -952,7 +956,7 @@ class CCOCommands(commands.Cog):
             embed.color = constants.EMBED_COLOUR_OK
 
             # add a footer depending on state of cAPI
-            if carrier_data.capi:
+            if not carrier_data.capi:
                 embed.set_footer(text="⚠ Consider enabling Frontier API to fetch stocks if this is a non-Epic Games carrier using /cco capi enable.")
             else:
                 embed.set_footer(text="✅ Frontier API enabled for stock checks.")
