@@ -12,13 +12,16 @@ import requests
 import traceback
 
 # import discord.py
+import discord
+from discord import Forbidden
 
 # import local classes
 from ptn.missionalertbot.classes.CarrierData import CarrierData
+from ptn.missionalertbot.classes.WMMData import WMMData
 
 # import local constants
 import ptn.missionalertbot.constants as constants
-from ptn.missionalertbot.constants import bot, API_TOKEN, API_HOST
+from ptn.missionalertbot.constants import bot, API_TOKEN, API_HOST, channel_cco_wmm_talk
 
 # import local modules
 from ptn.missionalertbot.modules.ErrorHandler import CommandChannelError, CommandRoleError, CustomError, GenericError, on_generic_error
@@ -161,3 +164,27 @@ def from_hex(mystr):
         return "Unregistered Carrier"
     except ValueError:
         return "Unregistered Carrier"
+    
+
+def chunk(chunk_list, max_size=10):
+    """
+    Take an input list, and an expected max_size.
+
+    :returns: A chunked list that is yielded back to the caller
+    :rtype: iterator
+    """
+    for i in range(0, len(chunk_list), max_size):
+        yield chunk_list[i:i + max_size]
+
+
+# notify WMM owner
+async def notify_wmm_owner(carrier_data: WMMData, embed, message):
+    # notify the owner
+    owner = await bot.fetch_user(carrier_data.carrier_owner)
+    try:
+        owner.send(embed=embed)
+    except Forbidden:
+        # ping the owner in-channel
+        ccochannel = bot.get_channel(channel_cco_wmm_talk())
+        ccochannel.send(message)
+

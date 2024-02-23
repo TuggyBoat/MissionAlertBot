@@ -3,6 +3,14 @@ A module containing embeds that are required by multiple functions.
 
 STATUS: This file is complete, but needs to be imported into modules that use it
 """
+import sys
+
+if __name__ == "__main__":
+    # Prevent accidental independent execution of this file 
+    print("This script should not be run independently. Please run it through application.py.")
+    # Exit the script with an error code
+    sys.exit(1)
+
 
 # import libraries
 import os
@@ -23,7 +31,6 @@ from ptn.missionalertbot.constants import ptn_logo_discord
 
 #import local modules
 from ptn.missionalertbot.database.database import find_mission
-
 
 # confirm edit mission embed
 def _confirm_edit_mission_embed(mission_params: MissionParams):

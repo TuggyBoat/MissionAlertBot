@@ -4,7 +4,6 @@ Commands for use by CCOs
 """
 # import libraries
 import aiohttp
-import requests
 import traceback
 from time import strftime
 from typing import Union
@@ -29,7 +28,8 @@ from ptn.missionalertbot.classes.WMMData import WMMData
 
 # import local modules
 from ptn.missionalertbot.database.database import find_mission, find_webhook_from_owner, add_webhook_to_database, find_webhook_by_name, delete_webhook_by_name, \
-    CarrierDbFields, find_carrier, _update_carrier_last_trade, add_carrier_to_database, _update_carrier_capi, _add_to_wmm_db, find_wmm_carrier, _remove_from_wmm_db
+    CarrierDbFields, find_carrier, _update_carrier_last_trade, add_carrier_to_database, _update_carrier_capi, _add_to_wmm_db, find_wmm_carrier, _remove_from_wmm_db, \
+    _update_wmm_carrier
 from ptn.missionalertbot.modules.DateString import get_mission_delete_hammertime, get_inactive_hammertime
 from ptn.missionalertbot.modules.Embeds import role_granted_embed, confirm_remove_role_embed, role_already_embed, confirm_grant_role_embed, please_wait_embed
 from ptn.missionalertbot.modules.ErrorHandler import on_app_command_error, on_generic_error, GenericError, CustomError
@@ -778,7 +778,6 @@ class CCOCommands(commands.Cog):
 
             fccode = carrier_data.carrier_identifier
 
-            # do we have an existing auth?
             capi_response = capi(fccode)
             if capi_response.status_code != 200:
                 r = oauth_new(fccode)
@@ -812,7 +811,7 @@ class CCOCommands(commands.Cog):
                         except Exception as e:
                             return await on_generic_error(interaction, e)
 
-                    embed.description=f"🔑 Please check <@{owner.id}>'s direct messages for Frontier account authorisation link."
+                    embed.description=f"🔑 Please check <@{owner.id}>'s direct messages for Frontier account authorisation link, then repeat this command."
 
                     await interaction.edit_original_response(embed=embed)
 
@@ -827,7 +826,16 @@ class CCOCommands(commands.Cog):
                 embed.description=f"✅ cAPI auth already exists for {carrier_data.carrier_long_name} ({carrier_data.carrier_identifier}), enabling stock fetching."
                 await interaction.edit_original_response(embed=embed)
 
+            # write to the database
             await _update_carrier_capi(carrier_data.pid, 1)
+
+            # check if the carrier is being tracked for WMM
+            wmm_data: WMMData = find_wmm_carrier(carrier_data.carrier_identifier, 'cid')
+
+            if wmm_data:
+                # update the WMM database
+                wmm_data.capi = 1
+                await _update_wmm_carrier(wmm_data)
 
         except Exception as e:
             try:
@@ -871,6 +879,14 @@ class CCOCommands(commands.Cog):
                 print(f"⏳ Disabling cAPI for {carrier_data.carrier_long_name}...")
 
                 await _update_carrier_capi(carrier_data.pid, 0)
+
+                # check if the carrier is being tracked for WMM
+                wmm_data: WMMData = find_wmm_carrier(carrier_data.carrier_identifier, 'cid')
+
+                if wmm_data:
+                    # update the WMM database
+                    wmm_data.capi = 0
+                    await _update_wmm_carrier(wmm_data)
 
                 embed.description=f"✅ Frontier API stock tracking disabled for **{carrier_data.carrier_long_name}** ({carrier_data.carrier_identifier})."
                 embed.color=constants.EMBED_COLOUR_OK
@@ -929,7 +945,7 @@ class CCOCommands(commands.Cog):
                 return
 
             # add carrier to WMM database
-            await _add_to_wmm_db(carrier_data.carrier_long_name, carrier_data.carrier_identifier, station.upper())
+            await _add_to_wmm_db(carrier_data.carrier_long_name, carrier_data.carrier_identifier, station.upper(), carrier_data.ownerid, carrier_data.capi)
 
             # edit our embed to notify user
             embed.description=f"💸 Added **{carrier_data.carrier_long_name}** ({carrier_data.carrier_identifier}) to the WMM stock list at station **{station.upper()}**."

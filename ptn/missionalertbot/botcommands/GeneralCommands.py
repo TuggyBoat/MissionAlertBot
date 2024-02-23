@@ -32,7 +32,7 @@ from ptn.missionalertbot.modules.Embeds import _is_mission_active_embed, _format
 from ptn.missionalertbot.modules.ErrorHandler import on_app_command_error, GenericError, CustomError, on_generic_error
 from ptn.missionalertbot.modules.helpers import bot_exit, check_roles, check_command_channel, unlock_mission_channel, lock_mission_channel, \
     check_mission_channel_lock, list_active_locks
-from ptn.missionalertbot.modules.BackgroundTasks import lasttrade_cron, _monitor_reddit_comments
+from ptn.missionalertbot.modules.BackgroundTasks import lasttrade_cron, _monitor_reddit_comments, start_wmm_task, wmm_stock
 from ptn.missionalertbot.modules.MissionCleaner import check_trade_channels_on_startup
 from ptn.missionalertbot.modules.DateString import get_inactive_hammertime
 
@@ -135,6 +135,9 @@ class GeneralCommands(commands.Cog):
         # start monitoring reddit comments if not running
         if not _monitor_reddit_comments.is_running():
             _monitor_reddit_comments.start()
+        # start wmm loop if not running
+        if not wmm_stock.is_running():
+            await start_wmm_task()
 
 
     # processed on disconnect

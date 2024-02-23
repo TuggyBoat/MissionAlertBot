@@ -5,6 +5,14 @@ Depends on: constants, ErrorHandler
 
 """
 
+import sys
+
+if __name__ == "__main__":
+    # Prevent accidental independent execution of this file 
+    print("This script should not be run independently. Please run it through application.py.")
+    # Exit the script with an error code
+    sys.exit(1)
+
 # libraries
 import os
 import sqlite3
@@ -149,14 +157,16 @@ wmm_db = wmm_conn.cursor()
 # wmm database creation
 wmm_table_create = '''
     CREATE TABLE wmm(
-        "carrier"   TEXT NOT NULL UNIQUE,
-        "cid"   TEXT NOT NULL UNIQUE,
-        "location"   TEXT,
-        "notify"    TEXT DEFAULT NULL
+        carrier   TEXT NOT NULL UNIQUE,
+        cid   TEXT NOT NULL UNIQUE,
+        location   TEXT,
+        ownerid   INT,
+        notify    TEXT DEFAULT NULL,
+        capi BOOLEAN DEFAULT 0
     )
     '''
 
-wmm_table_columns = ['carrier', 'cid', 'location', 'notify']
+wmm_table_columns = ['carrier', 'cid', 'location', 'notify', 'capi']
 
 # We need some locks while we wait on the DB queries
 carrier_db_lock = asyncio.Lock()
@@ -961,13 +971,30 @@ def find_wmm_carrier(searchterm, searchfield):
         return wmm_data
 
 
+# wmm fetch all carriers
+def _fetch_wmm_carriers():
+    """
+    Fetches all actively tracked WMM carriers from the DB.
+
+    :returns: A list of WMMData class objects
+    """
+    print("Called _fetch_wmm_carriers")
+    sql = "SELECT * FROM wmm"
+    wmm_db.execute(sql)
+
+    # instantiate into WMMData
+    wmm_carriers = [WMMData(wmm_carrier) for wmm_carrier in wmm_db.fetchall()]
+
+    return wmm_carriers
+
+
 # WMM start tracking
-async def _add_to_wmm_db(carrier, cid, location):
-    print("Called _add_to_wmm_db for %s (%s), %s" % ( carrier, cid, location ))
+async def _add_to_wmm_db(carrier, cid, location, ownerid, capi):
+    print("Called _add_to_wmm_db for %s (%s), at %s, owned by %s / capi: %s" % ( carrier, cid, location, ownerid, capi ))
 
     # define variables
-    sql = f"INSERT INTO wmm VALUES (?, ?, ?, ?)"
-    values = [carrier, cid, location, None]
+    sql = f"INSERT INTO wmm VALUES (?, ?, ?, ?, ?, ?)"
+    values = [carrier, cid, location, ownerid, None, capi]
 
     # write to database
     try:
@@ -991,14 +1018,14 @@ async def _remove_from_wmm_db(cid):
     return print("Deleted")
 
 
-"""
 # WMM generic database edit function
+# TODO: presently unused
 def _wmm_database_insert(data):
-
+    """
     A function to write data into the WMM database.
 
     :param dict data: a dict containing the column names and values
-
+    """
     # Construct the SQL query from the dict
     columns = ', '.join(data.keys())
     placeholders = ', '.join('?' * len(data))
@@ -1009,4 +1036,35 @@ def _wmm_database_insert(data):
 
     # write to the db
     wmm_db.execute(sql, values)
-"""
+
+
+# update WMM entry
+async def _update_wmm_carrier(wmm_data: WMMData):
+    """
+    Updates details for a WMM carrier. Uses the carrier's identifier to search.
+    
+    :param WMMData wmm_data: The updated dataset
+    """
+    await wmm_db_lock.acquire()
+
+    try:
+
+        values = (
+            wmm_data.carrier_location,
+            wmm_data.notification_status,
+            wmm_data.capi,
+            wmm_data.carrier_identifier
+        )
+
+        sql = '''
+            UPDATE carriers
+            SET location = ?,
+                notify = ?,
+                capi = ?
+            WHERE cid = ?
+        '''
+
+        wmm_db.execute(sql, values)
+        wmm_conn.commit()
+    finally:
+        wmm_db_lock.release()
