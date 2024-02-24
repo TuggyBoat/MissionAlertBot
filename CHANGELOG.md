@@ -10,7 +10,7 @@ Integrated stock tracking features from stockbot (with thanks to DudeInCorner an
  - EDMC data notice is now context-sensitive:
   - EDMC notice will only show when source is 'inara'
   - EDMC-off missions will show a reminder to disable EDMC, instead of the reminder to use it
-- `/cco capi enable` will send the target carrier owner a DM with OAuth link and explanation, and flag the carrier as capi-enabled
+- `/cco capi enable` if capi auth is confirmed, will flag the carrier as capi-enabled; otherwise, will send the target carrier owner a DM with OAuth link and explanation
 - `/cco capi disable` will flag the carrier as capi-disabled and prevent capi stock checks
 - Adding carriers to Mission Alert Bot will no longer prompt the user to add to stockbot
 
@@ -29,6 +29,9 @@ Integrated WMM tracking features from stockbot (with thanks to Durzo):
 TODO:
 - `/cco wmm list`: lists all carriers being tracked for WMMs
 - restart on wmm start when already running
+- choose wmm location from menu options like cco load commodities
+- update trade-alerts with remaining stock levels when /stock is used
+- Adding carriers to Mission Alert Bot will no longer prompt the user to add to stockbot
 
 
 ## 2.3.8
