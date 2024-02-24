@@ -17,6 +17,7 @@ if __name__ == "__main__":
 import os
 import sqlite3
 import asyncio
+import json
 import shutil
 import enum
 import discord
@@ -1046,13 +1047,17 @@ async def _update_wmm_carrier(wmm_data: WMMData):
     :param WMMData wmm_data: The updated dataset
     """
     print("Received data: %s %s %s %s" % ( wmm_data.carrier_location, wmm_data.notification_status, wmm_data.capi, wmm_data.carrier_identifier ))
+
+    # notification status is a list, so we need to transform it into json before storing it in the db
+    notification_status = json.dumps(wmm_data.notification_status) if wmm_data.notification_status else None
+
     await wmm_db_lock.acquire()
 
     try:
 
         values = (
             wmm_data.carrier_location,
-            wmm_data.notification_status,
+            notification_status,
             wmm_data.capi,
             wmm_data.carrier_identifier
         )

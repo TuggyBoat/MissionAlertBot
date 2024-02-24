@@ -19,7 +19,7 @@ from discord.ext.commands import GroupCog
 import ptn.missionalertbot.constants as constants
 from ptn.missionalertbot.constants import bot, mission_command_channel, certcarrier_role, trainee_role, seconds_long, rescarrier_role, commodities_common, \
     bot_spam_channel, training_mission_command_channel, seconds_very_short, admin_role, mod_role, cco_mentor_role, aco_role, recruit_role, cco_color_role, \
-    API_HOST, ptn_logo_discord
+    API_HOST, ptn_logo_discord, locations_wmm
 
 # import local classes
 from ptn.missionalertbot.classes.MissionParams import MissionParams
@@ -1025,171 +1025,10 @@ class CCOCommands(commands.Cog):
                 return
 
 
-    # found I was using an old version of stockbot's code. sigh. below no longer necessary, probably
-    """@track_group.command(name='enable', description='Enable stock tracking.')
-    @describe(carrier = "A unique fragment of the carrier name you want to search for.")
-    @check_roles([certcarrier_role(), trainee_role(), rescarrier_role()])
-    @check_command_channel([mission_command_channel(), training_mission_command_channel()])
-    async def track_enable(self, interaction: discord.Interaction, carrier: str):
-        print(f"▶ Stock tracking enable called by {interaction.user} for search term {carrier}")
-
-        try:
-            embed = discord.Embed(
-                description="⏳ Please wait a moment...",
-                color=constants.EMBED_COLOUR_QU
-            )
-
-            await interaction.response.send_message(embed=embed)
-
-            # attempt to find matching carrier data
-            carrier_data = flexible_carrier_search_term(carrier)
-            
-            if not carrier_data:  # error condition
-                print(f"❌ No carrier found matching search term {carrier}")
-                carrier_error_embed = discord.Embed(
-                    description=f"❌ No carrier found for '**{carrier}**'. Use `/owner` to see a list of your carriers. If it's not in the list, ask an Admin to add it for you.",
-                    color=constants.EMBED_COLOUR_ERROR
-                )
-                return await interaction.edit_original_response(embed=carrier_error_embed)
-
-            # search EDSM to find carrier system. fallback to inara
-            search_data = None
-            try:
-                search_data = edsm_find_fc_system(carrier_data.carrier_identifier)
-            except:
-                try:
-                    search_data = inara_find_fc_system(carrier_data.carrier_identifier)
-                except:
-                    pass
-
-            if search_data is False:
-                try:
-                    raise CustomError(f"Could not locate system for {carrier_data.carrier_long_name}. Please ensure you have used EDMC upload or journal import to log your carrier's location.")
-                except Exception as e:
-                    await on_generic_error(interaction, e)
-                    return
-
-            elif search_data is not None:
-                fc_system = search_data['system']
-            try:
-                parameters = {'systemName': fc_system, 'stationName': carrier_data.carrier_identifier}
-                r = requests.get('https://www.edsm.net/api-system-v1/stations/market', params=parameters)
-                market_id = r.json()
-
-                if r.text=='{}':
-                    try:
-                        raise CustomError(f"Could not locate system for {carrier_data.carrier_long_name}. Please ensure you have used EDMC upload or journal import to log your carrier's location.")
-                    except Exception as e:
-                        await on_generic_error(interaction, e)
-                        return
-                else:
-                    embed.description=f"✅ Found {carrier_data.carrier_long_name} ({carrier_data.carrier_identifier}) in {fc_system}..."
-                    embed.color=constants.EMBED_COLOUR_OK
-
-                    await interaction.edit_original_response(embed=embed)
-            except:
-                print("Failure getting edsm data")
-                try:
-                    raise CustomError(f"Failed getting EDSM data, please try again.")
-                except Exception as e:
-                    await on_generic_error(interaction, e)
-                    return
-
-            print(f"Resolved market ID: {market_id['marketId']}")
-            market_id_string = str(market_id['marketId'])
-
-            # save market ID to database
-            try:
-                await _update_carrier_market_id(carrier_data.pid, market_id_string)
-            except Exception as e:
-                try:
-                    error = f'Could not update carrier database: {e}'
-                    raise CustomError(error)
-                except Exception as e:
-                    await on_generic_error(interaction, e)
-                    return
-
-            embed.description=f"📈 Market tracking enabled for **{carrier_data.carrier_long_name}**.\n\n" \
-                               "Use `/stock` in the carrier channel to check market data, or `/stock <carrier_name>` to check stock here."
-
-            await interaction.edit_original_response(embed=embed)
-
-            spamchannel = bot.get_channel(bot_spam_channel())
-
-            embed = discord.Embed(
-                description=f"📈 <@{interaction.user.id}> enabled stock tracking for {carrier_data.carrier_long_name}.",
-                color=constants.EMBED_COLOUR_OK
-            )
-
-            await spamchannel.send(embed=embed)
-
-        except Exception as e:
-            try:
-                raise GenericError(e)
-            except Exception as e:
-                await on_generic_error(interaction, e)
-
-
-    @track_group.command(name='disable', description='Disable stock tracking.')
-    @describe(carrier = "A unique fragment of the carrier name you want to search for.")
-    @check_roles([certcarrier_role(), trainee_role(), rescarrier_role()])
-    @check_command_channel([mission_command_channel(), training_mission_command_channel()])
-    async def track_disable(self, interaction: discord.Interaction, carrier: str):
-        print(f"▶ Stock tracking disable called by {interaction.user} for search term {carrier}")
-
-        try:
-            embed = discord.Embed(
-                description="⏳ Please wait a moment...",
-                color=constants.EMBED_COLOUR_QU
-            )
-
-            await interaction.response.send_message(embed=embed)
-
-            # attempt to find matching carrier data
-            carrier_data = flexible_carrier_search_term(carrier)
-            
-            if not carrier_data:  # error condition
-                print(f"❌ No carrier found matching search term {carrier}")
-                carrier_error_embed = discord.Embed(
-                    description=f"❌ No carrier found for '**{carrier}**'. Use `/owner` to see a list of your carriers. If it's not in the list, ask an Admin to add it for you.",
-                    color=constants.EMBED_COLOUR_ERROR
-                )
-                return await interaction.edit_original_response(embed=carrier_error_embed)
-            
-            if not carrier_data.marketid:
-                print(f"Market tracking already disabled for {carrier_data.carrier_long_name}")
-                embed.description=f"✅ Market tracking is already disabled for {carrier_data.carrier_long_name}."
-                embed.color=constants.EMBED_COLOUR_OK
-
-                return await interaction.edit_original_response(embed=embed)
-
-            # save null market ID to database
-            try:
-                await _update_carrier_market_id(carrier_data.pid, None)
-            except Exception as e:
-                try:
-                    error = f'Could not update carrier database: {e}'
-                    raise CustomError(error)
-                except Exception as e:
-                    await on_generic_error(interaction, e)
-                    return
-
-            embed.description=f"✅ Disabled market tracking for **{carrier_data.carrier_long_name}**."
-            embed.color=constants.EMBED_COLOUR_OK
-
-            await interaction.edit_original_response(embed=embed)
-
-            spamchannel = bot.get_channel(bot_spam_channel())
-
-            embed = discord.Embed(
-                description=f"📉 <@{interaction.user.id}> disabled stock tracking for {carrier_data.carrier_long_name}.",
-                color=constants.EMBED_COLOUR_QU
-            )
-
-            await spamchannel.send(embed=embed)
-
-        except Exception as e:
-            try:
-                raise GenericError(e)
-            except Exception as e:
-                await on_generic_error(interaction, e)"""
+    # autocomplete WMM station names
+    @wmm_enable.autocomplete("station")
+    async def location_autocomplete(self, interaction: discord.Interaction, current: str):
+        locations = [] # define the list we will return
+        for location in locations_wmm: # iterate through our possible locations to append them as Choice options to our return list
+            locations.append(app_commands.Choice(name=location, value=location))
+        return locations # return the list of Choices

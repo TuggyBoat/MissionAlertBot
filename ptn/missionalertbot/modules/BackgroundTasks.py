@@ -14,6 +14,7 @@ if __name__ == "__main__":
 # import libraries
 import asyncio
 from datetime import datetime, timezone, timedelta
+import json
 import traceback
 
 # import discord
@@ -125,7 +126,7 @@ async def lasttrade_cron():
         for carrier_data in carriers:
             # check roles on owners, remove/add as needed.
             last_traded = datetime.fromtimestamp(carrier_data.lasttrade).strftime('%Y-%m-%d %H:%M:%S')
-            print(f"Processing carrier '{carrier_data.carrier_short_name}'. Last traded: {last_traded}")
+            print(f"Processing carrier '{carrier_data.carrier_long_name}'. Last traded: {last_traded}")
             owner = guild.get_member(carrier_data.ownerid)
             if owner:
                 if cc_role in owner.roles:
@@ -145,7 +146,7 @@ async def lasttrade_cron():
                     await spamchannel.send(f"{owner.name} has been added to the Fleet Reserve role.")
             else:
                 print(f"Carrier owner id {carrier_data.ownerid} is invalid, skipping.")
-                await spamchannel.send(f"Owner of {carrier_data.carrier_short_name} with ID {carrier_data.ownerid} is invalid. "
+                await spamchannel.send(f"Owner of {carrier_data.carrier_long_name} ({carrier_data.carrier_identifier}) with ID {carrier_data.ownerid} is invalid. "
                                         "Cannot process lasttrade_cron for this carrier.")
         print("All carriers have been processed.")
     except Exception as e:
@@ -262,8 +263,8 @@ async def wmm_stock(message, wmm_channel, ccochannel):
             if not stn_data:
                 print(f"no inara market data for {carrier.carrier_identifier}")
                 continue
-            carrier_name = stn_data['full_name']
-            stn_data['currentStarSystem'] = stn_data['name']
+            carrier_name = stn_data['full_name'].upper()
+            stn_data['currentStarSystem'] = stn_data['name'].upper()
             stn_data['market'] = {'commodities': stn_data['commodities']}
             try:
                 utc_time = datetime.strptime(stn_data['market_updated'].split('(')[1][0:-1], "%d %b %Y, %I:%M%p")
@@ -316,7 +317,9 @@ async def wmm_stock(message, wmm_channel, ccochannel):
                     )
 
                     # Notify the owner once per commodity per wmm_tracking session.
-                    if com['name'] not in carrier.notification_status:
+                    notification_status = json.loads(carrier.notification_status) if carrier.notification_status else []
+                    if com['name'] not in notification_status:
+                        print(f"Low stock warning for {carrier.carrier_name}")
                         
                         embed = discord.Embed(
                             description=f"📉 Your fleet carrier {carrier.carrier_name} ({carrier.carrier_identifier}) is low on %s - %s remaining." 
@@ -330,23 +333,24 @@ async def wmm_stock(message, wmm_channel, ccochannel):
                         await notify_wmm_owner(carrier, embed, message)
 
                         # tell the db we've notified for this commodity
-                        if not carrier.notification_status:
-                            carrier.notification_status = []
+                        if not notification_status:
+                            notification_status = []
 
-                        carrier.notification_status.append(com['name'])
+                        notification_status.append(com['name'])
+                        carrier.notification_status = notification_status
 
                         await _update_wmm_carrier(carrier)
 
                 # has stock, not low
                 else:
                     wmm_stock[carrier.carrier_location].append("%s x %s - %s (%s) - **%s** - Price: %s %s" % (
-                        com['name'], format(com['stock'], ','), stn_data['currentStarSystem'], carrier.carrier_location, carrier_name, format(com['buyPrice'], ','), market_updated )
+                        com['name'], format(com['stock'], ','), stn_data['currentStarSystem'].upper(), carrier.carrier_location, carrier_name, format(com['buyPrice'], ','), market_updated )
                     )
 
         # no stock at all
         if not carrier_has_stock:
             wmm_stock[carrier.carrier_location].append("**%s** - %s (%s) has no stock of any WMM commodity! %s" % (
-                carrier_name, stn_data['currentStarSystem'], carrier.carrier_location, market_updated )
+                carrier_name, stn_data['currentStarSystem'].upper(), carrier.carrier_location, market_updated )
             )
 
     for system in wmm_systems:
@@ -412,15 +416,15 @@ async def wmm_stock(message, wmm_channel, ccochannel):
             await ccochannel.send('\n'.join(page))
 
     # the following code allows us to change sleep time dynamically
-    # waiting at least 10 seconds before checking constants.WMM_INTERVAL again
+    # waiting at least 10 seconds before checking constants.wmm_interval again
     # This also checks for the trigger to manually update.
     slept_for = 0
-    while slept_for < constants.WMM_INTERVAL:
+    while slept_for < constants.wmm_interval:
         # wmm_trigger is set by ;wmm_stock command
         if constants.wmm_trigger:
             print("Manual WMM stock refresh triggered.")
             constants.wmm_trigger = False
-            slept_for = constants.WMM_INTERVAL
+            slept_for = constants.wmm_interval
         else:
             await asyncio.sleep(10)
             slept_for = slept_for + 10

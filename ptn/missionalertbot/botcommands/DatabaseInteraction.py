@@ -21,6 +21,7 @@ from ptn.missionalertbot.classes.CarrierData import CarrierData
 from ptn.missionalertbot.classes.CommunityCarrierData import CommunityCarrierData
 from ptn.missionalertbot.classes.NomineesData import NomineesData
 from ptn.missionalertbot.classes.Views import db_delete_View, BroadcastView, CarrierEditView, MissionDeleteView, AddCarrierButtons, ConfirmPurgeView
+from ptn.missionalertbot.classes.WMMData import WMMData
 
 # local constants
 import ptn.missionalertbot.constants as constants
@@ -29,7 +30,7 @@ from ptn.missionalertbot.constants import bot, cmentor_role, admin_role, cteam_b
 
 # local modules
 from ptn.missionalertbot.database.database import find_nominee_with_id, carrier_db, CarrierDbFields, find_carrier, backup_database, \
-    add_carrier_to_database, find_carriers_mult, find_commodity, find_community_carrier, CCDbFields
+    add_carrier_to_database, find_carriers_mult, find_commodity, find_community_carrier, CCDbFields, wmm_db
 from ptn.missionalertbot.modules.ErrorHandler import on_app_command_error, CustomError, on_generic_error, GenericError
 from ptn.missionalertbot.modules.helpers import check_roles, check_command_channel, _regex_alphanumeric_with_hyphens, extract_carrier_ident_strings
 from ptn.missionalertbot.modules.Embeds import _add_common_embed_fields, _configure_all_carrier_detail_embed, orphaned_carrier_summary_embed
@@ -409,15 +410,7 @@ class DatabaseInteraction(commands.Cog):
                             color=constants.EMBED_COLOUR_OK)
         info_embed = _add_common_embed_fields(info_embed, carrier_data, interaction)
 
-        cp_embed = discord.Embed(
-            title="Copy/Paste code for Stockbot",
-            description=f"```;add_FC {carrier_data.carrier_identifier} {carrier_data.carrier_short_name} {carrier_data.ownerid}```",
-            color=constants.EMBED_COLOUR_QU
-        )
-
-        embeds = [info_embed, cp_embed]
-
-        await interaction.response.send_message(embeds=embeds)
+        await interaction.response.send_message(embed=info_embed)
 
         # notify bot-spam
         spamchannel: discord.TextChannel = bot.get_channel(bot_spam_channel())
@@ -615,6 +608,127 @@ class DatabaseInteraction(commands.Cog):
                 if ctx.fetch_message(message.id) and ctx.fetch_message(ctx.message.id):
                     print(f'Timeout hit during carrier request by: {ctx.author}')
                     embed = discord.Embed(description=f'Closed the active carrier list request from {ctx.author} due to no input in 60 seconds.', color=constants.EMBED_COLOUR_QU)
+                    await ctx.send(embed=embed)
+                    await message.delete()
+                    await ctx.message.delete()
+                    break
+                else:
+                    return
+
+    # list WMM FCs
+    # TODO: slashify, new list logic
+    @commands.command(name='wmm_list', help='List all Fleet Carriers active in WMM supply. This times out after 60 seconds')
+    @commands.has_any_role(*constants.any_elevated_role)
+    async def wmm_list(self, ctx):
+
+        print(f'WMM list requested by user: {ctx.author}')
+
+        wmm_db.execute(f"SELECT * FROM wmm")
+        carriers = [WMMData(carrier) for carrier in wmm_db.fetchall()]
+
+        carrier: WMMData
+
+        def chunk(chunk_list, max_size=10):
+            """
+            Take an input list, and an expected max_size.
+
+            :returns: A chunked list that is yielded back to the caller
+            :rtype: iterator
+            """
+            for i in range(0, len(chunk_list), max_size):
+                yield chunk_list[i:i + max_size]
+
+        def validate_response(react, user):
+            return user == ctx.author and str(react.emoji) in ["◀️", "❌", "▶️"]
+            # This makes sure nobody except the command sender can interact with the "menu"
+
+        # TODO: should pages just be a list of embed_fields we want to add?
+        pages = [page for page in chunk(carriers)]
+
+        max_pages = len(pages)
+        current_page = 1
+
+        embed = discord.Embed(title=f"{len(carriers)} Active WMM Fleet Carriers Page:#{current_page} of {max_pages}")
+        count = 0   # Track the overall count for all carriers
+        # Go populate page 0 by default
+        for carrier in pages[0]:
+            count += 1
+            embed.add_field(name=f"{count}: {carrier.carrier_name} ({carrier.carrier_identifier})",
+                            value=f"Location: {carrier.carrier_location} CAPI: {carrier.capi}", inline=False)
+        # Now go send it and wait on a reaction
+        message = await ctx.send(embed=embed)
+
+        await message.add_reaction("❌")
+        # From page 0 we can only go forwards
+        if not current_page == max_pages: await message.add_reaction("▶️")
+
+        # 60 seconds time out gets raised by Asyncio
+        while True:
+            try:
+                reaction, user = await bot.wait_for('reaction_add', timeout=60, check=validate_response)
+                if str(reaction.emoji) == "❌":
+                    print(f'Closed list carrier request by: {ctx.author}')
+                    embed = discord.Embed(description=f'Closed the active carrier list.', color=constants.EMBED_COLOUR_OK)
+                    await ctx.send(embed=embed)
+                    await message.delete()
+                    await ctx.message.delete()
+                    return
+
+                elif str(reaction.emoji) == "▶️" and current_page != max_pages:
+                    print(f'{ctx.author} requested to go forward a page.')
+                    current_page += 1   # Forward a page
+                    new_embed = discord.Embed(title=f"{len(carriers)} Active WMM Fleet Carriers Page:{current_page}")
+                    for carrier in pages[current_page-1]:
+                        # Page -1 as humans think page 1, 2, but python thinks 0, 1, 2
+                        count += 1
+                        new_embed.add_field(name=f"{count}: {carrier.carrier_name} ({carrier.carrier_identifier})",
+                            value=f"Location: {carrier.carrier_location} CAPI: {carrier.capi}", inline=False)
+
+                    await message.edit(embed=new_embed)
+
+                    # Ok now we can go back, check if we can also go forwards still
+                    if current_page == max_pages:
+                        await message.clear_reaction("▶️")
+
+                    await message.remove_reaction(reaction, user)
+                    await message.add_reaction("◀️")
+
+                elif str(reaction.emoji) == "◀️" and current_page > 1:
+                    print(f'{ctx.author} requested to go back a page.')
+                    current_page -= 1   # Go back a page
+
+                    new_embed = discord.Embed(title=f"{len(carriers)} Active WMM Fleet Carriers Page:{current_page}")
+                    # Start by counting back however many carriers are in the current page, minus the new page, that way
+                    # when we start a 3rd page we don't end up in problems
+                    count -= len(pages[current_page - 1])
+                    count -= len(pages[current_page])
+
+                    for carrier in pages[current_page - 1]:
+                        # Page -1 as humans think page 1, 2, but python thinks 0, 1, 2
+                        count += 1
+                        new_embed.add_field(name=f"{count}: {carrier.carrier_name} ({carrier.carrier_identifier})",
+                            value=f"Location: {carrier.carrier_location} CAPI: {carrier.capi}", inline=False)
+
+                    await message.edit(embed=new_embed)
+                    # Ok now we can go forwards, check if we can also go backwards still
+                    if current_page == 1:
+                        await message.clear_reaction("◀️")
+
+                    await message.remove_reaction(reaction, user)
+                    await message.add_reaction("▶️")
+                else:
+                    # It should be impossible to hit this part, but lets gate it just in case.
+                    print(f'HAL9000 error: {ctx.author} ended in a random state while trying to handle: {reaction.emoji} '
+                        f'and on page: {current_page}.')
+                    # HAl-9000 error response.
+                    error_embed = discord.Embed(title=f"I'm sorry {ctx.author.name}, I'm afraid I can't do that.")
+                    await message.edit(embed=error_embed)
+                    await message.remove_reaction(reaction, user)
+
+            except asyncio.TimeoutError:
+                if ctx.fetch_message(message.id) and ctx.fetch_message(ctx.message.id):
+                    print(f'Timeout hit during WMM carrier request by: {ctx.author}')
+                    embed = discord.Embed(description=f'Closed the active WMM carrier list request from {ctx.author} due to no input in 60 seconds.', color=constants.EMBED_COLOUR_QU)
                     await ctx.send(embed=embed)
                     await message.delete()
                     await ctx.message.delete()

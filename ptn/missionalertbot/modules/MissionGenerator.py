@@ -483,7 +483,7 @@ async def return_discord_channel_embeds(mission_params: MissionParams):
     # desc used by the local PTN additional info embed
     additional_info_description = f"💎 Carrier Owner: <@{carrier_data.ownerid}>" \
                                   f"\n🔤 Carrier information: </info:849040914948554766>" \
-                                  f"\n📊 Stock information: `;stock {carrier_data.carrier_short_name}`\n\n"
+                                  f"\n📊 Stock information: `/stock`\n\n"
 
     print("Define help embed (local)")
     # desc used by the local PTN help embed
@@ -1437,7 +1437,7 @@ async def create_mission_temp_channel(interaction, owner: discord.Member, missio
     else:
         # channel does not exist, create it
 
-        topic = f"Use \";stock {mission_params.carrier_data.carrier_short_name}\" to retrieve stock levels for this carrier."
+        topic = f"Use '/stock' to retrieve stock levels for this carrier."
 
         category = discord.utils.get(interaction.guild.categories, id=mission_params.channel_defs.category_actual)
         mission_temp_channel = await interaction.guild.create_text_channel(mission_params.carrier_data.discord_channel, category=category, topic=topic)

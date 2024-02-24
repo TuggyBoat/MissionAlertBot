@@ -122,10 +122,11 @@ async def _configure_all_carrier_detail_embed(embed, carrier_data: CarrierData):
     """
     embed.add_field(name='Carrier Name', value=f'{carrier_data.carrier_long_name}', inline=True)
     embed.add_field(name='Carrier Identifier', value=f'{carrier_data.carrier_identifier}', inline=True)
-    embed.add_field(name='Short Name', value=f'{carrier_data.carrier_short_name}', inline=True)
+    # embed.add_field(name='Short Name', value=f'{carrier_data.carrier_short_name}', inline=True)
     embed.add_field(name='Discord Channel', value=f'#{carrier_data.discord_channel}', inline=True)
     embed.add_field(name='Carrier Owner', value=f'<@{carrier_data.ownerid}>', inline=True)
     embed.add_field(name='DB ID', value=f'{carrier_data.pid}', inline=True)
+    embed.add_field(name='Frontier API', value='✅ Enabled' if carrier_data.capi else 'Disabled', inline=True)
     embed.set_footer(text="Note: DB ID is not an editable field.")
     return embed
 
@@ -154,7 +155,7 @@ async def _generate_cc_notice_embed(channel_id, user, avatar, title, message, im
     return embed, thumb_file
 
 # add common embed fields for carrier info
-def _add_common_embed_fields(embed, carrier_data, ctx_interaction):
+def _add_common_embed_fields(embed, carrier_data: CarrierData, ctx_interaction):
     embed.add_field(name="Carrier Name", value=f"{carrier_data.carrier_long_name}", inline=True)
     embed.add_field(name="Carrier ID", value=f"{carrier_data.carrier_identifier}", inline=True)
     embed.add_field(name="Database Entry", value=f"{carrier_data.pid}", inline=True)
@@ -165,7 +166,7 @@ def _add_common_embed_fields(embed, carrier_data, ctx_interaction):
     embed.add_field(name="Discord Channel", value=f"{discord_channel}", inline=True)
 
     embed.add_field(name="Owner", value=f"<@{carrier_data.ownerid}>", inline=True)
-    embed.add_field(name="Market Data", value=f"`;stock {carrier_data.carrier_short_name}`", inline=True)
+    embed.add_field(name="Frontier API", value="✅ Enabled" if carrier_data.capi else "Disabled", inline=True)
     embed.add_field(name="Last Trade", value=f"<t:{carrier_data.lasttrade}> (<t:{carrier_data.lasttrade}:R>)", inline=True)
     # shortname is not relevant to users and will be auto-generated in future
     return embed

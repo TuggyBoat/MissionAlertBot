@@ -25,13 +25,15 @@ from ptn.missionalertbot.classes.MissionParams import MissionParams
 
 # local constants
 import ptn.missionalertbot.constants as constants
-from ptn.missionalertbot.constants import bot, certcarrier_role, trainee_role, rescarrier_role, mission_command_channel, training_mission_command_channel
+from ptn.missionalertbot.constants import bot, certcarrier_role, trainee_role, rescarrier_role, mission_command_channel, training_mission_command_channel, \
+    bot_spam_channel, get_guild
 
 # local modules
 from ptn.missionalertbot.database.database import find_carrier, find_mission
 from ptn.missionalertbot.modules.helpers import check_roles, check_command_channel, flexible_carrier_search_term
 from ptn.missionalertbot.modules.StockHelpers import get_fc_stock
 from ptn.missionalertbot.modules.ErrorHandler import on_app_command_error, on_generic_error, CustomError, GenericError
+from ptn.missionalertbot.modules.MissionEditor import edit_discord_alerts
 
 
 # initialise the Cog and attach our global error handler
@@ -161,6 +163,34 @@ class StockTracker(commands.Cog):
                              + (f"\n{edmc_string}" if source == 'inara' else ""))
 
             await interaction.edit_original_response(embed=embed)
+
+            # update mission alert if carrier was on a mission
+            if mission_data:
+                print("⌛ Evaluating stock for trade alert update...")
+                mission_params: MissionParams = mission_data.mission_params
+                # check if commodity from stock check matches from mission params
+                print("Checking for match for %s" % ( mission_params.commodity_name.title() ))
+
+                # create a list of commodities in stock - this is to handle future planned multi-commodity support
+                commodities_in_stock = []
+                for com in com_data:
+                    if com['name'].title() == mission_params.commodity_name.title():
+                        print("Found match: %s %s %s" % ( com['name'].title(), com['stock'], com['demand'] ))
+                        if com['stock'] != 0 or com['demand'] != 0:
+                            # retrieve correct value for supply or demand
+                            stock = com['stock'] if com['stock'] != 0 else com['demand']
+                        # create a DICT to hold the name/stock pair
+                        commodity = {'name': com['name'].title(), 'stock': stock}
+                        # add DICT to our list
+                        commodities_in_stock.append(commodity)
+
+                if commodities_in_stock:
+                    for commodity in commodities_in_stock:
+                        print("Found matching commodity %s at %s" % ( commodity['name'], commodity['stock'] ))
+
+                    spamchannel = bot.get_channel(bot_spam_channel())
+
+                    await edit_discord_alerts(interaction, mission_params, spamchannel, commodities_in_stock)
 
         except Exception as e:
             try:

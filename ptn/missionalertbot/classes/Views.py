@@ -836,23 +836,9 @@ class AddCarrierButtons(View):
                                         color=constants.EMBED_COLOUR_OK)
                     info_embed = _add_common_embed_fields(info_embed, carrier_data, interaction)
 
-                    cp_embed = discord.Embed(
-                        title="Copy/Paste code for Stockbot",
-                        description=f"▶ <#{bot_command_channel()}>:\n```;add_FC {carrier_data.carrier_identifier} {carrier_data.carrier_short_name} {carrier_data.ownerid}```",
-                        color=constants.EMBED_COLOUR_QU
-                    )
-
-                    embeds = [info_embed, cp_embed]
-
                     # TODO link with existing add_carrier function to remove duplicate code
 
-                    confirmation: discord.Message = await interaction.followup.send(embeds=embeds)
-
-                    stock_command_channel = bot.get_channel(bot_command_channel())
-
-                    content = f"<@{interaction.user.id}>: Please use the following command to add **{long_name}** ({carrier_id}) from {confirmation.jump_url} to Stockbot."
-
-                    await stock_command_channel.send(content=content, embed=cp_embed)
+                    confirmation: discord.Message = await interaction.followup.send(embed=info_embed)
 
                     # notify bot-spam
                     print("Notify bot-spam")

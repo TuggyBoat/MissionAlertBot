@@ -235,9 +235,21 @@ commodities_wmm = [
   "Silver"
 ]
 
-wmm_trigger_event = asyncio.Event()
+# WMM stations
+locations_wmm = [
+  "Swanson",
+  "Malerba",
+  "Darlton",
+  "Burkin",
+  "Middle"
+]
 
+# define global WMM trigger 
 wmm_trigger = False
+
+# define default WMM tracking interval
+wmm_interval = 3600 # 1 hour
+
 
 # random gifs and images
 
@@ -321,10 +333,10 @@ OPT_IN_ID = 'OPT-INX'
 
 # images and icons used in mission embeds
 BLANKLINE_400PX = 'https://pilotstradenetwork.com/wp-content/uploads/2023/01/400x1-00000000.png'
-ICON_BUY_FROM_STATION = 'https://pilotstradenetwork.com/wp-content/uploads/2023/10/mab_buy_from_station.png'
-ICON_BUY_FROM_CARRIER = 'https://pilotstradenetwork.com/wp-content/uploads/2023/10/mab_buy_from_carrier.png'
-ICON_SELL_TO_STATION = 'https://pilotstradenetwork.com/wp-content/uploads/2023/10/mab_sell_to_station.png'
-ICON_SELL_TO_CARRIER = 'https://pilotstradenetwork.com/wp-content/uploads/2023/10/mab_sell_to_carrier.png'
+ICON_BUY_FROM_STATION = 'https://pilotstradenetwork.com/wp-content/uploads/2024/02/mab_buy_from_station.png'
+ICON_BUY_FROM_CARRIER = 'https://pilotstradenetwork.com/wp-content/uploads/2024/02/mab_buy_from_carrier.png'
+ICON_SELL_TO_STATION = 'https://pilotstradenetwork.com/wp-content/uploads/2024/02/mab_sell_to_station.png'
+ICON_SELL_TO_CARRIER = 'https://pilotstradenetwork.com/wp-content/uploads/2024/02/mab_sell_to_carrier.png'
 ICON_DATA = 'https://pilotstradenetwork.com/wp-content/uploads/2023/06/Data.png'
 ICON_DISCORD_CIRCLE = 'https://pilotstradenetwork.com/wp-content/uploads/2023/06/discord-icon-in-circle.png'
 ICON_DISCORD_PING = 'https://pilotstradenetwork.com/wp-content/uploads/2023/06/discord-notification-dot-icon.png'
@@ -345,9 +357,6 @@ DISCORD_INVITE_URL = 'https://discord.gg/ptn'
 # link to our Discord by way of Josh's original post on Reddit
 REDDIT_DISCORD_LINK_URL = \
     'https://discord.gg/ptn'
-
-# default WMM tracking interval
-WMM_INTERVAL = 3600 # 1 hour
 
 # define constants based on prod or test environment
 def reddit_flair_mission_start():

@@ -535,7 +535,7 @@ class GeneralCommands(commands.Cog):
 
         try:
 
-            if not wmm_stock.is_running():
+            if not wmm_stock.is_running(): # task is stopped, start it
                 print("WMM task was not running. Restarting...")
                 await start_wmm_task()
 
@@ -546,10 +546,22 @@ class GeneralCommands(commands.Cog):
 
                 await interaction.edit_original_response(embed=embed)
 
-            else: # TODO this should restart the task
+            else: # restart the task
+
+                embed.description="⏳ WMM task already running. Attempting to restart..."
+
+                await interaction.edit_original_response(embed=embed)
+
+                wmm_stock.cancel()
+
+                # wait for the task to finish
+                while wmm_stock.is_running():
+                    await asyncio.sleep(2)
+
+                await start_wmm_task()
 
                 embed = discord.Embed(
-                    description="✅ WMM background task is already running.",
+                    description="✅ WMM background task was running and has been restarted.",
                     color=constants.EMBED_COLOUR_OK
                 )
 
@@ -574,7 +586,7 @@ class GeneralCommands(commands.Cog):
             print(f"{interval} minutes is {seconds} seconds")
 
             # update variable
-            constants.WMM_INTERVAL = seconds
+            constants.wmm_interval = seconds
 
             # notify user
 
@@ -597,7 +609,7 @@ class GeneralCommands(commands.Cog):
     async def wmm_interval_check(self, interaction: discord.Interaction):
         try:
             # convert to minutes
-            minutes = int(constants.WMM_INTERVAL/60)
+            minutes = int(constants.wmm_interval/60)
 
             # notify user
 
