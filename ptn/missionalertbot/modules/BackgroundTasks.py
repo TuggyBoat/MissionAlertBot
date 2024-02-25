@@ -264,7 +264,7 @@ async def wmm_stock(message, wmm_channel, ccochannel):
                 print(f"no inara market data for {carrier.carrier_identifier}")
                 continue
             carrier_name = stn_data['full_name'].upper()
-            stn_data['currentStarSystem'] = stn_data['name'].upper()
+            stn_data['currentStarSystem'] = stn_data['name'].title()
             stn_data['market'] = {'commodities': stn_data['commodities']}
             try:
                 utc_time = datetime.strptime(stn_data['market_updated'].split('(')[1][0:-1], "%d %b %Y, %I:%M%p")
@@ -390,6 +390,9 @@ async def wmm_stock(message, wmm_channel, ccochannel):
     footer.append("Carriers with no timestamp are fetched from cAPI and are accurate to within an hour.")
     footer.append("Carriers with (As of ...) are fetched from Inara. Ensure EDMC is running to update stock levels!")
     await wmm_channel.send('\n'.join(footer))
+
+    print("Current list of stations:")
+    print(wmm_station_stock)
 
     for system in wmm_station_stock:
         ccocontent[system] = []
