@@ -16,7 +16,7 @@ from discord import app_commands
 
 # local classes
 from ptn.missionalertbot.classes.MissionData import MissionData
-from ptn.missionalertbot.classes.Views import MissionCompleteView, MissionDeleteView
+from ptn.missionalertbot.classes.Views import MissionCompleteView, MissionDeleteView, ConfirmCAPISync
 
 # local constants
 from ptn.missionalertbot._metadata import __version__
@@ -34,7 +34,7 @@ from ptn.missionalertbot.modules.helpers import bot_exit, check_roles, check_com
     check_mission_channel_lock, list_active_locks
 from ptn.missionalertbot.modules.BackgroundTasks import lasttrade_cron, _monitor_reddit_comments, start_wmm_task, wmm_stock
 from ptn.missionalertbot.modules.MissionCleaner import check_trade_channels_on_startup
-from ptn.missionalertbot.modules.DateString import get_inactive_hammertime
+from ptn.missionalertbot.modules.DateString import get_inactive_hammertime, get_formatted_date_string
 
 
 """
@@ -430,39 +430,6 @@ class GeneralCommands(commands.Cog):
                 await on_generic_error(interaction, e)
 
 
-    @wmm_group.command(name='update', description='Refresh WMM stock without changing the update interval.')
-    @check_roles([admin_role()])
-    @check_command_channel(bot_command_channel())
-    async def wmm_update(self, interaction: discord.Interaction):
-        print(f"▶ Manual WMM refresh called by {interaction.user}")
-        try:
-            constants.wmm_trigger = True
-            embed = discord.Embed(
-                description=f"⏳ WMM stock update requested. Please wait a moment before checking <#{constants.channel_wmm_stock()}>.",
-                color=constants.EMBED_COLOUR_QU
-            )
-
-            await interaction.response.send_message(embed=embed)
-
-            if not wmm_stock.is_running() or wmm_stock.failed():
-                print("wmm_stock task has failed, restarting.")
-
-                embed = discord.Embed(
-                description="⚠ WMM stock background task was not running. Restarting now.",
-                color=constants.EMBED_COLOUR_WARNING
-                )
-
-                await interaction.followup.send(embed=embed)
-
-                await start_wmm_task()
-
-        except Exception as e:
-            try:
-                raise GenericError(e)
-            except Exception as e:
-                await on_generic_error(interaction, e)
-
-
     @wmm_group.command(name='status', description='Check the status of the WMM stock background task.')
     @check_roles([admin_role()])
     @check_command_channel(bot_command_channel())
@@ -475,6 +442,7 @@ class GeneralCommands(commands.Cog):
             await interaction.response.send_message(embed=embed)
 
             if not wmm_stock.is_running() or wmm_stock.failed():
+                print("⚠ WMM task has failed or stopped!")
 
                 embed = discord.Embed(
                     description=f":warning: WMM stock background task is not running; WMM stock will not update. Restart it with `/admin wmm start`.",
@@ -484,10 +452,23 @@ class GeneralCommands(commands.Cog):
                 await interaction.edit_original_response(embed=embed)
 
             else:
+                print("✅ WMM task is running, returning status and next check interval.")
+                # generate hammertime for last loop and next loop
+                posix_time_now = get_formatted_date_string()[2]
+                next_loop_seconds = constants.wmm_interval - constants.wmm_slept_for
+                last_loop_absolute = posix_time_now - constants.wmm_slept_for
+                next_loop_absolute = posix_time_now + next_loop_seconds
+                last_hammertime = f"<t:{last_loop_absolute}:R>"
+                next_hammertime = f"<t:{next_loop_absolute}:R>"
+
                 embed = discord.Embed(
-                    description="✅ WMM background task is running.",
+                    title="WMM STOCK TRACKER STATUS",
+                    description=f"✅ WMM background task is running.\n:chart_with_upwards_trend: Last scheduled check: {last_hammertime}."
+                                f"\n:hourglass_flowing_sand: Next scheduled check {next_hammertime}."
+                                f"\n:timer: Current check interval: {int(constants.wmm_interval/60)} minutes.",
                     color=constants.EMBED_COLOUR_OK
                 )
+                embed.set_footer(text="/cco wmm update can trigger updates outwith the above schedule.")
 
             await interaction.edit_original_response(embed=embed)
 
@@ -575,7 +556,7 @@ class GeneralCommands(commands.Cog):
 
 
 
-    @wmm_group.command(name='set_interval', description='Set the interval for WMM stock updates in minutes. Default: 60 minutes.')
+    @wmm_group.command(name='interval', description='Set the interval for WMM stock updates in minutes. Default: 60 minutes.')
     @check_roles([admin_role()])
     @check_command_channel(bot_command_channel())
     async def wmm_interval_set(self, interaction: discord.Interaction, interval: int):
@@ -603,28 +584,32 @@ class GeneralCommands(commands.Cog):
                 await on_generic_error(interaction, e)
 
 
-    @wmm_group.command(name='check_interval', description='View the current WMM update interval. Default: 60 minutes.')
+    # synchronise the status of CAPI auth for all carriers in the database
+    @admin_group.command(name='capi_sync', description='Synchronise CAPI status for all carriers in database. WARNING: takes a while.')
     @check_roles([admin_role()])
     @check_command_channel(bot_command_channel())
-    async def wmm_interval_check(self, interaction: discord.Interaction):
+    async def wmm_stop(self, interaction: discord.Interaction):
+        print(f"⚠ CAPI database status sync called by {interaction.user}")
+
         try:
-            # convert to minutes
-            minutes = int(constants.wmm_interval/60)
-
-            # notify user
-
             embed = discord.Embed(
-                description=f":timer: WMM stock update interval currently {minutes} minutes.",
-                color=constants.EMBED_COLOUR_OK
+                description=":warning: This command should only be run when first transitioning from StockBot or when rebuilding the carrier database."
+                            f" It will iterate through every PTN Fleet Carrier in the <@{bot.user.id}> database and attempt to connect to its associated Frontier account via the cAPI."
+                            " This could take a couple of seconds per registered Fleet Carrier, so several minutes in total. Are you sure you want to continue?",
+                color=constants.EMBED_COLOUR_WARNING
             )
 
-            await interaction.response.send_message(embed=embed)
+            view = ConfirmCAPISync(embed, interaction.user)
+
+            await interaction.response.send_message(embed=embed, view=view)
+
+            view.message = await interaction.original_response()
+
         except Exception as e:
             try:
                 raise GenericError(e)
             except Exception as e:
                 await on_generic_error(interaction, e)
-
 
 
     # forceably quit the bot

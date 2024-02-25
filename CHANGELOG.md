@@ -3,39 +3,36 @@
 ## 2.4.0
 Integrated stock tracking features from stockbot (with thanks to DudeInCorner and Durzo):
 - `/stock`:
- - can be used in a carrier channel without parameters to check stock of that carrier
- - can be used with carrier as a parameter to check stock for any carrier
- - can optionally specify inara or capi as source; default is capi
- - added information in footer as to stock source
+ - can be used in a carrier channel without parameters to check stock of that carrier.
+ - can be used with carrier as a parameter to check stock for any carrier.
+ - can optionally specify inara or capi as source; default is capi.
+ - added information in footer as to stock source.
  - EDMC data notice is now context-sensitive:
-  - EDMC notice will only show when source is 'inara'
-  - EDMC-off missions will show a reminder to disable EDMC, instead of the reminder to use it
-- `/cco capi enable` if capi auth is confirmed, will flag the carrier as capi-enabled; otherwise, will send the target carrier owner a DM with OAuth link and explanation
-- `/cco capi disable` will flag the carrier as capi-disabled and prevent capi stock checks
-- Adding carriers to Mission Alert Bot will no longer prompt the user to add to stockbot
+   - EDMC notice will only show when source is 'inara'.
+   - EDMC-off missions will show a reminder to disable EDMC, instead of the reminder to use it
+- `/cco capi enable`: If capi auth is confirmed, will flag the carrier(s) as capi-enabled; otherwise, will send the target carrier owner a DM with OAuth link and explanation. Multiple carriers can be separated by commas.
+- `/cco capi disable`: Will flag the carrier(s) as capi-disabled and prevent capi stock checks. Multiple carriers can be separated by commas.
+- Adding carriers to Mission Alert Bot will no longer prompt the user to add to stockbot.
 
 Integrated WMM tracking features from stockbot (with thanks to Durzo):
-- WMM stock display in #wmm-stock and #cco-wmm-supplies
-- `/cco wmm enable`: adds a carrier to WMM tracking; option to autocomplete station location from list.
-- `/cco wmm disable`: removes a carrier from WMM tracking
-- `/admin wmm update`: trigger manual refresh of WMM stock
-- `/admin wmm status`: check the status of the WMM background task
-- `/admin wmm stop`: stop the WMM background task
-- `/admin wmm start`: start or restart the WMM background task
-- `/admin wmm check_interval`: view the current WMM update interval in minutes
-- `/admin wmm set_interval`: set the WMM update interval in minutes
-- `m.wmm_list`: list active WMM carriers
+- WMM stock display in #wmm-stock and #cco-wmm-supplies.
+- `/cco wmm enable`: Adds a carrier to WMM tracking; option to autocomplete station location from list.
+- `/cco wmm disable`: Removes one or more carriers from WMM tracking. Multiple carriers can be separated by commas.
+- `/cco wmm update`: Trigger manual refresh of all WMM stock.
+- `/admin wmm status`: Check the status of the WMM background task; now shows time remaining until next loop, as well as current interval time.
+- `/admin wmm stop`: Stop the WMM background task.
+- `/admin wmm start`: Start or restart the WMM background task.
+- `/admin wmm interval`: Set the WMM update interval in minutes.
+- `m.wmm_list`: List active WMM carriers.
 
 Other:
-- `carrier_add` and `Add Carrier` no longer offer StockBot code for ;add_FC
-- Changed references to `;stock <shortname>` to `/stock`
-- Removed shortname as a user-facing variable
-- Added cAPI status to carrier info embeds
-- Trade Alerts will now include updated supply/demand remaining if a user uses `/stock` for a carrier on a mission
-- Updated web links for loading/unloading images so Discord will finally stock mocking me with cached images from 3 months ago
-
-To do:
-- command to sync CAPI status on first deployment
+- `carrier_add` and `Add Carrier` no longer offer StockBot code for `;add_FC`.
+- Changed references to `;stock <shortname>` to `/stock`.
+- Removed shortname as a user-facing variable.
+- Added cAPI status to carrier info embeds.
+- Trade Alerts will now include updated supply/demand remaining if a user uses `/stock` for a carrier on a mission.
+- Updated web links for loading/unloading images so Discord will finally stock mocking me with cached images from 3 months ago.
+- `/admin capi_sync`: Intended for first run after StockBot migration: updates CAPI status for all registered PTN Fleet Carriers.
 
 
 ## 2.3.8

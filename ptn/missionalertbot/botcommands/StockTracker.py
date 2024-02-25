@@ -157,6 +157,7 @@ class StockTracker(commands.Cog):
             msg = "```%s```\n" % ( table.draw() )
 
             embed = discord.Embed()
+            embed.color = constants.EMBED_COLOUR_OK
             embed.add_field(name = f"{fcname} ({stn_data['sName']}) stock", value = msg, inline = False)
             embed.add_field(name = 'FC Location', value = loc_data, inline = False)
             embed.set_footer(text = f"Data last updated: {stn_data['market_updated']}\nData source: {source_formal}\n" \

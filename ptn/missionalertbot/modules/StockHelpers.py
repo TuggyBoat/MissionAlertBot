@@ -183,8 +183,10 @@ async def notify_wmm_owner(carrier_data: WMMData, embed, message):
     owner = await bot.fetch_user(carrier_data.carrier_owner)
     try:
         await owner.send(embed=embed)
+        print(f"Low stock DM sent to {owner}")
     except Forbidden:
+        print(f"Unable to DM {owner}, error 403. Pinging in channel instead.")
         # ping the owner in-channel
-        ccochannel = bot.get_channel(channel_cco_wmm_talk())
-        await ccochannel.send(message)
+        cco_channel = bot.get_channel(channel_cco_wmm_talk())
+        await cco_channel.send(message)
 

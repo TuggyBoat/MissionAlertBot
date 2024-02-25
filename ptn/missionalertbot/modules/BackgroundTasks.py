@@ -319,7 +319,7 @@ async def wmm_stock(message, wmm_channel, ccochannel):
                     # Notify the owner once per commodity per wmm_tracking session.
                     notification_status = json.loads(carrier.notification_status) if carrier.notification_status else []
                     if com['name'] not in notification_status:
-                        print(f"Low stock warning for {carrier.carrier_name}")
+                        print(f"Generating low stock warning for {carrier.carrier_name} to DM to owner")
                         
                         embed = discord.Embed(
                             description=f"📉 Your fleet carrier {carrier.carrier_name} ({carrier.carrier_identifier}) is low on %s - %s remaining." 
@@ -396,10 +396,10 @@ async def wmm_stock(message, wmm_channel, ccochannel):
         for station in wmm_station_stock[system]:
             ccocontent[system].append('-')
             for commodity in commodities_wmm:
-                if commodity not in wmm_station_stock[system][station]:
+                if commodity.lower() not in wmm_station_stock[system][station]:
                     ccocontent[system].append(f"{commodity.title()} x NO STOCK !! - {system} ({station})")
                 else:
-                    ccocontent[system].append(f"{commodity.title()} x {format(wmm_station_stock[system][station][commodity], ',')} - {system} ({station})")
+                    ccocontent[system].append(f"{commodity.title()} x {format(wmm_station_stock[system][station][commodity.lower()], ',')} - {system} ({station})")
 
     # for each station, use a new message.
     # and split messages over 10 lines.
@@ -418,16 +418,16 @@ async def wmm_stock(message, wmm_channel, ccochannel):
     # the following code allows us to change sleep time dynamically
     # waiting at least 10 seconds before checking constants.wmm_interval again
     # This also checks for the trigger to manually update.
-    slept_for = 0
-    while slept_for < constants.wmm_interval:
+    constants.wmm_slept_for = 0
+    while constants.wmm_slept_for < constants.wmm_interval:
         # wmm_trigger is set by ;wmm_stock command
         if constants.wmm_trigger:
             print("Manual WMM stock refresh triggered.")
             constants.wmm_trigger = False
-            slept_for = constants.wmm_interval
+            constants.wmm_slept_for = constants.wmm_interval
         else:
             await asyncio.sleep(10)
-            slept_for = slept_for + 10
+            constants.wmm_slept_for = constants.wmm_slept_for + 10
 
 @wmm_stock.after_loop
 async def wmm_after_loop():

@@ -19,7 +19,7 @@ from discord.ext.commands import GroupCog
 import ptn.missionalertbot.constants as constants
 from ptn.missionalertbot.constants import bot, mission_command_channel, certcarrier_role, trainee_role, seconds_long, rescarrier_role, commodities_common, \
     bot_spam_channel, training_mission_command_channel, seconds_very_short, admin_role, mod_role, cco_mentor_role, aco_role, recruit_role, cco_color_role, \
-    API_HOST, ptn_logo_discord, locations_wmm
+    API_HOST, ptn_logo_discord, locations_wmm, bot_command_channel
 
 # import local classes
 from ptn.missionalertbot.classes.MissionParams import MissionParams
@@ -39,6 +39,7 @@ from ptn.missionalertbot.modules.MissionGenerator import confirm_send_mission_vi
 from ptn.missionalertbot.modules.MissionCleaner import _cleanup_completed_mission
 from ptn.missionalertbot.modules.MissionEditor import edit_active_mission
 from ptn.missionalertbot.modules.StockHelpers import capi, oauth_new
+from ptn.missionalertbot.modules.BackgroundTasks import wmm_stock, start_wmm_task
 
 
 """
@@ -753,92 +754,113 @@ class CCOCommands(commands.Cog):
     Stock tracker
     """
     
-    @capi_group.command(name='enable', description='Enable stock tracking via the Frontier API.')
-    @describe(carrier = "A unique fragment of the carrier name you want to search for.")
+    @capi_group.command(name='enable', description='Enable stock tracking via the Frontier API. Multiple carriers can be separated by a comma.')
+    @describe(carriers = "One or more unique fragments of the carrier names you want to search for.")
     @check_roles([certcarrier_role(), trainee_role(), rescarrier_role()])
-    @check_command_channel([mission_command_channel(), training_mission_command_channel()])
-    async def capi_enable(self, interaction: discord.Interaction, carrier: str):
-        print(f"▶ cAPI tracking enable called by {interaction.user} for search term {carrier}")
+    @check_command_channel([mission_command_channel(), training_mission_command_channel(), bot_command_channel()])
+    async def capi_enable(self, interaction: discord.Interaction, carriers: str):
+        print(f"▶ cAPI tracking enable called by {interaction.user} for search term {carriers}")
 
         try:
-            embed: discord.Embed = please_wait_embed()
 
+            embed: discord.Embed = please_wait_embed()
             await interaction.response.send_message(embed=embed)
 
-            # attempt to find matching carrier data
-            carrier_data = flexible_carrier_search_term(carrier)
-            
-            if not carrier_data:  # error condition
-                print(f"❌ No carrier found matching search term {carrier}")
-                carrier_error_embed = discord.Embed(
-                    description=f"❌ No carrier found for '**{carrier}**'. Use `/owner` to see a list of your carriers. If it's not in the list, ask an Admin to add it for you.",
-                    color=constants.EMBED_COLOUR_ERROR
-                )
-                return await interaction.edit_original_response(embed=carrier_error_embed)
+            if ", " in carriers:
+                print("User requested multiple carriers")
+                carrier_list = carriers.split(', ')
+            elif "," in carriers:
+                print("What kind of monster uses a comma without a trailing space?")
+                carrier_list = carriers.split(',')
+            else:
+                carrier_list = [carriers]
 
-            fccode = carrier_data.carrier_identifier
+            embeds = []
 
-            capi_response = capi(fccode)
-            print(f"capi response: {capi_response.status_code}")
-            if capi_response.status_code != 200:
-                r = oauth_new(fccode)
-                oauth_response = r.json()
-                print(f"capi_enable response {r.status_code} - {oauth_response}")
-                if 'token' in oauth_response:
-                    try:
-                        # DM the carrier owner with oauth link
-                        owner = await bot.fetch_user(carrier_data.ownerid)
+            for carrier in carrier_list:
+                # attempt to find matching carrier data
+                carrier_data = flexible_carrier_search_term(carrier)
+                
+                if not carrier_data:  # error condition
+                    print(f"❌ No carrier found matching search term {carrier}")
+                    carrier_error_embed = discord.Embed(
+                        description=f"❌ No carrier found for '**{carrier}**'. Use `/owner` to see a list of your carriers. If it's not in the list, ask an Admin to add it for you.",
+                        color=constants.EMBED_COLOUR_ERROR
+                    )
+                    embeds.append(carrier_error_embed)
+                    continue # try other items in list
 
-                        oauth_url = f"{API_HOST}/generate/{fccode}?token={oauth_response['token']}"
+                fccode = carrier_data.carrier_identifier
 
-                        oauth_embed = discord.Embed(
-                            title="🔗 Frontier Account Link Request",
-                            description=f"Use the link below to **sign in to the Frontier Account** associated with {carrier_data.carrier_long_name} ({carrier_data.carrier_identifier})."
-                                        f" This will authorise <@{bot.user.id}> to query this account for stock tracking purposes.\n\n"
-                                        f"**[✅ Yes, authorise cAPI stock tracking for {carrier_data.carrier_long_name}]({oauth_url})**",
-                            color=constants.EMBED_COLOUR_QU
-                        )
-
-                        oauth_embed.set_thumbnail(url=ptn_logo_discord(strftime('%B')))
-
-                        await owner.send(embed=oauth_embed)
-
-                    except Forbidden:
-                        print(f"Couldn't message {owner}- DMs are blocked (403 Forbidden).")
+                capi_response = capi(fccode)
+                print(f"capi response: {capi_response.status_code}")
+                if capi_response.status_code != 200:
+                    r = oauth_new(fccode)
+                    oauth_response = r.json()
+                    print(f"capi_enable response {r.status_code} - {oauth_response}")
+                    if 'token' in oauth_response:
                         try:
-                            error = "Error 403 (Forbidden) while attempting to send your OAuth link. " \
-                                   f"Please make sure you have allowed direct messages from <@{bot.user.id}> and try again."
+                            # DM the carrier owner with oauth link
+                            owner = await bot.fetch_user(carrier_data.ownerid)
+
+                            oauth_url = f"{API_HOST}/generate/{fccode}?token={oauth_response['token']}"
+
+                            oauth_embed = discord.Embed(
+                                title="🔗 Frontier Account Link Request",
+                                description=f"Use the link below to **sign in to the Frontier Account** associated with {carrier_data.carrier_long_name} ({carrier_data.carrier_identifier})."
+                                            f" This will authorise <@{bot.user.id}> to query this account for stock tracking purposes.\n\n"
+                                            f"**[✅ Yes, authorise cAPI stock tracking for {carrier_data.carrier_long_name}]({oauth_url})**",
+                                color=constants.EMBED_COLOUR_QU
+                            )
+
+                            oauth_embed.set_thumbnail(url=ptn_logo_discord(strftime('%B')))
+
+                            await owner.send(embed=oauth_embed)
+
+                        except Forbidden:
+                            print(f"Couldn't message {owner}- DMs are blocked (403 Forbidden).")
+                            try:
+                                error = "Error 403 (Forbidden) while attempting to send your OAuth link. " \
+                                    f"Please make sure you have allowed direct messages from <@{bot.user.id}> and try again."
+                                raise CustomError(error)
+                            except Exception as e:
+                                return await on_generic_error(interaction, e)
+
+                        embed.description=f"🔑 Please check <@{owner.id}>'s direct messages for Frontier account authorisation link, then repeat this command."
+
+                        embeds.append(embed)
+
+                        continue # stop there for this item
+
+                    else:
+                        try:
+                            error = f"Could not generate auth URL for {carrier_data.carrier_long_name} ({carrier_data.carrier_identifier}): {e}"
                             raise CustomError(error)
                         except Exception as e:
                             return await on_generic_error(interaction, e)
 
-                    embed.description=f"🔑 Please check <@{owner.id}>'s direct messages for Frontier account authorisation link, then repeat this command."
-
-                    await interaction.edit_original_response(embed=embed)
-
                 else:
-                    try:
-                        error = f"Could not generate auth URL for {carrier_data.carrier_long_name} ({carrier_data.carrier_identifier}): {e}"
-                        raise CustomError(error)
-                    except Exception as e:
-                        return await on_generic_error(interaction, e)
+                    embed = discord.Embed(
+                        description=f"✅ cAPI auth already exists for {carrier_data.carrier_long_name} ({carrier_data.carrier_identifier}), enabling stock fetching.",
+                        color=constants.EMBED_COLOUR_OK
+                    )
+                    embeds.append(embed)
 
-            else:
-                embed.description=f"✅ cAPI auth already exists for {carrier_data.carrier_long_name} ({carrier_data.carrier_identifier}), enabling stock fetching."
-                await interaction.edit_original_response(embed=embed)
+                # write to the database
+                await _update_carrier_capi(carrier_data.pid, 1)
 
-            # write to the database
-            await _update_carrier_capi(carrier_data.pid, 1)
+                # check if the carrier is being tracked for WMM
+                wmm_data: WMMData = find_wmm_carrier(carrier_data.carrier_identifier, 'cid')
 
-            # check if the carrier is being tracked for WMM
-            wmm_data: WMMData = find_wmm_carrier(carrier_data.carrier_identifier, 'cid')
+                if wmm_data:
+                    # update the WMM database
+                    wmm_data.capi = 1
+                    await _update_wmm_carrier(wmm_data)
 
-            if wmm_data:
-                # update the WMM database
-                wmm_data.capi = 1
-                await _update_wmm_carrier(wmm_data)
+                print("Finished updating cAPI flag.")
 
-            print("Finished updating cAPI flag.")
+            # now return summary to user
+            await interaction.edit_original_response(embeds=embeds)
 
         except Exception as e:
             try:
@@ -848,61 +870,84 @@ class CCOCommands(commands.Cog):
                 await on_generic_error(interaction, e)
 
 
-    @capi_group.command(name='disable', description='Disable stock tracking via the Frontier API.')
-    @describe(carrier = "A unique fragment of the carrier name you want to search for.")
+    @capi_group.command(name='disable', description='Disable stock tracking via the Frontier API. Multiple carriers can be separated by a comma.')
+    @describe(carriers = "One or more unique fragments of the carrier names you want to search for.")
     @check_roles([certcarrier_role(), trainee_role(), rescarrier_role()])
-    @check_command_channel([mission_command_channel(), training_mission_command_channel()])
-    async def capi_disable(self, interaction: discord.Interaction, carrier: str):
-        print(f"▶ cAPI tracking disable called by {interaction.user} for search term {carrier}")
+    @check_command_channel([mission_command_channel(), training_mission_command_channel(), bot_command_channel()])
+    async def capi_disable(self, interaction: discord.Interaction, carriers: str):
+        print(f"▶ cAPI tracking disable called by {interaction.user} for search term {carriers}")
 
         try:
             embed: discord.Embed = please_wait_embed()
-
             await interaction.response.send_message(embed=embed)
 
-            # attempt to find matching carrier data
-            carrier_data = flexible_carrier_search_term(carrier)
-            
-            if not carrier_data:  # error condition
-                print(f"❌ No carrier found matching search term {carrier}")
-                carrier_error_embed = discord.Embed(
-                    description=f"❌ No carrier found for '**{carrier}**'. Use `/owner` to see a list of your carriers. If it's not in the list, ask an Admin to add it for you.",
-                    color=constants.EMBED_COLOUR_ERROR
-                )
-                return await interaction.edit_original_response(embed=carrier_error_embed)
+            if ", " in carriers:
+                print("User requested multiple carriers")
+                carrier_list = carriers.split(', ')
+            elif "," in carriers:
+                print("What kind of monster uses a comma without a trailing space?")
+                carrier_list = carriers.split(',')
+            else:
+                carrier_list = [carriers]
 
-            if not carrier_data.capi:
-                print(f"cAPI already disabled for {carrier_data.carrier_long_name}")
+            embeds = []
 
-                embed.description=f"✅ Frontier API stock tracking is already disabled for **{carrier_data.carrier_long_name}** ({carrier_data.carrier_identifier})."
-                embed.color=constants.EMBED_COLOUR_OK
+            for carrier in carrier_list:
+                # attempt to find matching carrier data
+                carrier_data = flexible_carrier_search_term(carrier)
+                
+                if not carrier_data:  # error condition
+                    print(f"❌ No carrier found matching search term {carrier}")
+                    carrier_error_embed = discord.Embed(
+                        description=f"❌ No carrier found for '**{carrier}**'. Use `/owner` to see a list of your carriers. If it's not in the list, ask an Admin to add it for you.",
+                        color=constants.EMBED_COLOUR_ERROR
+                    )
 
-                return await interaction.edit_original_response(embed=embed)
+                    embeds.append(carrier_error_embed)
+                    continue
 
-            try:
-                print(f"⏳ Disabling cAPI for {carrier_data.carrier_long_name}...")
+                if not carrier_data.capi:
+                    print(f"cAPI already disabled for {carrier_data.carrier_long_name}")
 
-                await _update_carrier_capi(carrier_data.pid, 0)
+                    embed = discord.Embed (
+                        description=f"✅ Frontier API stock tracking is already disabled for **{carrier_data.carrier_long_name}** ({carrier_data.carrier_identifier}).",
+                        color=constants.EMBED_COLOUR_OK
+                    )
 
-                # check if the carrier is being tracked for WMM
-                wmm_data: WMMData = find_wmm_carrier(carrier_data.carrier_identifier, 'cid')
+                    embeds.append(embed)
+                    continue
 
-                if wmm_data:
-                    # update the WMM database
-                    wmm_data.capi = 0
-                    await _update_wmm_carrier(wmm_data)
-
-                embed.description=f"✅ Frontier API stock tracking disabled for **{carrier_data.carrier_long_name}** ({carrier_data.carrier_identifier})."
-                embed.color=constants.EMBED_COLOUR_OK
-
-                await interaction.edit_original_response(embed=embed)
-
-            except Exception as e:
                 try:
-                    error = f"Unable to disable cAPI for **{carrier_data.carrier_long_name}** ({carrier_data.carrier_identifier}): {e}"
-                    raise CustomError(error)
+                    print(f"⏳ Disabling cAPI for {carrier_data.carrier_long_name}...")
+
+                    await _update_carrier_capi(carrier_data.pid, 0)
+
+                    # check if the carrier is being tracked for WMM
+                    wmm_data: WMMData = find_wmm_carrier(carrier_data.carrier_identifier, 'cid')
+
+                    if wmm_data:
+                        # update the WMM database
+                        wmm_data.capi = 0
+                        await _update_wmm_carrier(wmm_data)
+
+                    embed = discord.Embed(
+                        description=f"✅ Frontier API stock tracking disabled for **{carrier_data.carrier_long_name}** ({carrier_data.carrier_identifier}).",
+                        olor=constants.EMBED_COLOUR_OK
+                    )
+
+                    embeds.append(embed)
+                    continue
+
                 except Exception as e:
-                    return await on_generic_error(interaction, e)
+                    try:
+                        error = f"Unable to disable cAPI for **{carrier_data.carrier_long_name}** ({carrier_data.carrier_identifier}): {e}"
+                        raise CustomError(error)
+                    except Exception as e:
+                        await on_generic_error(interaction, e)
+                        continue
+
+            # now return summary to user
+            await interaction.edit_original_response(embeds=embeds)
 
         except Exception as e:
             try:
@@ -918,7 +963,7 @@ class CCOCommands(commands.Cog):
     @wmm_group.command(name='enable', description='Begin WMM tracking for specified carrier.')
     @describe(carrier="A unique fragment of the carrier name you want to search for.")
     @check_roles([certcarrier_role(), trainee_role(), rescarrier_role()])
-    @check_command_channel([mission_command_channel(), training_mission_command_channel()])
+    @check_command_channel([mission_command_channel(), training_mission_command_channel(), bot_command_channel()])
     async def wmm_enable(self, interaction: discord.Interaction, carrier: str, station: str):
         print(f"▶ WMM tracking start called by {interaction.user} for search term {carrier} in {station}")
         try:
@@ -972,49 +1017,69 @@ class CCOCommands(commands.Cog):
                 return
 
 
-
-
-    @wmm_group.command(name='disable', description='Stop WMM tracking for specified carrier.')
-    @describe(carrier="A unique fragment of the carrier name you want to search for.")
+    @wmm_group.command(name='disable', description='Stop WMM tracking for specified carrier. Multiple carriers can be separated by a comma.')
+    @describe(carriers = "One or more unique fragments of the carrier names you want to search for.")
     @check_roles([certcarrier_role(), trainee_role(), rescarrier_role()])
-    @check_command_channel([mission_command_channel(), training_mission_command_channel()])
-    async def wmm_disable(self, interaction: discord.Interaction, carrier: str):
-        print(f"▶ WMM tracking stop called by {interaction.user} for search term {carrier}")
+    @check_command_channel([mission_command_channel(), training_mission_command_channel(), bot_command_channel()])
+    async def wmm_disable(self, interaction: discord.Interaction, carriers: str):
+        print(f"▶ WMM tracking stop called by {interaction.user} for search term {carriers}")
         try:
             embed: discord.Embed = please_wait_embed()
-
             await interaction.response.send_message(embed=embed)
 
-            # attempt to find matching carrier data
-            carrier_data = flexible_carrier_search_term(carrier)
-            
-            if not carrier_data:  # error condition
-                print(f"❌ No carrier found matching search term {carrier}")
-                carrier_error_embed = discord.Embed(
-                    description=f"❌ No carrier found for '**{carrier}**'. Use `/owner` to see a list of your carriers. If it's not in the list, ask an Admin to add it for you.",
-                    color=constants.EMBED_COLOUR_ERROR
+            if ", " in carriers:
+                print("User requested multiple carriers")
+                carrier_list = carriers.split(', ')
+            elif "," in carriers:
+                print("What kind of monster uses a comma without a trailing space?")
+                carrier_list = carriers.split(',')
+            else:
+                carrier_list = [carriers]
+
+            embeds = []
+
+            for carrier in carrier_list:
+                # attempt to find matching carrier data
+                carrier_data = flexible_carrier_search_term(carrier)
+                
+                if not carrier_data:  # error condition
+                    print(f"❌ No carrier found matching search term {carrier}")
+                    carrier_error_embed = discord.Embed(
+                        description=f"❌ No carrier found for '**{carrier}**'. Use `/owner` to see a list of your carriers. If it's not in the list, ask an Admin to add it for you.",
+                        color=constants.EMBED_COLOUR_ERROR
+                    )
+                    embeds.append(carrier_error_embed)
+                    continue
+
+                # check if carrier is being tracked already
+                wmm_data: WMMData = find_wmm_carrier(carrier_data.carrier_identifier, 'cid')
+
+                if not wmm_data:
+                    # carrier is already being tracked, notify user
+                    print("No WMM data found for %s" % ( carrier_data.carrier_long_name ))
+
+                    embed = discord.Embed(
+                        description=f"✅ **{carrier_data.carrier_long_name}** ({carrier_data.carrier_identifier}) is not presently being tracked for WMMs.",
+                        color = constants.EMBED_COLOUR_OK
+                    )
+
+                    embeds.append(embed)
+                    continue
+
+                # remove carrier from WMM database
+                await _remove_from_wmm_db(carrier_data.carrier_identifier)
+
+                # embed to notify user
+                embed = discord.Embed(
+                    description=f"🗑 Removed **{carrier_data.carrier_long_name}** ({carrier_data.carrier_identifier}) from the WMM stock list.",
+                    color = constants.EMBED_COLOUR_OK
                 )
-                return await interaction.edit_original_response(embed=carrier_error_embed)
 
-            # check if carrier is being tracked already
-            wmm_data: WMMData = find_wmm_carrier(carrier_data.carrier_identifier, 'cid')
+                embeds.append(embed)
+                continue
 
-            if not wmm_data:
-                # carrier is already being tracked, notify user
-                print("No WMM data found for %s" % ( carrier_data.carrier_long_name ))
-                embed.description=f"✅ **{carrier_data.carrier_long_name}** ({carrier_data.carrier_identifier}) is not presently being tracked for WMMs."
-                embed.color = constants.EMBED_COLOUR_OK
-                await interaction.edit_original_response(embed=embed)
-                return
-
-            # remove carrier from WMM database
-            await _remove_from_wmm_db(carrier_data.carrier_identifier)
-
-            # edit our embed to notify user
-            embed.description=f"🗑 Removed **{carrier_data.carrier_long_name}** ({carrier_data.carrier_identifier}) from the WMM stock list."
-            embed.color = constants.EMBED_COLOUR_OK
-
-            await interaction.edit_original_response(embed=embed)
+            # now return summary to user
+            await interaction.edit_original_response(embeds=embeds)
 
         except Exception as e:
             try:
@@ -1032,3 +1097,36 @@ class CCOCommands(commands.Cog):
         for location in locations_wmm: # iterate through our possible locations to append them as Choice options to our return list
             locations.append(app_commands.Choice(name=location, value=location))
         return locations # return the list of Choices
+    
+
+    @wmm_group.command(name='update', description='Refresh WMM stock without changing the update interval.')
+    @check_roles([certcarrier_role(), trainee_role(), rescarrier_role()])
+    @check_command_channel([mission_command_channel(), training_mission_command_channel(), bot_command_channel()])
+    async def wmm_update(self, interaction: discord.Interaction):
+        print(f"▶ Manual WMM refresh called by {interaction.user}")
+        try:
+            constants.wmm_trigger = True
+            embed = discord.Embed(
+                description=f"⏳ WMM stock update requested. Please wait a moment before checking <#{constants.channel_wmm_stock()}>.",
+                color=constants.EMBED_COLOUR_QU
+            )
+
+            await interaction.response.send_message(embed=embed)
+
+            if not wmm_stock.is_running() or wmm_stock.failed():
+                print("wmm_stock task has failed, restarting.")
+
+                embed = discord.Embed(
+                description="⚠ WMM stock background task was not running. Restarting now.",
+                color=constants.EMBED_COLOUR_WARNING
+                )
+
+                await interaction.followup.send(embed=embed)
+
+                await start_wmm_task()
+
+        except Exception as e:
+            try:
+                raise GenericError(e)
+            except Exception as e:
+                await on_generic_error(interaction, e)

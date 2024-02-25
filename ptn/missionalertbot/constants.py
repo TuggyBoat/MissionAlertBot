@@ -203,6 +203,7 @@ EMBED_COLOUR_ERROR = 0x800000           # dark red
 EMBED_COLOUR_QU = 0x00d9ff              # que?
 EMBED_COLOUR_OK = 0x80ff80              # we're good here thanks, how are you?
 EMBED_COLOUR_WARNING = 0xFFD700         # and it was all yellow
+EMBED_COLOUR_EXPIRED = 0x808080         # grey
 
 
 # defining fonts for pillow use
@@ -246,6 +247,9 @@ locations_wmm = [
 
 # define global WMM trigger 
 wmm_trigger = False
+
+# define global WMM check timer
+wmm_slept_for = 0
 
 # define default WMM tracking interval
 wmm_interval = 3600 # 1 hour

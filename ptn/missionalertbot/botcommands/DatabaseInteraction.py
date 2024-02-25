@@ -605,7 +605,7 @@ class DatabaseInteraction(commands.Cog):
                     await message.remove_reaction(reaction, user)
 
             except asyncio.TimeoutError:
-                if ctx.fetch_message(message.id) and ctx.fetch_message(ctx.message.id):
+                if await ctx.fetch_message(message.id) and await ctx.fetch_message(ctx.message.id):
                     print(f'Timeout hit during carrier request by: {ctx.author}')
                     embed = discord.Embed(description=f'Closed the active carrier list request from {ctx.author} due to no input in 60 seconds.', color=constants.EMBED_COLOUR_QU)
                     await ctx.send(embed=embed)
@@ -726,7 +726,7 @@ class DatabaseInteraction(commands.Cog):
                     await message.remove_reaction(reaction, user)
 
             except asyncio.TimeoutError:
-                if ctx.fetch_message(message.id) and ctx.fetch_message(ctx.message.id):
+                if await ctx.fetch_message(message.id) and await ctx.fetch_message(ctx.message.id):
                     print(f'Timeout hit during WMM carrier request by: {ctx.author}')
                     embed = discord.Embed(description=f'Closed the active WMM carrier list request from {ctx.author} due to no input in 60 seconds.', color=constants.EMBED_COLOUR_QU)
                     await ctx.send(embed=embed)
