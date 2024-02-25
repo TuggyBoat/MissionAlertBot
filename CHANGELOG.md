@@ -36,6 +36,9 @@ Other:
 
 TODO:
 - test wine load stock updates
+- swap button positions for capi_sync
+- remove shortname field from /carrier add
+- do we want wmm update to affect the time until the next stock check or not?
 
 ## 2.3.8
 - All admin commands are now interactions in the 'admin' group:

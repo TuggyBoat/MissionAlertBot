@@ -463,7 +463,7 @@ class GeneralCommands(commands.Cog):
 
                 embed = discord.Embed(
                     title="WMM STOCK TRACKER STATUS",
-                    description=f"✅ WMM background task is running.\n:chart_with_upwards_trend: Last scheduled check: {last_hammertime}."
+                    description=f"✅ WMM background task is running.\n:chart_with_upwards_trend: Last check: {last_hammertime}."
                                 f"\n:hourglass_flowing_sand: Next scheduled check {next_hammertime}."
                                 f"\n:timer: Current check interval: {int(constants.wmm_interval/60)} minutes.",
                     color=constants.EMBED_COLOUR_OK
