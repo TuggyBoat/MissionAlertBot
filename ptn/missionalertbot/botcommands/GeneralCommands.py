@@ -588,7 +588,7 @@ class GeneralCommands(commands.Cog):
     @admin_group.command(name='capi_sync', description='Synchronise CAPI status for all carriers in database. WARNING: takes a while.')
     @check_roles([admin_role()])
     @check_command_channel(bot_command_channel())
-    async def wmm_stop(self, interaction: discord.Interaction):
+    async def capi_database_sync(self, interaction: discord.Interaction):
         print(f"⚠ CAPI database status sync called by {interaction.user}")
 
         try:

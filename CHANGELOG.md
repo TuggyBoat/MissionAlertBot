@@ -34,6 +34,8 @@ Other:
 - Updated web links for loading/unloading images so Discord will finally stock mocking me with cached images from 3 months ago.
 - `/admin capi_sync`: Intended for first run after StockBot migration: updates CAPI status for all registered PTN Fleet Carriers.
 
+TODO:
+- test wine load stock updates
 
 ## 2.3.8
 - All admin commands are now interactions in the 'admin' group:
