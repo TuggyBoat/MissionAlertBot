@@ -35,6 +35,9 @@ Other:
 - Trade Alerts will now include updated supply/demand remaining if a user uses `/stock` for a carrier on a mission.
 - Updated web links for loading/unloading images so Discord will finally stock mocking me with cached images from 3 months ago.
 - `/admin capi_sync`: Intended for first run after StockBot migration: updates CAPI status for all registered PTN Fleet Carriers.
+- Added initial `settings.txt` with option to disable WMM auto start and specific some command IDs; for now, only `/stock` is implemented:
+ - `/admin settings view` to view settings.txt;
+ - `/admin settings change` to change a setting in the file.
 
 
 ## 2.3.8

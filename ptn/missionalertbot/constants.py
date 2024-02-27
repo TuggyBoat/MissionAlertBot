@@ -36,6 +36,9 @@ MISSIONS_DB_PATH = os.path.join(DATA_DIR, 'database', 'missions.db')
 WMM_DB_PATH = os.path.join(DATA_DIR, 'database', 'wmm.db')
 BACKUP_DB_PATH = os.path.join(DATA_DIR, 'database', 'backups')
 SQL_PATH = os.path.join(DATA_DIR, 'database', 'db_sql')
+SETTINGS_PATH = os.path.join(DATA_DIR, 'settings')
+SETTINGS_FILE = 'settings.txt'
+SETTINGS_FILE_PATH = os.path.join(SETTINGS_PATH, SETTINGS_FILE)
 
 # image paths
 IMAGE_PATH = os.path.join(DATA_DIR, 'images')
@@ -63,6 +66,11 @@ bot = commands.Bot(command_prefix='m.', intents=discord.Intents.all())
 # PTN2FDevOAuth for cAPI communication
 API_HOST = os.getenv('API_HOST')
 API_TOKEN = os.getenv('API_TOKEN')
+
+
+# default settings.txt values
+wmm_autostart = False
+commandid_stock = None
 
 
 # Production variables

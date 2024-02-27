@@ -481,9 +481,13 @@ async def return_discord_channel_embeds(mission_params: MissionParams):
 
     print("Define sell embed")
     # desc used by the local PTN additional info embed
+    if constants.commandid_stock:
+        stock_string = f"</stock:{constants.commandid_stock}>"
+    else:
+        stock_string = "`/stock`"
     additional_info_description = f"💎 Carrier Owner: <@{carrier_data.ownerid}>" \
                                   f"\n🔤 Carrier information: </info:849040914948554766>" \
-                                  f"\n📊 Stock information: `/stock`\n\n"
+                                  f"\n📊 Stock information: {stock_string}\n\n"
 
     print("Define help embed (local)")
     # desc used by the local PTN help embed

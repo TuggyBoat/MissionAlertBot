@@ -22,6 +22,7 @@ import shutil
 import enum
 import discord
 import pickle
+import traceback
 from datetime import datetime
 from datetime import timezone
 
@@ -52,10 +53,68 @@ def build_directory_structure_on_startup():
     os.makedirs(constants.IMAGE_PATH, exist_ok=True) # /images - carrier images
     os.makedirs(f"{constants.IMAGE_PATH}/old", exist_ok=True) # /images/old - backed up carrier images
     os.makedirs(constants.SQL_PATH, exist_ok=True) # /database/db_sql - DB SQL dumps
+    os.makedirs(constants.SETTINGS_PATH, exist_ok=True) # /database/db_sql - DB SQL dumps
     os.makedirs(constants.BACKUP_DB_PATH, exist_ok=True) # /database/backups - db backups
     os.makedirs(constants.CC_IMAGE_PATH, exist_ok=True) # /images/cc - CC thumbnail images
 
 build_directory_structure_on_startup() # build directory structure when bot first starts
+
+class Settings:
+    def __init__(self):
+        self.wmm_autostart = constants.wmm_autostart
+        self.commandid_stock = constants.commandid_stock
+
+    def read_settings_file(self, file_path = constants.SETTINGS_FILE_PATH):
+        # method to read settings from file and update class attributes
+        with open(file_path, 'r') as file:
+            for line in file:
+                key, value = line.strip().split('=')
+                # Convert 'True'/'False' to boolean if necessary
+                if value.strip().lower() == 'true':
+                    value = True
+                elif value.strip().lower() == 'false':
+                    value = False
+                elif value.strip().lower() == 'none':
+                    value = None
+                else:
+                    value = value.strip()
+                setattr(self, key.strip(), value)
+                print("Updated %s = %s" % (key.strip(), value))
+
+    def write_settings(self, file_path = constants.SETTINGS_FILE_PATH):
+        # method to write changed settings values to the file
+        with open(file_path, 'w') as file:
+            for attr_name, attr_value in vars(self).items():
+                file.write(f"{attr_name} = {attr_value}\n")
+        with open(file_path, 'r') as file:
+                file_contents = file.read()
+                print(f"Updated {constants.SETTINGS_FILE}:")
+                print(file_contents)
+
+def print_settings_file(file_path = constants.SETTINGS_FILE_PATH):
+    with open(file_path, 'r') as file:
+        file_contents = file.read()
+        return file_contents
+
+def create_settings_file():
+    try:
+        print("Creating Settings instance")
+        settings = Settings()
+        if os.path.exists(constants.SETTINGS_FILE_PATH):
+            print("Reading existing settings.txt")
+            # update class instance with existing settings
+            settings.read_settings_file()
+        # write any missing settings
+        print("Writing settings.txt")
+        settings.write_settings()
+        # save these values back to our global Settings class
+        constants.wmm_autostart = settings.wmm_autostart
+        constants.commandid_stock = settings.commandid_stock
+    except Exception as e:
+        print(f"Error creating settings file: {str(e)}")
+        traceback.print_exc()
+
+create_settings_file()
 
 
 # connect to sqlite carrier database
@@ -774,7 +833,7 @@ def find_mission(searchterm, searchfield):
     # unpickle the mission_params object if it exists
     if mission_data.mission_params:
         print("Found mission_params, enumerating...")
-        mission_data.mission_params: MissionParams = pickle.loads(mission_data.mission_params)
+        mission_data.mission_params = pickle.loads(mission_data.mission_params)
         mission_data.mission_params.print_values()
     else:
         print("No mission_params found")

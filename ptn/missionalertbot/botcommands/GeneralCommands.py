@@ -7,10 +7,11 @@ A Cog for general bot commands that don't fit in other categories.
 import asyncio
 from datetime import datetime, timezone
 import random
+import traceback
 
 # discord.py
 import discord
-from discord.app_commands import Group, describe
+from discord.app_commands import Group, describe, Choice
 from discord.ext import commands
 from discord import app_commands
 
@@ -27,7 +28,7 @@ from ptn.missionalertbot.constants import bot, bot_command_channel, bot_dev_chan
 # local modules
 from ptn.missionalertbot.database.database import backup_database, find_carrier, find_mission, _is_carrier_channel, \
     mission_db, carrier_db, carrier_db_lock, carriers_conn, find_nominator_with_id, delete_nominee_by_nominator, find_community_carrier, \
-    CCDbFields, find_opt_ins
+    CCDbFields, find_opt_ins, Settings, print_settings_file
 from ptn.missionalertbot.modules.Embeds import _is_mission_active_embed, _format_missions_embed, please_wait_embed
 from ptn.missionalertbot.modules.ErrorHandler import on_app_command_error, GenericError, CustomError, on_generic_error
 from ptn.missionalertbot.modules.helpers import bot_exit, check_roles, check_command_channel, unlock_mission_channel, lock_mission_channel, \
@@ -135,9 +136,12 @@ class GeneralCommands(commands.Cog):
         # start monitoring reddit comments if not running
         if not _monitor_reddit_comments.is_running():
             _monitor_reddit_comments.start()
-        # start wmm loop if not running
-        if not wmm_stock.is_running():
-            await start_wmm_task()
+        # start wmm loop if not running, and our settings.txt allows it
+        if constants.wmm_autostart:
+            if not wmm_stock.is_running():
+                await start_wmm_task()
+        else:
+            print("⚠ WMM task autostart disabled, skipping")
 
 
     # processed on disconnect
@@ -209,6 +213,104 @@ class GeneralCommands(commands.Cog):
     lock_group = Group(parent=admin_group, name='lock', description='Channel Lock override commmands')
 
     wmm_group = Group(parent=admin_group, name='wmm', description='WMM admin commands')
+
+    settings_group = Group(parent=admin_group, name='settings', description='settings.txt options')
+
+
+    # command to view settings.txt values
+    @settings_group.command(name='view', description='View settings.txt')
+    @check_roles([admin_role(), dev_role()])
+    @check_command_channel(bot_command_channel())
+    async def admin_settings(self, interaction: discord.Interaction):
+        print(f"/admin settings view called by {interaction.user}")
+
+        try:
+            settings = print_settings_file()
+
+            embed = discord.Embed(
+                description=f"📄 `settings.txt`:\n\n```{settings}```",
+                color=constants.EMBED_COLOUR_OK
+            )
+
+            await interaction.response.send_message(embed=embed)
+
+        except Exception as e:
+            traceback.print_exc()
+            try:
+                raise GenericError(e)
+            except Exception as e:
+                await on_generic_error(interaction, e)
+
+
+    # command to apply settings.txt values
+    @settings_group.command(name='change', description='Change a value in settings.txt')
+    @describe(
+        setting='The setting to change',
+        value='The value to apply'
+        )
+    @app_commands.choices(setting = [
+        Choice(name='WMM Auto Start', value='wmm_autostart'),
+        Choice(name='Stock Command ID', value='commandid_stock')
+    ])
+    @check_roles([admin_role(), dev_role()])
+    @check_command_channel(bot_command_channel())
+    async def admin_settings(self, interaction: discord.Interaction, setting: Choice[str], value: str):
+        print("/admin settings change called for %s %s by %s" % (setting.value, value, interaction.user))
+
+        try:
+            if setting.value == 'wmm_autostart':
+                if not value.lower() in ['true', 'false']:
+                    print("Value not true or false")
+                    embed = discord.Embed(
+                        description="❌ Value must be 'True' or 'False'", 
+                        color=constants.EMBED_COLOUR_ERROR
+                    )
+
+                    return await interaction.response.send_message(embed=embed, ephemeral=True)
+                else:
+                    value = value.title()
+
+            elif setting.value == 'commandid_stock':
+                try:
+                    value = int(value)
+                except ValueError:
+                    print("Value not int")
+                    embed = discord.Embed(
+                        description="❌ Value must be an integer.", 
+                        color=constants.EMBED_COLOUR_ERROR
+                    )
+
+                    return await interaction.response.send_message(embed=embed, ephemeral=True)
+
+            print("instantiating settings")
+            settings = Settings()
+            print("updating from file")
+            settings.read_settings_file()
+            print("applying new values")
+            setattr(settings, setting.value, value)
+            settings.write_settings()
+            # apply to our global values
+            constants.wmm_autostart = settings.wmm_autostart
+            constants.commandid_stock = settings.commandid_stock
+
+
+            print("reading new values")
+            new_settings = print_settings_file()
+
+            embed = discord.Embed(
+                description=f"✅ Set `{setting.value}` to `{value}`. New `settings.txt`:\n\n```{new_settings}```",
+                color=constants.EMBED_COLOUR_OK
+            )
+
+            await interaction.response.send_message(embed=embed)
+
+        except Exception as e:
+            traceback.print_exc()
+            try:
+                raise GenericError(e)
+            except Exception as e:
+                await on_generic_error(interaction, e)
+
 
     # manually release a channel lock
     @lock_group.command(name='release', description='Manually release a designated channel lock object.')
