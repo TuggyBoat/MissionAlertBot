@@ -932,7 +932,7 @@ class CCOCommands(commands.Cog):
 
                     embed = discord.Embed(
                         description=f"✅ Frontier API stock tracking disabled for **{carrier_data.carrier_long_name}** ({carrier_data.carrier_identifier}).",
-                        olor=constants.EMBED_COLOUR_OK
+                        color=constants.EMBED_COLOUR_OK
                     )
 
                     embeds.append(embed)
