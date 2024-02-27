@@ -807,7 +807,7 @@ class CCOCommands(commands.Cog):
 
                             oauth_embed = discord.Embed(
                                 title="🔗 Frontier Account Link Request",
-                                description=f"Use the link below to **sign in to the Frontier Account** associated with {carrier_data.carrier_long_name} ({carrier_data.carrier_identifier})."
+                                description=f"Use the link below to **sign in to the Frontier Account** associated with **{carrier_data.carrier_long_name}** ({carrier_data.carrier_identifier})."
                                             f" This will authorise <@{bot.user.id}> to query this account for stock tracking purposes.\n\n"
                                             f"**[✅ Yes, authorise cAPI stock tracking for {carrier_data.carrier_long_name}]({oauth_url})**",
                                 color=constants.EMBED_COLOUR_QU
@@ -841,7 +841,7 @@ class CCOCommands(commands.Cog):
 
                 else:
                     embed = discord.Embed(
-                        description=f"✅ cAPI auth already exists for {carrier_data.carrier_long_name} ({carrier_data.carrier_identifier}), enabling stock fetching.",
+                        description=f"✅ cAPI auth already exists for **{carrier_data.carrier_long_name}** ({carrier_data.carrier_identifier}), enabling stock fetching.",
                         color=constants.EMBED_COLOUR_OK
                     )
                     embeds.append(embed)
