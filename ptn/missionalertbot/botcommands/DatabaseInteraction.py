@@ -26,13 +26,14 @@ from ptn.missionalertbot.classes.WMMData import WMMData
 # local constants
 import ptn.missionalertbot.constants as constants
 from ptn.missionalertbot.constants import bot, cmentor_role, admin_role, cteam_bot_channel, cteam_bot_channel, bot_command_channel, cc_role, \
-    admin_role, mod_role, bot_spam_channel, fc_complete_emoji, get_guild
+    admin_role, mod_role, bot_spam_channel, fc_complete_emoji, get_guild, channel_cco_general_chat
 
 # local modules
 from ptn.missionalertbot.database.database import find_nominee_with_id, carrier_db, CarrierDbFields, find_carrier, backup_database, \
     add_carrier_to_database, find_carriers_mult, find_commodity, find_community_carrier, CCDbFields, wmm_db
 from ptn.missionalertbot.modules.ErrorHandler import on_app_command_error, CustomError, on_generic_error, GenericError
-from ptn.missionalertbot.modules.helpers import check_roles, check_command_channel, _regex_alphanumeric_with_hyphens, extract_carrier_ident_strings
+from ptn.missionalertbot.modules.helpers import check_roles, check_command_channel, _regex_alphanumeric_with_hyphens, extract_carrier_ident_strings, \
+    _regex_alphanumeric_only
 from ptn.missionalertbot.modules.Embeds import _add_common_embed_fields, _configure_all_carrier_detail_embed, orphaned_carrier_summary_embed
 
 
@@ -352,13 +353,12 @@ class DatabaseInteraction(commands.Cog):
 
     # add FC to database
     @carrier_group.command(name='add', description='Add a Fleet Carrier to the database.')
-    @describe(short_name='The name used by the ;stock command.',
-                           long_name='The full name of the Fleet Carrier (will be converted to UPPERCASE).',
-                           carrier_id='The carrier\'s registration in the format XXX-XXX.',
-                           owner_id='The Discord ID of the carrier\'s owner.')
+    @describe(full_name='The full name of the Fleet Carrier (will be converted to UPPERCASE).',
+              carrier_id='The carrier\'s registration in the format XXX-XXX.',
+              owner_id='The Discord ID of the carrier\'s owner.')
     @check_roles([admin_role()])
-    @check_command_channel(bot_command_channel())
-    async def add(self, interaction: discord.Interaction, short_name: str, long_name: str, carrier_id: str, owner_id: str):
+    @check_command_channel([bot_command_channel(), channel_cco_general_chat()])
+    async def add(self, interaction: discord.Interaction, full_name: str, carrier_id: str, owner_id: str):
 
         # check the ID code is correct format (thanks boozebot code!)
         if not re.match(r"\w{3}-\w{3}", carrier_id):
@@ -378,20 +378,25 @@ class DatabaseInteraction(commands.Cog):
 
         # Only add to the carrier DB if it does not exist, if it does exist then the user should not be adding it.
         # TODO: merge with Add Carrier
-        carrier_data = find_carrier(long_name, CarrierDbFields.longname.name)
+        carrier_data = find_carrier(full_name, CarrierDbFields.longname.name)
         if carrier_data:
             # Carrier exists already, go skip it.
-            print(f'Request recieved from {interaction.user} to add a carrier that already exists in the database ({long_name}).')
+            print(f'Request recieved from {interaction.user} to add a carrier that already exists in the database ({full_name}).')
 
             embed = discord.Embed(title="Fleet carrier already exists, use /carrier_edit to change its details.",
-                                description=f"Carrier data matched for {long_name}", color=constants.EMBED_COLOUR_OK)
+                                description=f"Carrier data matched for {full_name}", color=constants.EMBED_COLOUR_OK)
             embed = _add_common_embed_fields(embed, carrier_data, interaction)
             return await interaction.response.send_message(embed=embed, ephemeral=True)
 
         backup_database('carriers')  # backup the carriers database before going any further
 
-        # now generate a string to use for the carrier's channel name based on its long name
-        stripped_name = _regex_alphanumeric_with_hyphens(long_name)
+        # now generate a string to use for the carrier's channel name based on its full (long) name
+        stripped_name = _regex_alphanumeric_with_hyphens(full_name)
+
+        # generate a shortname from the stripped fullname
+        shortname_pattern = r'(P\.?T\.?N\.?)'
+        shortname_string = re.sub(shortname_pattern, '', stripped_name)
+        short_name = _regex_alphanumeric_only(shortname_string)
 
         # find carrier owner as a user object so we know they're a valid user
         # TODO: move error to handler
@@ -403,9 +408,9 @@ class DatabaseInteraction(commands.Cog):
 
         # finally, send all the info to the db
         # TODO: merge with Add Carrier
-        await add_carrier_to_database(short_name.lower(), long_name.upper(), carrier_id.upper(), stripped_name.lower(), 0, owner_id)
+        await add_carrier_to_database(short_name.lower(), full_name.upper(), carrier_id.upper(), stripped_name.lower(), 0, owner_id)
 
-        carrier_data = find_carrier(long_name, CarrierDbFields.longname.name)
+        carrier_data = find_carrier(full_name, CarrierDbFields.longname.name)
         info_embed = discord.Embed(title="Fleet Carrier successfully added to database",
                             color=constants.EMBED_COLOUR_OK)
         info_embed = _add_common_embed_fields(info_embed, carrier_data, interaction)

@@ -47,7 +47,7 @@ def txt_create_discord(interaction: Interaction, mission_params: MissionParams, 
             f"**{name_link}** "
             f"**({mission_params.carrier_data.carrier_identifier})** | "
             f" <@{mission_params.carrier_data.ownerid}> | {mission_params.system.title()}/{mission_params.station.title()} - "
-            f"**{mission_params.demand}k :wine_glass:**"
+            f"**{mission_params.demand}k :wine_glass:** "
             f"{updated_stock_level}"
             f"{mission_params.cco_message_text if mission_params.cco_message_text else ''}"
         )

@@ -77,6 +77,7 @@ PROD_CHANNEL_UPVOTES = 828279034387103744    # The ID for the updoots channel
 PROD_CHANNEL_WMM_STOCK = 847483747388358686 # wmm-stock channel for hauler information
 PROD_CHANNEL_CCO_WMM_SUPPLIES = 990709169474633788 # CCO WMM tracking channel
 PROD_CHANNEL_CCO_WMM_DISCUSSION = 827972977727242250 # CCO WMM chat channel
+PROD_CHANNEL_CCO_GENERAL_CHAT = 800094622746542140 # CCO general chat channel
 PROD_REDDIT_CHANNEL = 878029150336720936 # the ID for the Reddit Comments channel
 PROD_MISSION_COMMAND_CHANNEL = 822603169104265276    # The ID for the production mission channel
 PROD_BOT_COMMAND_CHANNEL = 802523724674891826   # Bot backend commands are locked to a channel
@@ -142,6 +143,7 @@ TEST_CHANNEL_UPVOTES = 839918504676294666    # The ID for the updoots channel on
 TEST_CHANNEL_WMM_STOCK = 1210635262854697020 # wmm stock channel
 TEST_CHANNEL_CCO_WMM_SUPPLIES = 1210628703319756800 # CCO WMM tracking channel
 TEST_CHANNEL_CCO_WMM_DISCUSSION = 1210629377361051658 # CCO WMM chat channel
+TEST_CHANNEL_CCO_GENERAL_CHAT = 1210629377361051658 # CCO general chat channel
 TEST_REDDIT_CHANNEL = 878029350933520484 # the ID for the Reddit Comments channel
 TEST_MISSION_COMMAND_CHANNEL = 842138710651961364    # The ID for the production mission channel
 TEST_BOT_COMMAND_CHANNEL = 842152343441375283   # Bot backend commands are locked to a channel
@@ -397,6 +399,9 @@ def channel_wmm_stock():
 
 def channel_cco_wmm_talk():
   return PROD_CHANNEL_CCO_WMM_DISCUSSION if _production else TEST_CHANNEL_CCO_WMM_DISCUSSION
+
+def channel_cco_general_chat():
+  return PROD_CHANNEL_CCO_GENERAL_CHAT if _production else TEST_CHANNEL_CCO_GENERAL_CHAT
 
 def reddit_channel():
   return PROD_REDDIT_CHANNEL if _production else TEST_REDDIT_CHANNEL

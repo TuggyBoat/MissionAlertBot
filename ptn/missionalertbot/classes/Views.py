@@ -1080,6 +1080,16 @@ class ConfirmCAPISync(View):
         super().__init__(timeout=60)
 
 
+    @discord.ui.button(label='✗ Cancel', style=discord.ButtonStyle.danger, custom_id='capi_sync_cancel')
+    async def capi_sync_cancel(self, interaction: discord.Interaction, button):
+        print("User clicked cancel.")
+
+        self.original_embed.description="❌ Cancelled."
+        self.original_embed.color=constants.EMBED_COLOUR_OK
+
+        await interaction.response.edit_message(embed=self.original_embed, view=None)
+
+
     @discord.ui.button(label='✔ Confirm', style=discord.ButtonStyle.primary, custom_id='capi_sync_confirm')
     async def capi_sync_confirm(self, interaction: discord.Interaction, button):
         print("User clicked confirm.")
@@ -1138,16 +1148,6 @@ class ConfirmCAPISync(View):
         )
 
         await self.spamchannel.send(embed=spamchannel_embed)
-
-
-    @discord.ui.button(label='✗ Cancel', style=discord.ButtonStyle.danger, custom_id='capi_sync_cancel')
-    async def capi_sync_cancel(self, interaction: discord.Interaction, button):
-        print("User clicked cancel.")
-
-        self.original_embed.description="❌ Cancelled."
-        self.original_embed.color=constants.EMBED_COLOUR_OK
-
-        await interaction.response.edit_message(embed=self.original_embed, view=None)
 
 
     async def interaction_check(self, interaction: discord.Interaction): # only allow original command user to interact with buttons

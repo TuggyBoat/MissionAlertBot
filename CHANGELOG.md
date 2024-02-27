@@ -26,7 +26,9 @@ Integrated WMM tracking features from stockbot (with thanks to Durzo):
 - `m.wmm_list`: List active WMM carriers.
 
 Other:
-- `carrier_add` and `Add Carrier` no longer offer StockBot code for `;add_FC`.
+- `/carrier add` and `Add Carrier` no longer offer StockBot code for `;add_FC`.
+- `/carrier add` no longer has a shortname field; all shortnames are now generated internally by MAB.
+- `/carrier add` can now be used in #CCO-general-chat
 - Changed references to `;stock <shortname>` to `/stock`.
 - Removed shortname as a user-facing variable.
 - Added cAPI status to carrier info embeds.
@@ -34,11 +36,6 @@ Other:
 - Updated web links for loading/unloading images so Discord will finally stock mocking me with cached images from 3 months ago.
 - `/admin capi_sync`: Intended for first run after StockBot migration: updates CAPI status for all registered PTN Fleet Carriers.
 
-TODO:
-- test wine load stock updates
-- swap button positions for capi_sync
-- remove shortname field from /carrier add
-- do we want wmm update to affect the time until the next stock check or not?
 
 ## 2.3.8
 - All admin commands are now interactions in the 'admin' group:
