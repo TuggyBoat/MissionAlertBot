@@ -127,9 +127,6 @@ class GeneralCommands(commands.Cog):
         embed.set_image(url=random.choice(constants.hello_gifs))
         await devchannel.send(embed=embed)
 
-        # Check if any trade channels were not deleted before bot restart/stop
-        await check_trade_channels_on_startup()
-
         # start the lasttrade_cron loop if not running
         if not lasttrade_cron.is_running():
             lasttrade_cron.start()
@@ -142,6 +139,9 @@ class GeneralCommands(commands.Cog):
                 await start_wmm_task()
         else:
             print("⚠ WMM task autostart disabled, skipping")
+
+        # Check if any trade channels were not deleted before bot restart/stop
+        await check_trade_channels_on_startup()
 
 
     # processed on disconnect
