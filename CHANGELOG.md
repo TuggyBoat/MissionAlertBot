@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.4.3
+- [#668](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/668) Fix for order of checks/background tasks on startup, so background tasks should start at correct time
+
+
 ## 2.4.2
 - [#665](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/665) Fixed WMM task breaking if carrier stock is low on two or more commodities
 
