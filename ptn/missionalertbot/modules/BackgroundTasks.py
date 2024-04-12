@@ -266,7 +266,7 @@ async def wmm_stock(message, wmm_channel, ccochannel):
                 print(f"no inara market data for {carrier.carrier_identifier}")
                 continue
             carrier_name = stn_data['full_name'].upper()
-            stn_data['currentStarSystem'] = stn_data['name'].title()
+            stn_data['currentStarSystem'] = stn_data['name'].title().upper() # Capitalize system name
             stn_data['market'] = {'commodities': stn_data['commodities']}
             try:
                 utc_time = datetime.strptime(stn_data['market_updated'].split('(')[1][0:-1], "%d %b %Y, %I:%M%p")

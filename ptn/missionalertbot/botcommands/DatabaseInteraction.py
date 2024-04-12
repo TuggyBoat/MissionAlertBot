@@ -26,7 +26,7 @@ from ptn.missionalertbot.classes.WMMData import WMMData
 # local constants
 import ptn.missionalertbot.constants as constants
 from ptn.missionalertbot.constants import bot, cmentor_role, admin_role, cteam_bot_channel, cteam_bot_channel, bot_command_channel, cc_role, \
-    admin_role, mod_role, bot_spam_channel, fc_complete_emoji, get_guild, channel_cco_general_chat
+    admin_role, mod_role, bot_spam_channel, fc_complete_emoji, get_guild, channel_cco_general_chat, advisor_role
 
 # local modules
 from ptn.missionalertbot.database.database import find_nominee_with_id, carrier_db, CarrierDbFields, find_carrier, backup_database, \
@@ -38,7 +38,7 @@ from ptn.missionalertbot.modules.Embeds import _add_common_embed_fields, _config
 
 
 @bot.tree.context_menu(name='Add Carrier')
-@check_roles([admin_role()])
+@check_roles([admin_role(), advisor_role()])
 async def add_carrier(interaction:  discord.Interaction, message: discord.Message):
     print(f"add_carrier called by {interaction.user.display_name} for {message.author.display_name}")
 
@@ -145,7 +145,7 @@ class DatabaseInteraction(commands.Cog):
     @app_commands.command(name='cp_delete_nominee_from_database',
                           description='Completely removes all nominations for a user by user ID. NOT RECOVERABLE.')
     @app_commands.describe(userid='The Discord ID of the user whose nominations you wish to delete.')
-    @check_roles([cmentor_role(), admin_role()])
+    @check_roles([cmentor_role(), admin_role(), advisor_role()])
     @check_command_channel(cteam_bot_channel())
     async def cp_delete_nominee_from_database(self, interaction: discord.Interaction, userid: str):
         print(f"{interaction.command.name} called by {interaction.user}")
@@ -175,7 +175,7 @@ class DatabaseInteraction(commands.Cog):
     # command to display a list of nominees who meet a given threshhold for number of nominations
     @app_commands.command(name='cp_nominees_list', description='Shows all users with a given nomination threshhold.')
     @app_commands.describe(number='The number of nominations needed for a nominee to appear in the list output.')
-    @check_roles([cmentor_role(), admin_role()])
+    @check_roles([cmentor_role(), admin_role(), advisor_role()])
     @check_command_channel(cteam_bot_channel())
     async def cp_nominees_list(self, interaction: discord.Interaction, number: int):
 
@@ -238,7 +238,7 @@ class DatabaseInteraction(commands.Cog):
     # command to retrieve text for all nominations for a given user from the database
     @app_commands.command(name='cp_nomination_details', description='Shows details of all nominations for a given user by ID.')
     @app_commands.describe(userid='The Discord ID of the target user. Use Developer Mode to retrieve user IDs.')
-    @check_roles([cmentor_role(), admin_role()])
+    @check_roles([cmentor_role(), admin_role(), advisor_role()])
     @check_command_channel(cteam_bot_channel())
     async def cp_nomination_details(self, interaction: discord.Interaction, userid: str):
 
@@ -292,7 +292,7 @@ class DatabaseInteraction(commands.Cog):
 
     # purge database of carrier owners who are no longer on the server
     @carrier_group.command(name='purge', description='Generate a list of carriers belonging to departed owners, with option to purge.')
-    @check_roles([admin_role()])
+    @check_roles([admin_role(), advisor_role()])
     @check_command_channel(bot_command_channel())
     async def purge(self, interaction: discord.Interaction):
         print(f"Carrier database purge called by {interaction.user}")
@@ -356,7 +356,7 @@ class DatabaseInteraction(commands.Cog):
     @describe(full_name='The full name of the Fleet Carrier (will be converted to UPPERCASE).',
               carrier_id='The carrier\'s registration in the format XXX-XXX.',
               owner_id='The Discord ID of the carrier\'s owner.')
-    @check_roles([admin_role()])
+    @check_roles([admin_role(), advisor_role()])
     @check_command_channel([bot_command_channel(), channel_cco_general_chat()])
     async def add(self, interaction: discord.Interaction, full_name: str, carrier_id: str, owner_id: str):
 
@@ -431,7 +431,7 @@ class DatabaseInteraction(commands.Cog):
     # remove FC from database
     @carrier_group.command(name='delete', description='Delete a Fleet Carrier from the database using its database entry ID#.',)
     @describe(db_id='The database ID number of the carrier to delete. Use /find to retrieve the carrier ID.')
-    @check_roles([admin_role()])
+    @check_roles([admin_role(), advisor_role()])
     @check_command_channel(bot_command_channel())
     async def delete(self, interaction: discord.Interaction, db_id: int):
         print(f"{interaction.command.name} called by {interaction.user.display_name}")
@@ -471,7 +471,7 @@ class DatabaseInteraction(commands.Cog):
     @carrier_group.command(name="edit",
                           description="Edit a specific carrier in the database")
     @describe(carrier_name_search_term='A string to search for that should match part of the target carrier\'s full name.')
-    @check_roles([admin_role()])
+    @check_roles([admin_role(), advisor_role()])
     @check_command_channel(bot_command_channel())
     async def edit(self, interaction: discord.Interaction, carrier_name_search_term: str):
         """

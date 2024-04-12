@@ -20,7 +20,7 @@ from ptn.missionalertbot.classes.Views import RemoveCCView, SendNoticeModal, Con
 # import local constants
 import ptn.missionalertbot.constants as constants
 from ptn.missionalertbot.constants import bot, cmentor_role, admin_role, cc_role, cc_cat, archive_cat, bot_spam_channel, cpillar_role, mod_role, \
-    roleapps_channel, verified_role, fc_complete_emoji, event_organiser_role
+    roleapps_channel, verified_role, fc_complete_emoji, event_organiser_role, advisor_role
 
 # import local modules
 from ptn.missionalertbot.database.database import carrier_db
@@ -45,7 +45,7 @@ Event Organiser
 """
 
 @bot.tree.context_menu(name='Verify Member')
-@check_roles([cmentor_role(), admin_role(), mod_role()])
+@check_roles([cmentor_role(), admin_role(), mod_role(), advisor_role()])
 @check_command_channel(roleapps_channel())
 async def verify_member(interaction:  discord.Interaction, message: discord.Message):
     print(f"verify_member called by {interaction.user.display_name} for {message.author.display_name}")
@@ -103,7 +103,7 @@ async def verify_member(interaction:  discord.Interaction, message: discord.Mess
 
 
 @bot.tree.context_menu(name='Toggle Event Organiser')
-@check_roles([cmentor_role(), admin_role(), mod_role()])
+@check_roles([cmentor_role(), admin_role(), mod_role(), advisor_role()])
 async def toggle_event_organiser(interaction:  discord.Interaction, member: discord.Member):
     print(f"toggle_event_organiser called by {interaction.user.display_name} for {member.display_name}")
 
@@ -160,7 +160,7 @@ async def toggle_event_organiser(interaction:  discord.Interaction, member: disc
 
 # send_notice app command - alternative to slash command, just noms a message like adroomba but via right click
 @bot.tree.context_menu(name='Send CC Notice')
-@check_roles([cmentor_role(), admin_role(), cc_role()])
+@check_roles([cmentor_role(), admin_role(), cc_role(), advisor_role()])
 async def send_cc_notice(interaction:  discord.Interaction, message: discord.Message):
     print(f"{interaction.user.name} used send context menu in {interaction.channel.name}")
 
@@ -191,7 +191,7 @@ async def send_cc_notice(interaction:  discord.Interaction, message: discord.Mes
 
 # edit notice app command - edits an existing sent notice
 @bot.tree.context_menu(name='Edit CC Notice')
-@check_roles([cmentor_role(), admin_role(), cc_role()])
+@check_roles([cmentor_role(), admin_role(), cc_role(), advisor_role()])
 async def edit_cc_notice(interaction:  discord.Interaction, message: discord.Message):
     print(f"{interaction.user.name} used edit CC notice context menu in {interaction.channel.name}")
 
@@ -223,7 +223,7 @@ async def edit_cc_notice(interaction:  discord.Interaction, message: discord.Mes
 
 # app command to upload cc thumbnail
 @bot.tree.context_menu(name='Upload CC Thumb')
-@check_roles([cmentor_role(), admin_role(), cc_role()])
+@check_roles([cmentor_role(), admin_role(), cc_role(), advisor_role()])
 async def upload_cc_thumb(interaction:  discord.Interaction, message: discord.Message):
     # check we're in the CC channel
     if not await _community_channel_owner_check(interaction): return
@@ -292,7 +292,7 @@ class CTeamCommands(commands.Cog):
     @app_commands.describe(owner='An @mention of the member who will be the registered owner of the new channel.',
                            channel_name='The name you want the new channel to have.',
                            channel_emoji='Optional: pick an emoji to go at the start of the channel name.')
-    @check_roles([cmentor_role(), admin_role()])
+    @check_roles([cmentor_role(), admin_role(), advisor_role()])
     async def _create_community_channel(self, interaction:  discord.Interaction, owner: discord.Member, channel_name: str, channel_emoji: str = None):
         print(f"{interaction.user.name} used /create_community_channel")
         print(f"Params: {owner} {channel_name} {channel_emoji}")
@@ -362,7 +362,7 @@ class CTeamCommands(commands.Cog):
     @app_commands.command(name="restore_community_channel",
         description="Restore an archived Community Channel.")
     @app_commands.describe(owner='An @mention of the user to become the owner of the restored channel.')
-    @check_roles([cmentor_role(), admin_role()])
+    @check_roles([cmentor_role(), admin_role(), advisor_role()])
     async def _restore_community_channel(self, interaction:  discord.Interaction, owner: discord.Member):
 
         # get the CC categories as discord channel category objects
@@ -416,7 +416,7 @@ class CTeamCommands(commands.Cog):
     # delete a Community Carrier
     @app_commands.command(name="remove_community_channel",
                     description="Retires a community channel.")
-    @check_roles([cmentor_role(), admin_role()])
+    @check_roles([cmentor_role(), admin_role(), advisor_role()])
     async def _remove_community_channel(self, interaction:  discord.Interaction):
 
         print(f"{interaction.user.name} called `/remove_community_channel` command in {interaction.channel.name}")
@@ -478,7 +478,7 @@ class CTeamCommands(commands.Cog):
     # open a community channel (i.e. set non private)
     @app_commands.command(name="open_community_channel",
         description="Use in a Community Channel to open it to visitors (set it non-private).", )
-    @check_roles([cmentor_role(), admin_role(), cc_role()]) # allow owners to open/close their own channels
+    @check_roles([cmentor_role(), admin_role(), cc_role(), advisor_role()]) # allow owners to open/close their own channels
     async def _open_community_channel(self, interaction:  discord.Interaction):
         print(f"{interaction.user.name} used /open_community_channel in {interaction.channel.name}")
         open = True
@@ -499,7 +499,7 @@ class CTeamCommands(commands.Cog):
         description="Use in a Community Channel to change the name of its channel and associated role.", )
     @app_commands.describe(new_name='The updated name for this community channel/role.',
                            new_emoji='Optional: pick an emoji to go at the start of the channel/role name.')
-    @check_roles([cmentor_role(), admin_role(), cc_role()]) # allow owners to open/close their own channels
+    @check_roles([cmentor_role(), admin_role(), cc_role(), advisor_role()]) # allow owners to open/close their own channels
     async def _rename_community_channel(self, interaction:  discord.Interaction, new_name: str, new_emoji: str = None):
         print(f"{interaction.user.name} used /rename_community_channel in {interaction.channel.name}")
         try:
@@ -560,7 +560,7 @@ class CTeamCommands(commands.Cog):
     # send a notice from a Community Carrier owner to their 'crew' - this is the long form command using a modal
     @app_commands.command(name="send_notice",
         description="Private command: Used by Community Channel owners to send notices to their participants.", )
-    @check_roles([cmentor_role(), admin_role(), cc_role()]) # allow all owners for now then restrict during command
+    @check_roles([cmentor_role(), admin_role(), cc_role(), advisor_role()]) # allow all owners for now then restrict during command
     async def _send_notice(self, interaction:  discord.Interaction):
         print(f"{interaction.user.name} used /send_notice in {interaction.channel.name}")
 
@@ -583,7 +583,7 @@ class CTeamCommands(commands.Cog):
     # TODO: import from a text file?
     @app_commands.command(name="community_channel_help",
         description="Private command: get help with Community Channel commands and functions.", )
-    @check_roles([cmentor_role(), admin_role(), cc_role(), cpillar_role()])
+    @check_roles([cmentor_role(), admin_role(), cc_role(), cpillar_role(), advisor_role()])
     async def _community_channel_help(self, interaction:  discord.Interaction):
         print(f"{interaction.user.name} used /community_channel_help")
         embed = discord.Embed(title="Community Channel Help",
@@ -659,7 +659,7 @@ class CTeamCommands(commands.Cog):
     # prints information about /nominate to current channel
     @app_commands.command(name="thanks",
         description="COMMUNITY TEAM ONLY: Display information about the /nominate command.", )
-    @check_roles([cpillar_role(), cmentor_role(), admin_role(), mod_role()]) 
+    @check_roles([cpillar_role(), cmentor_role(), admin_role(), mod_role(), advisor_role()])
     async def _thanks(self, interaction:  discord.Interaction):
         print(f"/thanks called by {interaction.user} in {interaction.channel.name}")
         embed = discord.Embed(title=":heart: NOMINATE TO APPRECIATE :heart:",

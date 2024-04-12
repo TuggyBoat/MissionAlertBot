@@ -121,6 +121,7 @@ PROD_PILOT_ROLE = 800396412217982999 # Pilot role
 PROD_EVENT_ORGANISER_ROLE = 1023296182639939594 # Event Organiser
 PROD_BOT_ROLE = 802523214809923596 # General Bot role on live (Robot Overlords)
 PROD_ALUM_ROLE = 1086777372981858404 # Council Alumni role on live
+PROD_ADVISOR_ROLE = 1226645094439063612 # Council Advisor role on live
 PROD_CCO_COLOR_ROLE = 1166838944109957240 # CCO Color role on live
 PROD_TRADE_CAT = 801558838414409738 # Trade Carrier category on live server
 PROD_ARCHIVE_CAT = 1048957416781393970 # Archive category on live server
@@ -187,6 +188,7 @@ TEST_PILOT_ROLE = 818174614810787840 # Pilot role
 TEST_EVENT_ORGANISER_ROLE = 1121748430650355822 # Event Organiser
 TEST_BOT_ROLE = 842524877051133963 # TestingAlertBot role only - need a generic bot role on test
 TEST_ALUM_ROLE = 1156729563188035664 # Alumni role on test server
+TEST_ADVISOR_ROLE = 1227350727131660359 #
 TEST_CCO_COLOR_ROLE = 1168280960572334151 # CCO Color role on test server
 TEST_TRADE_CAT = 876569219259580436 # Trade Carrier category on live server
 TEST_ARCHIVE_CAT = 877244591579992144 # Archive category on live server
@@ -516,6 +518,9 @@ def bot_role():
 def alum_role():
     return PROD_ALUM_ROLE if _production else TEST_ALUM_ROLE
 
+def advisor_role():
+    return PROD_ADVISOR_ROLE if _production else TEST_ADVISOR_ROLE
+
 def cco_color_role():
     return PROD_CCO_COLOR_ROLE if _production else TEST_CCO_COLOR_ROLE
 
@@ -568,7 +573,9 @@ def training_reddit_completed():
 
 
 
-any_elevated_role = [cc_role(), cmentor_role(), certcarrier_role(), rescarrier_role(), admin_role(), trainee_role(), dev_role()]
+any_elevated_role = [cc_role(), cmentor_role(), certcarrier_role(), rescarrier_role(), admin_role(), trainee_role(), dev_role(), advisor_role()]
+nomination_immune = [cpillar_role(), cmentor_role(), admin_role(), mod_role(), bot_role(), alum_role(), advisor_role()]
+admin_roles = [admin_role(), dev_role(), advisor_role()]
 
 
 async def get_reddit():
