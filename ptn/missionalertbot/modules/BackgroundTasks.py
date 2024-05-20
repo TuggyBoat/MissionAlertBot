@@ -13,6 +13,7 @@ if __name__ == "__main__":
 
 # import libraries
 import asyncio
+from collections import defaultdict, Counter
 from datetime import datetime, timezone, timedelta
 import json
 import traceback
@@ -175,21 +176,16 @@ async def wmm_stock(message, wmm_channel, ccochannel):
     print("▶ Starting WMM stock check loop.")
 
     #print(f"wmm_stock function start")
-    wmm_systems = []
-
     # retrieve all WMM carriers
     wmm_carriers = _fetch_wmm_carriers()
 
     carrier: WMMData
 
-    # populate active WMM systems
-    for carrier in wmm_carriers:
-        if carrier.carrier_location not in wmm_systems:
-            wmm_systems.append(carrier.carrier_location)
+    wmm_stations = set()
 
     # Message to send to the WMM channel if no carriers are being tracked
     # TODO: harmonise with MAB formats
-    if wmm_systems == []:
+    if not any(carrier.carrier_location for carrier in wmm_carriers):
         nofc = "WMM Stock: No Fleet Carriers are currently being tracked for WMM. Please add some to the list!"
         try:
             await message.edit(content=nofc)
@@ -198,10 +194,10 @@ async def wmm_stock(message, wmm_channel, ccochannel):
             await wmm_channel.send(nofc)
         return
 
-    content = {}
-    ccocontent = {}
-    wmm_stock = {}
-    wmm_station_stock = {}
+    content = defaultdict(list)
+    ccocontent = defaultdict(list)
+    wmm_stock = defaultdict(lambda: defaultdict(list))
+    wmm_station_stock = defaultdict(lambda: defaultdict(Counter))
 
     for carrier in wmm_carriers:
         print(f"Interrogating {carrier} for stock...")
@@ -274,102 +270,95 @@ async def wmm_stock(message, wmm_channel, ccochannel):
             except:
                 market_updated = "(As of %s)" % stn_data['market_updated']
                 pass
+
         if 'market' not in stn_data:
             print(f"No market data for {carrier.carrier_identifier}")
             continue
+
+        current_system = stn_data['currentStarSystem']
+        current_station = carrier.carrier_location
+        # populate active WMM systems
+        wmm_stations.add((current_system, current_station))
 
         # now we interrogate the carrier's stock levels
         com_data = stn_data['market']['commodities']
         print("Market data for %s: %s" % ( carrier.carrier_name, com_data ))
 
         # check for if market is empty
-        if com_data == []:
+        if not com_data:
             # TODO: how should this look?
-            content[carrier.carrier_location].append("**%s** - %s (%s) has no current market data. please visit the carrier with EDMC running" % (
-                carrier.carrier_name, stn_data['currentStarSystem'], carrier.carrier_location )
+            content[(current_system, current_station)].append("**%s** - %s (%s) has no current market data. please visit the carrier with EDMC running" % (
+                carrier.carrier_name, current_system, current_station)
             )
             continue
 
         # iterate through commodities
         for com in com_data:
-            # add carrier location to the wmm_stock list if not already there
-            if carrier.carrier_location not in wmm_stock:
-                wmm_stock[carrier.carrier_location] = []
-            if stn_data['currentStarSystem'] not in wmm_station_stock:
-                wmm_station_stock[stn_data['currentStarSystem']] = {}
-            if carrier.carrier_location not in wmm_station_stock[stn_data['currentStarSystem']]:
-                wmm_station_stock[stn_data['currentStarSystem']][carrier.carrier_location] = {}
-
-            # add commodity to the master list if not already there
+            # skip if not a WMM commodity
             if com['name'].title() not in commodities_wmm:
                 continue
 
             # if carrier has stock of the commodity
-            if com['stock'] != 0:
-                print("Found stock for %s" % (com['name']))
-                carrier_has_stock = True
-                if com['name'].lower() not in wmm_station_stock[stn_data['currentStarSystem']][carrier.carrier_location]:
-                    wmm_station_stock[stn_data['currentStarSystem']][carrier.carrier_location][com['name'].lower()] = int(com['stock'])
-                else:
-                    wmm_station_stock[stn_data['currentStarSystem']][carrier.carrier_location][com['name'].lower()] += int(com['stock'])
+            if com['stock'] == 0:
+                continue
+            print("Found stock for %s" % (com['name']))
+            carrier_has_stock = True
+            wmm_station_stock[current_system][current_station][com['name'].lower()] += int(com['stock'])
 
-                # if commodity stock is low 
-                if int(com['stock']) < 1000:
-                    wmm_stock[carrier.carrier_location].append("%s x %s - %s (%s) - **%s** - Price: %s - LOW STOCK %s" % (
-                        com['name'], format(com['stock'], ','), stn_data['currentStarSystem'], carrier.carrier_location, carrier_name, format(com['buyPrice'], ','), market_updated )
+            low_stock_msg = ''
+            # if commodity stock is low 
+            if int(com['stock']) < 1000:
+                low_stock_msg = " - LOW STOCK"
+
+                # Notify the owner once per commodity per wmm_tracking session.
+                print("Notification status: %s" % (notification_status))
+                if com['name'] not in notification_status:
+                    print(f"Generating low stock warning for {carrier.carrier_name} to DM to owner")
+                    
+                    embed = discord.Embed(
+                        description=f"📉 Your fleet carrier {carrier.carrier_name} ({carrier.carrier_identifier}) is low on %s - %s remaining." 
+                                        % ( com['name'], com['stock'] ),
+                        color=constants.EMBED_COLOUR_WARNING
                     )
 
-                    # Notify the owner once per commodity per wmm_tracking session.
-                    print("Notification status: %s" % (notification_status))
-                    if com['name'] not in notification_status:
-                        print(f"Generating low stock warning for {carrier.carrier_name} to DM to owner")
-                        
-                        embed = discord.Embed(
-                            description=f"📉 Your fleet carrier {carrier.carrier_name} ({carrier.carrier_identifier}) is low on %s - %s remaining." 
-                                         % ( com['name'], com['stock'] ),
-                            color=constants.EMBED_COLOUR_WARNING
-                        )
+                    message = f"<@{carrier.carrier_owner}>: Your fleet carrier {carrier.carrier_name} ({carrier.carrier_identifier}) is low on %s - %s remaining.\n\n" \
+                                f"*Please enable direct messages from <@{bot.user.id}> to receive these alerts via DM.*" % ( com['name'], com['stock'] )
+                    
+                    await notify_wmm_owner(carrier, embed, message)
 
-                        message = f"<@{carrier.carrier_owner}>: Your fleet carrier {carrier.carrier_name} ({carrier.carrier_identifier}) is low on %s - %s remaining.\n\n" \
-                                  f"*Please enable direct messages from <@{bot.user.id}> to receive these alerts via DM.*" % ( com['name'], com['stock'] )
-                        
-                        await notify_wmm_owner(carrier, embed, message)
+                    # tell the db we've notified for this commodity
+                    if not notification_status:
+                        notification_status = []
 
-                        # tell the db we've notified for this commodity
-                        if not notification_status:
-                            notification_status = []
+                    notification_status.append(com['name'])
+                    carrier.notification_status = notification_status
 
-                        notification_status.append(com['name'])
-                        carrier.notification_status = notification_status
+                    await _update_wmm_carrier(carrier)
 
-                        await _update_wmm_carrier(carrier)
-
-                # has stock, not low
-                else:
-                    wmm_stock[carrier.carrier_location].append("%s x %s - %s (%s) - **%s** - Price: %s %s" % (
-                        com['name'], format(com['stock'], ','), stn_data['currentStarSystem'].upper(), carrier.carrier_location, carrier_name, format(com['buyPrice'], ','), market_updated )
-                    )
+            wmm_stock[(current_system, current_station)][com['name']].append(
+                "%s x %s - %s (%s) - **%s** - Price: %s %s %s" % 
+                (com['name'], format(com['stock'], ','), current_system.upper(), current_station, carrier_name, format(com['buyPrice'], ','), low_stock_msg, market_updated)
+            )
 
         # no stock at all
         if not carrier_has_stock:
-            wmm_stock[carrier.carrier_location].append("**%s** - %s (%s) has no stock of any WMM commodity! %s" % (
-                carrier_name, stn_data['currentStarSystem'].upper(), carrier.carrier_location, market_updated )
+            wmm_stock[(current_system, current_station)][constants.wmm_no_stock_key].append(
+                "**%s** - %s (%s) has no stock of any WMM commodity! %s" %
+                (carrier_name, current_system.upper(), current_station, market_updated)
             )
 
-    for system in wmm_systems:
-        content[system] = []
-        content[system].append('-')
-        if system not in wmm_stock:
-            content[system].append("Could not find any carriers with stock in %s" % system)
+    for (system, station) in wmm_stations:
+        content[(system, station)].append('-')
+        if (system, station) not in wmm_stock:
+            content[(system, station)].append(f"Could not find any carriers with stock in {system.upper()} ({station})")
         else:
-            for line in wmm_stock[system]:
-                content[system].append(line)
+            for _commodity, messages in sorted(wmm_stock[(system, station)].items()):
+                content[(system, station)] += messages
 
     try:
         wmm_updated = "<t:%d:R>" % datetime.now().timestamp()
     except:
         wmm_updated = datetime.now().strftime("%d %b %Y %H:%M:%S")
-        pass
 
     # clear message history
     await clear_history(wmm_channel)
@@ -378,7 +367,7 @@ async def wmm_stock(message, wmm_channel, ccochannel):
     # and split messages over 10 lines.
     # each line is between 120-200 chars
     # using max: 2000 / 200 = 10
-    for (system, stncontent) in content.items():
+    for (_location, stncontent) in sorted(content.items()):
         if len(stncontent) == 1:
             # this station has no carriers, dont bother printing it.
             continue
@@ -397,11 +386,10 @@ async def wmm_stock(message, wmm_channel, ccochannel):
     print("Current list of stations:")
     print(wmm_station_stock)
 
-    for system in wmm_station_stock:
-        ccocontent[system] = []
-        for station in wmm_station_stock[system]:
+    for system in sorted(wmm_station_stock):
+        for station in sorted(wmm_station_stock[system]):
             ccocontent[system].append('-')
-            for commodity in commodities_wmm:
+            for commodity in sorted(commodities_wmm):
                 if commodity.lower() not in wmm_station_stock[system][station]:
                     ccocontent[system].append(f"{commodity.title()} x NO STOCK !! - {system} ({station})")
                 else:
