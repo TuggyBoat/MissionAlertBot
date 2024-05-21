@@ -1,5 +1,5 @@
 """
-Commands for use by CCOs 
+Commands for use by CCOs
 
 """
 # import libraries
@@ -27,7 +27,7 @@ from ptn.missionalertbot.classes.Views import ConfirmRemoveRoleView, ConfirmGran
 from ptn.missionalertbot.classes.WMMData import WMMData
 
 # import local modules
-from ptn.missionalertbot.database.database import find_mission, find_webhook_from_owner, add_webhook_to_database, find_webhook_by_name, delete_webhook_by_name, \
+from ptn.missionalertbot.database.database import commodities_all, find_mission, find_webhook_from_owner, add_webhook_to_database, find_webhook_by_name, delete_webhook_by_name, \
     CarrierDbFields, find_carrier, _update_carrier_last_trade, add_carrier_to_database, _update_carrier_capi, _add_to_wmm_db, find_wmm_carrier, _remove_from_wmm_db, \
     _update_wmm_carrier
 from ptn.missionalertbot.modules.DateString import get_mission_delete_hammertime, get_inactive_hammertime
@@ -81,7 +81,7 @@ async def toggle_cco_trainee(interaction:  discord.Interaction, member: discord.
         try:
             print(f"Giving {cco_trainee_role_object.name} role to {member.name}")
             await member.add_roles(cco_trainee_role_object)
-         
+
             # feed back to the command user
             embed, bot_spam_embed = role_granted_embed(interaction, member, None, cco_trainee_role_object)
             await interaction.edit_original_response(embed=embed)
@@ -440,11 +440,16 @@ class CCOCommands(commands.Cog):
     @unload.autocomplete("commodity")
     @edit.autocomplete("commodity")
     async def commodity_autocomplete(self, interaction: discord.Interaction, current: str):
-        commodities = [] # define the list we will return
-        for commodity in commodities_common: # iterate through our common commodities to append them as Choice options to our return list
-            commodities.append(app_commands.Choice(name=commodity, value=commodity))
-        return commodities # return the list of Choices
-    
+        if len(current) < 3:
+            commodities = [app_commands.Choice(name=commodity, value=commodity) for commodity in commodities_common]
+        else:
+            commodities = [
+                app_commands.Choice(name=commodity, value=commodity)
+                for commodity in dict.fromkeys(commodities_common + commodities_all)  # common commodities ordered first
+                if current.lower() in commodity.lower()
+            ]
+        return commodities[:25]  # return the list of Choices (up to 25 supported)
+
     # autocomplete pads
     @load.autocomplete("pads")
     @unload.autocomplete("pads")
@@ -454,7 +459,7 @@ class CCOCommands(commands.Cog):
         pads.append(app_commands.Choice(name="Large", value="L"))
         pads.append(app_commands.Choice(name="Medium", value="M"))
         return pads
-    
+
 
     """
     CCO mission complete command
@@ -500,7 +505,6 @@ class CCOCommands(commands.Cog):
     @check_command_channel([mission_command_channel(), training_mission_command_channel()])
     async def image(self, interaction: discord.Interaction, carrier: str):
         print(f"{interaction.user.display_name} called /cco image for {carrier}")
-
 
         embed = discord.Embed(
             description="Searching for Fleet Carrier and image...",
@@ -685,7 +689,7 @@ class CCOCommands(commands.Cog):
         )
         await spamchannel.send(embed=embed)
         return print("/webhook_add complete")
-    
+
 
     # command for a CCO to view all their webhooks
     @webhook_group.command(name='view', description='Shows details of all your registered webhooks.')
@@ -701,7 +705,7 @@ class CCOCommands(commands.Cog):
                 color=constants.EMBED_COLOUR_ERROR
             )
             return await interaction.response.send_message(embed=embed, ephemeral=True)
-        
+
         embed = discord.Embed(
             description=f"Showing webhooks for <@{interaction.user.id}>"
                          "\nRemember, webhooks can be used by *anyone* to post *anything* and therefore **MUST** be kept secret from other users.",
@@ -748,12 +752,12 @@ class CCOCommands(commands.Cog):
                 return await on_generic_error(interaction, e)
 
         return
-    
+
 
     """
     Stock tracker
     """
-    
+
     @capi_group.command(name='enable', description='Enable stock tracking via the Frontier API. Multiple carriers can be separated by a comma.')
     @describe(carriers = "One or more unique fragments of the carrier names you want to search for.")
     @check_roles([certcarrier_role(), trainee_role(), rescarrier_role()])
@@ -780,7 +784,7 @@ class CCOCommands(commands.Cog):
             for carrier in carrier_list:
                 # attempt to find matching carrier data
                 carrier_data = flexible_carrier_search_term(carrier)
-                
+
                 if not carrier_data:  # error condition
                     print(f"❌ No carrier found matching search term {carrier}")
                     carrier_error_embed = discord.Embed(
@@ -895,7 +899,7 @@ class CCOCommands(commands.Cog):
             for carrier in carrier_list:
                 # attempt to find matching carrier data
                 carrier_data = flexible_carrier_search_term(carrier)
-                
+
                 if not carrier_data:  # error condition
                     print(f"❌ No carrier found matching search term {carrier}")
                     carrier_error_embed = discord.Embed(
@@ -973,7 +977,7 @@ class CCOCommands(commands.Cog):
 
             # attempt to find matching carrier data
             carrier_data = flexible_carrier_search_term(carrier)
-            
+
             if not carrier_data:  # error condition
                 print(f"❌ No carrier found matching search term {carrier}")
                 carrier_error_embed = discord.Embed(
@@ -1041,7 +1045,7 @@ class CCOCommands(commands.Cog):
             for carrier in carrier_list:
                 # attempt to find matching carrier data
                 carrier_data = flexible_carrier_search_term(carrier)
-                
+
                 if not carrier_data:  # error condition
                     print(f"❌ No carrier found matching search term {carrier}")
                     carrier_error_embed = discord.Embed(
@@ -1093,11 +1097,10 @@ class CCOCommands(commands.Cog):
     # autocomplete WMM station names
     @wmm_enable.autocomplete("station")
     async def location_autocomplete(self, interaction: discord.Interaction, current: str):
-        locations = [] # define the list we will return
-        for location in locations_wmm: # iterate through our possible locations to append them as Choice options to our return list
+        locations = []  # define the list we will return
+        for location in locations_wmm:  # iterate through our possible locations to append them as Choice options to our return list
             locations.append(app_commands.Choice(name=location, value=location))
-        return locations # return the list of Choices
-    
+        return locations  # return the list of Choices
 
     @wmm_group.command(name='update', description='Refresh WMM stock without changing the update interval.')
     @check_roles([certcarrier_role(), trainee_role(), rescarrier_role()])
