@@ -28,3 +28,13 @@ MissionAlertBot also serves as the main repository for all PTN carriers' and FCO
 ## Technology Used
 
 Carrier and active mission details are stored on an SQL database.
+
+## Dev/Testing instructions
+- In MissionAlertBot dir, run `pip install -e .`
+- Run the bot via `python ptn/missionalertbot/application.py` once. Let it error out - this should create the directory tree
+- In MissionAlertBot dir, run the following commands:
+```shell
+mkdir -p ptn/missionalertbot/data
+echo "MAB_BOT_DISCORD_TOKEN_TESTING=YOUR_TOKEN_HERE" > ptn/missionalertbot/data/.env
+```
+- Run the bot again - it should pop a connection notice in the test Discord server -> #mab-discussion
