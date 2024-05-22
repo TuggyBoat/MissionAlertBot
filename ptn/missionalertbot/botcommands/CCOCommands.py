@@ -517,8 +517,6 @@ class CCOCommands(commands.Cog):
 
         await assign_carrier_image(interaction, carrier, embeds)
 
-        return
-
 
     # set active status
     @cco_group.command(name='active', description='Toggle active CCO status; becoming active grants the CCO role for at least 28 days.')
@@ -1097,9 +1095,14 @@ class CCOCommands(commands.Cog):
     # autocomplete WMM station names
     @wmm_enable.autocomplete("station")
     async def location_autocomplete(self, interaction: discord.Interaction, current: str):
-        locations = []  # define the list we will return
-        for location in locations_wmm:  # iterate through our possible locations to append them as Choice options to our return list
-            locations.append(app_commands.Choice(name=location, value=location))
+        locations = [
+            app_commands.Choice(name=location, value=location)
+            for location in locations_wmm
+            if current.lower() in location.lower()
+        ]
+        # If no match, return all WMM locations
+        if not locations:
+            locations = [app_commands.Choice(name=location, value=location) for location in locations_wmm]
         return locations  # return the list of Choices
 
     @wmm_group.command(name='update', description='Refresh WMM stock without changing the update interval.')
@@ -1128,8 +1131,8 @@ class CCOCommands(commands.Cog):
                 print("wmm_stock task has failed, restarting.")
 
                 embed = discord.Embed(
-                description=":warning: WMM stock background task was not running. Restarting now.",
-                color=constants.EMBED_COLOUR_WARNING
+                    description=":warning: WMM stock background task was not running. Restarting now.",
+                    color=constants.EMBED_COLOUR_WARNING
                 )
 
                 await interaction.followup.send(embed=embed)
