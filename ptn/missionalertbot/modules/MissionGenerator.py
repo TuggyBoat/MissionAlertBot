@@ -208,7 +208,7 @@ class MissionSendView(View):
     @discord.ui.button(label="Set Message", style=discord.ButtonStyle.secondary, emoji="✍", custom_id="message", row=1)
     async def message_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         print(f"{interaction.user.display_name} wants to add a message to their mission")
-    
+
         await interaction.response.send_modal(AddMessageModal(self.mission_params, self.owner, self.author))
 
     async def interaction_check(self, interaction: discord.Interaction): # only allow original command user to interact with buttons
@@ -376,7 +376,7 @@ async def validate_pads(interaction: discord.Interaction, mission_params):
         print(f"Set returnflag {mission_params.returnflag}")
         mission_params.returnflag = False
         return await interaction.channel.send(embed=pads_error_embed)
-    
+
 
 async def validate_supplydemand(interaction: discord.Interaction, mission_params):
     print("Validating supply/demand")
@@ -450,14 +450,14 @@ async def return_discord_channel_embeds(mission_params: MissionParams):
                         f"\n🛬 Landing Pad: {pads}" \
                         f"\n🌟 System: **{mission_params.system.upper()}**" \
                         f"\n📦 Commodity: **{mission_params.commodity_name.upper()}**"
-        
+
         buy_thumb = constants.ICON_BUY_FROM_STATION
 
         sell_description=f"🎯 Fleet Carrier: **{carrier_data.carrier_long_name}**" \
                          f"\n🔢 Carrier ID: **{carrier_data.carrier_identifier}**" \
                          f"\n💰 Profit: **{mission_params.profit}K PER TON**" \
                          f"\n📥 Demand: **{mission_params.demand}K TONS**"
-        
+
         sell_thumb = constants.ICON_SELL_TO_CARRIER
 
         embed_colour = constants.EMBED_COLOUR_LOADING
@@ -474,7 +474,7 @@ async def return_discord_channel_embeds(mission_params: MissionParams):
         sell_description=f"📌 Station: **{mission_params.station.upper()}**" \
                          f"\n🛬 Landing Pad: {pads}" \
                          f"\n💰 Profit: **{mission_params.profit}K PER TON**" \
-        
+
         sell_thumb = constants.ICON_SELL_TO_STATION
 
         embed_colour = constants.EMBED_COLOUR_UNLOADING
@@ -503,7 +503,7 @@ async def return_discord_channel_embeds(mission_params: MissionParams):
     # desc used for sending cco_message_text
     owner_text_description = mission_params.cco_message_text
 
-    # desc used by the webhook additional info embed    
+    # desc used by the webhook additional info embed
     webhook_info_description = f"💎 Carrier Owner: <@{carrier_data.ownerid}>" \
                                f"\n🔤 [PTN Discord](https://discord.gg/ptn)" \
                                 "\n💡 [PTN trade mission guide](https://pilotstradenetwork.com/fleet-carrier-trade-missions/)"
@@ -532,7 +532,7 @@ async def return_discord_channel_embeds(mission_params: MissionParams):
     )
     info_embed.set_image(url=constants.BLANKLINE_400PX)
     info_embed.set_thumbnail(url=owner_avatar)
-    
+
     help_embed = discord.Embed(
         description=help_description,
         color=embed_colour
@@ -573,6 +573,8 @@ async def send_mission_to_discord(interaction: discord.Interaction, owner: disco
 
     message_send = await interaction.channel.send("**Sending to Discord...**")
     try:
+        if not mission_temp_channel:
+            raise RuntimeError("Failed to get mission channel")
         # TRADE ALERT
         # send trade alert to trade alerts channel, or to wine alerts channel if loading wine for the BC
         submit_mission = await send_discord_alert(interaction, owner, mission_params)
@@ -740,7 +742,7 @@ async def send_mission_to_subreddit(interaction, mission_params):
                                                 flair_id=mission_params.channel_defs.reddit_flair_in_progress,
                                                 without_websockets=True) # temporary ? workaround for PRAW error
                 return
-                
+
             await asyncio.wait_for(_post_submission_to_reddit(), timeout=reddit_timeout())
 
         except asyncio.TimeoutError:
@@ -758,7 +760,7 @@ async def send_mission_to_subreddit(interaction, mission_params):
             traceback.print_exc()
 
         try:
-            print("⏳ Attempting to retrieve Reddit post...") 
+            print("⏳ Attempting to retrieve Reddit post...")
             async def _get_new_reddit_post(): # temporary ? workaround for PRAW error
                 submission = None
                 while True:
@@ -912,7 +914,7 @@ async def send_mission_to_webhook(interaction: discord.Interaction, mission_para
         )
         webhook_error_embed.set_footer(text="Attempting to continue with other sends.")
         await interaction.channel.send(embed=webhook_error_embed)
-    
+
     await message_send.delete()
 
 
@@ -1027,7 +1029,7 @@ async def confirm_send_mission_via_button(interaction: discord.Interaction, miss
     # this function does initial checks and returns send options to the user
 
     mission_params.returnflag = True # set the returnflag to true, any errors will change it to false
-    
+
     await prepare_for_gen_mission(interaction, mission_params)
 
     # find carrier owner as a user object
@@ -1142,7 +1144,7 @@ async def prepare_for_gen_mission(interaction: discord.Interaction, mission_para
 
     # check if the carrier can be found, exit gracefully if not
     carrier_data = flexible_carrier_search_term(mission_params.carrier_name_search_term)
-    
+
     if not carrier_data:  # error condition
         carrier_error_embed = discord.Embed(
             description=f"❌ No carrier found for '**{mission_params.carrier_name_search_term}**'. Use `/owner` to see a list of your carriers. If it's not in the list, ask an Admin to add it for you.",
@@ -1246,7 +1248,7 @@ async def gen_mission(interaction: discord.Interaction, owner: discord.Member, m
 
     print(f'Mission generation type: {mission_params.mission_type} requested by {interaction.user}. Request triggered from '
         f'channel {current_channel}.')
-    
+
     if mission_params.training:
         print("Training mode is active.")
 
@@ -1409,7 +1411,7 @@ async def create_mission_temp_channel(interaction, owner: discord.Member, missio
             description=f"❌ Could not acquire lock for `{mission_params.carrier_data.discord_channel}` after 10 seconds. Please try mission generation again. If the problem persists, contact an Admin.",
             color=constants.EMBED_COLOUR_ERROR
         )
-        return await interaction.channel.send("❌ Channel lock could not be acquired, please try again. If the problem persists please contact an Admin.")
+        await interaction.channel.send("❌ Channel lock could not be acquired, please try again. If the problem persists please contact an Admin.")
 
     await lockwait_msg.delete()
 
