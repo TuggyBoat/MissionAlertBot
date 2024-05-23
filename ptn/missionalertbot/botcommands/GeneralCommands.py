@@ -23,7 +23,7 @@ from ptn.missionalertbot.classes.Views import MissionCompleteView, MissionDelete
 from ptn.missionalertbot._metadata import __version__
 import ptn.missionalertbot.constants as constants
 from ptn.missionalertbot.constants import bot, bot_command_channel, bot_dev_channel, cmentor_role, certcarrier_role, \
-    admin_role, dev_role, trade_alerts_channel, mod_role, cpillar_role, bot_spam_channel, bot_role, mcomplete_id, alum_role
+    admin_role, dev_role, trade_alerts_channel, mod_role, cpillar_role, bot_spam_channel, bot_role, mcomplete_id, alum_role, advisor_role, nomination_immune, admin_roles
 
 # local modules
 from ptn.missionalertbot.database.database import backup_database, find_carrier, find_mission, _is_carrier_channel, \
@@ -219,7 +219,7 @@ class GeneralCommands(commands.Cog):
 
     # command to view settings.txt values
     @settings_group.command(name='view', description='View settings.txt')
-    @check_roles([admin_role(), dev_role()])
+    @check_roles(admin_roles)
     @check_command_channel(bot_command_channel())
     async def admin_settings(self, interaction: discord.Interaction):
         print(f"/admin settings view called by {interaction.user}")
@@ -252,7 +252,7 @@ class GeneralCommands(commands.Cog):
         Choice(name='WMM Auto Start', value='wmm_autostart'),
         Choice(name='Stock Command ID', value='commandid_stock')
     ])
-    @check_roles([admin_role(), dev_role()])
+    @check_roles(admin_roles)
     @check_command_channel(bot_command_channel())
     async def admin_settings(self, interaction: discord.Interaction, setting: Choice[str], value: str):
         print("/admin settings change called for %s %s by %s" % (setting.value, value, interaction.user))
@@ -315,7 +315,7 @@ class GeneralCommands(commands.Cog):
     # manually release a channel lock
     @lock_group.command(name='release', description='Manually release a designated channel lock object.')
     @describe(channelname='The exact name of the channel as it appears in the settings dialog e.g. ptn-starscape-olympus')
-    @check_roles([admin_role(), dev_role()])
+    @check_roles(admin_roles)
     @check_command_channel(bot_command_channel())
     async def admin_release_channel_lock(self, interaction: discord.Interaction, channelname: str):
         print(f"🔐 {interaction.user.name} called manual channel_lock release for {channelname}")
@@ -352,7 +352,7 @@ class GeneralCommands(commands.Cog):
     # manually acquire a channel lock
     @lock_group.command(name='acquire', description='Manually acquire a designated channel lock object. WARNING: DO NOT USE.')
     @describe(channelname='The exact name of the channel as it appears in the settings dialog e.g. ptn-starscape-olympus')
-    @check_roles([admin_role(), dev_role()])
+    @check_roles(admin_roles)
     @check_command_channel(bot_command_channel())
     async def admin_acquire_channel_lock(self, interaction: discord.Interaction, channelname: str):
         print(f"🔐 {interaction.user.name} requested manual channel_lock acquisition for {channelname}")
@@ -387,7 +387,7 @@ class GeneralCommands(commands.Cog):
 
     # display active channel locks
     @lock_group.command(name='list', description='Display a list of all currently locked channels.')
-    @check_roles([admin_role(), dev_role()])
+    @check_roles(admin_roles)
     @check_command_channel(bot_command_channel())
     async def admin_acquire_channel_lock(self, interaction: discord.Interaction):
         print(f"🔐 admin_list_channel_locks called by {interaction.user}")
@@ -418,7 +418,7 @@ class GeneralCommands(commands.Cog):
 
     # a command to check the cron status for Fleet Reserve status
     @admin_group.command(name='cron_status', description='Check the status of the lasttrade cron task')
-    @check_roles([admin_role(), dev_role()])
+    @check_roles(admin_roles)
     async def cron_status(self, interaction: discord.Interaction):
         print(f"{interaction.user} requested lasttrade cron status")
 
@@ -439,7 +439,7 @@ class GeneralCommands(commands.Cog):
 
     # backup databases
     @admin_group.command(name='backup', description='Backs up the carrier and mission databases.')
-    @check_roles([admin_role()])
+    @check_roles([admin_role(), advisor_role()])
     @check_command_channel(bot_command_channel())
     async def backup(self, interaction: discord.Interaction):
         print(f"{interaction.user} requested a manual DB backup")
@@ -464,7 +464,7 @@ class GeneralCommands(commands.Cog):
     # manually delete a carrier trade mission from the database
     @admin_group.command(name='delete_mission', description='Manually remove a carrier trade mission from the database.')
     @describe(carrier='Carrier name to search for in the missions database.')
-    @check_roles([admin_role()])
+    @check_roles([admin_role(), advisor_role()])
     @check_command_channel(bot_command_channel())
     async def admin_delete_mission(self, interaction: discord.Interaction, carrier: str):
         print(f"admin_delete_mission called by {interaction.user.display_name} ({interaction.user.id})")
@@ -493,7 +493,7 @@ class GeneralCommands(commands.Cog):
     # monitor CCO opt-ins
     @admin_group.command(name="list_cco_optins",
                           description="Private command: Use to view CCO active opt-ins.")
-    @check_roles([admin_role()])
+    @check_roles([admin_role(), advisor_role()])
     @check_command_channel(bot_command_channel())
     async def _admin_list_optins(self, interaction: discord.Interaction):
 
@@ -533,7 +533,7 @@ class GeneralCommands(commands.Cog):
 
 
     @wmm_group.command(name='status', description='Check the status of the WMM stock background task.')
-    @check_roles([admin_role()])
+    @check_roles([admin_role(), advisor_role()])
     @check_command_channel(bot_command_channel())
     async def wmm_status(self, interaction: discord.Interaction):
         print(f"▶ WMM task check called by {interaction.user}")
@@ -582,7 +582,7 @@ class GeneralCommands(commands.Cog):
 
 
     @wmm_group.command(name='stop', description='Stop the WMM background tasks; WMM status will not update.')
-    @check_roles([admin_role()])
+    @check_roles([admin_role(), advisor_role()])
     @check_command_channel(bot_command_channel())
     async def wmm_stop(self, interaction: discord.Interaction):
         print(f"⚠ WMM task STOP called by {interaction.user}")
@@ -615,7 +615,7 @@ class GeneralCommands(commands.Cog):
 
 
     @wmm_group.command(name='start', description='Start the WMM background task if it is not running.')
-    @check_roles([admin_role()])
+    @check_roles([admin_role(), advisor_role()])
     @check_command_channel(bot_command_channel())
     async def wmm_start(self, interaction: discord.Interaction):
         print(f"⚠ WMM task START called by {interaction.user}")
@@ -683,7 +683,7 @@ class GeneralCommands(commands.Cog):
 
 
     @wmm_group.command(name='interval', description='Set the interval for WMM stock updates in minutes. Default: 60 minutes.')
-    @check_roles([admin_role()])
+    @check_roles([admin_role(), advisor_role()])
     @check_command_channel(bot_command_channel())
     async def wmm_interval_set(self, interaction: discord.Interaction, interval: int):
         print(f"⚠ WMM task interval called by {interaction.user} for value {interval} minutes")
@@ -722,7 +722,7 @@ class GeneralCommands(commands.Cog):
 
     # synchronise the status of CAPI auth for all carriers in the database
     @admin_group.command(name='capi_sync', description='Synchronise CAPI status for all carriers in database. WARNING: takes a while.')
-    @check_roles([admin_role()])
+    @check_roles([admin_role(), advisor_role()])
     @check_command_channel(bot_command_channel())
     async def capi_database_sync(self, interaction: discord.Interaction):
         print(f"⚠ CAPI database status sync called by {interaction.user}")
@@ -750,7 +750,7 @@ class GeneralCommands(commands.Cog):
 
     # forceably quit the bot
     @admin_group.command(name='stopquit', description="Forcibly stop the bot in an emergency. Requires host access to restart.")
-    @check_roles([admin_role()])
+    @check_roles([admin_role(), advisor_role()])
     @check_command_channel(bot_command_channel())
     async def stopquit(self, interaction: discord.Interaction):
         await interaction.response.send_message(f"https://media1.tenor.com/m/I6bSd_xNoc0AAAAC/hooray-its-weekend.gif")
@@ -962,12 +962,12 @@ class GeneralCommands(commands.Cog):
             return await interaction.response.send_message("You can't nominate yourself! But congrats on the positive self-esteem :)", ephemeral=True)
 
         #Skip nominating Cpillar|Cmentor|Council|Mod|Bot
-        for avoid_role in [cpillar_role(), cmentor_role(), admin_role(), mod_role(), bot_role(), alum_role()]:
+        for avoid_role in nomination_immune:
             if user.get_role(avoid_role):
-                print(f"{interaction.user} tried to nominate a Cpillar|Cmentor|Council|Mod|Council Alumni: {user.name}")
+                print(f"{interaction.user} tried to nominate a Cpillar|Cmentor|Council|Mod|Council Alumni|Council Advistor: {user.name}")
                 return await interaction.response.send_message(
                     (f"You can't nominate an existing <@&{cpillar_role()}>,"
-                    f" <@&{cmentor_role()}>, a <@&{admin_role()}>, <@&{mod_role()}>, <@&{alum_role()}> or bot."
+                    f" <@&{cmentor_role()}>, <@&{admin_role()}> member, <@&{advisor_role()}> member <@&{mod_role()}>, <@&{alum_role()}> or bot."
                     " But we appreciate your nomination attempt!"),
                     ephemeral=True)
 

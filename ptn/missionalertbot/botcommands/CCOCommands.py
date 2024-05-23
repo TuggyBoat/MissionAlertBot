@@ -19,7 +19,7 @@ from discord.ext.commands import GroupCog
 import ptn.missionalertbot.constants as constants
 from ptn.missionalertbot.constants import bot, mission_command_channel, certcarrier_role, trainee_role, seconds_long, rescarrier_role, commodities_common, \
     bot_spam_channel, training_mission_command_channel, seconds_very_short, admin_role, mod_role, cco_mentor_role, aco_role, recruit_role, cco_color_role, \
-    API_HOST, ptn_logo_discord, locations_wmm, bot_command_channel
+    API_HOST, ptn_logo_discord, locations_wmm, bot_command_channel, advisor_role
 
 # import local classes
 from ptn.missionalertbot.classes.MissionParams import MissionParams
@@ -58,7 +58,7 @@ CERTIFIED CARRIER OWNER COMMANDS
 """
 
 @bot.tree.context_menu(name='Make CCO Trainee')
-@check_roles([cco_mentor_role(), admin_role(), mod_role()])
+@check_roles([cco_mentor_role(), admin_role(), mod_role(), advisor_role()])
 async def toggle_cco_trainee(interaction:  discord.Interaction, member: discord.Member):
     print(f"toggle_cco_trainee called by {interaction.user.display_name} for {member.display_name}")
 
@@ -104,7 +104,7 @@ async def toggle_cco_trainee(interaction:  discord.Interaction, member: discord.
 
 
 @bot.tree.context_menu(name='Make Full CCO')
-@check_roles([cco_mentor_role(), admin_role(), mod_role()])
+@check_roles([cco_mentor_role(), admin_role(), mod_role(), advisor_role()])
 async def toggle_cco(interaction:  discord.Interaction, member: discord.Member):
     print(f"toggle_cco called by {interaction.user.display_name} for {member.display_name}")
 
