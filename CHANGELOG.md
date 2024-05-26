@@ -1,5 +1,6 @@
 # Changelog
-
+## 2.4.4
+- Fixed WMM stock not grouping Inara carriers correctly due to bad capitalization on system names
 ## 2.4.3
 - [#676](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/676) Fix for multi-word commodities not updating mission stock in alerts channel.
 - [#674](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/674) Check for whether stock type (supply/demand) matches mission type (loading/unloading).
