@@ -50,7 +50,7 @@ setup(
         'Pillow==10.3.0',
         'python-dotenv==0.15.0',
         # 'pytz==2021.1',
-        'typing-extensions==3.7.4.3',
+        'typing-extensions>=3.7.4.3',
         # 'yarl==1.6.3',
         # 'zope.interface==5.2.0',
         # 'update-checker==0.18.0',

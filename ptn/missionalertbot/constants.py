@@ -266,6 +266,8 @@ wmm_slept_for = 0
 # define default WMM tracking interval
 wmm_interval = 3600 # 1 hour
 
+# define sorting key for FCs without stock
+wmm_no_stock_key = "ZZZ_NO_STOCK"
 
 # random gifs and images
 

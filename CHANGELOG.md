@@ -1,6 +1,19 @@
 # Changelog
+
+## 2.4.5
+- Fix for WMM stock not grouping Inara carriers correctly due to bad capitalization on system names. (TuggyBoat)
+
+
 ## 2.4.4
-- Fixed WMM stock not grouping Inara carriers correctly due to bad capitalization on system names
+- Updated `README.md` with testing instructions. (IndorilReborn)
+- Message object will no longer be sent in place of channel ID if channel lock fails. (IndorilReborn)
+- Relaxed pinned typing_extensions version. (IndorilReborn)
+- Added filtering in commodity autocomplete. (IndorilReborn)
+- WMM stock messages sorted according to (System, Station, Commodity). Minor refactoring. (IndorilReborn)
+- [#691](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/691) Council Advisor role added to permissions. (TuggyBoat)
+- [#688](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/688) `/stock` embed should now be a consistent width. (Sihmm)
+
+
 ## 2.4.3
 - [#676](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/676) Fix for multi-word commodities not updating mission stock in alerts channel.
 - [#674](https://github.com/PilotsTradeNetwork/MissionAlertBot/issues/674) Check for whether stock type (supply/demand) matches mission type (loading/unloading).
